@@ -1,0 +1,9 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+COPY packages/ ./packages/
+COPY apps/conversation-service/ ./apps/conversation-service/
+RUN npm install
+RUN npm run build --workspace=@autozap/conversation-service
+EXPOSE 3006
+CMD ["npm", "run", "start", "--workspace=@autozap/conversation-service"]
