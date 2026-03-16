@@ -1,0 +1,264 @@
+import { db } from '../lib/db'
+import { logger } from '../lib/logger'
+import { AppError, NotFoundError, ConflictError, generateId, normalizePhone, paginationMeta } from '@autozap/utils'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface CreateContactInput {
+  tenantId: string
+  phone: string
+  name?: string
+  email?: string
+  company?: string
+  origin?: string
+  notes?: string
+  customFields?: Record<string, unknown>
+  tagIds?: string[]
+}
+
+export interface UpdateContactInput {
+  name?: string
+  email?: string
+  company?: string
+  notes?: string
+  status?: 'active' | 'blocked' | 'unsubscribed'
+  customFields?: Record<string, unknown>
+}
+
+export interface ContactFilter {
+  search?: string
+  status?: string
+  tagId?: string
+  origin?: string
+  page?: number
+  limit?: number
+}
+
+// ─── ContactService ───────────────────────────────────────────────────────────
+
+export class ContactService {
+
+  // ── Create ───────────────────────────────────────────────────────────────
+
+  async createContact(input: CreateContactInput) {
+    const { tenantId, phone, name, email, company, origin, notes, customFields, tagIds } = input
+
+    const normalizedPhone = normalizePhone(phone)
+
+    // Check for duplicate
+    const { data: existing } = await db
+      .from('contacts')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('phone', normalizedPhone)
+      .maybeSingle()
+
+    if (existing) throw new ConflictError(`Contact with phone ${normalizedPhone} already exists`)
+
+    const contactId = generateId()
+
+    const { data, error } = await db.from('contacts').insert({
+      id: contactId,
+      tenant_id: tenantId,
+      phone: normalizedPhone,
+      name: name || normalizedPhone,
+      email,
+      company,
+      origin: origin || 'manual',
+      notes,
+      custom_fields: customFields || {},
+      status: 'active',
+      last_interaction_at: new Date(),
+    }).select().single()
+
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+
+    // Add tags if provided
+    if (tagIds?.length) {
+      await this.addTags(contactId, tagIds)
+    }
+
+    logger.info('Contact created', { tenantId, contactId, phone: normalizedPhone })
+    return data
+  }
+
+  // ── Get ──────────────────────────────────────────────────────────────────
+
+  async getContact(contactId: string, tenantId: string) {
+    const { data, error } = await db
+      .from('contacts')
+      .select('*, contact_tags(tag_id, tags(id, name, color))')
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (error || !data) throw new NotFoundError('Contact')
+    return data
+  }
+
+  // ── List with filters ─────────────────────────────────────────────────────
+
+  async listContacts(tenantId: string, filter: ContactFilter = {}) {
+    const { search, status, tagId, origin, page = 1, limit = 20 } = filter
+    const offset = (page - 1) * limit
+
+    let query = db
+      .from('contacts')
+      .select('id, phone, name, email, company, status, origin, last_interaction_at, created_at, contact_tags(tag_id, tags(id, name, color))', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('last_interaction_at', { ascending: false, nullsFirst: false })
+      .range(offset, offset + limit - 1)
+
+    if (status) query = query.eq('status', status)
+    if (origin) query = query.eq('origin', origin)
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    if (tagId) {
+      // Filter by tag via subquery
+      const { data: taggedContacts } = await db
+        .from('contact_tags')
+        .select('contact_id')
+        .eq('tag_id', tagId)
+
+      const ids = (taggedContacts || []).map((t: any) => t.contact_id)
+      if (ids.length === 0) return { contacts: [], meta: paginationMeta(0, page, limit) }
+      query = query.in('id', ids)
+    }
+
+    const { data, count, error } = await query
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+
+    return {
+      contacts: data || [],
+      meta: paginationMeta(count || 0, page, limit),
+    }
+  }
+
+  // ── Update ────────────────────────────────────────────────────────────────
+
+  async updateContact(contactId: string, tenantId: string, input: UpdateContactInput) {
+    const { data, error } = await db
+      .from('contacts')
+      .update({
+        ...input,
+        custom_fields: input.customFields,
+      })
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single()
+
+    if (error || !data) throw new NotFoundError('Contact')
+    return data
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+
+  async deleteContact(contactId: string, tenantId: string) {
+    const { error } = await db
+      .from('contacts')
+      .delete()
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    logger.info('Contact deleted', { contactId, tenantId })
+  }
+
+  // ── Tags ──────────────────────────────────────────────────────────────────
+
+  async addTags(contactId: string, tagIds: string[]) {
+    const rows = tagIds.map(tagId => ({ contact_id: contactId, tag_id: tagId }))
+    await db.from('contact_tags').upsert(rows, { onConflict: 'contact_id,tag_id' })
+  }
+
+  async removeTags(contactId: string, tagIds: string[]) {
+    await db.from('contact_tags')
+      .delete()
+      .eq('contact_id', contactId)
+      .in('tag_id', tagIds)
+  }
+
+  // ── List tags ─────────────────────────────────────────────────────────────
+
+  async listTags(tenantId: string) {
+    const { data, error } = await db
+      .from('tags')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('name')
+
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    return data || []
+  }
+
+  async createTag(tenantId: string, name: string, color = '#5a8dee') {
+    const { data, error } = await db.from('tags').insert({
+      id: generateId(),
+      tenant_id: tenantId,
+      name,
+      color,
+    }).select().single()
+
+    if (error) throw new ConflictError(`Tag "${name}" already exists`)
+    return data
+  }
+
+  async deleteTag(tagId: string, tenantId: string) {
+    await db.from('tags').delete().eq('id', tagId).eq('tenant_id', tenantId)
+  }
+
+  // ── Import CSV ────────────────────────────────────────────────────────────
+  // Expects parsed rows: [{ phone, name?, email?, company? }]
+
+  async importContacts(tenantId: string, rows: any[]): Promise<{ created: number; skipped: number; errors: number }> {
+    let created = 0
+    let skipped = 0
+    let errors = 0
+
+    for (const row of rows) {
+      try {
+        if (!row.phone) { errors++; continue }
+
+        await this.createContact({
+          tenantId,
+          phone: row.phone,
+          name: row.name,
+          email: row.email,
+          company: row.company,
+          origin: 'csv_import',
+        })
+        created++
+      } catch (err: any) {
+        if (err.code === 'CONFLICT') skipped++
+        else errors++
+      }
+    }
+
+    logger.info('CSV import completed', { tenantId, created, skipped, errors })
+    return { created, skipped, errors }
+  }
+
+  // ── Export CSV ────────────────────────────────────────────────────────────
+
+  async exportContacts(tenantId: string): Promise<string> {
+    const { data } = await db
+      .from('contacts')
+      .select('phone, name, email, company, status, origin, created_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+
+    const rows = data || []
+    const header = 'phone,name,email,company,status,origin,created_at'
+    const lines = rows.map((r: any) =>
+      `${r.phone},${r.name || ''},${r.email || ''},${r.company || ''},${r.status},${r.origin},${r.created_at}`
+    )
+
+    return [header, ...lines].join('\n')
+  }
+}
+
+export const contactService = new ContactService()

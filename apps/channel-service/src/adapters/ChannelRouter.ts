@@ -1,0 +1,40 @@
+import type { IChannelAdapter, ChannelType } from './IChannelAdapter'
+import { gupshupAdapter } from './GupshupAdapter'
+import { AppError } from '@autozap/utils'
+
+// ─── ChannelRouter ────────────────────────────────────────────────────────────
+// Registry of all available adapters.
+// Add new channels here — nothing else in the system needs to change.
+
+class ChannelRouter {
+  private adapters = new Map<ChannelType, IChannelAdapter>()
+
+  constructor() {
+    this.register(gupshupAdapter)
+    // Future: this.register(metaCloudAdapter)
+    // Future: this.register(evolutionAdapter)
+    // Future: this.register(instagramAdapter)
+  }
+
+  register(adapter: IChannelAdapter): void {
+    this.adapters.set(adapter.channelType, adapter)
+  }
+
+  resolve(channelType: ChannelType): IChannelAdapter {
+    const adapter = this.adapters.get(channelType)
+    if (!adapter) {
+      throw new AppError(
+        'UNSUPPORTED_CHANNEL',
+        `Channel type "${channelType}" is not supported`,
+        400,
+      )
+    }
+    return adapter
+  }
+
+  getSupportedChannels(): ChannelType[] {
+    return Array.from(this.adapters.keys())
+  }
+}
+
+export const channelRouter = new ChannelRouter()
