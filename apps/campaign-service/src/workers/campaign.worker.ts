@@ -51,6 +51,7 @@ async function ensureContactAndConversation(
   phone: string,
   name: string,
 ): Promise<{ contactId: string; conversationId: string }> {
+  phone = phone.replace(/^\+/, '')
   // Find or create contact
   let contactId: string
   const { data: existingContact } = await db
