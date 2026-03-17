@@ -1,6 +1,7 @@
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
+COPY tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/campaign-service/ ./apps/campaign-service/
 RUN npm install --workspaces --include-workspace-root
