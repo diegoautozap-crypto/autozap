@@ -50,7 +50,7 @@ export function startMessageWorker(): Worker {
   const worker = new Worker<SendMessageJob>(
     'message_queue',
     async (job) => {
-      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount } = job.data
+      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount, campaignId } = job.data
 
       logger.debug('Processing message job', { messageUuid, to, attempt: retryCount })
 
@@ -84,8 +84,10 @@ export function startMessageWorker(): Worker {
         // Mark as sent in DB
         await messageService.markSent(messageUuid, result.data.externalId)
 
-        // Incrementa contador de uso do tenant
-        await db.rpc('increment_message_count', { tenant_id: tenantId }).catch(() => {})
+        // Incrementa contador de uso do tenant (somente campanhas)
+        if (campaignId) {
+          await db.rpc('increment_message_count', { tenant_id: tenantId }).catch(() => {})
+        }
 
         logger.info('Message sent successfully', {
           messageUuid,
