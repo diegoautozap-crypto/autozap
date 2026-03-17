@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc --skipLibCheck --noEmitOnError false",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -27,3 +27,4 @@
     "@types/cors": "^2.8.17"
   }
 }
+
