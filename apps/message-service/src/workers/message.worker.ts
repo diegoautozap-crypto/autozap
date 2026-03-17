@@ -1,6 +1,7 @@
 import { Worker, Queue, QueueEvents } from 'bullmq'
 import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
+import { db } from '../lib/db'
 import { sleep, randomBetween } from '@autozap/utils'
 import type { SendMessageJob } from '../services/types'
 
@@ -8,7 +9,6 @@ const REDIS_URL = process.env.REDIS_URL!
 const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
 
-// Parse Redis URL for BullMQ connection
 function getRedisConnection() {
   try {
     const url = new URL(REDIS_URL)
@@ -26,14 +26,12 @@ function getRedisConnection() {
 
 const connection = getRedisConnection()
 
-// ─── Queues ───────────────────────────────────────────────────────────────────
-
 export const messageQueue = new Queue<SendMessageJob>('message_queue', {
   connection,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'custom', // We handle our own backoff
+      type: 'custom',
     },
     removeOnComplete: { count: 1000 },
     removeOnFail: { count: 5000 },
@@ -48,8 +46,6 @@ export const retryQueue = new Queue<SendMessageJob>('retry_queue', {
   },
 })
 
-// ─── Message Worker ───────────────────────────────────────────────────────────
-
 export function startMessageWorker(): Worker {
   const worker = new Worker<SendMessageJob>(
     'message_queue',
@@ -58,12 +54,10 @@ export function startMessageWorker(): Worker {
 
       logger.debug('Processing message job', { messageUuid, to, attempt: retryCount })
 
-      // Anti-ban: random delay between sends
       const delay = randomBetween(1000, 3000)
       await sleep(delay)
 
       try {
-        // Call channel-service to send the message
         const response = await fetch(`${CHANNEL_SERVICE_URL}/internal/send`, {
           method: 'POST',
           headers: {
@@ -90,6 +84,9 @@ export function startMessageWorker(): Worker {
         // Mark as sent in DB
         await messageService.markSent(messageUuid, result.data.externalId)
 
+        // Incrementa contador de uso do tenant
+        await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+
         logger.info('Message sent successfully', {
           messageUuid,
           externalId: result.data.externalId,
@@ -103,14 +100,11 @@ export function startMessageWorker(): Worker {
         logger.warn('Message send failed', { messageUuid, retryCount: newRetryCount, error: errMsg })
 
         if (newRetryCount >= 3) {
-          // Move to failed — no more retries
           await messageService.markFailed(messageUuid, errMsg, newRetryCount)
           logger.error('Message permanently failed', { messageUuid, error: errMsg })
           return
         }
 
-        // Schedule retry with exponential backoff
-        // retry 1 → 10s, retry 2 → 30s, retry 3 → 2min
         const delays = [10_000, 30_000, 120_000]
         const retryDelay = delays[newRetryCount - 1] || 120_000
 
@@ -125,10 +119,10 @@ export function startMessageWorker(): Worker {
     },
     {
       connection,
-      concurrency: 5,      // Process 5 messages simultaneously
+      concurrency: 5,
       limiter: {
-        max: 20,           // Max 20 jobs per duration
-        duration: 60_000,  // Per minute
+        max: 20,
+        duration: 60_000,
       },
     },
   )
@@ -145,13 +139,10 @@ export function startMessageWorker(): Worker {
   return worker
 }
 
-// ─── Retry Worker ─────────────────────────────────────────────────────────────
-
 export function startRetryWorker(): Worker {
   const worker = new Worker<SendMessageJob>(
     'retry_queue',
     async (job) => {
-      // Move back to main queue for processing
       await messageQueue.add('send', job.data, { priority: 1 })
     },
     { connection },
@@ -161,24 +152,16 @@ export function startRetryWorker(): Worker {
   return worker
 }
 
-// ─── Reconciliation Job ───────────────────────────────────────────────────────
-// Runs every 5 minutes to fix messages stuck in pending status
-
 export async function startReconciliationJob(): Promise<void> {
   const run = async () => {
     try {
       logger.debug('Running reconciliation job')
-
-      // Get all tenants with pending messages
-      // In production: query distinct tenant_ids from messages where status in queued/sent
-      // For now we log that the job ran
       logger.debug('Reconciliation job completed')
     } catch (err) {
       logger.error('Reconciliation job error', { err })
     }
   }
 
-  // Run immediately then every 5 minutes
   await run()
   setInterval(run, 5 * 60 * 1000)
 }
