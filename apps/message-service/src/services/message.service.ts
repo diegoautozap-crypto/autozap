@@ -58,6 +58,12 @@ export class MessageService {
     // 1. Find or create contact
     const contact = await this.findOrCreateContact(tenantId, msg.from)
 
+    // Atualiza nome do contato se vier no payload Meta v3
+    const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
+    if (senderName && (!contact.name || contact.name === msg.from || contact.name.startsWith('Ol'))) {
+      await db.from('contacts').update({ name: senderName }).eq('id', contact.id)
+    }
+
     // 2. Find or create conversation
     const conversation = await this.findOrCreateConversation(tenantId, channelId, contact.id, msg.channelType)
 
