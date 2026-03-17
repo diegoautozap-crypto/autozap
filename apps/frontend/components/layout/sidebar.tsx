@@ -1,8 +1,10 @@
 'use client'
 
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
+import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { LayoutDashboard, Megaphone, Users, MessageSquare, Zap, Settings, LogOut, Zap as ZapIcon } from 'lucide-react'
 
@@ -14,6 +16,41 @@ const nav = [
   { href: '/dashboard/automations', label: 'Automações', icon: Zap },
   { href: '/dashboard/settings', label: 'Plano', icon: Settings },
 ]
+
+function UsageBar() {
+  const [sent, setSent] = useState(0)
+  const [limit, setLimit] = useState<number | null>(null)
+  const [pct, setPct] = useState(0)
+
+  useEffect(() => {
+    tenantApi.get('/tenant/usage').then(({ data }) => {
+      const { sent, limit, percentUsed } = data.data
+      setSent(sent)
+      setLimit(limit)
+      setPct(percentUsed || 0)
+    }).catch(() => {})
+  }, [])
+
+  return (
+    <div style={{ padding: '12px 16px', borderTop: '1px solid #ffffff10' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <span style={{ color: 'var(--sidebar-text)', fontSize: '11px' }}>Uso do mês</span>
+        <span style={{ color: '#25d366', fontSize: '11px', fontWeight: 600 }}>
+          {sent.toLocaleString()} / {limit ? limit.toLocaleString() : '∞'}
+        </span>
+      </div>
+      <div style={{ height: '4px', background: '#ffffff20', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{
+          width: `${pct}%`,
+          height: '100%',
+          background: pct > 80 ? '#f97316' : '#25d366',
+          borderRadius: '2px',
+          transition: 'width 0.3s',
+        }} />
+      </div>
+    </div>
+  )
+}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -72,6 +109,9 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Usage bar */}
+      <UsageBar />
 
       {/* Logout */}
       <div style={{ padding: '12px 8px', borderTop: '1px solid #ffffff10' }}>
