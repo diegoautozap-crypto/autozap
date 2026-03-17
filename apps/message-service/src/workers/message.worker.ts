@@ -85,7 +85,7 @@ export function startMessageWorker(): Worker {
         await messageService.markSent(messageUuid, result.data.externalId)
 
         // Incrementa contador de uso do tenant
-        await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+        await db.rpc('increment_message_count', { tenant_id: tenantId }).catch(() => {})
 
         logger.info('Message sent successfully', {
           messageUuid,
