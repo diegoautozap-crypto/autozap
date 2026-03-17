@@ -188,8 +188,11 @@ export class MessageService {
   // ── Private ──────────────────────────────────────────────────────────────
 
   private async findOrCreateContact(tenantId: string, phone: string) {
-    phone = phone.replace(/^\+/, '')
-    const { data: existing } = await db
+phone = phone.replace(/^\+/, '')
+// Normaliza número brasileiro: garante o 9 após o DDD
+if (phone.startsWith('55') && phone.length === 12) {
+  phone = phone.slice(0, 4) + '9' + phone.slice(4)
+}    const { data: existing } = await db
       .from('contacts')
       .select('id, name')
       .eq('tenant_id', tenantId)
