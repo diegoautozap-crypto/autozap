@@ -69,7 +69,7 @@ router.post('/webhook/gupshup/:apikey', async (req, res, next) => {
     const { apikey } = req.params
     const payload = req.body
 
-    logger.debug('Gupshup webhook received', { apikey, type: payload?.type })
+    logger.debug('Gupshup webhook received', { apikey, type: payload?.type, payload: JSON.stringify(payload) })
 
     // Find which tenant/channel this apikey belongs to
     const channel = await channelService.getChannelByApiKey(apikey)
