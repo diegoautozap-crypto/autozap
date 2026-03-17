@@ -231,8 +231,7 @@ export function startCampaignWorker(): Worker {
             logger.warn('Campaign contact failed', { campaignId, phone: contact.phone, error: err.message })
           }
 
-          const jitter = randomBetween(200, 800)
-          await sleep(delayMs + jitter)
+          await sleep(delayMs)
         }
       }
 

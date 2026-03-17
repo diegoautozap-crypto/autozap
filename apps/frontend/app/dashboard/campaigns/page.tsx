@@ -28,7 +28,7 @@ export default function CampaignsPage() {
   const [curlText, setCurlText] = useState('')
   const [campaignName, setCampaignName] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('')
-  const [messagesPerMin, setMessagesPerMin] = useState(10)
+  const [messagesPerMin, setMessagesPerMin] = useState(60)
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -343,7 +343,7 @@ export default function CampaignsPage() {
                 Mensagens por minuto (anti-ban)
               </label>
               <input
-                type="number" min="1" max="60"
+                type="number" min="1" max="300"
                 style={{ ...inputStyle, width: '120px' } as any}
                 value={messagesPerMin}
                 onChange={e => setMessagesPerMin(Number(e.target.value))}
