@@ -122,8 +122,9 @@ async function notifyMessageService(
   data: unknown,
 ): Promise<void> {
   const messageServiceUrl = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
+  logger.info('Notifying message-service', { event, url: messageServiceUrl })
   try {
-    await fetch(`${messageServiceUrl}/internal/${event}`, {
+    const response = await fetch(`${messageServiceUrl}/internal/${event}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -131,6 +132,7 @@ async function notifyMessageService(
       },
       body: JSON.stringify(data),
     })
+    logger.info('Message-service response', { status: response.status })
   } catch (err) {
     logger.error('Failed to notify message-service', { event, err })
   }
