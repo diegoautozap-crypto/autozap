@@ -58,8 +58,8 @@ export default function DashboardPage() {
       href: '/dashboard/inbox',
     },
     {
-      label: 'Automações ativas',
-      sub: 'em execução',
+      label: 'Automacoes ativas',
+      sub: 'em execucao',
       value: 0,
       icon: Zap,
       iconBg: '#f97316',
@@ -67,30 +67,11 @@ export default function DashboardPage() {
     },
   ]
 
-  // Usage bar
-  const totalSent = campaigns?.reduce((a: number, c: any) => a + (c.sent_count || 0), 0) || 0
-  const limit = 50000
-  const pct = Math.min(Math.round((totalSent / limit) * 100), 100)
-
   return (
     <div style={{ padding: '32px' }}>
       <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>Dashboard</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>Visão geral da sua conta</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>Visao geral da sua conta</p>
 
-      {/* Usage bar */}
-      <div style={{ ...card(), marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>
-            Uso do mês <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/ {limit.toLocaleString()} mensagens</span>
-          </span>
-          <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '14px' }}>{pct}%</span>
-        </div>
-        <div style={{ height: '8px', background: '#e8edf3', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: '4px' }} />
-        </div>
-      </div>
-
-      {/* Metric cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         {metrics.map(({ label, sub, value, icon: Icon, iconBg, href }) => (
           <div
