@@ -218,7 +218,7 @@ export function startCampaignWorker(): Worker {
               await campaignService.markContactSent(contact.id, messageUuid)
               await campaignService.incrementCounter(campaignId, 'sent_count')
               processed++
-              try { await db.rpc('increment_message_count', { tenant_id: tenantId }) } catch {}
+              try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
               await emitProgress(campaignId, tenantId)
               logger.info('Campaign message sent', { campaignId, phone: contact.phone, processed })
             } else {
