@@ -55,7 +55,7 @@ export class MessageService {
   // Called by the webhook handler when a message arrives from a user
 
   async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
-    // 1. Find or create contact
+// 1. Find or create contact
     const contact = await this.findOrCreateContact(tenantId, msg.from)
 
     // Atualiza nome do contato se vier no payload Meta v3
