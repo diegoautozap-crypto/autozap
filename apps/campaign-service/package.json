@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc --skipLibCheck --noEmitOnError false",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@autozap/types": "*",
@@ -30,4 +30,5 @@
     "@types/uuid": "^9.0.8"
   }
 }
+
 
