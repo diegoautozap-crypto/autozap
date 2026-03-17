@@ -17,7 +17,7 @@ const createCampaignSchema = z.object({
   mediaUrl: z.string().url().optional(),
   scheduledAt: z.string().datetime().optional(),
   batchSize: z.number().int().min(1).max(1000).optional(),
-  messagesPerMin: z.number().int().min(1).max(60).optional(),
+  messagesPerMin: z.number().int().min(1).max(300).optional(),
 })
 
 const importContactsSchema = z.object({
