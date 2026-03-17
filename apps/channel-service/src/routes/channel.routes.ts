@@ -81,7 +81,8 @@ router.post('/webhook/gupshup/:apikey', async (req, res, next) => {
     }
 
     // Route to correct parser based on payload type
-    if (payload?.type === 'message') {
+    const isMetaV3 = payload?.object === 'whatsapp_business_account'
+    if (payload?.type === 'message' || isMetaV3) {
       // Inbound message from user
       const normalized = await channelService.parseInbound('gupshup', payload)
       if (normalized) {
