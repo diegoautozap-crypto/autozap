@@ -4,7 +4,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --skipLibCheck",
     "dev": "tsc --watch",
     "lint": "eslint src/"
   },
@@ -19,3 +19,4 @@
     "@types/uuid": "^9.0.8"
   }
 }
+
