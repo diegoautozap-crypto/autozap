@@ -188,6 +188,7 @@ export class MessageService {
   // ── Private ──────────────────────────────────────────────────────────────
 
   private async findOrCreateContact(tenantId: string, phone: string) {
+    phone = phone.replace(/^\+/, '')
     const { data: existing } = await db
       .from('contacts')
       .select('id, name')
