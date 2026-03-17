@@ -23,6 +23,7 @@ function requireAuthOrInternal(req: any, res: any, next: any): void {
 router.post('/internal/inbound', requireInternal, async (req, res, next) => {
   try {
     const { tenantId, channelId, message } = req.body
+    logger.info('Inbound received', { message: JSON.stringify(message) })
     await messageService.processInbound(tenantId, channelId, {
       ...message,
       timestamp: new Date(message.timestamp),
