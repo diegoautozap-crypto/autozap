@@ -13,7 +13,7 @@ const nav = [
   { href: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },
   { href: '/dashboard/contacts', label: 'CRM', icon: Users },
   { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare },
-  { href: '/dashboard/automations', label: 'Automações', icon: Zap },
+  { href: '/dashboard/automations', label: 'Automacoes', icon: Zap },
   { href: '/dashboard/settings', label: 'Plano', icon: Settings },
 ]
 
@@ -34,9 +34,9 @@ function UsageBar() {
   return (
     <div style={{ padding: '12px 16px', borderTop: '1px solid #ffffff10' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-        <span style={{ color: 'var(--sidebar-text)', fontSize: '11px' }}>Uso do mês</span>
+        <span style={{ color: 'var(--sidebar-text)', fontSize: '11px' }}>Uso do mes</span>
         <span style={{ color: '#25d366', fontSize: '11px', fontWeight: 600 }}>
-          {sent.toLocaleString()} / {limit ? limit.toLocaleString() : '∞'}
+          {sent.toLocaleString()} / {limit ? limit.toLocaleString() : 'ilimitado'}
         </span>
       </div>
       <div style={{ height: '4px', background: '#ffffff20', borderRadius: '2px', overflow: 'hidden' }}>
@@ -59,7 +59,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await logout()
-    toast.success('Até logo!')
+    toast.success('Ate logo!')
     router.push('/login')
   }
 
@@ -72,7 +72,6 @@ export function Sidebar() {
       height: '100%',
       flexShrink: 0,
     }}>
-      {/* Logo */}
       <div style={{
         padding: '20px 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -84,7 +83,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px' }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
@@ -110,10 +108,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Usage bar */}
       <UsageBar />
 
-      {/* Logout */}
       <div style={{ padding: '12px 8px', borderTop: '1px solid #ffffff10' }}>
         <button
           onClick={handleLogout}
