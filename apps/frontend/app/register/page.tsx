@@ -1,123 +1,102 @@
 'use client'
 
-import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { campaignApi, conversationApi, contactApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth.store'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'sonner'
-import { Loader2, MessageSquare, CheckCircle } from 'lucide-react'
+import { Megaphone, Users, MessageSquare, Zap } from 'lucide-react'
 
-export default function RegisterPage() {
+const card = (style?: object) => ({
+  background: 'var(--card-bg)',
+  border: '1px solid var(--card-border)',
+  borderRadius: '10px',
+  padding: '24px',
+  boxShadow: 'var(--shadow)',
+  ...style,
+})
+
+export default function DashboardPage() {
   const router = useRouter()
-  const { register, isLoading } = useAuthStore()
-  const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
-  const [success, setSuccess] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      await register(form.name, form.email, form.password, form.tenantName)
-      setSuccess(true)
-    } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || 'Erro ao criar conta'
-      toast.error(msg)
-    }
-  }
+  const { data: campaigns } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data },
+  })
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-10 pb-8 space-y-4">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="text-xl font-bold">Conta criada com sucesso!</h2>
-            <p className="text-muted-foreground">
-              Enviamos um email de confirmação para <strong>{form.email}</strong>.
-              Verifique sua caixa de entrada e clique no link para ativar sua conta.
-            </p>
-            <Button className="w-full" onClick={() => router.push('/login')}>
-              Ir para o login
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations', 'open'],
+    queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data },
+  })
+
+  const { data: contactsMeta } = useQuery({
+    queryKey: ['contacts-count'],
+    queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta },
+  })
+
+  const metrics = [
+    {
+      label: 'Campanhas',
+      sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento`,
+      value: campaigns?.length ?? 0,
+      icon: Megaphone,
+      iconBg: '#4f87ff',
+      href: '/dashboard/campaigns',
+    },
+    {
+      label: 'Contatos',
+      sub: 'na sua base',
+      value: contactsMeta?.total ?? 0,
+      icon: Users,
+      iconBg: '#a855f7',
+      href: '/dashboard/contacts',
+    },
+    {
+      label: 'Conversas abertas',
+      sub: `${conversations?.filter((c: any) => c.status === 'waiting').length || 0} aguardando`,
+      value: conversations?.length ?? 0,
+      icon: MessageSquare,
+      iconBg: '#25d366',
+      href: '/dashboard/inbox',
+    },
+    {
+      label: 'Automações ativas',
+      sub: 'em execução',
+      value: 0,
+      icon: Zap,
+      iconBg: '#f97316',
+      href: '/dashboard/automations',
+    },
+  ]
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-primary-foreground" />
+    <div style={{ padding: '32px' }}>
+      <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>Dashboard</h1>
+      <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>Visão geral da sua conta</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        {metrics.map(({ label, sub, value, icon: Icon, iconBg, href }) => (
+          <div
+            key={label}
+            onClick={() => router.push(href)}
+            style={{ ...card(), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0' }}
+            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'}
+            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{label}</span>
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '10px',
+                background: iconBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon size={20} color="#fff" />
+              </div>
             </div>
-            <span className="text-2xl font-bold">AutoZap</span>
+            <div style={{ fontSize: '36px', fontWeight: 700, color: 'var(--text)', lineHeight: 1, marginBottom: '6px' }}>
+              {value.toLocaleString()}
+            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{sub}</div>
           </div>
-          <p className="text-muted-foreground text-sm">Crie sua conta grátis</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Criar conta</CardTitle>
-            <CardDescription>14 dias grátis, sem cartão de crédito</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome completo</Label>
-                <Input
-                  placeholder="João Silva"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Nome da empresa</Label>
-                <Input
-                  placeholder="Minha Empresa Ltda"
-                  value={form.tenantName}
-                  onChange={(e) => setForm({ ...form, tenantName: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="joao@empresa.com"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Senha</Label>
-                <Input
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando conta...</>
-                ) : 'Criar conta grátis'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-sm text-muted-foreground">
-          Já tem conta?{' '}
-          <a href="/login" className="text-primary hover:underline font-medium">Entrar</a>
-        </p>
+        ))}
       </div>
     </div>
   )
