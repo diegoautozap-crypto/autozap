@@ -83,32 +83,63 @@ export class GupshupAdapter implements IChannelAdapter {
   }
 
   // ─── Parse Inbound ────────────────────────────────────────────────────────
+parseInbound(rawPayload: unknown): NormalizedMessage | null {
+  const payload = rawPayload as any
 
-  parseInbound(rawPayload: unknown): NormalizedMessage | null {
-    const payload = rawPayload as any
+  // Meta (v3) format
+  if (payload?.object === 'whatsapp_business_account') {
+    try {
+      const entry = payload.entry?.[0]
+      const change = entry?.changes?.[0]
+      const value = change?.value
+      const msg = value?.messages?.[0]
+      const contact = value?.contacts?.[0]
 
-    // Gupshup wraps in { app, timestamp, version, type, payload }
-    if (payload?.type !== 'message') return null
+      if (!msg) return null
 
-    const msg = payload.payload
-    if (!msg) return null
+      const contentType = this.mapContentType(msg.type)
 
-    const contentType = this.mapContentType(msg.type)
-
-    return {
-      channelType: 'gupshup',
-      channelId: '',   // filled by ChannelRouter
-      externalId: msg.id,
-      from: msg.sender?.phone || payload.sender?.phone || '',
-      to: payload.app || '',
-      contentType,
-      body: msg.payload?.text || msg.payload?.caption || undefined,
-      mediaUrl: msg.payload?.url || undefined,
-      mediaMimeType: msg.payload?.contentType || undefined,
-      timestamp: new Date(payload.timestamp || Date.now()),
-      raw: rawPayload,
+      return {
+        channelType: 'gupshup',
+        channelId: '',
+        externalId: msg.id,
+        from: msg.from,
+        to: value?.metadata?.display_phone_number || '',
+        contentType,
+        body: msg.text?.body || msg.caption || undefined,
+        mediaUrl: msg.image?.id || msg.audio?.id || msg.video?.id || msg.document?.id || undefined,
+        mediaMimeType: msg.image?.mime_type || msg.audio?.mime_type || undefined,
+        timestamp: new Date(Number(msg.timestamp) * 1000),
+        raw: rawPayload,
+      }
+    } catch {
+      return null
     }
   }
+
+  // Gupshup (v2) format
+  if (payload?.type !== 'message') return null
+
+  const msg = payload.payload
+  if (!msg) return null
+
+  const contentType = this.mapContentType(msg.type)
+
+  return {
+    channelType: 'gupshup',
+    channelId: '',
+    externalId: msg.id,
+    from: msg.sender?.phone || payload.sender?.phone || '',
+    to: payload.app || '',
+    contentType,
+    body: msg.payload?.text || msg.payload?.caption || undefined,
+    mediaUrl: msg.payload?.url || undefined,
+    mediaMimeType: msg.payload?.contentType || undefined,
+    timestamp: new Date(payload.timestamp || Date.now()),
+    raw: rawPayload,
+  }
+}
+
 
   // ─── Parse Status Update ──────────────────────────────────────────────────
 
