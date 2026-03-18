@@ -103,20 +103,13 @@ async function sendViaFetch(
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Converte \r literal (texto "\\r") para char \r real (ASCII 13)
-    // Depois encodeURIComponent vai converter \r real para %0D
-    // que junto com possível \n vira quebra de linha no Gupshup
-    const messageReal = message
-      .replace(/\\r\\n/g, '\r\n')
-      .replace(/\\r/g, '\r')
-      .replace(/\\n/g, '\n')
-
-    // Monta o JSON do template manualmente SEM JSON.stringify
-    // para não escapar os chars especiais
-    const escapedMessage = messageReal
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-    const templateJson = `{"id":"${parsed.templateId}","params":["${escapedMessage}"]}`
+    // Usa JSON.stringify direto — message vem com \r como texto literal "\\r"
+    // JSON.stringify vai manter como "\\r" no JSON string
+    // encodeURIComponent vai encodar tudo corretamente
+    const templateJson = JSON.stringify({
+      id: parsed.templateId,
+      params: [message],
+    })
 
     const body = [
       'channel=' + encodeURIComponent(parsed.channel),
@@ -126,7 +119,7 @@ async function sendViaFetch(
       'template=' + encodeURIComponent(templateJson),
     ].join('&')
 
-    logger.debug('Sending to Gupshup', { phone, body: body.slice(0, 300) })
+    logger.info('Sending to Gupshup', { phone, templateJson, body: body.slice(0, 400) })
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
