@@ -57,8 +57,6 @@ interface ParsedCurl {
   channel: string
 }
 
-// ─── Fila controlada de CRM ───────────────────────────────────────────────────
-// Processa PARALLEL_CRM itens por vez
 class CrmQueue {
   private queue: (() => Promise<void>)[] = []
   private running = false
@@ -71,9 +69,14 @@ class CrmQueue {
   private async process() {
     this.running = true
     while (this.queue.length > 0) {
-      // Pega PARALLEL_CRM itens e processa em paralelo
       const batch = this.queue.splice(0, PARALLEL_CRM)
-      await Promise.all(batch.map(fn => fn().catch(err => logger.error('CRM queue error', { err: err.message }))
+      await Promise.all(
+        batch.map((fn) =>
+          fn().catch((err: any) =>
+            logger.error('CRM queue error', { err: err.message })
+          )
+        )
+      )
     }
     this.running = false
   }
