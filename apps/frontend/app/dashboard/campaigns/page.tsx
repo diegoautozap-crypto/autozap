@@ -7,19 +7,20 @@ import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2 } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
-  running:   { color: '#a3e635', bg: 'rgba(163,230,53,0.12)',  label: 'Enviando' },
-  completed: { color: '#34d399', bg: 'rgba(52,211,153,0.12)',  label: 'Concluída' },
-  draft:     { color: 'rgba(232,255,224,0.4)', bg: 'rgba(232,255,224,0.06)', label: 'Rascunho' },
-  paused:    { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  label: 'Pausada' },
-  failed:    { color: '#f87171', bg: 'rgba(248,113,113,0.12)', label: 'Falhou' },
+  running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
+  completed: { color: '#2563eb', bg: '#eff6ff', label: 'Concluída' },
+  draft:     { color: '#6b7280', bg: '#f9fafb', label: 'Rascunho' },
+  paused:    { color: '#d97706', bg: '#fffbeb', label: 'Pausada' },
+  failed:    { color: '#dc2626', bg: '#fef2f2', label: 'Falhou' },
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 14px',
-  background: 'rgba(10,30,18,0.8)',
-  border: '1px solid rgba(163,230,53,0.2)',
-  borderRadius: '8px', fontSize: '14px', outline: 'none',
-  color: '#e8ffe0',
+  width: '100%', padding: '9px 12px',
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  borderRadius: '6px', fontSize: '14px', outline: 'none',
+  color: '#111827',
+  transition: 'border-color 0.15s',
 }
 
 export default function CampaignsPage() {
@@ -75,13 +76,11 @@ export default function CampaignsPage() {
         const message = parts.slice(1).join(',').trim()
         return { phone, name: message || phone, message: message || '' }
       }).filter(r => r.phone && r.phone.length >= 8)
-      if (rows.length > 0) {
-        await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
-      }
+      if (rows.length > 0) await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
       return campData.data
     },
     onSuccess: (camp) => {
-      toast.success(`Campanha criada com ${contactsText.split('\n').filter(Boolean).length} contatos!`)
+      toast.success(`Campanha criada!`)
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false)
       setSelectedCamp(camp)
@@ -106,97 +105,60 @@ export default function CampaignsPage() {
   const sent = prog?.sent || prog?.sent_count || 0
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0
 
+  const label = (text: string) => (
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+      {text}
+    </label>
+  )
+
   return (
-    <div style={{ padding: '32px', position: 'relative', zIndex: 1 }}>
+    <div style={{ padding: '32px', maxWidth: '1200px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <div style={{ width: '3px', height: '14px', background: '#a3e635', borderRadius: '2px', boxShadow: '0 0 6px rgba(163,230,53,0.8)' }} />
-            <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#a3e635', fontWeight: 700 }}>
-              Disparos
-            </span>
-          </div>
-          <h1 style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: '26px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e8ffe0' }}>
-            Campanhas
-          </h1>
-          <p style={{ color: 'rgba(232,255,224,0.4)', fontSize: '13px', marginTop: '3px' }}>Gerencie seus disparos em massa</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Campanhas</h1>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Gerencie seus disparos em massa</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => refetch()}
-            style={{
-              padding: '9px 14px',
-              background: 'rgba(163,230,53,0.06)',
-              border: '1px solid rgba(163,230,53,0.2)',
-              borderRadius: '8px', color: 'rgba(232,255,224,0.6)',
-              fontSize: '13px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(163,230,53,0.4)'; (e.currentTarget as HTMLButtonElement).style.color = '#a3e635' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(163,230,53,0.2)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(232,255,224,0.6)' }}
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
           >
-            <RefreshCw size={14} /> Atualizar
+            <RefreshCw size={13} /> Atualizar
           </button>
           <button
             onClick={() => setShowModal(true)}
-            style={{
-              padding: '9px 16px',
-              background: '#a3e635', color: '#050e08',
-              border: 'none', borderRadius: '8px',
-              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontFamily: 'Rajdhani, sans-serif', letterSpacing: '0.05em', textTransform: 'uppercase',
-              boxShadow: '0 0 16px rgba(163,230,53,0.3)',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 24px rgba(163,230,53,0.5)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 16px rgba(163,230,53,0.3)' }}
+            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
           >
             <Plus size={14} /> Nova campanha
           </button>
         </div>
       </div>
 
-      {/* Campaign list */}
-      <div style={{
-        background: 'rgba(10,30,18,0.8)',
-        border: '1px solid rgba(163,230,53,0.12)',
-        borderRadius: '12px',
-        backdropFilter: 'blur(20px)',
-        overflow: 'hidden',
-        position: 'relative',
-      }}>
-        {/* Top line */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(163,230,53,0.4), transparent)' }} />
-
+      {/* Table */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
-            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#a3e635' }} />
+            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
           </div>
         ) : campaigns?.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
-            <p style={{ color: 'rgba(232,255,224,0.4)', fontSize: '14px', marginBottom: '16px' }}>Nenhuma campanha criada ainda</p>
-            <button onClick={() => setShowModal(true)} style={{ padding: '9px 20px', background: '#a3e635', color: '#050e08', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '14px' }}>Nenhuma campanha ainda</p>
+            <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Nova campanha
             </button>
           </div>
         ) : (
           <>
-            {/* Table header */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px',
-              gap: '16px', padding: '12px 20px',
-              borderBottom: '1px solid rgba(163,230,53,0.08)',
-              color: 'rgba(163,230,53,0.5)',
-              fontSize: '11px', fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.1em',
-              fontFamily: 'Rajdhani, sans-serif',
-            }}>
-              <span>Campanha</span><span>Total</span><span>Enviadas</span><span>Status</span><span>Ações</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
+              {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
+                <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+              ))}
             </div>
-
             {campaigns?.map((camp: any) => {
               const s = S[camp.status] || S.draft
               const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
@@ -207,41 +169,36 @@ export default function CampaignsPage() {
                   onClick={() => setSelectedCamp(camp)}
                   style={{
                     display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px',
-                    gap: '16px', padding: '14px 20px',
-                    borderBottom: '1px solid rgba(163,230,53,0.06)',
+                    gap: '12px', padding: '14px 20px',
+                    borderBottom: '1px solid #f9fafb',
                     cursor: 'pointer',
-                    background: isSelected ? 'rgba(163,230,53,0.06)' : 'transparent',
-                    transition: 'background 0.15s',
+                    background: isSelected ? '#f0fdf4' : '#fff',
+                    transition: 'background 0.1s',
+                    alignItems: 'center',
                   }}
-                  onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(163,230,53,0.03)' }}
-                  onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                  onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
+                  onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
                 >
                   <div>
-                    <div style={{ fontWeight: 500, color: '#e8ffe0', fontSize: '14px', marginBottom: '6px' }}>{camp.name}</div>
-                    <div style={{ height: '3px', background: 'rgba(163,230,53,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '2px', boxShadow: `0 0 4px ${s.color}` }} />
+                    <div style={{ fontWeight: 500, color: '#111827', fontSize: '14px', marginBottom: '5px' }}>{camp.name}</div>
+                    <div style={{ height: '3px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '99px', transition: 'width 0.3s' }} />
                     </div>
                   </div>
-                  <span style={{ color: '#e8ffe0', fontSize: '14px', display: 'flex', alignItems: 'center' }}>{camp.total_contacts}</span>
-                  <span style={{ color: '#e8ffe0', fontSize: '14px', display: 'flex', alignItems: 'center' }}>{camp.sent_count} ({p}%)</span>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: s.color, background: s.bg, padding: '3px 10px', borderRadius: '999px', border: `1px solid ${s.color}30`, fontFamily: 'Rajdhani, sans-serif', letterSpacing: '0.05em' }}>
+                  <span style={{ color: '#374151', fontSize: '14px' }}>{camp.total_contacts.toLocaleString()}</span>
+                  <span style={{ color: '#374151', fontSize: '14px' }}>{camp.sent_count.toLocaleString()} <span style={{ color: '#9ca3af' }}>({p}%)</span></span>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: s.color, background: s.bg, padding: '2px 10px', borderRadius: '99px', display: 'inline-block' }}>
                       {s.label}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                  <div onClick={e => e.stopPropagation()}>
                     {camp.status === 'running' ? (
-                      <button
-                        onClick={() => pauseMutation.mutate(camp.id)}
-                        style={{ padding: '5px 12px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#fbbf24' }}
-                      >
+                      <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280' }}>
                         <Pause size={11} /> Pausar
                       </button>
                     ) : ['draft', 'paused'].includes(camp.status) ? (
-                      <button
-                        onClick={() => startMutation.mutate(camp.id)}
-                        style={{ padding: '5px 12px', background: '#a3e635', border: 'none', color: '#050e08', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 8px rgba(163,230,53,0.3)' }}
-                      >
+                      <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '5px 12px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Play size={11} /> Disparar
                       </button>
                     ) : null}
@@ -253,138 +210,90 @@ export default function CampaignsPage() {
         )}
       </div>
 
-      {/* Progress detail */}
+      {/* Progress */}
       {selectedCamp && (
-        <div style={{
-          background: 'rgba(10,30,18,0.8)', border: '1px solid rgba(163,230,53,0.12)',
-          borderRadius: '12px', backdropFilter: 'blur(20px)',
-          padding: '22px', marginTop: '14px', position: 'relative', overflow: 'hidden',
-        }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(163,230,53,0.4), transparent)' }} />
-          <h3 style={{ fontFamily: 'Rajdhani, sans-serif', fontWeight: 700, fontSize: '16px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px', color: '#e8ffe0' }}>
-            {selectedCamp.name} — Progresso
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginTop: '12px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '14px' }}>{selectedCamp.name} — Progresso</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
             {[
-              { label: 'Total',     value: prog?.total || prog?.total_contacts || 0,   color: '#a3e635' },
-              { label: 'Enviadas',  value: prog?.sent || prog?.sent_count || 0,         color: '#34d399' },
-              { label: 'Entregues', value: prog?.delivered || prog?.delivered_count || 0, color: '#60a5fa' },
-              { label: 'Falhas',    value: prog?.failed || prog?.failed_count || 0,     color: '#f87171' },
+              { label: 'Total',     value: prog?.total || prog?.total_contacts || 0,    color: '#2563eb' },
+              { label: 'Enviadas',  value: prog?.sent || prog?.sent_count || 0,          color: '#16a34a' },
+              { label: 'Entregues', value: prog?.delivered || prog?.delivered_count || 0, color: '#0891b2' },
+              { label: 'Falhas',    value: prog?.failed || prog?.failed_count || 0,      color: '#dc2626' },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ background: 'rgba(163,230,53,0.04)', border: `1px solid ${color}20`, borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: '28px', fontWeight: 700, color, lineHeight: 1, marginBottom: '4px' }}>{value}</div>
-                <div style={{ color: 'rgba(232,255,224,0.4)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Rajdhani, sans-serif' }}>{label}</div>
+              <div key={label} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', padding: '14px' }}>
+                <div style={{ fontSize: '24px', fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>{value.toLocaleString()}</div>
+                <div style={{ color: '#9ca3af', fontSize: '12px', fontWeight: 500 }}>{label}</div>
               </div>
             ))}
           </div>
-          <div style={{ height: '6px', background: 'rgba(163,230,53,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #4d7c0f, #a3e635)', borderRadius: '3px', boxShadow: '0 0 8px rgba(163,230,53,0.4)', transition: 'width .5s' }} />
+          <div style={{ height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a', borderRadius: '99px', transition: 'width 0.4s' }} />
           </div>
-          <div style={{ textAlign: 'right', color: '#a3e635', fontSize: '12px', fontWeight: 700, fontFamily: 'Rajdhani, sans-serif', marginTop: '6px' }}>{pct}% CONCLUÍDO</div>
+          <div style={{ textAlign: 'right', color: '#6b7280', fontSize: '12px', marginTop: '5px' }}>{pct}% concluído</div>
         </div>
       )}
 
       {/* Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{
-            background: '#071210', borderRadius: '14px', padding: '28px',
-            width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto',
-            border: '1px solid rgba(163,230,53,0.2)',
-            boxShadow: '0 0 40px rgba(163,230,53,0.1), 0 20px 60px rgba(0,0,0,0.8)',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(163,230,53,0.6), transparent)' }} />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
-              <h2 style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e8ffe0' }}>
-                Nova Campanha
-              </h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'rgba(163,230,53,0.06)', border: '1px solid rgba(163,230,53,0.15)', borderRadius: '6px', cursor: 'pointer', color: 'rgba(232,255,224,0.5)', padding: '4px', display: 'flex' }}>
-                <X size={18} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)', animation: 'fadeIn 0.15s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#111827' }}>Nova Campanha</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '6px', display: 'flex' }}>
+                <X size={16} />
               </button>
             </div>
 
-            {[
-              { label: 'Nome da campanha', field: 'name' },
-            ].map(() => (
-              <div key="name" style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(163,230,53,0.6)', marginBottom: '6px', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Rajdhani, sans-serif' }}>
-                  Nome da campanha
-                </label>
-                <input style={inputStyle} placeholder="Ex: Promoção Black Friday" value={campaignName} onChange={e => setCampaignName(e.target.value)} />
-              </div>
-            ))}
+            <div style={{ marginBottom: '16px' }}>
+              {label('Nome da campanha')}
+              <input style={inputStyle} placeholder="Ex: Promoção Black Friday" value={campaignName} onChange={e => setCampaignName(e.target.value)} />
+            </div>
 
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(163,230,53,0.6)', marginBottom: '6px', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Rajdhani, sans-serif' }}>
-                Canal WhatsApp
-              </label>
+            <div style={{ marginBottom: '16px' }}>
+              {label('Canal WhatsApp')}
               <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedChannel} onChange={e => setSelectedChannel(e.target.value)}>
                 <option value="">Selecionar canal...</option>
                 {channels?.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             </div>
 
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(163,230,53,0.6)', marginBottom: '6px', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Rajdhani, sans-serif' }}>
-                Contatos — formato: numero,mensagem
-              </label>
+            <div style={{ marginBottom: '16px' }}>
+              {label('Contatos — formato: numero,mensagem')}
               <div
                 onClick={() => fileRef.current?.click()}
-                style={{ border: '2px dashed rgba(163,230,53,0.2)', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: 'rgba(163,230,53,0.03)', transition: 'all 0.15s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(163,230,53,0.5)'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(163,230,53,0.06)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(163,230,53,0.2)'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(163,230,53,0.03)' }}
+                style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa', transition: 'all 0.1s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#16a34a'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
               >
-                <Upload size={18} color="rgba(163,230,53,0.5)" style={{ margin: '0 auto 6px' }} />
-                <p style={{ fontSize: '13px', color: 'rgba(232,255,224,0.5)' }}>Clique para upload do <strong style={{ color: '#a3e635' }}>.csv</strong></p>
+                <Upload size={16} color="#9ca3af" style={{ margin: '0 auto 6px' }} />
+                <p style={{ fontSize: '13px', color: '#6b7280' }}>Clique para upload do <strong style={{ color: '#111827' }}>.csv</strong></p>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
-              <textarea
-                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' } as any}
-                placeholder="5511999990001,Olá!\n5511999990002,Oi tudo bem?"
-                value={contactsText}
-                onChange={e => setContactsText(e.target.value)}
-              />
-              {contactsText && (
-                <p style={{ fontSize: '11px', color: '#a3e635', marginTop: '4px' }}>
-                  {contactsText.split('\n').filter(Boolean).length} contatos detectados
-                </p>
-              )}
+              <textarea style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.6 } as any} placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
+              {contactsText && <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '4px', fontWeight: 500 }}>{contactsText.split('\n').filter(Boolean).length} contatos detectados</p>}
             </div>
 
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(163,230,53,0.6)', marginBottom: '6px', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Rajdhani, sans-serif' }}>
-                cURL do Gupshup
-              </label>
-              <textarea style={{ ...inputStyle, minHeight: '110px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' } as any} placeholder="curl -X POST https://api.gupshup.io/..." value={curlText} onChange={e => setCurlText(e.target.value)} />
+            <div style={{ marginBottom: '16px' }}>
+              {label('cURL do Gupshup')}
+              <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.6 } as any} placeholder="curl -X POST https://api.gupshup.io/..." value={curlText} onChange={e => setCurlText(e.target.value)} />
             </div>
 
             <div style={{ marginBottom: '22px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(163,230,53,0.6)', marginBottom: '6px', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Rajdhani, sans-serif' }}>
-                Msgs/minuto (anti-ban)
-              </label>
-              <input type="number" min="1" max="300" style={{ ...inputStyle, width: '120px' } as any} value={messagesPerMin} onChange={e => setMessagesPerMin(Number(e.target.value))} />
+              {label('Mensagens por minuto (anti-ban)')}
+              <input type="number" min="1" max="300" style={{ ...inputStyle, width: '100px' } as any} value={messagesPerMin} onChange={e => setMessagesPerMin(Number(e.target.value))} />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '11px', background: 'rgba(163,230,53,0.06)', border: '1px solid rgba(163,230,53,0.15)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'rgba(232,255,224,0.6)' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', color: '#374151', fontWeight: 500 }}>
                 Cancelar
               </button>
               <button
                 onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || !campaignName || !selectedChannel || !curlText}
-                style={{
-                  flex: 1, padding: '11px', background: '#a3e635', color: '#050e08',
-                  border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
-                  cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer',
-                  opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  fontFamily: 'Rajdhani, sans-serif', letterSpacing: '0.05em', textTransform: 'uppercase',
-                  boxShadow: '0 0 16px rgba(163,230,53,0.3)',
-                }}
+                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
-                {createMutation.isPending ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
+                {createMutation.isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} />}
                 Criar campanha
               </button>
             </div>
@@ -394,8 +303,8 @@ export default function CampaignsPage() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        input:focus, textarea:focus, select:focus { border-color: rgba(163,230,53,0.5) !important; box-shadow: 0 0 0 3px rgba(163,230,53,0.08) !important; outline: none; }
-        select option { background: #071210; color: #e8ffe0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        input:focus, textarea:focus, select:focus { border-color: #16a34a !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.1) !important; outline: none; }
       `}</style>
     </div>
   )
