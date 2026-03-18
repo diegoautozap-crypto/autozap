@@ -18,13 +18,18 @@ export interface QueueMessageInput {
   campaignId?: string
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Retorna true se o nome parece um número de telefone (ou seja, não é um nome real)
+function looksLikePhone(name: string): boolean {
+  return /^[\d\s\+\-\(\)]+$/.test(name.trim())
+}
+
 // ─── MessageService ───────────────────────────────────────────────────────────
 
 export class MessageService {
 
-  // ── Queue outbound message ───────────────────────────────────────────────
-  // Creates the message record with status=queued and returns the UUID
-  // The worker picks it up from BullMQ and calls channel-service to send
+  // ── Queue outbound message ─────────────────────────────────────────────────
 
   async queueMessage(input: QueueMessageInput): Promise<string> {
     const messageUuid = uuidv4()
@@ -51,17 +56,25 @@ export class MessageService {
     return messageUuid
   }
 
-  // ── Process inbound message ──────────────────────────────────────────────
-  // Called by the webhook handler when a message arrives from a user
+  // ── Process inbound message ────────────────────────────────────────────────
 
   async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
-// 1. Find or create contact
+    // 1. Find or create contact
     const contact = await this.findOrCreateContact(tenantId, msg.from)
 
-    // Atualiza nome do contato se vier no payload Meta v3
+    // ✅ BUG CORRIGIDO: atualiza o nome sempre que:
+    //    - vier um senderName no payload
+    //    - E o nome atual parecer um número (não é nome real)
     const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
-    if (senderName && (!contact.name || contact.name === msg.from || contact.name.startsWith('Ol'))) {
-      await db.from('contacts').update({ name: senderName }).eq('id', contact.id)
+    if (senderName && (!contact.name || looksLikePhone(contact.name))) {
+      await db.from('contacts')
+        .update({ name: senderName })
+        .eq('id', contact.id)
+      logger.info('Contact name updated from inbound', {
+        contactId: contact.id,
+        oldName: contact.name,
+        newName: senderName,
+      })
     }
 
     // 2. Find or create conversation
@@ -106,7 +119,7 @@ export class MessageService {
     })
   }
 
-  // ── Update message status from webhook ───────────────────────────────────
+  // ── Update message status from webhook ────────────────────────────────────
 
   async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage } = update
@@ -134,7 +147,7 @@ export class MessageService {
     logger.debug('Message status updated', { externalId, status })
   }
 
-  // ── Mark message as sent ─────────────────────────────────────────────────
+  // ── Mark message as sent ───────────────────────────────────────────────────
 
   async markSent(messageUuid: string, externalId: string): Promise<void> {
     await db.from('messages').update({
@@ -153,8 +166,7 @@ export class MessageService {
     }).eq('message_uuid', messageUuid)
   }
 
-  // ── Get pending messages for reconciliation ──────────────────────────────
-  // Called by the reconciliation job every 5 minutes
+  // ── Get pending messages for reconciliation ────────────────────────────────
 
   async getPendingMessages(tenantId: string, olderThanMinutes = 5) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000)
@@ -171,7 +183,7 @@ export class MessageService {
     return data || []
   }
 
-  // ── List messages in conversation (paginated) ────────────────────────────
+  // ── List messages in conversation (paginated) ──────────────────────────────
 
   async listMessages(conversationId: string, tenantId: string, cursor?: string, limit = 30) {
     let query = db
@@ -191,14 +203,16 @@ export class MessageService {
     return data || []
   }
 
-  // ── Private ──────────────────────────────────────────────────────────────
+  // ── Private ────────────────────────────────────────────────────────────────
 
   private async findOrCreateContact(tenantId: string, phone: string) {
-phone = phone.replace(/^\+/, '')
-// Normaliza número brasileiro: garante o 9 após o DDD
-if (phone.startsWith('55') && phone.length === 12) {
-  phone = phone.slice(0, 4) + '9' + phone.slice(4)
-}    const { data: existing } = await db
+    phone = phone.replace(/^\+/, '')
+    // Normaliza número brasileiro: garante o 9 após o DDD
+    if (phone.startsWith('55') && phone.length === 12) {
+      phone = phone.slice(0, 4) + '9' + phone.slice(4)
+    }
+
+    const { data: existing } = await db
       .from('contacts')
       .select('id, name')
       .eq('tenant_id', tenantId)
