@@ -103,15 +103,21 @@ async function sendViaFetch(
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // ✅ message vem com \r literal do CSV (ex: "Olá!\rTemos novidades")
-    // JSON.stringify vai manter o \r como \r no JSON
-    // encodeURIComponent vai encodar corretamente para o Gupshup
-    const templateJson = JSON.stringify({
-      id: parsed.templateId,
-      params: [message],
-    })
+    // Converte \r literal (texto "\\r") para char \r real (ASCII 13)
+    // Depois encodeURIComponent vai converter \r real para %0D
+    // que junto com possível \n vira quebra de linha no Gupshup
+    const messageReal = message
+      .replace(/\\r\\n/g, '\r\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\n/g, '\n')
 
-    // Body montado manualmente — controle total do encoding
+    // Monta o JSON do template manualmente SEM JSON.stringify
+    // para não escapar os chars especiais
+    const escapedMessage = messageReal
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+    const templateJson = `{"id":"${parsed.templateId}","params":["${escapedMessage}"]}`
+
     const body = [
       'channel=' + encodeURIComponent(parsed.channel),
       'source=' + encodeURIComponent(parsed.source),
@@ -119,6 +125,8 @@ async function sendViaFetch(
       'src.name=' + encodeURIComponent(parsed.srcName),
       'template=' + encodeURIComponent(templateJson),
     ].join('&')
+
+    logger.debug('Sending to Gupshup', { phone, body: body.slice(0, 300) })
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
@@ -257,8 +265,6 @@ export function startCampaignWorker(): Worker {
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
 
-            // ✅ Mantém \r literal — não converte nada
-            // O Gupshup interpreta \r como quebra de linha no template
             const contactMessage = (
               contact.variables?.mensagem ||
               contact.variables?.copy ||
