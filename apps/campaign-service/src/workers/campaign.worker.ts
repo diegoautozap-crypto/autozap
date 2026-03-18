@@ -12,8 +12,6 @@ const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
 const DELAY_BETWEEN_MESSAGES_MS = 0
-
-// Número de fetches simultâneos ao Gupshup
 const PARALLEL_FETCHES = 5
 
 function getRedisConnection() {
@@ -56,6 +54,27 @@ interface ParsedCurl {
   srcName: string
   templateId: string
   channel: string
+}
+
+// ─── Fila controlada de CRM ───────────────────────────────────────────────────
+// Processa 1 item por vez para não sobrecarregar o Supabase
+class CrmQueue {
+  private queue: (() => Promise<void>)[] = []
+  private running = false
+
+  add(fn: () => Promise<void>) {
+    this.queue.push(fn)
+    if (!this.running) this.process()
+  }
+
+  private async process() {
+    this.running = true
+    while (this.queue.length > 0) {
+      const fn = this.queue.shift()!
+      try { await fn() } catch {}
+    }
+    this.running = false
+  }
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
@@ -139,7 +158,7 @@ async function sendViaFetch(
   }
 }
 
-function saveAllAsync(
+async function saveToCrm(
   tenantId: string,
   channelId: string,
   campaignId: string,
@@ -147,92 +166,79 @@ function saveAllAsync(
   phone: string,
   message: string,
   messageUuid: string,
-): void {
-  ;(async () => {
-    try {
-      // Marca contato como enviado
-      await campaignService.markContactSent(contactId, messageUuid)
+): Promise<void> {
+  const cleanPhone = phone.replace(/^\+/, '')
 
-      // Incrementa contadores
-      await campaignService.incrementCounter(campaignId, 'sent_count')
-      await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+  // Marca contato como enviado
+  await campaignService.markContactSent(contactId, messageUuid)
 
-      // Salva no CRM
-      const cleanPhone = phone.replace(/^\+/, '')
-      let contactDbId: string
-      const { data: existingContact } = await db
-        .from('contacts').select('id')
-        .eq('tenant_id', tenantId).eq('phone', cleanPhone).maybeSingle()
+  // Incrementa contadores
+  await campaignService.incrementCounter(campaignId, 'sent_count')
+  await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
 
-      if (existingContact) {
-        contactDbId = existingContact.id
-      } else {
-        const { data: newContact } = await db.from('contacts').insert({
-          id: generateId(),
-          tenant_id: tenantId,
-          phone: cleanPhone,
-          name: cleanPhone,
-          origin: 'campaign',
-          status: 'active',
-        }).select('id').single()
-        contactDbId = newContact!.id
-      }
+  // Contato
+  let contactDbId: string
+  const { data: existingContact } = await db
+    .from('contacts').select('id')
+    .eq('tenant_id', tenantId).eq('phone', cleanPhone).maybeSingle()
 
-      let conversationId: string
-      const { data: existingConv } = await db
-        .from('conversations').select('id')
-        .eq('tenant_id', tenantId).eq('contact_id', contactDbId)
-        .eq('channel_id', channelId).maybeSingle()
+  if (existingContact) {
+    contactDbId = existingContact.id
+  } else {
+    const { data: newContact } = await db.from('contacts').insert({
+      id: generateId(),
+      tenant_id: tenantId,
+      phone: cleanPhone,
+      name: cleanPhone,
+      origin: 'campaign',
+      status: 'active',
+    }).select('id').single()
+    contactDbId = newContact!.id
+  }
 
-      if (existingConv) {
-        conversationId = existingConv.id
-      } else {
-        const { data: newConv } = await db.from('conversations').insert({
-          id: generateId(),
-          tenant_id: tenantId,
-          contact_id: contactDbId,
-          channel_id: channelId,
-          channel_type: 'gupshup',
-          status: 'open',
-          pipeline_stage: 'lead',
-          last_message_at: new Date(),
-        }).select('id').single()
-        conversationId = newConv!.id
-      }
+  // Conversa
+  let conversationId: string
+  const { data: existingConv } = await db
+    .from('conversations').select('id')
+    .eq('tenant_id', tenantId).eq('contact_id', contactDbId)
+    .eq('channel_id', channelId).maybeSingle()
 
-      await db.from('messages').insert({
-        id: generateId(),
-        message_uuid: messageUuid,
-        tenant_id: tenantId,
-        conversation_id: conversationId,
-        channel_id: channelId,
-        contact_id: contactDbId,
-        direction: 'outbound',
-        content_type: 'text',
-        body: message || '(template)',
-        status: 'sent',
-        sent_at: new Date(),
-        campaign_id: campaignId,
-      })
+  if (existingConv) {
+    conversationId = existingConv.id
+  } else {
+    const { data: newConv } = await db.from('conversations').insert({
+      id: generateId(),
+      tenant_id: tenantId,
+      contact_id: contactDbId,
+      channel_id: channelId,
+      channel_type: 'gupshup',
+      status: 'open',
+      pipeline_stage: 'lead',
+      last_message_at: new Date(),
+    }).select('id').single()
+    conversationId = newConv!.id
+  }
 
-      await db.from('conversations').update({
-        last_message: message || '(template)',
-        last_message_at: new Date(),
-      }).eq('id', conversationId)
+  // Mensagem
+  await db.from('messages').insert({
+    id: generateId(),
+    message_uuid: messageUuid,
+    tenant_id: tenantId,
+    conversation_id: conversationId,
+    channel_id: channelId,
+    contact_id: contactDbId,
+    direction: 'outbound',
+    content_type: 'text',
+    body: message || '(template)',
+    status: 'sent',
+    sent_at: new Date(),
+    campaign_id: campaignId,
+  })
 
-    } catch (err) {
-      logger.warn('saveAllAsync failed', { phone, err })
-    }
-  })()
-}
-
-function saveFailedAsync(contactId: string, campaignId: string, errorMessage: string): void {
-  ;(async () => {
-    try {
-      await campaignService.markContactFailed(contactId, errorMessage)
-      await campaignService.incrementCounter(campaignId, 'failed_count')
-    } catch {}
-  })()
+  await db.from('conversations').update({
+    last_message: message || '(template)',
+    last_message_at: new Date(),
+  }).eq('id', conversationId)
 }
 
 export function startCampaignWorker(): Worker {
@@ -251,7 +257,8 @@ export function startCampaignWorker(): Worker {
         throw new Error(`Failed to parse templateId from curl. source=${parsed.source}`)
       }
 
-      // Set em memória para evitar reprocessamento sem query síncrona
+      // Fila controlada — 1 operação CRM por vez, sem sobrecarregar Supabase
+      const crmQueue = new CrmQueue()
       const processedIds = new Set<string>()
       let processed = 0
 
@@ -263,16 +270,14 @@ export function startCampaignWorker(): Worker {
         }
 
         const contacts = await campaignService.getPendingContacts(campaignId, batchSize)
-        // Filtra contatos já processados em memória
         const pending = contacts.filter(c => !processedIds.has(c.id))
         if (pending.length === 0) {
           logger.info('No more pending contacts', { campaignId })
           break
         }
 
-        // ✅ Processa em chunks paralelos de PARALLEL_FETCHES
+        // Processa em chunks de PARALLEL_FETCHES simultâneos
         for (let i = 0; i < pending.length; i += PARALLEL_FETCHES) {
-          // Verifica pausa a cada chunk
           if (processed > 0 && processed % 100 === 0) {
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
@@ -280,7 +285,7 @@ export function startCampaignWorker(): Worker {
 
           const chunk = pending.slice(i, i + PARALLEL_FETCHES)
 
-          // Dispara PARALLEL_FETCHES simultâneos
+          // ✅ 5 fetches simultâneos ao Gupshup
           await Promise.all(chunk.map(async (contact) => {
             try {
               const contactMessage = (
@@ -297,18 +302,24 @@ export function startCampaignWorker(): Worker {
               const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
               if (result.ok) {
-                // Marca em memória imediatamente — sem query síncrona
                 processedIds.add(contact.id)
                 processed++
-                // Tudo em background
-                saveAllAsync(tenantId, channelId, campaignId, contact.id, contact.phone, contactMessage, messageUuid)
+
+                // ✅ CRM entra na fila controlada — 1 por vez, sem sobrecarga
+                crmQueue.add(() =>
+                  saveToCrm(tenantId, channelId, campaignId, contact.id, contact.phone, contactMessage, messageUuid)
+                )
+
                 logger.info('Message sent', { campaignId, phone: contact.phone, processed })
               } else {
                 throw new Error(result.error || 'Gupshup error')
               }
             } catch (err: any) {
-              processedIds.add(contact.id) // evita retentar o mesmo no loop atual
-              saveFailedAsync(contact.id, campaignId, err.message)
+              processedIds.add(contact.id)
+              crmQueue.add(async () => {
+                await campaignService.markContactFailed(contact.id, err.message)
+                await campaignService.incrementCounter(campaignId, 'failed_count')
+              })
               logger.warn('Contact failed', { campaignId, phone: contact.phone, error: err.message })
             }
           }))
