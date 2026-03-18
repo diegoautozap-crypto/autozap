@@ -110,15 +110,10 @@ async function ensureContactAndConversation(
   return { contactId, conversationId }
 }
 
-// ─── Parseia curl e extrai tudo que precisa ───────────────────────────────────
+// ─── Parseia curl ─────────────────────────────────────────────────────────────
 interface ParsedCurl {
   apiKey: string
-  source: string
-  srcName: string
-  templateId: string
-  channel: string
-  // body original com destination como placeholder
-  bodyTemplate: string
+  bodyTemplate: string // body original com destination substituído por __PHONE__
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
@@ -131,7 +126,7 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const apiKeyMatch = curlStr.match(/apikey:\s*([^\s"'\\]+)/)
   const apiKey = apiKeyMatch?.[1] || ''
 
-  // Extrai o body original — mantém tudo igual, só vamos trocar o destination
+  // Extrai body original sem modificar nada
   const singleQuoteMatch = curlStr.match(/-d\s+'([^']+)'/)
   let bodyRaw = ''
   if (singleQuoteMatch) {
@@ -143,65 +138,24 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     }
   }
 
-  const params = new URLSearchParams(bodyRaw)
-  const source = params.get('source') || ''
-  const srcName = params.get('src.name') || ''
-  const channel = params.get('channel') || 'whatsapp'
-
-  const templateParam = params.get('template') || ''
-  let templateId = ''
-  try {
-    templateId = JSON.parse(decodeURIComponent(templateParam)).id || ''
-  } catch {
-    try {
-      templateId = JSON.parse(templateParam).id || ''
-    } catch {
-      templateId = templateParam.match(/"id"\s*:\s*"([^"]+)"/)?.[1] || ''
-    }
-  }
-
-  // bodyTemplate: o body original com destination como __PHONE__
+  // Substitui apenas o placeholder do destination
   const bodyTemplate = bodyRaw
     .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
 
-  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...', source, srcName, templateId, channel })
+  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...' })
 
-  return { apiKey, source, srcName, templateId, channel, bodyTemplate }
+  return { apiKey, bodyTemplate }
 }
 
-// ─── Envia via fetch — usa body original, só troca o destination ──────────────
+// ─── Envia via fetch — body original, só troca destination ───────────────────
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
-  message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Substitui o phone no body original
-    let body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
-
-    // Se tiver mensagem no CSV, substitui o params do template
-    if (message) {
-      const cleanMessage = message
-        .replace(/\\r\\n/g, '\r\n')
-        .replace(/\\r/g, '\r')
-        .replace(/\\n/g, '\n')
-        .trim()
-
-      // Substitui o params dentro do template já encodado
-      const templateParam = new URLSearchParams(body).get('template') || ''
-      try {
-        const templateObj = JSON.parse(decodeURIComponent(templateParam))
-        templateObj.params = [cleanMessage]
-        const newTemplate = encodeURIComponent(JSON.stringify(templateObj))
-        body = body.replace(
-          /template=[^&]*/,
-          'template=' + newTemplate
-        )
-      } catch {
-        // Se falhar o parse, mantém o template original
-      }
-    }
+    // Usa o body original exatamente como está, só troca o número
+    const body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
@@ -214,7 +168,7 @@ async function sendViaFetch(
     })
 
     const data = await response.json() as any
-    logger.debug('Gupshup response', { phone, status: data.status, data: JSON.stringify(data).slice(0, 200) })
+    logger.debug('Gupshup response', { phone, status: data.status })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
@@ -241,7 +195,7 @@ async function processContact(
       .trim()
 
     const messageUuid = uuidv4()
-    const result = await sendViaFetch(parsed, contact.phone, contactMessage)
+    const result = await sendViaFetch(parsed, contact.phone)
 
     if (result.ok) {
       const { contactId, conversationId } = await ensureContactAndConversation(
@@ -304,11 +258,6 @@ export function startCampaignWorker(): Worker {
       const curlTemplate = (campaign as any).curl_template
       if (!curlTemplate) throw new Error('No curl template configured')
       const parsed = parseCurlTemplate(curlTemplate)
-
-      if (!parsed.templateId) {
-        logger.error('Failed to parse templateId', { campaignId, curlPreview: curlTemplate.slice(0, 100) })
-        throw new Error('Failed to parse templateId from curl')
-      }
 
       let processed = 0
 
