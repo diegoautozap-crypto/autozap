@@ -5,67 +5,55 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Image, FileAudio } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
 const CONVERSATION_SERVICE_URL = process.env.NEXT_PUBLIC_CONVERSATION_SERVICE_URL || ''
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const statusFilters = [
-  { key: 'all',     label: 'Todas' },
-  { key: 'open',    label: 'Abertas' },
+  { key: 'all', label: 'Todas' },
+  { key: 'open', label: 'Abertas' },
   { key: 'waiting', label: 'Aguardando' },
-  { key: 'closed',  label: 'Fechadas' },
+  { key: 'closed', label: 'Fechadas' },
 ]
 
 function cleanText(t: string) {
   return (t || '').replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\n/g, '\n')
 }
-
 function getInitials(n: string | undefined | null) {
   return ((n || '??').trim().slice(0, 2)).toUpperCase()
 }
-
 function getAvatarColor(n: string | undefined | null) {
   const colors = [
-    { bg: '#dbeafe', color: '#1d4ed8' },
-    { bg: '#dcfce7', color: '#15803d' },
-    { bg: '#fce7f3', color: '#be185d' },
-    { bg: '#ede9fe', color: '#6d28d9' },
-    { bg: '#ffedd5', color: '#c2410c' },
-    { bg: '#e0f2fe', color: '#0369a1' },
+    { bg: '#dbeafe', color: '#1d4ed8' }, { bg: '#dcfce7', color: '#15803d' },
+    { bg: '#fce7f3', color: '#be185d' }, { bg: '#ede9fe', color: '#6d28d9' },
+    { bg: '#ffedd5', color: '#c2410c' }, { bg: '#e0f2fe', color: '#0369a1' },
   ]
   return colors[((n || '').charCodeAt(0) || 0) % colors.length]
 }
-
 function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined): string | null {
   if (!mediaUrl) return null
   if (mediaUrl.startsWith('http')) return mediaUrl
   if (!channelId) return null
   return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}`
 }
-
 function getContentType(file: File): 'image' | 'audio' | 'video' | 'document' {
   if (file.type.startsWith('image/')) return 'image'
   if (file.type.startsWith('audio/')) return 'audio'
   if (file.type.startsWith('video/')) return 'video'
   return 'document'
 }
-
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
+    const osc = ctx.createOscillator(); const gain = ctx.createGain()
     osc.connect(gain); gain.connect(ctx.destination)
-    osc.frequency.setValueAtTime(800, ctx.currentTime)
-    osc.frequency.setValueAtTime(600, ctx.currentTime + 0.1)
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    osc.frequency.setValueAtTime(800, ctx.currentTime); osc.frequency.setValueAtTime(600, ctx.currentTime + 0.1)
+    gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3)
   } catch {}
 }
@@ -75,30 +63,24 @@ function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; c
   const sc = isOut ? 'rgba(255,255,255,0.65)' : '#9ca3af'
   const type = msg.content_type || 'text'
   const url = getMediaUrl(msg.media_url, channelId)
-
   if (type === 'image') return (
     <div>
       {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>[Imagem]</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
     </div>
   )
-
   if (type === 'audio') return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-        <Music size={13} color={tc} /><span style={{ fontSize: '12px', color: sc }}>Áudio</span>
-      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Music size={13} color={tc} /><span style={{ fontSize: '12px', color: sc }}>Áudio</span></div>
       {url ? <audio controls style={{ maxWidth: '220px', height: '34px' }}><source src={url} /></audio> : <p style={{ fontSize: '13px', color: sc }}>[Áudio não disponível]</p>}
     </div>
   )
-
   if (type === 'video') return (
     <div>
       {url ? <video controls style={{ maxWidth: '240px', borderRadius: '8px', display: 'block' }}><source src={url} /></video> : <p style={{ fontSize: '13px', color: sc }}>[Vídeo não disponível]</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc }}>{cleanText(msg.body)}</p>}
     </div>
   )
-
   if (type === 'document') {
     const fn = msg.body || msg.media_url?.split('/')?.pop() || 'documento'
     return (
@@ -113,7 +95,6 @@ function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; c
       </a>
     )
   }
-
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 
@@ -127,6 +108,7 @@ export default function InboxPage() {
   const [pendingFile, setPendingFile] = useState<{ file: File; previewUrl: string; contentType: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
@@ -152,20 +134,17 @@ export default function InboxPage() {
     queryFn: async () => { const url = statusFilter === 'all' ? '/conversations?limit=50' : `/conversations?status=${statusFilter}&limit=50`; const { data } = await conversationApi.get(url); return data.data },
     refetchInterval: 5000,
   })
-
   const { data: selectedConv } = useQuery({
     queryKey: ['conversation', selectedConvId],
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}`); return data.data },
     enabled: !!selectedConvId,
   })
-
   const { data: messages, isLoading: loadingMessages } = useQuery({
     queryKey: ['messages', selectedConvId],
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}/messages`); return data.data },
     enabled: !!selectedConvId,
     refetchInterval: 3000,
   })
-
   const contactId = selectedConv?.contact_id
   const { data: contactDetail } = useQuery({
     queryKey: ['contact', contactId],
@@ -176,20 +155,9 @@ export default function InboxPage() {
   const sendMutation = useMutation({
     mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
       if (!selectedConv) return
-      await messageApi.post('/messages/send', {
-        channelId: selectedConv.channel_id,
-        contactId: selectedConv.contact_id,
-        conversationId: selectedConvId,
-        to: selectedConv.contacts?.phone,
-        ...payload,
-      })
+      await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
-    onSuccess: () => {
-      setMessageText('')
-      setPendingFile(null)
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
-      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-    },
+    onSuccess: () => { setMessageText(''); setPendingFile(null); queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao enviar'),
   })
 
@@ -197,10 +165,9 @@ export default function InboxPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 15 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 15MB'); return }
-    const previewUrl = URL.createObjectURL(file)
-    const contentType = getContentType(file)
-    setPendingFile({ file, previewUrl, contentType })
+    setPendingFile({ file, previewUrl: URL.createObjectURL(file), contentType: getContentType(file) })
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (audioInputRef.current) audioInputRef.current.value = ''
   }
 
   const handleSendFile = async () => {
@@ -212,45 +179,32 @@ export default function InboxPage() {
       const { error } = await supabase.storage.from('media').upload(path, pendingFile.file, { contentType: pendingFile.file.type, upsert: false })
       if (error) throw error
       const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
-      const mediaUrl = publicData.publicUrl
-      await sendMutation.mutateAsync({ contentType: pendingFile.contentType, mediaUrl, body: messageText || undefined })
+      await sendMutation.mutateAsync({ contentType: pendingFile.contentType, mediaUrl: publicData.publicUrl, body: messageText || undefined })
       toast.success('Arquivo enviado!')
     } catch (err: any) {
-      toast.error('Erro ao enviar arquivo: ' + (err.message || 'tente novamente'))
-    } finally {
-      setUploading(false)
-    }
+      toast.error('Erro ao enviar: ' + (err.message || 'tente novamente'))
+    } finally { setUploading(false) }
   }
 
-  const handleSendText = () => {
-    if (!messageText.trim()) return
-    sendMutation.mutate({ contentType: 'text', body: messageText })
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText() }
-  }
+  const handleSendText = () => { if (messageText.trim()) sendMutation.mutate({ contentType: 'text', body: messageText }) }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText() } }
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const handleSelectConv = async (convId: string) => {
-    setSelectedConvId(convId)
-    setPendingFile(null)
+    setSelectedConvId(convId); setPendingFile(null)
     await conversationApi.post(`/conversations/${convId}/read`)
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
-  const conversations = (convData || []).filter((c: any) => {
-    if (!search) return true
-    return c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search)
-  })
-
+  const conversations = (convData || []).filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
   const channelId = selectedConv?.channel_id
-
   const closeConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }
   const openConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }
+
+  const btnStyle = { width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0 as const, background: '#f9fafb', border: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f6f8fa' }}>
@@ -274,8 +228,7 @@ export default function InboxPage() {
               const isSel = selectedConvId === conv.id
               const name = conv.contacts?.name || conv.contacts?.phone || undefined
               const av = getAvatarColor(name)
-              const lastMsg = conv.last_message || 'Sem mensagens'
-              const preview = lastMsg.startsWith('[') ? lastMsg : cleanText(lastMsg).split('\n')[0]
+              const preview = (conv.last_message || 'Sem mensagens').startsWith('[') ? conv.last_message : cleanText(conv.last_message || '').split('\n')[0]
               return (
                 <div key={conv.id} onClick={() => handleSelectConv(conv.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSel ? '#f0fdf4' : 'transparent', borderLeft: isSel ? '3px solid #16a34a' : '3px solid transparent' }}
@@ -306,7 +259,6 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 }}>{getInitials(contactName)}</div>
@@ -326,67 +278,68 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
-              {loadingMessages
-                ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
-                : messages?.length === 0
-                  ? <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '40px' }}>Nenhuma mensagem ainda</p>
-                  : messages?.map((msg: any) => {
-                    const isOut = msg.direction === 'outbound'
-                    const isMedia = msg.content_type !== 'text'
-                    return (
-                      <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
-                        <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#16a34a' : '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.06)' }}>
-                          <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
-                            <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                            {isOut && <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />}
-                          </div>
+              {loadingMessages ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
+                : messages?.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '40px' }}>Nenhuma mensagem ainda</p>
+                : messages?.map((msg: any) => {
+                  const isOut = msg.direction === 'outbound'
+                  const isMedia = msg.content_type !== 'text'
+                  return (
+                    <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#16a34a' : '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.06)' }}>
+                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
+                          <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                          {isOut && <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />}
                         </div>
                       </div>
-                    )
-                  })
+                    </div>
+                  )
+                })
               }
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Preview arquivo pendente */}
             {pendingFile && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                {pendingFile.contentType === 'image' ? (
-                  <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
-                ) : (
-                  <div style={{ width: '48px', height: '48px', background: '#dcfce7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileText size={20} color="#16a34a" />
-                  </div>
-                )}
+                {pendingFile.contentType === 'image'
+                  ? <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
+                  : <div style={{ width: '48px', height: '48px', background: '#dcfce7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingFile.contentType === 'audio' ? <Music size={20} color="#16a34a" /> : <FileText size={20} color="#16a34a" />}</div>
+                }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '13px', fontWeight: 500, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.file.name}</p>
                   <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{(pendingFile.file.size / 1024).toFixed(0)} KB • {pendingFile.contentType}</p>
                 </div>
-                <button onClick={handleSendFile} disabled={uploading}
-                  style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button onClick={handleSendFile} disabled={uploading} style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}
                   {uploading ? 'Enviando...' : 'Enviar'}
                 </button>
-                <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex' }}>
-                  <X size={16} />
-                </button>
+                <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex' }}><X size={16} /></button>
               </div>
             )}
 
-            {/* Input */}
             {selectedConv?.status !== 'closed' ? (
               <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                  <input ref={fileInputRef} type="file" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
-                  <button onClick={() => fileInputRef.current?.click()} style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: '#f9fafb', border: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}
+                  {/* Input oculto para arquivos (imagem, vídeo, doc) */}
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
+                  {/* Input oculto para áudio */}
+                  <input ref={audioInputRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleFileSelect} />
+
+                  {/* Botão anexar arquivo */}
+                  <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-                    title="Anexar arquivo">
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
                     <Paperclip size={16} />
                   </button>
+
+                  {/* Botão anexar áudio */}
+                  <button onClick={() => audioInputRef.current?.click()} style={btnStyle} title="Enviar áudio"
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
+                    <Mic size={16} />
+                  </button>
+
                   <textarea
                     style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                     placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
@@ -455,8 +408,7 @@ export default function InboxPage() {
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
               <a href="/dashboard/contacts" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#f9fafb', borderRadius: '6px', textDecoration: 'none', color: '#374151', fontSize: '13px', fontWeight: 500 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f3f4f6' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f9fafb' }}
-              >
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f9fafb' }}>
                 Ver no CRM <ChevronRight size={13} />
               </a>
             </div>
