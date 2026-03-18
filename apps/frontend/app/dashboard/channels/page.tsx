@@ -191,7 +191,7 @@ export default function ChannelsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {channels?.map((ch: any) => {
-            const webhookUrl = `${WEBHOOK_BASE}/webhook/gupshup/${ch.credentials?.apiKey}`
+            const webhookUrl = `${WEBHOOK_BASE}/webhook/gupshup/${ch.webhookApiKey}`
             const isVisible = showApiKey[ch.id]
             return (
               <div key={ch.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px' }}>
@@ -202,7 +202,7 @@ export default function ChannelsPage() {
                     </div>
                     <div>
                       <p style={{ fontWeight: 600, fontSize: '14px', color: '#111827', margin: 0 }}>{ch.name}</p>
-                      <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{ch.phone_number || ch.phoneNumber || ch.credentials?.source}</p>
+                      <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{ch.phoneNumber || ch.phone_number || ''}</p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -227,7 +227,7 @@ export default function ChannelsPage() {
                     <input
                       readOnly
                       type={isVisible ? 'text' : 'password'}
-                      value={ch.credentials?.apiKey || ''}
+                      value={ch.webhookApiKey || ''}
                       style={{ ...inputStyle, flex: 1, background: '#f9fafb', color: '#374151', fontSize: '13px' }}
                     />
                     <button onClick={() => toggleApiKey(ch.id)} style={{ padding: '9px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', display: 'flex', color: '#6b7280' }}>
@@ -246,7 +246,7 @@ export default function ChannelsPage() {
                       style={{ ...inputStyle, flex: 1, background: '#f9fafb', color: '#374151', fontSize: '12px', fontFamily: 'monospace' }}
                     />
                     <button
-                      onClick={() => copyWebhook(ch.id, ch.credentials?.apiKey)}
+                      onClick={() => copyWebhook(ch.id, ch.webhookApiKey)}
                       style={{ padding: '9px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', display: 'flex', color: '#6b7280' }}
                       title="Copiar"
                     >
@@ -256,7 +256,7 @@ export default function ChannelsPage() {
                       <ExternalLink size={14} />
                     </a>
                   </div>
-                  {!ch.credentials?.metaToken && (
+                  {!ch.hasMetaToken && (
                     <p style={{ fontSize: '11px', color: '#f59e0b', marginTop: '6px' }}>
                       ⚠️ Token do Meta não configurado — mídias recebidas (fotos, áudios) não serão exibidas
                     </p>
