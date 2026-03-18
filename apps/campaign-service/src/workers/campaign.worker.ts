@@ -11,7 +11,6 @@ const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-// 0 = máximo possível (limitado apenas pelo tempo de resposta do Gupshup)
 const DELAY_BETWEEN_MESSAGES_MS = 0
 
 function getRedisConnection() {
@@ -236,7 +235,7 @@ export function startCampaignWorker(): Worker {
       let processed = 0
 
       while (true) {
-        // Verifica pausa/cancelamento uma vez por lote (não por mensagem)
+        // Verifica pausa uma vez por lote
         const progress = await campaignService.getProgress(campaignId, tenantId)
         if (progress.status !== 'running') {
           logger.info('Campaign stopped', { campaignId, status: progress.status })
@@ -251,7 +250,7 @@ export function startCampaignWorker(): Worker {
 
         for (const contact of contacts) {
           try {
-            // ✅ Verifica pausa a cada 50 mensagens em vez de a cada 1
+            // Verifica pausa a cada 50 msgs (não a cada 1)
             if (processed > 0 && processed % 50 === 0) {
               const check = await campaignService.getProgress(campaignId, tenantId)
               if (check.status !== 'running') break
@@ -268,28 +267,29 @@ export function startCampaignWorker(): Worker {
               .trim()
 
             const messageUuid = uuidv4()
-
-            // ✅ Só aguarda o fetch — tudo mais vai em background
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
             if (result.ok) {
+              // ✅ markContactSent é SÍNCRONO — evita reprocessamento se reiniciar
+              await campaignService.markContactSent(contact.id, messageUuid)
               processed++
-              // ✅ Todas as queries de DB em background — não bloqueia o próximo envio
+
+              // ✅ Contadores e CRM em background — não bloqueiam
+              saveToCrmAsync(tenantId, channelId, campaignId, contact.phone, contactMessage, messageUuid)
               ;(async () => {
                 try {
-                  saveToCrmAsync(tenantId, channelId, campaignId, contact.phone, contactMessage, messageUuid)
-                  await campaignService.markContactSent(contact.id, messageUuid)
                   await campaignService.incrementCounter(campaignId, 'sent_count')
                   await db.rpc('increment_message_count', { p_tenant_id: tenantId })
                 } catch {}
               })()
+
               logger.info('Message sent', { campaignId, phone: contact.phone, processed })
             } else {
               throw new Error(result.error || 'Gupshup error')
             }
 
           } catch (err: any) {
-            // Falha também em background
+            // Falha em background também
             ;(async () => {
               try {
                 await campaignService.markContactFailed(contact.id, err.message)
