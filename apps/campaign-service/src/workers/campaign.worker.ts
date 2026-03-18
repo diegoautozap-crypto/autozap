@@ -266,11 +266,7 @@ export function startCampaignWorker(): Worker {
               contact.variables?.mensagem ||
               contact.variables?.copy ||
               ''
-            )
-              .replace(/\\r\\n/g, '\n')  // \r\n literal → newline real
-              .replace(/\\r/g, '\n')     // \r literal → newline real
-              .replace(/\\n/g, '\n')     // \n literal → newline real
-              .trim()
+            ).trim()
 
             const messageUuid = uuidv4()
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
