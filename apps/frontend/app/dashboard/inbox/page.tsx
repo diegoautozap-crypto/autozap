@@ -281,7 +281,7 @@ export default function InboxPage() {
                   <button
                     onClick={async () => {
                       await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' })
-                      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+                      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
                       queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
                     }}
                     style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 500 }}
