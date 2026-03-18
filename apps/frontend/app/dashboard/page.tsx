@@ -2,41 +2,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { campaignApi, conversationApi, contactApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
-import { Megaphone, Users, MessageSquare, Zap, TrendingUp, ArrowUpRight } from 'lucide-react'
+import { Megaphone, Users, MessageSquare, Zap, ArrowUpRight } from 'lucide-react'
 
 const metrics = [
-  {
-    label: 'Campanhas',
-    icon: Megaphone,
-    neon: '#00c3ff',
-    glow: 'rgba(0,195,255,0.3)',
-    href: '/dashboard/campaigns',
-    key: 'campaigns',
-  },
-  {
-    label: 'Contatos',
-    icon: Users,
-    neon: '#bf5fff',
-    glow: 'rgba(191,95,255,0.3)',
-    href: '/dashboard/contacts',
-    key: 'contacts',
-  },
-  {
-    label: 'Conversas Abertas',
-    icon: MessageSquare,
-    neon: '#00ff88',
-    glow: 'rgba(0,255,136,0.3)',
-    href: '/dashboard/inbox',
-    key: 'conversations',
-  },
-  {
-    label: 'Automações',
-    icon: Zap,
-    neon: '#ff3cac',
-    glow: 'rgba(255,60,172,0.3)',
-    href: '/dashboard/automations',
-    key: 'automations',
-  },
+  { key: 'campaigns',     label: 'Campanhas',        icon: Megaphone,      accent: '#a3e635' },
+  { key: 'contacts',      label: 'Contatos',          icon: Users,          accent: '#34d399' },
+  { key: 'conversations', label: 'Conversas Abertas', icon: MessageSquare,  accent: '#a3e635' },
+  { key: 'automations',   label: 'Automações',        icon: Zap,            accent: '#86efac' },
 ]
 
 export default function DashboardPage() {
@@ -56,10 +28,17 @@ export default function DashboardPage() {
   })
 
   const values: Record<string, { value: number; sub: string }> = {
-    campaigns:     { value: campaigns?.length ?? 0,       sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento` },
-    contacts:      { value: contactsMeta?.total ?? 0,     sub: 'na sua base' },
-    conversations: { value: conversations?.length ?? 0,   sub: `${conversations?.filter((c: any) => c.status === 'waiting').length || 0} aguardando` },
-    automations:   { value: 0,                            sub: 'em execução' },
+    campaigns:     { value: campaigns?.length ?? 0,     sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento` },
+    contacts:      { value: contactsMeta?.total ?? 0,   sub: 'na base' },
+    conversations: { value: conversations?.length ?? 0, sub: `${conversations?.filter((c: any) => c.status === 'waiting').length || 0} aguardando` },
+    automations:   { value: 0,                          sub: 'em execução' },
+  }
+
+  const hrefs: Record<string, string> = {
+    campaigns: '/dashboard/campaigns',
+    contacts: '/dashboard/contacts',
+    conversations: '/dashboard/inbox',
+    automations: '/dashboard/automations',
   }
 
   return (
@@ -67,60 +46,59 @@ export default function DashboardPage() {
 
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <TrendingUp size={18} color="#00ff88" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <div style={{ width: '3px', height: '16px', background: '#a3e635', borderRadius: '2px', boxShadow: '0 0 8px rgba(163,230,53,0.8)' }} />
           <span style={{
-            fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase',
-            color: '#00ff88', fontWeight: 600,
-            fontFamily: 'Syne, sans-serif',
-            textShadow: '0 0 10px rgba(0,255,136,0.5)',
+            fontFamily: 'Rajdhani, sans-serif',
+            fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: '#a3e635', fontWeight: 700,
           }}>
-            Visão geral
+            Visão Geral
           </span>
         </div>
         <h1 style={{
-          fontSize: '28px', fontWeight: 800,
-          fontFamily: 'Syne, sans-serif',
-          letterSpacing: '-0.03em',
-          lineHeight: 1,
-          color: '#fff',
+          fontFamily: 'Rajdhani, sans-serif',
+          fontSize: '32px', fontWeight: 700,
+          letterSpacing: '0.05em', textTransform: 'uppercase',
+          color: '#e8ffe0', lineHeight: 1,
         }}>
           Dashboard
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '14px', marginTop: '6px' }}>
+        <p style={{ color: 'rgba(232,255,224,0.4)', fontSize: '13px', marginTop: '6px' }}>
           Monitore sua operação em tempo real
         </p>
       </div>
 
       {/* Metric cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
-        {metrics.map(({ label, icon: Icon, neon, glow, href, key }) => {
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '28px' }}>
+        {metrics.map(({ key, label, icon: Icon, accent }) => {
           const { value, sub } = values[key]
           return (
             <div
               key={key}
-              onClick={() => router.push(href)}
+              onClick={() => router.push(hrefs[key])}
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: `1px solid ${neon}20`,
-                borderRadius: '16px',
-                padding: '24px',
+                background: 'rgba(10,30,18,0.8)',
+                border: `1px solid rgba(163,230,53,0.15)`,
+                borderRadius: '12px',
+                padding: '20px',
                 cursor: 'pointer',
                 position: 'relative',
                 overflow: 'hidden',
-                transition: 'all 0.25s ease',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(20px)',
               }}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLDivElement
-                el.style.background = `${neon}08`
-                el.style.borderColor = `${neon}40`
+                el.style.borderColor = 'rgba(163,230,53,0.4)'
+                el.style.background = 'rgba(15,40,24,0.9)'
                 el.style.transform = 'translateY(-2px)'
-                el.style.boxShadow = `0 8px 32px ${neon}15`
+                el.style.boxShadow = '0 8px 32px rgba(163,230,53,0.1)'
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLDivElement
-                el.style.background = 'rgba(255,255,255,0.03)'
-                el.style.borderColor = `${neon}20`
+                el.style.borderColor = 'rgba(163,230,53,0.15)'
+                el.style.background = 'rgba(10,30,18,0.8)'
                 el.style.transform = 'translateY(0)'
                 el.style.boxShadow = 'none'
               }}
@@ -128,61 +106,48 @@ export default function DashboardPage() {
               {/* Top glow line */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-                background: `linear-gradient(90deg, transparent, ${neon}60, transparent)`,
+                background: `linear-gradient(90deg, transparent, ${accent}80, transparent)`,
               }} />
 
-              {/* Background radial glow */}
+              {/* BG glow */}
               <div style={{
-                position: 'absolute', top: '-30px', right: '-30px',
-                width: '100px', height: '100px',
-                borderRadius: '50%',
-                background: `radial-gradient(circle, ${neon}15, transparent 70%)`,
+                position: 'absolute', top: '-20px', right: '-20px',
+                width: '80px', height: '80px', borderRadius: '50%',
+                background: `radial-gradient(circle, ${accent}12, transparent 70%)`,
                 pointerEvents: 'none',
               }} />
 
               {/* Icon */}
               <div style={{
-                width: '44px', height: '44px',
-                borderRadius: '12px',
-                background: `${neon}15`,
-                border: `1px solid ${neon}30`,
+                width: '40px', height: '40px', borderRadius: '10px',
+                background: `rgba(163,230,53,0.1)`,
+                border: `1px solid rgba(163,230,53,0.2)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: '16px',
-                boxShadow: `0 0 16px ${glow}`,
+                marginBottom: '14px',
+                boxShadow: `0 0 12px rgba(163,230,53,0.15)`,
               }}>
-                <Icon size={20} color={neon} />
+                <Icon size={18} color={accent} />
               </div>
 
               {/* Value */}
               <div style={{
-                fontSize: '38px', fontWeight: 800,
-                fontFamily: 'Syne, sans-serif',
-                letterSpacing: '-0.03em',
-                lineHeight: 1,
-                marginBottom: '6px',
-                color: '#fff',
-                textShadow: `0 0 20px ${neon}30`,
+                fontFamily: 'Rajdhani, sans-serif',
+                fontSize: '36px', fontWeight: 700,
+                letterSpacing: '0.02em',
+                color: '#e8ffe0',
+                lineHeight: 1, marginBottom: '4px',
               }}>
                 {value.toLocaleString()}
               </div>
 
-              {/* Label */}
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>
+              <div style={{ color: 'rgba(232,255,224,0.6)', fontSize: '13px', fontWeight: 500, marginBottom: '3px' }}>
                 {label}
               </div>
-
-              {/* Sub */}
-              <div style={{ color: neon, fontSize: '11px', fontWeight: 600, opacity: 0.8 }}>
+              <div style={{ color: accent, fontSize: '11px', fontWeight: 600, opacity: 0.8 }}>
                 {sub}
               </div>
 
-              {/* Arrow */}
-              <div style={{
-                position: 'absolute', top: '20px', right: '20px',
-                color: `${neon}50`,
-              }}>
-                <ArrowUpRight size={16} />
-              </div>
+              <ArrowUpRight size={14} style={{ position: 'absolute', top: '18px', right: '18px', color: 'rgba(163,230,53,0.3)' }} />
             </div>
           )
         })}
@@ -190,57 +155,57 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <div style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '16px',
-        padding: '24px',
+        background: 'rgba(10,30,18,0.8)',
+        border: '1px solid rgba(163,230,53,0.12)',
+        borderRadius: '12px',
+        padding: '22px',
         position: 'relative',
         overflow: 'hidden',
+        backdropFilter: 'blur(20px)',
       }}>
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(0,195,255,0.4), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(163,230,53,0.5), transparent)',
         }} />
 
         <h2 style={{
-          fontSize: '14px', fontWeight: 700,
-          fontFamily: 'Syne, sans-serif',
-          color: 'rgba(255,255,255,0.7)',
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase',
-          marginBottom: '16px',
+          fontFamily: 'Rajdhani, sans-serif',
+          fontSize: '12px', fontWeight: 700,
+          letterSpacing: '0.15em', textTransform: 'uppercase',
+          color: 'rgba(232,255,224,0.5)',
+          marginBottom: '14px',
         }}>
           Acesso rápido
         </h2>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {[
-            { label: '+ Nova campanha', href: '/dashboard/campaigns', neon: '#00c3ff' },
-            { label: '+ Importar contatos', href: '/dashboard/contacts', neon: '#bf5fff' },
-            { label: 'Abrir inbox', href: '/dashboard/inbox', neon: '#00ff88' },
-          ].map(({ label, href, neon }) => (
+            { label: '+ Nova campanha',    href: '/dashboard/campaigns' },
+            { label: '+ Importar contatos', href: '/dashboard/contacts' },
+            { label: 'Abrir inbox',         href: '/dashboard/inbox' },
+          ].map(({ label, href }) => (
             <button
               key={href}
               onClick={() => router.push(href)}
               style={{
-                padding: '10px 18px',
-                background: `${neon}10`,
-                border: `1px solid ${neon}30`,
-                borderRadius: '10px',
-                color: neon,
-                fontSize: '13px',
-                fontWeight: 600,
+                padding: '9px 16px',
+                background: 'rgba(163,230,53,0.08)',
+                border: '1px solid rgba(163,230,53,0.2)',
+                borderRadius: '8px',
+                color: '#a3e635',
+                fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
+                fontFamily: 'Inter, sans-serif',
               }}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLButtonElement
-                el.style.background = `${neon}20`
-                el.style.boxShadow = `0 0 16px ${neon}30`
+                el.style.background = 'rgba(163,230,53,0.15)'
+                el.style.boxShadow = '0 0 12px rgba(163,230,53,0.2)'
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLButtonElement
-                el.style.background = `${neon}10`
+                el.style.background = 'rgba(163,230,53,0.08)'
                 el.style.boxShadow = 'none'
               }}
             >
