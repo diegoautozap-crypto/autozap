@@ -11,6 +11,7 @@ const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
+// 0 = máximo possível (limitado apenas pelo tempo de resposta do Gupshup)
 const DELAY_BETWEEN_MESSAGES_MS = 0
 
 function getRedisConnection() {
@@ -116,8 +117,6 @@ async function sendViaFetch(
       'template=' + encodeURIComponent(templateJson),
     ].join('&')
 
-    logger.info('Sending to Gupshup', { phone, templateJson, body: body.slice(0, 400) })
-
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
       headers: {
@@ -129,7 +128,6 @@ async function sendViaFetch(
     })
 
     const data = await response.json() as any
-    logger.info('Gupshup response', { phone, status: data.status, messageId: data.messageId, data: JSON.stringify(data).slice(0, 200) })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
@@ -238,6 +236,7 @@ export function startCampaignWorker(): Worker {
       let processed = 0
 
       while (true) {
+        // Verifica pausa/cancelamento uma vez por lote (não por mensagem)
         const progress = await campaignService.getProgress(campaignId, tenantId)
         if (progress.status !== 'running') {
           logger.info('Campaign stopped', { campaignId, status: progress.status })
@@ -252,11 +251,12 @@ export function startCampaignWorker(): Worker {
 
         for (const contact of contacts) {
           try {
-            const check = await campaignService.getProgress(campaignId, tenantId)
-            if (check.status !== 'running') break
+            // ✅ Verifica pausa a cada 50 mensagens em vez de a cada 1
+            if (processed > 0 && processed % 50 === 0) {
+              const check = await campaignService.getProgress(campaignId, tenantId)
+              if (check.status !== 'running') break
+            }
 
-            // ✅ FIX: o banco salva \\r (escape duplo), precisa virar \r simples
-            // para o Gupshup interpretar como quebra de linha
             const contactMessage = (
               contact.variables?.mensagem ||
               contact.variables?.copy ||
@@ -268,26 +268,38 @@ export function startCampaignWorker(): Worker {
               .trim()
 
             const messageUuid = uuidv4()
+
+            // ✅ Só aguarda o fetch — tudo mais vai em background
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
             if (result.ok) {
-              saveToCrmAsync(tenantId, channelId, campaignId, contact.phone, contactMessage, messageUuid)
-              await campaignService.markContactSent(contact.id, messageUuid)
-              await campaignService.incrementCounter(campaignId, 'sent_count')
               processed++
-              try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
+              // ✅ Todas as queries de DB em background — não bloqueia o próximo envio
+              ;(async () => {
+                try {
+                  saveToCrmAsync(tenantId, channelId, campaignId, contact.phone, contactMessage, messageUuid)
+                  await campaignService.markContactSent(contact.id, messageUuid)
+                  await campaignService.incrementCounter(campaignId, 'sent_count')
+                  await db.rpc('increment_message_count', { p_tenant_id: tenantId })
+                } catch {}
+              })()
               logger.info('Message sent', { campaignId, phone: contact.phone, processed })
             } else {
               throw new Error(result.error || 'Gupshup error')
             }
 
           } catch (err: any) {
-            await campaignService.markContactFailed(contact.id, err.message)
-            await campaignService.incrementCounter(campaignId, 'failed_count')
+            // Falha também em background
+            ;(async () => {
+              try {
+                await campaignService.markContactFailed(contact.id, err.message)
+                await campaignService.incrementCounter(campaignId, 'failed_count')
+              } catch {}
+            })()
             logger.warn('Contact failed', { campaignId, phone: contact.phone, error: err.message })
           }
 
-          await sleep(DELAY_BETWEEN_MESSAGES_MS)
+          if (DELAY_BETWEEN_MESSAGES_MS > 0) await sleep(DELAY_BETWEEN_MESSAGES_MS)
         }
 
         await emitProgress(campaignId, tenantId)
