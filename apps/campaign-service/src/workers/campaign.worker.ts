@@ -13,6 +13,7 @@ const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
 const DELAY_BETWEEN_MESSAGES_MS = 0
 const PARALLEL_FETCHES = 5
+const PARALLEL_CRM = 5
 
 function getRedisConnection() {
   try {
@@ -57,7 +58,7 @@ interface ParsedCurl {
 }
 
 // ─── Fila controlada de CRM ───────────────────────────────────────────────────
-// Processa 1 item por vez para não sobrecarregar o Supabase
+// Processa PARALLEL_CRM itens por vez
 class CrmQueue {
   private queue: (() => Promise<void>)[] = []
   private running = false
@@ -70,8 +71,9 @@ class CrmQueue {
   private async process() {
     this.running = true
     while (this.queue.length > 0) {
-      const fn = this.queue.shift()!
-      try { await fn() } catch {}
+      // Pega PARALLEL_CRM itens e processa em paralelo
+      const batch = this.queue.splice(0, PARALLEL_CRM)
+      await Promise.all(batch.map(fn => fn().catch(() => {})))
     }
     this.running = false
   }
@@ -169,14 +171,10 @@ async function saveToCrm(
 ): Promise<void> {
   const cleanPhone = phone.replace(/^\+/, '')
 
-  // Marca contato como enviado
   await campaignService.markContactSent(contactId, messageUuid)
-
-  // Incrementa contadores
   await campaignService.incrementCounter(campaignId, 'sent_count')
   await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
 
-  // Contato
   let contactDbId: string
   const { data: existingContact } = await db
     .from('contacts').select('id')
@@ -196,7 +194,6 @@ async function saveToCrm(
     contactDbId = newContact!.id
   }
 
-  // Conversa
   let conversationId: string
   const { data: existingConv } = await db
     .from('conversations').select('id')
@@ -219,7 +216,6 @@ async function saveToCrm(
     conversationId = newConv!.id
   }
 
-  // Mensagem
   await db.from('messages').insert({
     id: generateId(),
     message_uuid: messageUuid,
@@ -257,7 +253,6 @@ export function startCampaignWorker(): Worker {
         throw new Error(`Failed to parse templateId from curl. source=${parsed.source}`)
       }
 
-      // Fila controlada — 1 operação CRM por vez, sem sobrecarregar Supabase
       const crmQueue = new CrmQueue()
       const processedIds = new Set<string>()
       let processed = 0
@@ -276,7 +271,6 @@ export function startCampaignWorker(): Worker {
           break
         }
 
-        // Processa em chunks de PARALLEL_FETCHES simultâneos
         for (let i = 0; i < pending.length; i += PARALLEL_FETCHES) {
           if (processed > 0 && processed % 100 === 0) {
             const check = await campaignService.getProgress(campaignId, tenantId)
@@ -285,7 +279,6 @@ export function startCampaignWorker(): Worker {
 
           const chunk = pending.slice(i, i + PARALLEL_FETCHES)
 
-          // ✅ 5 fetches simultâneos ao Gupshup
           await Promise.all(chunk.map(async (contact) => {
             try {
               const contactMessage = (
@@ -304,12 +297,9 @@ export function startCampaignWorker(): Worker {
               if (result.ok) {
                 processedIds.add(contact.id)
                 processed++
-
-                // ✅ CRM entra na fila controlada — 1 por vez, sem sobrecarga
                 crmQueue.add(() =>
                   saveToCrm(tenantId, channelId, campaignId, contact.id, contact.phone, contactMessage, messageUuid)
                 )
-
                 logger.info('Message sent', { campaignId, phone: contact.phone, processed })
               } else {
                 throw new Error(result.error || 'Gupshup error')
