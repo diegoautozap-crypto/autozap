@@ -6,8 +6,17 @@ import { ok, paginationSchema } from '@autozap/utils'
 
 const router = Router()
 
-// All routes require authentication
+// updated: trial plan support
 router.use(requireAuth)
+
+// ─── Limites por plano — inline para não depender do bundle de types ──────────
+const PLAN_LIMITS: Record<string, number | null> = {
+  trial:      100,
+  starter:    10_000,
+  pro:        50_000,
+  enterprise: 100_000,
+  unlimited:  null,
+}
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +37,6 @@ const updateRoleSchema = z.object({
 
 // ─── Tenant ───────────────────────────────────────────────────────────────────
 
-// GET /tenant — get current tenant info
 router.get('/', async (req, res, next) => {
   try {
     const tenant = await tenantService.getTenant(req.auth.tid)
@@ -38,7 +46,6 @@ router.get('/', async (req, res, next) => {
   }
 })
 
-// PATCH /tenant/name — update name (owner only)
 router.patch('/name', requireRole('owner'), validate(updateNameSchema), async (req, res, next) => {
   try {
     const tenant = await tenantService.updateName(req.auth.tid, req.body.name)
@@ -48,7 +55,6 @@ router.patch('/name', requireRole('owner'), validate(updateNameSchema), async (r
   }
 })
 
-// PATCH /tenant/settings
 router.patch('/settings', requireRole('admin', 'owner'), validate(updateSettingsSchema), async (req, res, next) => {
   try {
     const tenant = await tenantService.updateSettings(req.auth.tid, req.body)
@@ -58,7 +64,6 @@ router.patch('/settings', requireRole('admin', 'owner'), validate(updateSettings
   }
 })
 
-// GET /tenant/subscription
 router.get('/subscription', async (req, res, next) => {
   try {
     const subscription = await tenantService.getSubscription(req.auth.tid)
@@ -68,12 +73,11 @@ router.get('/subscription', async (req, res, next) => {
   }
 })
 
-// GET /tenant/usage — check current message usage vs limit
+// GET /tenant/usage
 router.get('/usage', async (req, res, next) => {
   try {
     const tenant = await tenantService.getTenant(req.auth.tid)
-    const { PLAN_LIMITS } = await import('@autozap/types')
-    const limit = PLAN_LIMITS[tenant.planSlug]
+    const limit = PLAN_LIMITS[tenant.planSlug] ?? null
     res.json(ok({
       sent: tenant.messagesSentThisPeriod,
       limit,
@@ -87,7 +91,6 @@ router.get('/usage', async (req, res, next) => {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-// GET /tenant/users
 router.get('/users', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const { page, limit } = paginationSchema.parse(req.query)
@@ -98,7 +101,6 @@ router.get('/users', requireRole('admin', 'owner'), async (req, res, next) => {
   }
 })
 
-// PATCH /tenant/users/:userId/role
 router.patch('/users/:userId/role', requireRole('owner'), validate(updateRoleSchema), async (req, res, next) => {
   try {
     await tenantService.updateUserRole(req.auth.tid, req.params.userId, req.body.role)
@@ -108,7 +110,6 @@ router.patch('/users/:userId/role', requireRole('owner'), validate(updateRoleSch
   }
 })
 
-// DELETE /tenant/users/:userId — deactivate user
 router.delete('/users/:userId', requireRole('owner'), async (req, res, next) => {
   try {
     await tenantService.deactivateUser(req.auth.tid, req.params.userId)
