@@ -17,11 +17,11 @@ function cleanText(text: string) {
   return (text || '').replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\n/g, '\n')
 }
 
-function getInitials(name: string) {
-  return (name || '??').slice(0, 2).toUpperCase()
+function getInitials(name: string | undefined | null) {
+  return ((name || '??').trim().slice(0, 2)).toUpperCase()
 }
 
-function getAvatarColor(name: string) {
+function getAvatarColor(name: string | undefined | null) {
   const colors = [
     { bg: '#dbeafe', color: '#1d4ed8' },
     { bg: '#dcfce7', color: '#15803d' },
@@ -30,7 +30,7 @@ function getAvatarColor(name: string) {
     { bg: '#ffedd5', color: '#c2410c' },
     { bg: '#e0f2fe', color: '#0369a1' },
   ]
-  const idx = (name || '').charCodeAt(0) % colors.length
+  const idx = ((name || '').charCodeAt(0) || 0) % colors.length
   return colors[idx]
 }
 
@@ -128,16 +128,10 @@ export default function InboxPage() {
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid #f3f4f6' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Inbox</h2>
-
-          {/* Search */}
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
-              style={{
-                width: '100%', padding: '7px 10px 7px 30px',
-                background: '#f9fafb', border: '1px solid #e5e7eb',
-                borderRadius: '6px', fontSize: '13px', outline: 'none', color: '#111827',
-              }}
+              style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', color: '#111827' }}
               placeholder="Buscar contato..."
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -177,7 +171,7 @@ export default function InboxPage() {
           ) : (
             conversations.map((conv: any) => {
               const isSelected = selectedConvId === conv.id
-              const name = conv.contacts?.name || conv.contacts?.phone || '??'
+              const name = conv.contacts?.name || conv.contacts?.phone || undefined
               const av = getAvatarColor(name)
               return (
                 <div
@@ -206,7 +200,7 @@ export default function InboxPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {name}
+                        {name || '??'}
                       </span>
                       {conv.last_message_at && (
                         <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0, marginLeft: '6px' }}>
@@ -242,27 +236,16 @@ export default function InboxPage() {
         ) : (
           <>
             {/* Chat header */}
-            <div style={{
-              padding: '12px 20px',
-              borderBottom: '1px solid #e5e7eb',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: '#fff',
-            }}>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '36px', height: '36px', borderRadius: '50%',
-                  background: avatarColor.bg, color: avatarColor.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: 700,
-                }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>
                   {getInitials(contactName)}
                 </div>
                 <div>
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>{contactName}</p>
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>{contactName || '??'}</p>
                   <p style={{ fontSize: '12px', color: '#9ca3af' }}>{selectedConv?.contacts?.phone}</p>
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: '6px' }}>
                 {selectedConv?.status !== 'closed' ? (
                   <button
@@ -271,7 +254,7 @@ export default function InboxPage() {
                       queryClient.invalidateQueries({ queryKey: ['conversations'] })
                       queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
                     }}
-                    style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 500, transition: 'all 0.1s' }}
+                    style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 500 }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
                   >
@@ -293,12 +276,7 @@ export default function InboxPage() {
             </div>
 
             {/* Messages */}
-            <div style={{
-              flex: 1, overflowY: 'auto',
-              padding: '20px',
-              display: 'flex', flexDirection: 'column', gap: '6px',
-              background: '#f6f8fa',
-            }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
               {loadingMessages ? (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
                   <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
@@ -311,8 +289,7 @@ export default function InboxPage() {
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        maxWidth: '65%',
-                        padding: '10px 14px',
+                        maxWidth: '65%', padding: '10px 14px',
                         borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                         background: isOut ? '#16a34a' : '#fff',
                         color: isOut ? '#fff' : '#111827',
@@ -340,11 +317,7 @@ export default function InboxPage() {
               <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                 <form onSubmit={handleSend} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
-                    style={{
-                      flex: 1, padding: '10px 14px',
-                      background: '#f9fafb', border: '1px solid #e5e7eb',
-                      borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827',
-                    }}
+                    style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827' }}
                     placeholder="Digite uma mensagem..."
                     value={messageText}
                     onChange={e => setMessageText(e.target.value)}
