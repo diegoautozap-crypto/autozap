@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi } from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Search, Send, Loader2, MessageSquare, CheckCheck } from 'lucide-react'
+import Pusher from 'pusher-js'
 
 const statusFilters = [
   { key: 'all',     label: 'Todas' },
@@ -41,7 +43,44 @@ export default function InboxPage() {
   const [statusFilter, setStatusFilter] = useState('open')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
 
+  // ── Pusher realtime ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
+    if (!key || !user) return
+
+    const pusher = new Pusher(key, { cluster })
+
+    // Pega o tenantId do JWT decodificado via auth store
+    // O user tem o tenantId disponível via store
+    const tenantId = (user as any)?.tenantId || (user as any)?.tid
+    if (!tenantId) return
+
+    const channel = pusher.subscribe(`tenant-${tenantId}`)
+
+    // Nova mensagem recebida — atualiza lista e mensagens abertas
+    channel.bind('inbound.message', (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      if (data?.conversationId === selectedConvId) {
+        queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
+      }
+    })
+
+    // Conversa atualizada (status, última mensagem)
+    channel.bind('conversation.updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    return () => {
+      channel.unbind_all()
+      pusher.unsubscribe(`tenant-${tenantId}`)
+      pusher.disconnect()
+    }
+  }, [user, selectedConvId, queryClient])
+
+  // ── Queries ──────────────────────────────────────────────────────────────
   const { data: convData, isLoading: loadingConvs } = useQuery({
     queryKey: ['conversations', statusFilter],
     queryFn: async () => {
@@ -49,7 +88,7 @@ export default function InboxPage() {
       const { data } = await conversationApi.get(url)
       return data.data
     },
-    refetchInterval: 2000,
+    refetchInterval: 5000,
   })
 
   const { data: selectedConv } = useQuery({
@@ -68,7 +107,7 @@ export default function InboxPage() {
       return data.data
     },
     enabled: !!selectedConvId,
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   })
 
   const sendMutation = useMutation({
@@ -86,6 +125,7 @@ export default function InboxPage() {
     onSuccess: () => {
       setMessageText('')
       queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao enviar'),
   })
@@ -119,12 +159,8 @@ export default function InboxPage() {
     <div style={{ display: 'flex', height: '100%', background: '#f6f8fa' }}>
 
       {/* ── Left: conversation list ── */}
-      <div style={{
-        width: '300px', flexShrink: 0,
-        background: '#fff',
-        borderRight: '1px solid #e5e7eb',
-        display: 'flex', flexDirection: 'column',
-      }}>
+      <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid #f3f4f6' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Inbox</h2>
@@ -179,8 +215,7 @@ export default function InboxPage() {
                   onClick={() => handleSelectConv(conv.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '11px 14px',
-                    borderBottom: '1px solid #f9fafb',
+                    padding: '11px 14px', borderBottom: '1px solid #f9fafb',
                     cursor: 'pointer',
                     background: isSelected ? '#f0fdf4' : 'transparent',
                     borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent',
@@ -189,12 +224,7 @@ export default function InboxPage() {
                   onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                   onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                 >
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '50%',
-                    background: av.bg, color: av.color,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '12px', fontWeight: 700, flexShrink: 0,
-                  }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
                     {getInitials(name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
