@@ -56,41 +56,31 @@ interface ParsedCurl {
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
-  // Normaliza quebras de linha e continuações
   const curlStr = curlTemplate
     .split('\n')
     .map(line => line.trimEnd().replace(/\\$/, ''))
     .join(' ')
     .trim()
 
-  // Extrai apikey do header -H "apikey: xxx"
   const apiKeyMatch = curlStr.match(/apikey:\s*([^\s"'\\]+)/)
   const apiKey = apiKeyMatch?.[1] || ''
 
-  // Extrai o body do -d "..." ou -d '...'
-  // Para aspas duplas com escapes internos, pega tudo após -d " até o fim da string
-  let bodyRaw = ''
-
-  // Tenta aspas simples primeiro
   const singleQuoteMatch = curlStr.match(/-d\s+'([^']+)'/)
+  let bodyRaw = ''
   if (singleQuoteMatch) {
     bodyRaw = singleQuoteMatch[1]
   } else {
-    // Aspas duplas com possíveis \" internos — pega tudo após -d "
-    const doubleQuoteMatch = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/  )
+    const doubleQuoteMatch = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
     if (doubleQuoteMatch) {
-      // Desfaz os escapes: \" → "
       bodyRaw = doubleQuoteMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
     }
   }
 
   const params = new URLSearchParams(bodyRaw)
-
   const source = params.get('source') || ''
   const srcName = params.get('src.name') || ''
   const channel = params.get('channel') || 'whatsapp'
 
-  // Extrai templateId
   const templateParam = params.get('template') || ''
   let templateId = ''
   try {
@@ -104,7 +94,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   }
 
   logger.info('Curl parsed result', { apiKey: apiKey.slice(0, 8) + '...', source, srcName, templateId, channel })
-
   return { apiKey, source, srcName, templateId, channel }
 }
 
@@ -114,13 +103,22 @@ async function sendViaFetch(
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const body = new URLSearchParams({
-      channel: parsed.channel,
-      source: parsed.source,
-      destination: phone,
-      'src.name': parsed.srcName,
-      template: JSON.stringify({ id: parsed.templateId, params: [message] }),
+    // ✅ message vem com \r literal do CSV (ex: "Olá!\rTemos novidades")
+    // JSON.stringify vai manter o \r como \r no JSON
+    // encodeURIComponent vai encodar corretamente para o Gupshup
+    const templateJson = JSON.stringify({
+      id: parsed.templateId,
+      params: [message],
     })
+
+    // Body montado manualmente — controle total do encoding
+    const body = [
+      'channel=' + encodeURIComponent(parsed.channel),
+      'source=' + encodeURIComponent(parsed.source),
+      'destination=' + encodeURIComponent(phone),
+      'src.name=' + encodeURIComponent(parsed.srcName),
+      'template=' + encodeURIComponent(templateJson),
+    ].join('&')
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
@@ -129,12 +127,10 @@ async function sendViaFetch(
         'Content-Type': 'application/x-www-form-urlencoded',
         'Cache-Control': 'no-cache',
       },
-      body: body.toString(),
+      body,
     })
 
     const data = await response.json() as any
-
-    // Loga a resposta para debug
     logger.info('Gupshup response', { phone, status: data.status, messageId: data.messageId, data: JSON.stringify(data).slice(0, 200) })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
@@ -237,9 +233,8 @@ export function startCampaignWorker(): Worker {
 
       const parsed = parseCurlTemplate(curlTemplate)
 
-      // Valida que o parse funcionou
       if (!parsed.templateId) {
-        throw new Error(`Failed to parse templateId from curl. apiKey=${parsed.apiKey.slice(0,8)} source=${parsed.source}`)
+        throw new Error(`Failed to parse templateId from curl. source=${parsed.source}`)
       }
 
       let processed = 0
@@ -262,15 +257,13 @@ export function startCampaignWorker(): Worker {
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
 
+            // ✅ Mantém \r literal — não converte nada
+            // O Gupshup interpreta \r como quebra de linha no template
             const contactMessage = (
               contact.variables?.mensagem ||
               contact.variables?.copy ||
               ''
-            )
-              .replace(/\\r\\n/g, '\n')  // \r\n literal → \n real (vira %0A no URL)
-              .replace(/\\r/g, '\n')     // \r literal → \n real (vira %0A no URL)
-              .replace(/\\n/g, '\n')     // \n literal → \n real (vira %0A no URL)
-              .trim()
+            ).trim()
 
             const messageUuid = uuidv4()
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
