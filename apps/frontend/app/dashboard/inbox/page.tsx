@@ -198,14 +198,16 @@ export default function InboxPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm'
+      const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
 
       mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const file = new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' })
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm'
+        const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mimeType })
         stream.getTracks().forEach(t => t.stop())
         setIsRecording(false)
         setRecordingSeconds(0)
