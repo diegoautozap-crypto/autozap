@@ -85,6 +85,8 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     if (contentType) res.setHeader('Content-Type', contentType)
     if (contentLength) res.setHeader('Content-Length', contentLength)
     res.setHeader('Cache-Control', 'public, max-age=86400')
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    res.setHeader('Access-Control-Allow-Origin', '*')
 
     const buffer = await mediaResponse.arrayBuffer()
     res.send(Buffer.from(buffer))
