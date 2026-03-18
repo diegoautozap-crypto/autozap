@@ -4,7 +4,10 @@ import { logger } from '../lib/logger'
 import { AppError, NotFoundError, generateId } from '@autozap/utils'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const PUSHER_APP_ID = process.env.PUSHER_APP_ID
+const PUSHER_KEY = process.env.PUSHER_KEY
+const PUSHER_SECRET = process.env.PUSHER_SECRET
+const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
 
 export interface QueueMessageInput {
   tenantId: string
@@ -18,18 +21,33 @@ export interface QueueMessageInput {
   campaignId?: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Retorna true se o nome parece um número de telefone (ou seja, não é um nome real)
 function looksLikePhone(name: string): boolean {
   return /^[\d\s\+\-\(\)]+$/.test(name.trim())
 }
 
-// ─── MessageService ───────────────────────────────────────────────────────────
+async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
+  if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
+  try {
+    const body = JSON.stringify({
+      name: event,
+      channel: `tenant-${tenantId}`,
+      data: JSON.stringify(data),
+    })
+    const crypto = await import('crypto')
+    const timestamp = Math.floor(Date.now() / 1000)
+    const md5Body = crypto.createHash('md5').update(body).digest('hex')
+    const stringToSign = `POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${timestamp}&auth_version=1.0&body_md5=${md5Body}`
+    const signature = crypto.createHmac('sha256', PUSHER_SECRET).update(stringToSign).digest('hex')
+    await fetch(
+      `https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${timestamp}&auth_version=1.0&body_md5=${md5Body}&auth_signature=${signature}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+    )
+  } catch (err) {
+    logger.error('Failed to emit Pusher event', { err })
+  }
+}
 
 export class MessageService {
-
-  // ── Queue outbound message ─────────────────────────────────────────────────
 
   async queueMessage(input: QueueMessageInput): Promise<string> {
     const messageUuid = uuidv4()
@@ -56,15 +74,11 @@ export class MessageService {
     return messageUuid
   }
 
-  // ── Process inbound message ────────────────────────────────────────────────
-
   async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
     // 1. Find or create contact
     const contact = await this.findOrCreateContact(tenantId, msg.from)
 
-    // ✅ BUG CORRIGIDO: atualiza o nome sempre que:
-    //    - vier um senderName no payload
-    //    - E o nome atual parecer um número (não é nome real)
+    // Atualiza nome se vier do payload e parecer número
     const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
     if (senderName && (!contact.name || looksLikePhone(contact.name))) {
       await db.from('contacts')
@@ -112,14 +126,21 @@ export class MessageService {
       last_interaction_at: msg.timestamp,
     }).eq('id', contact.id)
 
+    // ✅ 6. Emit Pusher — notifica frontend em tempo real
+    emitPusher(tenantId, 'inbound.message', {
+      conversationId: conversation.id,
+      contactId: contact.id,
+      body: msg.body,
+      contentType: msg.contentType,
+      timestamp: msg.timestamp,
+    })
+
     logger.info('Inbound message processed', {
       tenantId,
       contactId: contact.id,
       conversationId: conversation.id,
     })
   }
-
-  // ── Update message status from webhook ────────────────────────────────────
 
   async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage } = update
@@ -147,8 +168,6 @@ export class MessageService {
     logger.debug('Message status updated', { externalId, status })
   }
 
-  // ── Mark message as sent ───────────────────────────────────────────────────
-
   async markSent(messageUuid: string, externalId: string): Promise<void> {
     await db.from('messages').update({
       status: 'sent',
@@ -166,8 +185,6 @@ export class MessageService {
     }).eq('message_uuid', messageUuid)
   }
 
-  // ── Get pending messages for reconciliation ────────────────────────────────
-
   async getPendingMessages(tenantId: string, olderThanMinutes = 5) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000)
 
@@ -182,8 +199,6 @@ export class MessageService {
 
     return data || []
   }
-
-  // ── List messages in conversation (paginated) ──────────────────────────────
 
   async listMessages(conversationId: string, tenantId: string, cursor?: string, limit = 30) {
     let query = db
@@ -203,11 +218,8 @@ export class MessageService {
     return data || []
   }
 
-  // ── Private ────────────────────────────────────────────────────────────────
-
   private async findOrCreateContact(tenantId: string, phone: string) {
     phone = phone.replace(/^\+/, '')
-    // Normaliza número brasileiro: garante o 9 após o DDD
     if (phone.startsWith('55') && phone.length === 12) {
       phone = phone.slice(0, 4) + '9' + phone.slice(4)
     }
@@ -227,7 +239,7 @@ export class MessageService {
         id: generateId(),
         tenant_id: tenantId,
         phone,
-        name: phone, // Will be updated when we get the contact's name
+        name: phone,
         origin: 'inbound',
         status: 'active',
         last_interaction_at: new Date(),
@@ -245,7 +257,6 @@ export class MessageService {
     contactId: string,
     channelType: string,
   ) {
-    // Look for open conversation
     const { data: existing } = await db
       .from('conversations')
       .select('id')
@@ -259,7 +270,6 @@ export class MessageService {
 
     if (existing) return existing
 
-    // Create new conversation
     const { data: created, error } = await db
       .from('conversations')
       .insert({
