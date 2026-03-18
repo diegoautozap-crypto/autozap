@@ -1,284 +1,169 @@
-import { v4 as uuidv4 } from 'uuid'
-import { db } from '../lib/db'
+import { Worker, Queue } from 'bullmq'
 import { logger } from '../lib/logger'
-import { AppError, NotFoundError, generateId } from '@autozap/utils'
-import type { NormalizedMessage, MessageStatusUpdate } from './types'
+import { messageService } from '../services/message.service'
+import { db } from '../lib/db'
+import { sleep, randomBetween } from '@autozap/utils'
+import type { SendMessageJob } from '../services/types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const REDIS_URL = process.env.REDIS_URL!
+const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
 
-export interface QueueMessageInput {
-  tenantId: string
-  channelId: string
-  contactId: string
-  conversationId: string
-  to: string
-  contentType: string
-  body?: string
-  mediaUrl?: string
-  campaignId?: string
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Retorna true se o nome parece um número de telefone (ou seja, não é um nome real)
-function looksLikePhone(name: string): boolean {
-  return /^[\d\s\+\-\(\)]+$/.test(name.trim())
-}
-
-// ─── MessageService ───────────────────────────────────────────────────────────
-
-export class MessageService {
-
-  // ── Queue outbound message ─────────────────────────────────────────────────
-
-  async queueMessage(input: QueueMessageInput): Promise<string> {
-    const messageUuid = uuidv4()
-
-    const { data, error } = await db.from('messages').insert({
-      id: generateId(),
-      message_uuid: messageUuid,
-      tenant_id: input.tenantId,
-      conversation_id: input.conversationId,
-      channel_id: input.channelId,
-      contact_id: input.contactId,
-      direction: 'outbound',
-      content_type: input.contentType,
-      body: input.body,
-      media_url: input.mediaUrl,
-      status: 'queued',
-      campaign_id: input.campaignId,
-      retry_count: 0,
-    }).select('id').single()
-
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
-
-    logger.debug('Message queued', { messageUuid, tenantId: input.tenantId })
-    return messageUuid
-  }
-
-  // ── Process inbound message ────────────────────────────────────────────────
-
-  async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
-    // 1. Find or create contact
-    const contact = await this.findOrCreateContact(tenantId, msg.from)
-
-    // ✅ BUG CORRIGIDO: atualiza o nome sempre que:
-    //    - vier um senderName no payload
-    //    - E o nome atual parecer um número (não é nome real)
-    const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
-    if (senderName && (!contact.name || looksLikePhone(contact.name))) {
-      await db.from('contacts')
-        .update({ name: senderName })
-        .eq('id', contact.id)
-      logger.info('Contact name updated from inbound', {
-        contactId: contact.id,
-        oldName: contact.name,
-        newName: senderName,
-      })
+function getRedisConnection() {
+  try {
+    const url = new URL(REDIS_URL)
+    return {
+      host: url.hostname,
+      port: Number(url.port) || 6379,
+      password: url.password || undefined,
+      username: url.username || undefined,
+      tls: url.protocol === 'rediss:' ? {} : undefined,
     }
-
-    // 2. Find or create conversation
-    const conversation = await this.findOrCreateConversation(tenantId, channelId, contact.id, msg.channelType)
-
-    // 3. Save message
-    await db.from('messages').insert({
-      id: generateId(),
-      message_uuid: uuidv4(),
-      tenant_id: tenantId,
-      conversation_id: conversation.id,
-      channel_id: channelId,
-      contact_id: contact.id,
-      direction: 'inbound',
-      content_type: msg.contentType,
-      body: msg.body,
-      media_url: msg.mediaUrl,
-      media_mime_type: msg.mediaMimeType,
-      external_id: msg.externalId,
-      status: 'delivered',
-      sent_at: msg.timestamp,
-      delivered_at: msg.timestamp,
-    })
-
-    // 4. Update conversation
-    await db.from('conversations').update({
-      last_message: msg.body || `[${msg.contentType}]`,
-      last_message_at: msg.timestamp,
-      unread_count: db.rpc('increment_unread', { p_conversation_id: conversation.id }) as any,
-      status: 'open',
-    }).eq('id', conversation.id)
-
-    // 5. Update contact last interaction
-    await db.from('contacts').update({
-      last_interaction_at: msg.timestamp,
-    }).eq('id', contact.id)
-
-    logger.info('Inbound message processed', {
-      tenantId,
-      contactId: contact.id,
-      conversationId: conversation.id,
-    })
-  }
-
-  // ── Update message status from webhook ────────────────────────────────────
-
-  async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
-    const { externalId, status, timestamp, errorMessage } = update
-
-    const updateData: Record<string, unknown> = { status }
-
-    if (status === 'delivered') updateData.delivered_at = timestamp
-    if (status === 'read') updateData.read_at = timestamp
-    if (status === 'failed') {
-      updateData.failed_at = timestamp
-      updateData.error_message = errorMessage
-    }
-
-    const { error } = await db
-      .from('messages')
-      .update(updateData)
-      .eq('external_id', externalId)
-      .eq('tenant_id', tenantId)
-
-    if (error) {
-      logger.error('Failed to update message status', { externalId, status, error })
-      return
-    }
-
-    logger.debug('Message status updated', { externalId, status })
-  }
-
-  // ── Mark message as sent ───────────────────────────────────────────────────
-
-  async markSent(messageUuid: string, externalId: string): Promise<void> {
-    await db.from('messages').update({
-      status: 'sent',
-      external_id: externalId,
-      sent_at: new Date(),
-    }).eq('message_uuid', messageUuid)
-  }
-
-  async markFailed(messageUuid: string, errorMessage: string, retryCount: number): Promise<void> {
-    await db.from('messages').update({
-      status: retryCount >= 3 ? 'failed' : 'queued',
-      error_message: errorMessage,
-      retry_count: retryCount,
-      failed_at: retryCount >= 3 ? new Date() : null,
-    }).eq('message_uuid', messageUuid)
-  }
-
-  // ── Get pending messages for reconciliation ────────────────────────────────
-
-  async getPendingMessages(tenantId: string, olderThanMinutes = 5) {
-    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000)
-
-    const { data } = await db
-      .from('messages')
-      .select('id, message_uuid, external_id, channel_id, tenant_id')
-      .eq('tenant_id', tenantId)
-      .in('status', ['queued', 'sent'])
-      .lt('sent_at', cutoff.toISOString())
-      .not('external_id', 'is', null)
-      .limit(100)
-
-    return data || []
-  }
-
-  // ── List messages in conversation (paginated) ──────────────────────────────
-
-  async listMessages(conversationId: string, tenantId: string, cursor?: string, limit = 30) {
-    let query = db
-      .from('messages')
-      .select('id, direction, content_type, body, media_url, status, sent_at, created_at, external_id')
-      .eq('conversation_id', conversationId)
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (cursor) {
-      query = query.lt('created_at', cursor)
-    }
-
-    const { data, error } = await query
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
-    return data || []
-  }
-
-  // ── Private ────────────────────────────────────────────────────────────────
-
-  private async findOrCreateContact(tenantId: string, phone: string) {
-    phone = phone.replace(/^\+/, '')
-    // Normaliza número brasileiro: garante o 9 após o DDD
-    if (phone.startsWith('55') && phone.length === 12) {
-      phone = phone.slice(0, 4) + '9' + phone.slice(4)
-    }
-
-    const { data: existing } = await db
-      .from('contacts')
-      .select('id, name')
-      .eq('tenant_id', tenantId)
-      .eq('phone', phone)
-      .maybeSingle()
-
-    if (existing) return existing
-
-    const { data: created, error } = await db
-      .from('contacts')
-      .insert({
-        id: generateId(),
-        tenant_id: tenantId,
-        phone,
-        name: phone, // Will be updated when we get the contact's name
-        origin: 'inbound',
-        status: 'active',
-        last_interaction_at: new Date(),
-      })
-      .select('id, name')
-      .single()
-
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
-    return created
-  }
-
-  private async findOrCreateConversation(
-    tenantId: string,
-    channelId: string,
-    contactId: string,
-    channelType: string,
-  ) {
-    // Look for open conversation
-    const { data: existing } = await db
-      .from('conversations')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('contact_id', contactId)
-      .eq('channel_id', channelId)
-      .in('status', ['open', 'waiting'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (existing) return existing
-
-    // Create new conversation
-    const { data: created, error } = await db
-      .from('conversations')
-      .insert({
-        id: generateId(),
-        tenant_id: tenantId,
-        contact_id: contactId,
-        channel_id: channelId,
-        channel_type: channelType,
-        status: 'open',
-        pipeline_stage: 'lead',
-        unread_count: 1,
-        last_message_at: new Date(),
-      })
-      .select('id')
-      .single()
-
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
-    return created
+  } catch {
+    return { host: 'localhost', port: 6379 }
   }
 }
 
-export const messageService = new MessageService()
+const connection = getRedisConnection()
+
+export const messageQueue = new Queue<SendMessageJob>('message_queue', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: 'custom',
+    },
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 },
+  },
+})
+
+export const retryQueue = new Queue<SendMessageJob>('retry_queue', {
+  connection,
+  defaultJobOptions: {
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  },
+})
+
+export function startMessageWorker(): Worker {
+  const worker = new Worker<SendMessageJob>(
+    'message_queue',
+    async (job) => {
+      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount, campaignId } = job.data
+
+      logger.debug('Processing message job', { messageUuid, to, attempt: retryCount })
+
+      const delay = randomBetween(1000, 3000)
+      await sleep(delay)
+
+      try {
+        const response = await fetch(`${CHANNEL_SERVICE_URL}/internal/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': INTERNAL_SECRET,
+          },
+          body: JSON.stringify({
+            messageUuid,
+            channelId,
+            tenantId,
+            to,
+            contentType,
+            body,
+            mediaUrl,
+          }),
+        })
+
+        const result = await response.json() as any
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error?.message || `HTTP ${response.status}`)
+        }
+
+        // Mark as sent in DB
+        await messageService.markSent(messageUuid, result.data.externalId)
+
+        // Incrementa contador de uso do tenant (somente campanhas)
+        if (campaignId) {
+          await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+        }
+
+        logger.info('Message sent successfully', {
+          messageUuid,
+          externalId: result.data.externalId,
+          tenantId,
+        })
+
+      } catch (err: any) {
+        const newRetryCount = retryCount + 1
+        const errMsg = err.message || 'Unknown error'
+
+        logger.warn('Message send failed', { messageUuid, retryCount: newRetryCount, error: errMsg })
+
+        if (newRetryCount >= 3) {
+          await messageService.markFailed(messageUuid, errMsg, newRetryCount)
+          logger.error('Message permanently failed', { messageUuid, error: errMsg })
+          return
+        }
+
+        const delays = [10_000, 30_000, 120_000]
+        const retryDelay = delays[newRetryCount - 1] || 120_000
+
+        await messageService.markFailed(messageUuid, errMsg, newRetryCount)
+
+        await retryQueue.add(
+          'retry',
+          { ...job.data, retryCount: newRetryCount },
+          { delay: retryDelay },
+        )
+      }
+    },
+    {
+      connection,
+      concurrency: 5,
+      limiter: {
+        max: 20,
+        duration: 60_000,
+      },
+    },
+  )
+
+  worker.on('completed', (job) => {
+    logger.debug('Job completed', { jobId: job.id })
+  })
+
+  worker.on('failed', (job, err) => {
+    logger.error('Job failed', { jobId: job?.id, error: err.message })
+  })
+
+  logger.info('Message worker started')
+  return worker
+}
+
+export function startRetryWorker(): Worker {
+  const worker = new Worker<SendMessageJob>(
+    'retry_queue',
+    async (job) => {
+      await messageQueue.add('send', job.data, { priority: 1 })
+    },
+    { connection },
+  )
+
+  logger.info('Retry worker started')
+  return worker
+}
+
+export async function startReconciliationJob(): Promise<void> {
+  const run = async () => {
+    try {
+      logger.debug('Running reconciliation job')
+      logger.debug('Reconciliation job completed')
+    } catch (err) {
+      logger.error('Reconciliation job error', { err })
+    }
+  }
+
+  await run()
+  setInterval(run, 5 * 60 * 1000)
+}
