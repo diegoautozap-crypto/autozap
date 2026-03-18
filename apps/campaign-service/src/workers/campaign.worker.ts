@@ -266,7 +266,11 @@ export function startCampaignWorker(): Worker {
               contact.variables?.mensagem ||
               contact.variables?.copy ||
               ''
-            ).trim()
+            )
+              .replace(/\\r\\n/g, '\n')  // \r\n literal → \n real (vira %0A no URL)
+              .replace(/\\r/g, '\n')     // \r literal → \n real (vira %0A no URL)
+              .replace(/\\n/g, '\n')     // \n literal → \n real (vira %0A no URL)
+              .trim()
 
             const messageUuid = uuidv4()
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
