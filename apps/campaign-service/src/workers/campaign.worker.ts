@@ -110,13 +110,15 @@ async function ensureContactAndConversation(
   return { contactId, conversationId }
 }
 
-// ─── Parseia o curl template ──────────────────────────────────────────────────
+// ─── Parseia curl e extrai tudo que precisa ───────────────────────────────────
 interface ParsedCurl {
   apiKey: string
   source: string
   srcName: string
   templateId: string
   channel: string
+  // body original com destination como placeholder
+  bodyTemplate: string
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
@@ -129,6 +131,7 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const apiKeyMatch = curlStr.match(/apikey:\s*([^\s"'\\]+)/)
   const apiKey = apiKeyMatch?.[1] || ''
 
+  // Extrai o body original — mantém tudo igual, só vamos trocar o destination
   const singleQuoteMatch = curlStr.match(/-d\s+'([^']+)'/)
   let bodyRaw = ''
   if (singleQuoteMatch) {
@@ -157,28 +160,48 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     }
   }
 
-  return { apiKey, source, srcName, templateId, channel }
+  // bodyTemplate: o body original com destination como __PHONE__
+  const bodyTemplate = bodyRaw
+    .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
+    .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
+
+  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...', source, srcName, templateId, channel })
+
+  return { apiKey, source, srcName, templateId, channel, bodyTemplate }
 }
 
-// ─── Envia via fetch direto ───────────────────────────────────────────────────
+// ─── Envia via fetch — usa body original, só troca o destination ──────────────
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const templateJson = JSON.stringify({
-      id: parsed.templateId,
-      params: [message],
-    })
+    // Substitui o phone no body original
+    let body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
 
-    const body = [
-      'channel=' + encodeURIComponent(parsed.channel),
-      'source=' + encodeURIComponent(parsed.source),
-      'destination=' + encodeURIComponent(phone),
-      'src.name=' + encodeURIComponent(parsed.srcName),
-      'template=' + encodeURIComponent(templateJson),
-    ].join('&')
+    // Se tiver mensagem no CSV, substitui o params do template
+    if (message) {
+      const cleanMessage = message
+        .replace(/\\r\\n/g, '\r\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\n/g, '\n')
+        .trim()
+
+      // Substitui o params dentro do template já encodado
+      const templateParam = new URLSearchParams(body).get('template') || ''
+      try {
+        const templateObj = JSON.parse(decodeURIComponent(templateParam))
+        templateObj.params = [cleanMessage]
+        const newTemplate = encodeURIComponent(JSON.stringify(templateObj))
+        body = body.replace(
+          /template=[^&]*/,
+          'template=' + newTemplate
+        )
+      } catch {
+        // Se falhar o parse, mantém o template original
+      }
+    }
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
@@ -191,6 +214,8 @@ async function sendViaFetch(
     })
 
     const data = await response.json() as any
+    logger.debug('Gupshup response', { phone, status: data.status, data: JSON.stringify(data).slice(0, 200) })
+
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
     return { ok: false, error: JSON.stringify(data) }
@@ -280,6 +305,11 @@ export function startCampaignWorker(): Worker {
       if (!curlTemplate) throw new Error('No curl template configured')
       const parsed = parseCurlTemplate(curlTemplate)
 
+      if (!parsed.templateId) {
+        logger.error('Failed to parse templateId', { campaignId, curlPreview: curlTemplate.slice(0, 100) })
+        throw new Error('Failed to parse templateId from curl')
+      }
+
       let processed = 0
 
       while (true) {
@@ -304,7 +334,7 @@ export function startCampaignWorker(): Worker {
             const canContinue = await checkPlanLimit(tenantId)
             if (!canContinue) {
               await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
-              logger.warn('Campaign paused — plan limit reached mid-run', { campaignId, tenantId, processed })
+              logger.warn('Campaign paused — plan limit reached', { campaignId, tenantId, processed })
               break
             }
           }
