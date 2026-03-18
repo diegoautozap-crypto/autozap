@@ -11,9 +11,7 @@ const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-// ─── Delay entre mensagens (ms) ──────────────────────────────────────────────
-// 200ms = ~300 msgs/min | 100ms = ~600 msgs/min | 50ms = ~1200 msgs/min
-const DELAY_BETWEEN_MESSAGES_MS = 100
+const DELAY_BETWEEN_MESSAGES_MS = 50
 
 function getRedisConnection() {
   try {
@@ -49,7 +47,6 @@ export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   },
 })
 
-// ─── Parseia o curl template e extrai os campos necessários ──────────────────
 interface ParsedCurl {
   apiKey: string
   source: string
@@ -59,64 +56,70 @@ interface ParsedCurl {
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
-  // Normaliza o curl (remove quebras de linha e barras de continuação)
+  // Normaliza quebras de linha e continuações
   const curlStr = curlTemplate
     .split('\n')
     .map(line => line.trimEnd().replace(/\\$/, ''))
     .join(' ')
     .trim()
 
-  // Extrai apikey do header
-  const apiKeyMatch = curlStr.match(/apikey:\s*([^\s'"]+)/)
+  // Extrai apikey do header -H "apikey: xxx"
+  const apiKeyMatch = curlStr.match(/apikey:\s*([^\s"'\\]+)/)
   const apiKey = apiKeyMatch?.[1] || ''
 
-  // Extrai o body -d '...'
-  const bodyMatch = curlStr.match(/-d\s+'([^']+)'/) || curlStr.match(/-d\s+"([^"]+)"/)
-  const bodyRaw = bodyMatch?.[1] || ''
+  // Extrai o body do -d "..." ou -d '...'
+  // Para aspas duplas com escapes internos, pega tudo após -d " até o fim da string
+  let bodyRaw = ''
+
+  // Tenta aspas simples primeiro
+  const singleQuoteMatch = curlStr.match(/-d\s+'([^']+)'/)
+  if (singleQuoteMatch) {
+    bodyRaw = singleQuoteMatch[1]
+  } else {
+    // Aspas duplas com possíveis \" internos — pega tudo após -d "
+    const doubleQuoteMatch = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/  )
+    if (doubleQuoteMatch) {
+      // Desfaz os escapes: \" → "
+      bodyRaw = doubleQuoteMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    }
+  }
+
   const params = new URLSearchParams(bodyRaw)
 
-  // Extrai campos do body
   const source = params.get('source') || ''
   const srcName = params.get('src.name') || ''
   const channel = params.get('channel') || 'whatsapp'
 
-  // Extrai templateId do JSON do template
+  // Extrai templateId
   const templateParam = params.get('template') || ''
   let templateId = ''
   try {
-    const templateJson = JSON.parse(decodeURIComponent(templateParam))
-    templateId = templateJson.id || ''
+    templateId = JSON.parse(decodeURIComponent(templateParam)).id || ''
   } catch {
     try {
-      const templateJson = JSON.parse(templateParam)
-      templateId = templateJson.id || ''
+      templateId = JSON.parse(templateParam).id || ''
     } catch {
-      const idMatch = templateParam.match(/"id"\s*:\s*"([^"]+)"/)
-      templateId = idMatch?.[1] || ''
+      templateId = templateParam.match(/"id"\s*:\s*"([^"]+)"/)?.[1] || ''
     }
   }
+
+  logger.info('Curl parsed result', { apiKey: apiKey.slice(0, 8) + '...', source, srcName, templateId, channel })
 
   return { apiKey, source, srcName, templateId, channel }
 }
 
-// ─── Envia uma mensagem via fetch direto (sem exec/curl) ──────────────────────
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const template = JSON.stringify({
-      id: parsed.templateId,
-      params: [message],
-    })
-
     const body = new URLSearchParams({
       channel: parsed.channel,
       source: parsed.source,
       destination: phone,
       'src.name': parsed.srcName,
-      template,
+      template: JSON.stringify({ id: parsed.templateId, params: [message] }),
     })
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
@@ -131,70 +134,94 @@ async function sendViaFetch(
 
     const data = await response.json() as any
 
-    if (data.status === 'error') {
-      return { ok: false, error: JSON.stringify(data.message) }
-    }
+    // Loga a resposta para debug
+    logger.info('Gupshup response', { phone, status: data.status, messageId: data.messageId, data: JSON.stringify(data).slice(0, 200) })
 
-    if (data.status === 'submitted' || data.messageId || data.status === 'success') {
-      return { ok: true }
-    }
-
+    if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
+    if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
     return { ok: false, error: JSON.stringify(data) }
   } catch (err: any) {
     return { ok: false, error: err.message }
   }
 }
 
-// ─── Garante contato e conversa no CRM ───────────────────────────────────────
-async function ensureContactAndConversation(
+function saveToCrmAsync(
   tenantId: string,
   channelId: string,
+  campaignId: string,
   phone: string,
-): Promise<{ contactId: string; conversationId: string }> {
-  phone = phone.replace(/^\+/, '')
+  message: string,
+  messageUuid: string,
+): void {
+  ;(async () => {
+    try {
+      phone = phone.replace(/^\+/, '')
 
-  let contactId: string
-  const { data: existingContact } = await db
-    .from('contacts').select('id')
-    .eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
+      let contactId: string
+      const { data: existingContact } = await db
+        .from('contacts').select('id')
+        .eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
 
-  if (existingContact) {
-    contactId = existingContact.id
-  } else {
-    const { data: newContact } = await db.from('contacts').insert({
-      id: generateId(),
-      tenant_id: tenantId,
-      phone,
-      name: phone, // sempre o número como nome inicial
-      origin: 'campaign',
-      status: 'active',
-    }).select('id').single()
-    contactId = newContact!.id
-  }
+      if (existingContact) {
+        contactId = existingContact.id
+      } else {
+        const { data: newContact } = await db.from('contacts').insert({
+          id: generateId(),
+          tenant_id: tenantId,
+          phone,
+          name: phone,
+          origin: 'campaign',
+          status: 'active',
+        }).select('id').single()
+        contactId = newContact!.id
+      }
 
-  let conversationId: string
-  const { data: existingConv } = await db
-    .from('conversations').select('id')
-    .eq('tenant_id', tenantId).eq('contact_id', contactId)
-    .eq('channel_id', channelId).maybeSingle()
+      let conversationId: string
+      const { data: existingConv } = await db
+        .from('conversations').select('id')
+        .eq('tenant_id', tenantId).eq('contact_id', contactId)
+        .eq('channel_id', channelId).maybeSingle()
 
-  if (existingConv) {
-    conversationId = existingConv.id
-  } else {
-    const { data: newConv } = await db.from('conversations').insert({
-      id: generateId(),
-      tenant_id: tenantId,
-      contact_id: contactId,
-      channel_id: channelId,
-      channel_type: 'gupshup',
-      status: 'open',
-      pipeline_stage: 'lead',
-      last_message_at: new Date(),
-    }).select('id').single()
-    conversationId = newConv!.id
-  }
+      if (existingConv) {
+        conversationId = existingConv.id
+      } else {
+        const { data: newConv } = await db.from('conversations').insert({
+          id: generateId(),
+          tenant_id: tenantId,
+          contact_id: contactId,
+          channel_id: channelId,
+          channel_type: 'gupshup',
+          status: 'open',
+          pipeline_stage: 'lead',
+          last_message_at: new Date(),
+        }).select('id').single()
+        conversationId = newConv!.id
+      }
 
-  return { contactId, conversationId }
+      await db.from('messages').insert({
+        id: generateId(),
+        message_uuid: messageUuid,
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        channel_id: channelId,
+        contact_id: contactId,
+        direction: 'outbound',
+        content_type: 'text',
+        body: message || '(template)',
+        status: 'sent',
+        sent_at: new Date(),
+        campaign_id: campaignId,
+      })
+
+      await db.from('conversations').update({
+        last_message: message || '(template)',
+        last_message_at: new Date(),
+      }).eq('id', conversationId)
+
+    } catch (err) {
+      logger.warn('CRM save failed (background)', { phone, err })
+    }
+  })()
 }
 
 export function startCampaignWorker(): Worker {
@@ -204,13 +231,16 @@ export function startCampaignWorker(): Worker {
       const { campaignId, tenantId, channelId, batchSize } = job.data
       logger.info('Campaign worker started', { campaignId })
 
-      // Parseia o curl UMA VEZ só — não repete a cada mensagem
       const campaign = await campaignService.getCampaign(campaignId, tenantId)
       const curlTemplate = (campaign as any).curl_template
       if (!curlTemplate) throw new Error('No curl template configured')
 
       const parsed = parseCurlTemplate(curlTemplate)
-      logger.info('Curl parsed', { templateId: parsed.templateId, source: parsed.source })
+
+      // Valida que o parse funcionou
+      if (!parsed.templateId) {
+        throw new Error(`Failed to parse templateId from curl. apiKey=${parsed.apiKey.slice(0,8)} source=${parsed.source}`)
+      }
 
       let processed = 0
 
@@ -229,11 +259,9 @@ export function startCampaignWorker(): Worker {
 
         for (const contact of contacts) {
           try {
-            // Verifica pausa/cancelamento a cada contato
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
 
-            // Mensagem do CSV (preserva \r para quebra de linha no WhatsApp)
             const contactMessage = (
               contact.variables?.mensagem ||
               contact.variables?.copy ||
@@ -241,41 +269,14 @@ export function startCampaignWorker(): Worker {
             ).trim()
 
             const messageUuid = uuidv4()
-
-            // ✅ fetch direto — sem overhead de processo filho
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
             if (result.ok) {
-              const { contactId, conversationId } = await ensureContactAndConversation(
-                tenantId, channelId, contact.phone
-              )
-
-              await db.from('messages').insert({
-                id: generateId(),
-                message_uuid: messageUuid,
-                tenant_id: tenantId,
-                conversation_id: conversationId,
-                channel_id: channelId,
-                contact_id: contactId,
-                direction: 'outbound',
-                content_type: 'text',
-                body: contactMessage || '(template)',
-                status: 'sent',
-                sent_at: new Date(),
-                campaign_id: campaignId,
-              })
-
-              await db.from('conversations').update({
-                last_message: contactMessage || '(template)',
-                last_message_at: new Date(),
-              }).eq('id', conversationId)
-
+              saveToCrmAsync(tenantId, channelId, campaignId, contact.phone, contactMessage, messageUuid)
               await campaignService.markContactSent(contact.id, messageUuid)
               await campaignService.incrementCounter(campaignId, 'sent_count')
               processed++
               try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
-              await emitProgress(campaignId, tenantId)
-
               logger.info('Message sent', { campaignId, phone: contact.phone, processed })
             } else {
               throw new Error(result.error || 'Gupshup error')
@@ -287,9 +288,10 @@ export function startCampaignWorker(): Worker {
             logger.warn('Contact failed', { campaignId, phone: contact.phone, error: err.message })
           }
 
-          // Delay mínimo entre mensagens
           await sleep(DELAY_BETWEEN_MESSAGES_MS)
         }
+
+        await emitProgress(campaignId, tenantId)
       }
 
       await campaignService.checkCompletion(campaignId)
