@@ -1,13 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
-import { AppError, generateId } from '@autozap/utils'
+import { AppError, NotFoundError, generateId } from '@autozap/utils'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 
-const PUSHER_APP_ID = process.env.PUSHER_APP_ID
-const PUSHER_KEY = process.env.PUSHER_KEY
-const PUSHER_SECRET = process.env.PUSHER_SECRET
-const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface QueueMessageInput {
   tenantId: string
@@ -21,50 +18,20 @@ export interface QueueMessageInput {
   campaignId?: string
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Retorna true se o nome parece um número de telefone (ou seja, não é um nome real)
 function looksLikePhone(name: string): boolean {
   return /^[\d\s\+\-\(\)]+$/.test(name.trim())
 }
 
-async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
-  if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
-  try {
-    const body = JSON.stringify({
-      name: event,
-      channel: `tenant-${tenantId}`,
-      data: JSON.stringify(data),
-    })
-    const crypto = await import('crypto')
-    const timestamp = Math.floor(Date.now() / 1000)
-    const md5Body = crypto.createHash('md5').update(body).digest('hex')
-    const stringToSign = `POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${timestamp}&auth_version=1.0&body_md5=${md5Body}`
-    const signature = crypto.createHmac('sha256', PUSHER_SECRET).update(stringToSign).digest('hex')
-    await fetch(
-      `https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${timestamp}&auth_version=1.0&body_md5=${md5Body}&auth_signature=${signature}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
-    )
-  } catch (err) {
-    logger.error('Failed to emit Pusher event', { err })
-  }
-}
+// ─── MessageService ───────────────────────────────────────────────────────────
 
 export class MessageService {
 
-  async queueMessage(input: QueueMessageInput): Promise<string> {
-    // ✅ Verifica limite do plano antes de enfileirar
-    try {
-      const { data: canSend } = await db.rpc('tenant_can_send', {
-        p_tenant_id: input.tenantId,
-        p_count: 1,
-      })
-      if (!canSend) {
-        throw new AppError('PLAN_LIMIT_EXCEEDED', 'Limite de mensagens do plano atingido. Faça upgrade para continuar enviando.', 429)
-      }
-    } catch (err: any) {
-      if (err.code === 'PLAN_LIMIT_EXCEEDED') throw err
-      // Se falhar a verificação por outro motivo, deixa passar
-      logger.warn('Failed to check plan limit', { tenantId: input.tenantId, err: err.message })
-    }
+  // ── Queue outbound message ─────────────────────────────────────────────────
 
+  async queueMessage(input: QueueMessageInput): Promise<string> {
     const messageUuid = uuidv4()
 
     const { data, error } = await db.from('messages').insert({
@@ -84,15 +51,20 @@ export class MessageService {
     }).select('id').single()
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
+
     logger.debug('Message queued', { messageUuid, tenantId: input.tenantId })
     return messageUuid
   }
+
+  // ── Process inbound message ────────────────────────────────────────────────
 
   async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
     // 1. Find or create contact
     const contact = await this.findOrCreateContact(tenantId, msg.from)
 
-    // Atualiza nome se vier do payload e parecer número
+    // ✅ BUG CORRIGIDO: atualiza o nome sempre que:
+    //    - vier um senderName no payload
+    //    - E o nome atual parecer um número (não é nome real)
     const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
     if (senderName && (!contact.name || looksLikePhone(contact.name))) {
       await db.from('contacts')
@@ -127,35 +99,18 @@ export class MessageService {
       delivered_at: msg.timestamp,
     })
 
-    // 4. Update conversation — separado do increment_unread
+    // 4. Update conversation
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
+      unread_count: db.rpc('increment_unread', { p_conversation_id: conversation.id }) as any,
       status: 'open',
     }).eq('id', conversation.id)
 
-    // 5. Incrementa unread em query separada
-    try {
-      await db.rpc('increment_unread', { p_conversation_id: conversation.id })
-    } catch {
-      await db.from('conversations')
-        .update({ unread_count: (conversation.unread_count || 0) + 1 })
-        .eq('id', conversation.id)
-    }
-
-    // 6. Update contact last interaction
+    // 5. Update contact last interaction
     await db.from('contacts').update({
       last_interaction_at: msg.timestamp,
     }).eq('id', contact.id)
-
-    // 7. Emit Pusher — notifica frontend em tempo real
-    emitPusher(tenantId, 'inbound.message', {
-      conversationId: conversation.id,
-      contactId: contact.id,
-      body: msg.body,
-      contentType: msg.contentType,
-      timestamp: msg.timestamp,
-    })
 
     logger.info('Inbound message processed', {
       tenantId,
@@ -164,26 +119,35 @@ export class MessageService {
     })
   }
 
+  // ── Update message status from webhook ────────────────────────────────────
+
   async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage } = update
+
     const updateData: Record<string, unknown> = { status }
+
     if (status === 'delivered') updateData.delivered_at = timestamp
     if (status === 'read') updateData.read_at = timestamp
     if (status === 'failed') {
       updateData.failed_at = timestamp
       updateData.error_message = errorMessage
     }
+
     const { error } = await db
       .from('messages')
       .update(updateData)
       .eq('external_id', externalId)
       .eq('tenant_id', tenantId)
+
     if (error) {
       logger.error('Failed to update message status', { externalId, status, error })
       return
     }
+
     logger.debug('Message status updated', { externalId, status })
   }
+
+  // ── Mark message as sent ───────────────────────────────────────────────────
 
   async markSent(messageUuid: string, externalId: string): Promise<void> {
     await db.from('messages').update({
@@ -202,8 +166,11 @@ export class MessageService {
     }).eq('message_uuid', messageUuid)
   }
 
+  // ── Get pending messages for reconciliation ────────────────────────────────
+
   async getPendingMessages(tenantId: string, olderThanMinutes = 5) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000)
+
     const { data } = await db
       .from('messages')
       .select('id, message_uuid, external_id, channel_id, tenant_id')
@@ -212,8 +179,11 @@ export class MessageService {
       .lt('sent_at', cutoff.toISOString())
       .not('external_id', 'is', null)
       .limit(100)
+
     return data || []
   }
+
+  // ── List messages in conversation (paginated) ──────────────────────────────
 
   async listMessages(conversationId: string, tenantId: string, cursor?: string, limit = 30) {
     let query = db
@@ -223,37 +193,48 @@ export class MessageService {
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(limit)
-    if (cursor) query = query.lt('created_at', cursor)
+
+    if (cursor) {
+      query = query.lt('created_at', cursor)
+    }
+
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return data || []
   }
 
+  // ── Private ────────────────────────────────────────────────────────────────
+
   private async findOrCreateContact(tenantId: string, phone: string) {
     phone = phone.replace(/^\+/, '')
+    // Normaliza número brasileiro: garante o 9 após o DDD
     if (phone.startsWith('55') && phone.length === 12) {
       phone = phone.slice(0, 4) + '9' + phone.slice(4)
     }
+
     const { data: existing } = await db
       .from('contacts')
       .select('id, name')
       .eq('tenant_id', tenantId)
       .eq('phone', phone)
       .maybeSingle()
+
     if (existing) return existing
+
     const { data: created, error } = await db
       .from('contacts')
       .insert({
         id: generateId(),
         tenant_id: tenantId,
         phone,
-        name: phone,
+        name: phone, // Will be updated when we get the contact's name
         origin: 'inbound',
         status: 'active',
         last_interaction_at: new Date(),
       })
       .select('id, name')
       .single()
+
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
@@ -264,9 +245,10 @@ export class MessageService {
     contactId: string,
     channelType: string,
   ) {
+    // Look for open conversation
     const { data: existing } = await db
       .from('conversations')
-      .select('id, unread_count')
+      .select('id')
       .eq('tenant_id', tenantId)
       .eq('contact_id', contactId)
       .eq('channel_id', channelId)
@@ -274,7 +256,10 @@ export class MessageService {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
     if (existing) return existing
+
+    // Create new conversation
     const { data: created, error } = await db
       .from('conversations')
       .insert({
@@ -288,8 +273,9 @@ export class MessageService {
         unread_count: 1,
         last_message_at: new Date(),
       })
-      .select('id, unread_count')
+      .select('id')
       .single()
+
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
