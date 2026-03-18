@@ -1,7 +1,7 @@
 import { Worker, Queue } from 'bullmq'
 import { logger } from '../lib/logger'
 import { campaignService } from '../services/campaign.service'
-import { sleep, randomBetween, generateId } from '@autozap/utils'
+import { sleep, generateId } from '@autozap/utils'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 
@@ -10,6 +10,10 @@ const PUSHER_APP_ID = process.env.PUSHER_APP_ID
 const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
+
+// ─── Delay entre mensagens (ms) ──────────────────────────────────────────────
+// 200ms = ~300 msgs/min | 100ms = ~600 msgs/min | 50ms = ~1200 msgs/min
+const DELAY_BETWEEN_MESSAGES_MS = 100
 
 function getRedisConnection() {
   try {
@@ -45,14 +49,110 @@ export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   },
 })
 
+// ─── Parseia o curl template e extrai os campos necessários ──────────────────
+interface ParsedCurl {
+  apiKey: string
+  source: string
+  srcName: string
+  templateId: string
+  channel: string
+}
+
+function parseCurlTemplate(curlTemplate: string): ParsedCurl {
+  // Normaliza o curl (remove quebras de linha e barras de continuação)
+  const curlStr = curlTemplate
+    .split('\n')
+    .map(line => line.trimEnd().replace(/\\$/, ''))
+    .join(' ')
+    .trim()
+
+  // Extrai apikey do header
+  const apiKeyMatch = curlStr.match(/apikey:\s*([^\s'"]+)/)
+  const apiKey = apiKeyMatch?.[1] || ''
+
+  // Extrai o body -d '...'
+  const bodyMatch = curlStr.match(/-d\s+'([^']+)'/) || curlStr.match(/-d\s+"([^"]+)"/)
+  const bodyRaw = bodyMatch?.[1] || ''
+  const params = new URLSearchParams(bodyRaw)
+
+  // Extrai campos do body
+  const source = params.get('source') || ''
+  const srcName = params.get('src.name') || ''
+  const channel = params.get('channel') || 'whatsapp'
+
+  // Extrai templateId do JSON do template
+  const templateParam = params.get('template') || ''
+  let templateId = ''
+  try {
+    const templateJson = JSON.parse(decodeURIComponent(templateParam))
+    templateId = templateJson.id || ''
+  } catch {
+    try {
+      const templateJson = JSON.parse(templateParam)
+      templateId = templateJson.id || ''
+    } catch {
+      const idMatch = templateParam.match(/"id"\s*:\s*"([^"]+)"/)
+      templateId = idMatch?.[1] || ''
+    }
+  }
+
+  return { apiKey, source, srcName, templateId, channel }
+}
+
+// ─── Envia uma mensagem via fetch direto (sem exec/curl) ──────────────────────
+async function sendViaFetch(
+  parsed: ParsedCurl,
+  phone: string,
+  message: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const template = JSON.stringify({
+      id: parsed.templateId,
+      params: [message],
+    })
+
+    const body = new URLSearchParams({
+      channel: parsed.channel,
+      source: parsed.source,
+      destination: phone,
+      'src.name': parsed.srcName,
+      template,
+    })
+
+    const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
+      method: 'POST',
+      headers: {
+        'apikey': parsed.apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache',
+      },
+      body: body.toString(),
+    })
+
+    const data = await response.json() as any
+
+    if (data.status === 'error') {
+      return { ok: false, error: JSON.stringify(data.message) }
+    }
+
+    if (data.status === 'submitted' || data.messageId || data.status === 'success') {
+      return { ok: true }
+    }
+
+    return { ok: false, error: JSON.stringify(data) }
+  } catch (err: any) {
+    return { ok: false, error: err.message }
+  }
+}
+
+// ─── Garante contato e conversa no CRM ───────────────────────────────────────
 async function ensureContactAndConversation(
   tenantId: string,
   channelId: string,
   phone: string,
-  name: string,
 ): Promise<{ contactId: string; conversationId: string }> {
   phone = phone.replace(/^\+/, '')
-  // Find or create contact
+
   let contactId: string
   const { data: existingContact } = await db
     .from('contacts').select('id')
@@ -65,14 +165,13 @@ async function ensureContactAndConversation(
       id: generateId(),
       tenant_id: tenantId,
       phone,
-      name: name || phone,
+      name: phone, // sempre o número como nome inicial
       origin: 'campaign',
       status: 'active',
     }).select('id').single()
     contactId = newContact!.id
   }
 
-  // Find or create conversation
   let conversationId: string
   const { data: existingConv } = await db
     .from('conversations').select('id')
@@ -98,68 +197,21 @@ async function ensureContactAndConversation(
   return { contactId, conversationId }
 }
 
-async function executeCurlForPhone(
-  curlTemplate: string,
-  phone: string,
-  contactMessage?: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const { exec } = await import('child_process')
-    const { promisify } = await import('util')
-    const execAsync = promisify(exec)
-
-    // Normalize multiline curl
-    let curlStr = curlTemplate
-      .split('\n')
-      .map(line => line.trimEnd().replace(/\\$/, ''))
-      .join(' ')
-      .trim()
-
-    // Replace phone number
-    curlStr = curlStr
-      .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, phone)
-      .replace(/\{\{destination_phone_number\}\}/gi, phone)
-
-    // Replace message in params if provided
-    if (contactMessage) {
-      const msg = contactMessage
-        .replace(/\r\n/g, '\\n')
-        .replace(/\r/g, '\\n')
-        .replace(/\n/g, '\\n')
-        .trim()
-
-      curlStr = curlStr.replace(
-        /(%22params%22:%5B%22)[^%"]*(%22%5D)/gi,
-        `$1${encodeURIComponent(msg)}$2`
-      )
-    }
-
-    logger.debug('Executing curl via exec', { phone, curlPreview: curlStr.slice(0, 150) })
-
-    const { stdout, stderr } = await execAsync(curlStr, { timeout: 15000 })
-    const output = stdout || stderr
-
-    try {
-      const data = JSON.parse(output)
-      if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
-      return { ok: true }
-    } catch {
-      if (output.includes('submitted') || output.includes('messageId')) return { ok: true }
-      return { ok: false, error: output.slice(0, 200) }
-    }
-  } catch (err: any) {
-    return { ok: false, error: err.message }
-  }
-}
-
 export function startCampaignWorker(): Worker {
   const worker = new Worker<CampaignJob>(
     'campaign_queue',
     async (job) => {
-      const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
+      const { campaignId, tenantId, channelId, batchSize } = job.data
       logger.info('Campaign worker started', { campaignId })
 
-      const delayMs = Math.floor((60 * 1000) / messagesPerMin)
+      // Parseia o curl UMA VEZ só — não repete a cada mensagem
+      const campaign = await campaignService.getCampaign(campaignId, tenantId)
+      const curlTemplate = (campaign as any).curl_template
+      if (!curlTemplate) throw new Error('No curl template configured')
+
+      const parsed = parseCurlTemplate(curlTemplate)
+      logger.info('Curl parsed', { templateId: parsed.templateId, source: parsed.source })
+
       let processed = 0
 
       while (true) {
@@ -177,23 +229,27 @@ export function startCampaignWorker(): Worker {
 
         for (const contact of contacts) {
           try {
-            const campaign = await campaignService.getCampaign(campaignId, tenantId)
-            const curlTemplate = (campaign as any).curl_template
-            if (!curlTemplate) throw new Error('No curl template configured')
+            // Verifica pausa/cancelamento a cada contato
+            const check = await campaignService.getProgress(campaignId, tenantId)
+            if (check.status !== 'running') break
 
-            const rawMessage = contact.variables?.mensagem || contact.variables?.copy || contact.name || undefined
-            const contactMessage = rawMessage?.trim()
+            // Mensagem do CSV (preserva \r para quebra de linha no WhatsApp)
+            const contactMessage = (
+              contact.variables?.mensagem ||
+              contact.variables?.copy ||
+              ''
+            ).trim()
 
             const messageUuid = uuidv4()
-            const result = await executeCurlForPhone(curlTemplate, contact.phone, contactMessage)
+
+            // ✅ fetch direto — sem overhead de processo filho
+            const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
             if (result.ok) {
-              // Create contact and conversation in CRM
               const { contactId, conversationId } = await ensureContactAndConversation(
-                tenantId, channelId, contact.phone, contact.name || contact.phone
+                tenantId, channelId, contact.phone
               )
 
-              // Save message in conversation
               await db.from('messages').insert({
                 id: generateId(),
                 message_uuid: messageUuid,
@@ -209,9 +265,8 @@ export function startCampaignWorker(): Worker {
                 campaign_id: campaignId,
               })
 
-              // Update conversation last message
               await db.from('conversations').update({
-                last_message: (contactMessage || '(template)').replace(/\\r/g, '\n').replace(/\\n/g, '\n'),
+                last_message: contactMessage || '(template)',
                 last_message_at: new Date(),
               }).eq('id', conversationId)
 
@@ -220,7 +275,8 @@ export function startCampaignWorker(): Worker {
               processed++
               try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
               await emitProgress(campaignId, tenantId)
-              logger.info('Campaign message sent', { campaignId, phone: contact.phone, processed })
+
+              logger.info('Message sent', { campaignId, phone: contact.phone, processed })
             } else {
               throw new Error(result.error || 'Gupshup error')
             }
@@ -228,10 +284,11 @@ export function startCampaignWorker(): Worker {
           } catch (err: any) {
             await campaignService.markContactFailed(contact.id, err.message)
             await campaignService.incrementCounter(campaignId, 'failed_count')
-            logger.warn('Campaign contact failed', { campaignId, phone: contact.phone, error: err.message })
+            logger.warn('Contact failed', { campaignId, phone: contact.phone, error: err.message })
           }
 
-          await sleep(delayMs)
+          // Delay mínimo entre mensagens
+          await sleep(DELAY_BETWEEN_MESSAGES_MS)
         }
       }
 
