@@ -5,10 +5,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Image, FileAudio } from 'lucide-react'
 import Pusher from 'pusher-js'
+import { createClient } from '@supabase/supabase-js'
 
 const CONVERSATION_SERVICE_URL = process.env.NEXT_PUBLIC_CONVERSATION_SERVICE_URL || ''
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const statusFilters = [
   { key: 'all',     label: 'Todas' },
@@ -42,6 +47,13 @@ function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined
   if (mediaUrl.startsWith('http')) return mediaUrl
   if (!channelId) return null
   return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}`
+}
+
+function getContentType(file: File): 'image' | 'audio' | 'video' | 'document' {
+  if (file.type.startsWith('image/')) return 'image'
+  if (file.type.startsWith('audio/')) return 'audio'
+  if (file.type.startsWith('video/')) return 'video'
+  return 'document'
 }
 
 function playNotificationSound() {
@@ -111,7 +123,10 @@ export default function InboxPage() {
   const [messageText, setMessageText] = useState('')
   const [statusFilter, setStatusFilter] = useState('open')
   const [showProfile, setShowProfile] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [pendingFile, setPendingFile] = useState<{ file: File; previewUrl: string; contentType: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
@@ -159,24 +174,70 @@ export default function InboxPage() {
   })
 
   const sendMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
       if (!selectedConv) return
-      await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, contentType: 'text', body: messageText })
+      await messageApi.post('/messages/send', {
+        channelId: selectedConv.channel_id,
+        contactId: selectedConv.contact_id,
+        conversationId: selectedConvId,
+        to: selectedConv.contacts?.phone,
+        ...payload,
+      })
     },
-    onSuccess: () => { setMessageText(''); queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) },
+    onSuccess: () => {
+      setMessageText('')
+      setPendingFile(null)
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+    },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao enviar'),
   })
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 15 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 15MB'); return }
+    const previewUrl = URL.createObjectURL(file)
+    const contentType = getContentType(file)
+    setPendingFile({ file, previewUrl, contentType })
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleSendFile = async () => {
+    if (!pendingFile || !selectedConv) return
+    setUploading(true)
+    try {
+      const ext = pendingFile.file.name.split('.').pop()
+      const path = `inbox/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('media').upload(path, pendingFile.file, { contentType: pendingFile.file.type, upsert: false })
+      if (error) throw error
+      const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
+      const mediaUrl = publicData.publicUrl
+      await sendMutation.mutateAsync({ contentType: pendingFile.contentType, mediaUrl, body: messageText || undefined })
+      toast.success('Arquivo enviado!')
+    } catch (err: any) {
+      toast.error('Erro ao enviar arquivo: ' + (err.message || 'tente novamente'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleSendText = () => {
+    if (!messageText.trim()) return
+    sendMutation.mutate({ contentType: 'text', body: messageText })
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText() }
+  }
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const handleSelectConv = async (convId: string) => {
     setSelectedConvId(convId)
+    setPendingFile(null)
     await conversationApi.post(`/conversations/${convId}/read`)
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (messageText.trim()) sendMutation.mutate() }
   }
 
   const conversations = (convData || []).filter((c: any) => {
@@ -265,7 +326,7 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Messages — flex: 1 + overflow: auto = scroll */}
+            {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
               {loadingMessages
                 ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
@@ -290,10 +351,42 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input fixo embaixo */}
+            {/* Preview arquivo pendente */}
+            {pendingFile && (
+              <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                {pendingFile.contentType === 'image' ? (
+                  <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
+                ) : (
+                  <div style={{ width: '48px', height: '48px', background: '#dcfce7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FileText size={20} color="#16a34a" />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.file.name}</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{(pendingFile.file.size / 1024).toFixed(0)} KB • {pendingFile.contentType}</p>
+                </div>
+                <button onClick={handleSendFile} disabled={uploading}
+                  style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}
+                  {uploading ? 'Enviando...' : 'Enviar'}
+                </button>
+                <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Input */}
             {selectedConv?.status !== 'closed' ? (
               <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                  <input ref={fileInputRef} type="file" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
+                  <button onClick={() => fileInputRef.current?.click()} style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: '#f9fafb', border: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
+                    title="Anexar arquivo">
+                    <Paperclip size={16} />
+                  </button>
                   <textarea
                     style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                     placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
@@ -303,7 +396,7 @@ export default function InboxPage() {
                     onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#fff' }}
                     onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb' }}
                   />
-                  <button onClick={() => { if (messageText.trim()) sendMutation.mutate() }} disabled={sendMutation.isPending || !messageText.trim()}
+                  <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()}
                     style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {sendMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />}
                   </button>
