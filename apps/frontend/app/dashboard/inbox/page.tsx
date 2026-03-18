@@ -404,7 +404,7 @@ export default function InboxPage() {
               <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                   <textarea
-                    style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', minHeight: '42px', maxHeight: '120px', lineHeight: 1.5, fontFamily: 'inherit' }}
+                    style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                     placeholder="Digite uma mensagem... (Enter para enviar, Shift+Enter para nova linha)"
                     value={messageText}
                     onChange={e => setMessageText(e.target.value)}
