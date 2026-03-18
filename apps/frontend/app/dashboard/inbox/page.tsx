@@ -40,17 +40,13 @@ function getAvatarColor(name: string | undefined | null) {
 
 // ─── Resolve URL de mídia via proxy ──────────────────────────────────────────
 function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined): string | null {
-  if (!mediaUrl || !channelId) return null
+  if (!mediaUrl) return null
 
-  // Se já for uma URL completa (Gupshup v2), usa direto via proxy
-  // Se for um ID (Meta/Gupshup v3), monta a URL do proxy
-  const isUrl = mediaUrl.startsWith('http')
-  if (isUrl) {
-    // Mesmo URLs diretas podem precisar de auth — usa proxy
-    const encoded = encodeURIComponent(mediaUrl)
-    return `${CONVERSATION_SERVICE_URL}/conversations/media/${encoded}?channelId=${channelId}`
-  }
-  // É um mediaId — monta URL do proxy
+  // Se já for uma URL completa (Gupshup v2 / filemanager.gupshup.io), usa direto
+  if (mediaUrl.startsWith('http')) return mediaUrl
+
+  // É um ID numérico (v3) — usa proxy do backend
+  if (!channelId) return null
   return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}`
 }
 
