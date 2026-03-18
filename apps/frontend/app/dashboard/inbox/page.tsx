@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, CheckCheck, Image, FileText, Music, Video, File } from 'lucide-react'
 import Pusher from 'pusher-js'
 
 const statusFilters = [
@@ -36,6 +36,105 @@ function getAvatarColor(name: string | undefined | null) {
   return colors[idx]
 }
 
+// ─── Renderiza mídia da mensagem ──────────────────────────────────────────────
+function MediaMessage({ msg, isOut }: { msg: any; isOut: boolean }) {
+  const url = msg.media_url
+  const type = msg.content_type || ''
+  const textColor = isOut ? '#fff' : '#111827'
+  const subColor = isOut ? 'rgba(255,255,255,0.7)' : '#9ca3af'
+
+  if (!url && type === 'text') {
+    return (
+      <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: textColor }}>
+        {cleanText(msg.body || '')}
+      </p>
+    )
+  }
+
+  if (type === 'image' || (url && /\.(jpg|jpeg|png|gif|webp)/i.test(url))) {
+    return (
+      <div>
+        <img
+          src={url}
+          alt="imagem"
+          style={{ maxWidth: '260px', borderRadius: '8px', display: 'block', cursor: 'pointer' }}
+          onClick={() => window.open(url, '_blank')}
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+        />
+        {msg.body && (
+          <p style={{ fontSize: '13px', marginTop: '6px', color: textColor, whiteSpace: 'pre-line' }}>
+            {cleanText(msg.body)}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  if (type === 'audio' || (url && /\.(mp3|ogg|wav|m4a|opus)/i.test(url))) {
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <Music size={14} color={textColor} />
+          <span style={{ fontSize: '12px', color: subColor }}>Áudio</span>
+        </div>
+        <audio controls style={{ maxWidth: '240px', height: '36px' }}>
+          <source src={url} />
+        </audio>
+      </div>
+    )
+  }
+
+  if (type === 'video' || (url && /\.(mp4|mov|avi|webm)/i.test(url))) {
+    return (
+      <div>
+        <video
+          controls
+          style={{ maxWidth: '260px', borderRadius: '8px', display: 'block' }}
+        >
+          <source src={url} />
+        </video>
+        {msg.body && (
+          <p style={{ fontSize: '13px', marginTop: '6px', color: textColor }}>{cleanText(msg.body)}</p>
+        )}
+      </div>
+    )
+  }
+
+  if (type === 'document' || type === 'file' || url) {
+    const fileName = url ? url.split('/').pop() || 'documento' : 'documento'
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: 'none' }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 12px',
+          background: isOut ? 'rgba(255,255,255,0.15)' : '#f3f4f6',
+          borderRadius: '8px', cursor: 'pointer',
+        }}>
+          <FileText size={20} color={isOut ? '#fff' : '#6b7280'} />
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 500, color: textColor, margin: 0 }}>
+              {fileName.length > 30 ? fileName.slice(0, 30) + '...' : fileName}
+            </p>
+            <p style={{ fontSize: '11px', color: subColor, margin: 0 }}>Clique para abrir</p>
+          </div>
+        </div>
+      </a>
+    )
+  }
+
+  // Fallback — texto simples
+  return (
+    <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: textColor }}>
+      {cleanText(msg.body || `[${type}]`)}
+    </p>
+  )
+}
+
 export default function InboxPage() {
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -45,32 +144,27 @@ export default function InboxPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
-  // ── Pusher realtime ──────────────────────────────────────────────────────
+  // ── Pusher realtime ───────────────────────────────────────────────────────
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
     if (!key || !user) return
 
     const pusher = new Pusher(key, { cluster })
-
-    // Pega o tenantId do JWT decodificado via auth store
-    // O user tem o tenantId disponível via store
     const tenantId = (user as any)?.tenantId || (user as any)?.tid
     if (!tenantId) return
 
     const channel = pusher.subscribe(`tenant-${tenantId}`)
 
-    // Nova mensagem recebida — atualiza lista e mensagens abertas
     channel.bind('inbound.message', (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       if (data?.conversationId === selectedConvId) {
         queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       }
     })
 
-    // Conversa atualizada (status, última mensagem)
     channel.bind('conversation.updated', () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
     })
 
     return () => {
@@ -80,7 +174,7 @@ export default function InboxPage() {
     }
   }, [user, selectedConvId, queryClient])
 
-  // ── Queries ──────────────────────────────────────────────────────────────
+  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: convData, isLoading: loadingConvs } = useQuery({
     queryKey: ['conversations', statusFilter],
     queryFn: async () => {
@@ -125,7 +219,7 @@ export default function InboxPage() {
     onSuccess: () => {
       setMessageText('')
       queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao enviar'),
   })
@@ -137,7 +231,7 @@ export default function InboxPage() {
   const handleSelectConv = async (convId: string) => {
     setSelectedConvId(convId)
     await conversationApi.post(`/conversations/${convId}/read`)
-    queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
   const handleSend = (e: React.FormEvent) => {
@@ -160,8 +254,6 @@ export default function InboxPage() {
 
       {/* ── Left: conversation list ── */}
       <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
-
-        {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid #f3f4f6' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Inbox</h2>
           <div style={{ position: 'relative' }}>
@@ -175,7 +267,6 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* Filters */}
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '4px' }}>
           {statusFilters.map(f => (
             <button
@@ -193,7 +284,6 @@ export default function InboxPage() {
           ))}
         </div>
 
-        {/* List */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loadingConvs ? (
             <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -209,6 +299,8 @@ export default function InboxPage() {
               const isSelected = selectedConvId === conv.id
               const name = conv.contacts?.name || conv.contacts?.phone || undefined
               const av = getAvatarColor(name)
+              const lastMsg = conv.last_message || 'Sem mensagens'
+              const lastMsgPreview = lastMsg.startsWith('[') ? lastMsg : cleanText(lastMsg).split('\n')[0]
               return (
                 <div
                   key={conv.id}
@@ -239,7 +331,7 @@ export default function InboxPage() {
                       )}
                     </div>
                     <div style={{ color: '#9ca3af', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {cleanText(conv.last_message || 'Sem mensagens').split('\n')[0]}
+                      {lastMsgPreview}
                     </div>
                   </div>
                   {conv.unread_count > 0 && (
@@ -294,7 +386,7 @@ export default function InboxPage() {
                   <button
                     onClick={async () => {
                       await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' })
-                      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+                      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
                       queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
                     }}
                     style={{ padding: '6px 14px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}
@@ -316,23 +408,23 @@ export default function InboxPage() {
               ) : (
                 messages?.map((msg: any) => {
                   const isOut = msg.direction === 'outbound'
+                  const hasMedia = msg.content_type !== 'text' || msg.media_url
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        maxWidth: '65%', padding: '10px 14px',
+                        maxWidth: hasMedia ? '280px' : '65%',
+                        padding: '10px 14px',
                         borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                         background: isOut ? '#16a34a' : '#fff',
                         color: isOut ? '#fff' : '#111827',
                         boxShadow: '0 1px 2px rgba(0,0,0,.06)',
                       }}>
-                        <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                          {cleanText(msg.body || '')}
-                        </p>
+                        <MediaMessage msg={msg} isOut={isOut} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '11px', opacity: 0.65 }}>
+                          <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>
                             {msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
-                          {isOut && <CheckCheck size={12} style={{ opacity: 0.65 }} />}
+                          {isOut && <CheckCheck size={12} color={isOut ? '#fff' : '#9ca3af'} style={{ opacity: 0.65 }} />}
                         </div>
                       </div>
                     </div>
