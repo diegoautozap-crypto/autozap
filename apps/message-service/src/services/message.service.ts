@@ -49,21 +49,8 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
 
 export class MessageService {
 
+  // Inbox não conta no limite — só campanhas contam
   async queueMessage(input: QueueMessageInput): Promise<string> {
-    // ✅ Verifica limite do plano antes de enfileirar
-    try {
-      const { data: canSend } = await db.rpc('tenant_can_send', {
-        p_tenant_id: input.tenantId,
-        p_count: 1,
-      })
-      if (!canSend) {
-        throw new AppError('PLAN_LIMIT_EXCEEDED', 'Limite de mensagens do plano atingido. Faça upgrade para continuar enviando.', 429)
-      }
-    } catch (err: any) {
-      if (err.code === 'PLAN_LIMIT_EXCEEDED') throw err
-      logger.warn('Failed to check plan limit', { tenantId: input.tenantId, err: err.message })
-    }
-
     const messageUuid = uuidv4()
 
     const { data, error } = await db.from('messages').insert({
@@ -126,7 +113,7 @@ export class MessageService {
       delivered_at: msg.timestamp,
     })
 
-    // ✅ 4. Update conversation — separado do increment_unread para não falhar
+    // ✅ 4. Update conversation — separado do increment_unread
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
