@@ -49,7 +49,7 @@ export default function InboxPage() {
       const { data } = await conversationApi.get(url)
       return data.data
     },
-    refetchInterval: 8000,
+    refetchInterval: 2000,
   })
 
   const { data: selectedConv } = useQuery({
