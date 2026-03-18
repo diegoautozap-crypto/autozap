@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
-import { AppError, NotFoundError, generateId } from '@autozap/utils'
+import { AppError, generateId } from '@autozap/utils'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 
 const PUSHER_APP_ID = process.env.PUSHER_APP_ID
@@ -69,7 +69,6 @@ export class MessageService {
     }).select('id').single()
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
-
     logger.debug('Message queued', { messageUuid, tenantId: input.tenantId })
     return messageUuid
   }
@@ -113,20 +112,29 @@ export class MessageService {
       delivered_at: msg.timestamp,
     })
 
-    // 4. Update conversation
+    // ✅ 4. Update conversation — separado do increment_unread para não falhar
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
-      unread_count: db.rpc('increment_unread', { p_conversation_id: conversation.id }) as any,
       status: 'open',
     }).eq('id', conversation.id)
 
-    // 5. Update contact last interaction
+    // ✅ 5. Incrementa unread em query separada
+    try {
+      await db.rpc('increment_unread', { p_conversation_id: conversation.id })
+    } catch {
+      // Incrementa manualmente se a função não existir
+      await db.from('conversations')
+        .update({ unread_count: conversation.unread_count ? conversation.unread_count + 1 : 1 })
+        .eq('id', conversation.id)
+    }
+
+    // 6. Update contact last interaction
     await db.from('contacts').update({
       last_interaction_at: msg.timestamp,
     }).eq('id', contact.id)
 
-    // ✅ 6. Emit Pusher — notifica frontend em tempo real
+    // ✅ 7. Emit Pusher — notifica frontend em tempo real
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,
       contactId: contact.id,
@@ -144,27 +152,22 @@ export class MessageService {
 
   async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage } = update
-
     const updateData: Record<string, unknown> = { status }
-
     if (status === 'delivered') updateData.delivered_at = timestamp
     if (status === 'read') updateData.read_at = timestamp
     if (status === 'failed') {
       updateData.failed_at = timestamp
       updateData.error_message = errorMessage
     }
-
     const { error } = await db
       .from('messages')
       .update(updateData)
       .eq('external_id', externalId)
       .eq('tenant_id', tenantId)
-
     if (error) {
       logger.error('Failed to update message status', { externalId, status, error })
       return
     }
-
     logger.debug('Message status updated', { externalId, status })
   }
 
@@ -187,7 +190,6 @@ export class MessageService {
 
   async getPendingMessages(tenantId: string, olderThanMinutes = 5) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000)
-
     const { data } = await db
       .from('messages')
       .select('id, message_uuid, external_id, channel_id, tenant_id')
@@ -196,7 +198,6 @@ export class MessageService {
       .lt('sent_at', cutoff.toISOString())
       .not('external_id', 'is', null)
       .limit(100)
-
     return data || []
   }
 
@@ -208,11 +209,7 @@ export class MessageService {
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(limit)
-
-    if (cursor) {
-      query = query.lt('created_at', cursor)
-    }
-
+    if (cursor) query = query.lt('created_at', cursor)
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return data || []
@@ -223,16 +220,13 @@ export class MessageService {
     if (phone.startsWith('55') && phone.length === 12) {
       phone = phone.slice(0, 4) + '9' + phone.slice(4)
     }
-
     const { data: existing } = await db
       .from('contacts')
       .select('id, name')
       .eq('tenant_id', tenantId)
       .eq('phone', phone)
       .maybeSingle()
-
     if (existing) return existing
-
     const { data: created, error } = await db
       .from('contacts')
       .insert({
@@ -246,7 +240,6 @@ export class MessageService {
       })
       .select('id, name')
       .single()
-
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
@@ -259,7 +252,7 @@ export class MessageService {
   ) {
     const { data: existing } = await db
       .from('conversations')
-      .select('id')
+      .select('id, unread_count')
       .eq('tenant_id', tenantId)
       .eq('contact_id', contactId)
       .eq('channel_id', channelId)
@@ -267,9 +260,7 @@ export class MessageService {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
     if (existing) return existing
-
     const { data: created, error } = await db
       .from('conversations')
       .insert({
@@ -283,9 +274,8 @@ export class MessageService {
         unread_count: 1,
         last_message_at: new Date(),
       })
-      .select('id')
+      .select('id, unread_count')
       .single()
-
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
