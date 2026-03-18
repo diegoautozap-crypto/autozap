@@ -73,7 +73,7 @@ class CrmQueue {
     while (this.queue.length > 0) {
       // Pega PARALLEL_CRM itens e processa em paralelo
       const batch = this.queue.splice(0, PARALLEL_CRM)
-      await Promise.all(batch.map(fn => fn().catch(() => {})))
+      await Promise.all(batch.map(fn => fn().catch(err => logger.error('CRM queue error', { err: err.message }))
     }
     this.running = false
   }
