@@ -176,7 +176,11 @@ async function saveToCrm(
 
   await campaignService.markContactSent(contactId, messageUuid)
   await campaignService.incrementCounter(campaignId, 'sent_count')
-  await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+
+  // ✅ FIX: usar try/catch em vez de .catch() no rpc do Supabase
+  try {
+    await db.rpc('increment_message_count', { p_tenant_id: tenantId })
+  } catch {}
 
   let contactDbId: string
   const { data: existingContact } = await db
