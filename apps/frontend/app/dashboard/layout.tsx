@@ -10,14 +10,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { isAuthenticated } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
 
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
+  useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
-    if (hydrated && !isAuthenticated) {
-      router.push('/login')
-    }
+    if (hydrated && !isAuthenticated) router.push('/login')
   }, [hydrated, isAuthenticated, router])
 
   if (!hydrated) return null
@@ -28,7 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />
-        <div className="flex-1">
+        <div className="flex-1 overflow-hidden">
           {children}
         </div>
       </main>
