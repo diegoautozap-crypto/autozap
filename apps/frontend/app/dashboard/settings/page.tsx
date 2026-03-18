@@ -2,8 +2,10 @@
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
 import { tenantApi } from '@/lib/api'
+import { AlertTriangle, Zap, Check } from 'lucide-react'
 
 const PLAN_NAMES: Record<string, string> = {
+  trial:      'Trial',
   starter:    'Starter',
   pro:        'Pro',
   enterprise: 'Enterprise',
@@ -22,6 +24,13 @@ const PLAN_MSGS: Record<string, string> = {
   pro:        '50.000 msgs',
   enterprise: '100.000 msgs',
   unlimited:  'Ilimitado',
+}
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  starter:    ['10.000 mensagens/mês', 'Inbox em tempo real', 'Campanhas em massa', 'CRM de contatos'],
+  pro:        ['50.000 mensagens/mês', 'Tudo do Starter', 'Múltiplos usuários', 'Suporte prioritário'],
+  enterprise: ['100.000 mensagens/mês', 'Tudo do Pro', 'API dedicada', 'SLA garantido'],
+  unlimited:  ['Mensagens ilimitadas', 'Tudo do Enterprise', 'Onboarding dedicado', 'Suporte 24/7'],
 }
 
 export default function SettingsPage() {
@@ -44,12 +53,31 @@ export default function SettingsPage() {
     },
   })
 
+  const { data: subscription } = useQuery({
+    queryKey: ['subscription'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant/subscription')
+      return data.data
+    },
+  })
+
   const sent = usage?.sent ?? 0
   const limit = usage?.limit ?? 0
   const pct = usage?.percentUsed ?? 0
   const planSlug = tenant?.planSlug ?? 'starter'
   const planName = PLAN_NAMES[planSlug] ?? planSlug
   const isWarning = pct > 80
+  const isTrial = planSlug === 'trial'
+  const isTrialExpired = isTrial && (pct >= 100)
+
+  // Dias restantes do trial
+  const trialEndsAt = subscription?.trial_ends_at || subscription?.current_period_end
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null
+  const isTrialExpiredByDate = trialDaysLeft !== null && trialDaysLeft === 0
+
+  const trialExpired = isTrialExpired || isTrialExpiredByDate
 
   const card: React.CSSProperties = {
     background: '#fff',
@@ -79,6 +107,55 @@ export default function SettingsPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
+        {/* ── Banner trial expirado ── */}
+        {isTrial && trialExpired && (
+          <div style={{
+            background: '#fef2f2', border: '1px solid #fecaca',
+            borderRadius: '12px', padding: '20px',
+            display: 'flex', gap: '14px', alignItems: 'flex-start',
+          }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertTriangle size={18} color="#ef4444" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, color: '#dc2626', fontSize: '15px', marginBottom: '4px' }}>
+                Seu trial expirou
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '14px' }}>
+                Você atingiu o limite de 100 mensagens do trial. Escolha um plano abaixo para continuar usando o AutoZap.
+              </p>
+              <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}>
+                <Zap size={14} /> Ver planos
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* ── Banner trial ativo com aviso ── */}
+        {isTrial && !trialExpired && (
+          <div style={{
+            background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4',
+            border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`,
+            borderRadius: '12px', padding: '16px 20px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <p style={{ fontWeight: 600, color: '#111827', fontSize: '14px', marginBottom: '2px' }}>
+                {trialDaysLeft !== null && trialDaysLeft <= 2
+                  ? `⚠️ Seu trial expira em ${trialDaysLeft} dia${trialDaysLeft !== 1 ? 's' : ''}!`
+                  : `🎉 Trial ativo — ${usage?.remaining ?? 0} mensagens restantes`
+                }
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '13px' }}>
+                Escolha um plano para não perder o acesso
+              </p>
+            </div>
+            <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+              <Zap size={13} /> Fazer upgrade
+            </a>
+          </div>
+        )}
+
         {/* Perfil */}
         <div style={card}>
           <span style={label}>Perfil</span>
@@ -89,8 +166,13 @@ export default function SettingsPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6b7280' }}>Plano atual</span>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '2px 10px', borderRadius: '99px' }}>
-                {planName}
+              <span style={{
+                fontSize: '13px', fontWeight: 600,
+                color: isTrial ? '#d97706' : '#16a34a',
+                background: isTrial ? '#fffbeb' : '#f0fdf4',
+                padding: '2px 10px', borderRadius: '99px',
+              }}>
+                {isTrial ? '🎯 Trial (7 dias)' : planName}
               </span>
             </div>
           </div>
@@ -107,15 +189,13 @@ export default function SettingsPage() {
           </div>
           <div style={{ height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
             <div style={{
-              width: `${Math.min(pct, 100)}%`,
-              height: '100%',
-              background: isWarning ? '#f97316' : '#16a34a',
-              borderRadius: '99px',
-              transition: 'width 0.4s ease',
+              width: `${Math.min(pct, 100)}%`, height: '100%',
+              background: trialExpired ? '#ef4444' : isWarning ? '#f97316' : '#16a34a',
+              borderRadius: '99px', transition: 'width 0.4s ease',
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-            <span style={{ fontSize: '12px', color: isWarning ? '#f97316' : '#9ca3af', fontWeight: isWarning ? 600 : 400 }}>
+            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : '#9ca3af', fontWeight: isWarning ? 600 : 400 }}>
               {pct}% utilizado
             </span>
             {limit !== null && (
@@ -127,46 +207,79 @@ export default function SettingsPage() {
         </div>
 
         {/* Planos */}
-        <div style={card}>
-          <span style={label}>Planos disponíveis</span>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map(slug => {
+        <div style={card} id="planos">
+          <span style={label}>
+            {isTrial ? '🚀 Escolha seu plano' : 'Planos disponíveis'}
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map((slug, i) => {
               const isActive = planSlug === slug
+              const isPopular = slug === 'pro'
               return (
                 <div
                   key={slug}
                   style={{
-                    border: isActive ? '2px solid #16a34a' : '1px solid #e5e7eb',
-                    borderRadius: '10px',
-                    padding: '16px',
+                    border: isActive ? '2px solid #16a34a' : isPopular ? '2px solid #6366f1' : '1px solid #e5e7eb',
+                    borderRadius: '12px', padding: '18px',
                     background: isActive ? '#f0fdf4' : '#fff',
                     position: 'relative',
+                    cursor: isTrial ? 'pointer' : 'default',
+                    transition: 'box-shadow 0.15s',
                   }}
+                  onMouseEnter={e => { if (isTrial) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none' }}
                 >
                   {isActive && (
-                    <span style={{
-                      position: 'absolute', top: '10px', right: '10px',
-                      fontSize: '10px', fontWeight: 700,
-                      color: '#16a34a', background: '#dcfce7',
-                      padding: '1px 8px', borderRadius: '99px',
-                      textTransform: 'uppercase', letterSpacing: '0.05em',
-                    }}>
+                    <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#16a34a', background: '#dcfce7', padding: '1px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
                       Atual
                     </span>
                   )}
-                  <p style={{ fontWeight: 600, fontSize: '14px', color: '#111827', marginBottom: '3px' }}>
+                  {isPopular && !isActive && (
+                    <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#6366f1', background: '#eef2ff', padding: '1px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
+                      Popular
+                    </span>
+                  )}
+                  <p style={{ fontWeight: 700, fontSize: '15px', color: '#111827', marginBottom: '2px' }}>
                     {PLAN_NAMES[slug]}
                   </p>
-                  <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '8px' }}>
+                  <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '10px' }}>
                     {PLAN_MSGS[slug]}
                   </p>
-                  <p style={{ fontWeight: 700, fontSize: '15px', color: '#111827' }}>
+                  <p style={{ fontWeight: 800, fontSize: '18px', color: '#111827', marginBottom: '12px' }}>
                     {PLAN_PRICES[slug]}
                   </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
+                    {PLAN_FEATURES[slug]?.map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Check size={12} color="#16a34a" />
+                        <span style={{ fontSize: '12px', color: '#374151' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {isTrial && !isActive && (
+                    <button
+                      onClick={() => alert('Em breve! Entre em contato pelo WhatsApp para assinar.')}
+                      style={{
+                        width: '100%', padding: '8px',
+                        background: isPopular ? '#6366f1' : '#16a34a',
+                        color: '#fff', border: 'none',
+                        borderRadius: '6px', fontSize: '13px',
+                        fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Assinar {PLAN_NAMES[slug]}
+                    </button>
+                  )}
                 </div>
               )
             })}
           </div>
+
+          {isTrial && (
+            <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
+              Para assinar entre em contato: <a href="https://wa.me/5547999497488" target="_blank" rel="noopener noreferrer" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>WhatsApp</a>
+            </p>
+          )}
         </div>
 
       </div>
