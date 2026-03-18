@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { LayoutDashboard, Megaphone, Users, MessageSquare, Zap, Settings, LogOut, Zap as ZapIcon } from 'lucide-react'
+import { LayoutDashboard, Megaphone, Users, MessageSquare, Zap, Settings, LogOut, Zap as ZapIcon, Radio } from 'lucide-react'
 
 const nav = [
   { href: '/dashboard',             label: 'Dashboard',  icon: LayoutDashboard },
@@ -14,6 +14,7 @@ const nav = [
   { href: '/dashboard/contacts',    label: 'CRM',        icon: Users },
   { href: '/dashboard/inbox',       label: 'Inbox',      icon: MessageSquare },
   { href: '/dashboard/automations', label: 'Automações', icon: Zap },
+  { href: '/dashboard/channels',    label: 'Canais',     icon: Radio },
   { href: '/dashboard/settings',    label: 'Plano',      icon: Settings },
 ]
 
@@ -75,13 +76,7 @@ export function Sidebar() {
       {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px', height: '32px',
-            background: '#16a34a',
-            borderRadius: '8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
+          <div style={{ width: '32px', height: '32px', background: '#16a34a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <ZapIcon size={16} color="#fff" fill="#fff" />
           </div>
           <div>
@@ -97,25 +92,14 @@ export function Sidebar() {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link key={href} href={href} style={{ textDecoration: 'none', display: 'block', marginBottom: '1px' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '9px',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                background: isActive ? '#f0fdf4' : 'transparent',
-                color: isActive ? '#16a34a' : '#6b7280',
-                fontSize: '13.5px',
-                fontWeight: isActive ? 600 : 400,
-                transition: 'all 0.1s ease',
-              }}
-              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#f9fafb' }}
-              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? '#f0fdf4' : 'transparent', color: isActive ? '#16a34a' : '#6b7280', fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#f9fafb' }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
               >
                 <Icon size={15} strokeWidth={isActive ? 2.5 : 1.8} />
                 <span>{label}</span>
-                {isActive && (
-                  <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-                )}
+                {isActive && <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />}
               </div>
             </Link>
           )
@@ -128,13 +112,7 @@ export function Sidebar() {
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={handleLogout}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '9px',
-            padding: '8px 10px', borderRadius: '6px',
-            width: '100%', background: 'none', border: 'none',
-            color: '#9ca3af', fontSize: '13.5px', cursor: 'pointer',
-            transition: 'all 0.1s ease',
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', width: '100%', background: 'none', border: 'none', color: '#9ca3af', fontSize: '13.5px', cursor: 'pointer', transition: 'all 0.1s ease' }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
         >
