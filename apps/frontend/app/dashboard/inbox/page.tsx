@@ -5,8 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck, Image, FileText, Music, Video, File } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText } from 'lucide-react'
 import Pusher from 'pusher-js'
+
+const CONVERSATION_SERVICE_URL = process.env.NEXT_PUBLIC_CONVERSATION_SERVICE_URL || ''
 
 const statusFilters = [
   { key: 'all',     label: 'Todas' },
@@ -36,101 +38,117 @@ function getAvatarColor(name: string | undefined | null) {
   return colors[idx]
 }
 
-// ─── Renderiza mídia da mensagem ──────────────────────────────────────────────
-function MediaMessage({ msg, isOut }: { msg: any; isOut: boolean }) {
-  const url = msg.media_url
-  const type = msg.content_type || ''
-  const textColor = isOut ? '#fff' : '#111827'
-  const subColor = isOut ? 'rgba(255,255,255,0.7)' : '#9ca3af'
+// ─── Resolve URL de mídia via proxy ──────────────────────────────────────────
+function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined): string | null {
+  if (!mediaUrl || !channelId) return null
 
-  if (!url && type === 'text') {
-    return (
-      <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: textColor }}>
-        {cleanText(msg.body || '')}
-      </p>
-    )
+  // Se já for uma URL completa (Gupshup v2), usa direto via proxy
+  // Se for um ID (Meta/Gupshup v3), monta a URL do proxy
+  const isUrl = mediaUrl.startsWith('http')
+  if (isUrl) {
+    // Mesmo URLs diretas podem precisar de auth — usa proxy
+    const encoded = encodeURIComponent(mediaUrl)
+    return `${CONVERSATION_SERVICE_URL}/conversations/media/${encoded}?channelId=${channelId}`
   }
+  // É um mediaId — monta URL do proxy
+  return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}`
+}
 
-  if (type === 'image' || (url && /\.(jpg|jpeg|png|gif|webp)/i.test(url))) {
+// ─── Renderiza conteúdo da mensagem ──────────────────────────────────────────
+function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; channelId?: string }) {
+  const textColor = isOut ? '#fff' : '#111827'
+  const subColor = isOut ? 'rgba(255,255,255,0.65)' : '#9ca3af'
+  const type = msg.content_type || 'text'
+  const proxyUrl = getMediaUrl(msg.media_url, channelId)
+
+  if (type === 'image') {
     return (
       <div>
-        <img
-          src={url}
-          alt="imagem"
-          style={{ maxWidth: '260px', borderRadius: '8px', display: 'block', cursor: 'pointer' }}
-          onClick={() => window.open(url, '_blank')}
-          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-        />
-        {msg.body && (
-          <p style={{ fontSize: '13px', marginTop: '6px', color: textColor, whiteSpace: 'pre-line' }}>
-            {cleanText(msg.body)}
-          </p>
+        {proxyUrl ? (
+          <img
+            src={proxyUrl}
+            alt="imagem"
+            style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }}
+            onClick={() => window.open(proxyUrl, '_blank')}
+            onError={e => {
+              const el = e.currentTarget as HTMLImageElement
+              el.style.display = 'none'
+              const p = document.createElement('p')
+              p.style.color = textColor
+              p.style.fontSize = '13px'
+              p.textContent = '[Imagem não disponível]'
+              el.parentNode?.appendChild(p)
+            }}
+          />
+        ) : (
+          <p style={{ fontSize: '13px', color: subColor }}>[Imagem]</p>
         )}
+        {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: textColor, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
       </div>
     )
   }
 
-  if (type === 'audio' || (url && /\.(mp3|ogg|wav|m4a|opus)/i.test(url))) {
+  if (type === 'audio') {
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <Music size={14} color={textColor} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+          <Music size={13} color={textColor} />
           <span style={{ fontSize: '12px', color: subColor }}>Áudio</span>
         </div>
-        <audio controls style={{ maxWidth: '240px', height: '36px' }}>
-          <source src={url} />
-        </audio>
-      </div>
-    )
-  }
-
-  if (type === 'video' || (url && /\.(mp4|mov|avi|webm)/i.test(url))) {
-    return (
-      <div>
-        <video
-          controls
-          style={{ maxWidth: '260px', borderRadius: '8px', display: 'block' }}
-        >
-          <source src={url} />
-        </video>
-        {msg.body && (
-          <p style={{ fontSize: '13px', marginTop: '6px', color: textColor }}>{cleanText(msg.body)}</p>
+        {proxyUrl ? (
+          <audio controls style={{ maxWidth: '220px', height: '34px' }}>
+            <source src={proxyUrl} />
+          </audio>
+        ) : (
+          <p style={{ fontSize: '13px', color: subColor }}>[Áudio não disponível]</p>
         )}
       </div>
     )
   }
 
-  if (type === 'document' || type === 'file' || url) {
-    const fileName = url ? url.split('/').pop() || 'documento' : 'documento'
+  if (type === 'video') {
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ textDecoration: 'none' }}
-      >
+      <div>
+        {proxyUrl ? (
+          <video controls style={{ maxWidth: '240px', borderRadius: '8px', display: 'block' }}>
+            <source src={proxyUrl} />
+          </video>
+        ) : (
+          <p style={{ fontSize: '13px', color: subColor }}>[Vídeo não disponível]</p>
+        )}
+        {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: textColor }}>{cleanText(msg.body)}</p>}
+      </div>
+    )
+  }
+
+  if (type === 'document') {
+    const fileName = msg.body || msg.media_url?.split('/')?.pop() || 'documento'
+    return (
+      <a href={proxyUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: '10px',
           padding: '10px 12px',
           background: isOut ? 'rgba(255,255,255,0.15)' : '#f3f4f6',
-          borderRadius: '8px', cursor: 'pointer',
+          borderRadius: '8px', cursor: proxyUrl ? 'pointer' : 'default',
         }}>
           <FileText size={20} color={isOut ? '#fff' : '#6b7280'} />
           <div>
             <p style={{ fontSize: '13px', fontWeight: 500, color: textColor, margin: 0 }}>
-              {fileName.length > 30 ? fileName.slice(0, 30) + '...' : fileName}
+              {String(fileName).slice(0, 30)}{String(fileName).length > 30 ? '...' : ''}
             </p>
-            <p style={{ fontSize: '11px', color: subColor, margin: 0 }}>Clique para abrir</p>
+            <p style={{ fontSize: '11px', color: subColor, margin: 0 }}>
+              {proxyUrl ? 'Clique para abrir' : 'Documento'}
+            </p>
           </div>
         </div>
       </a>
     )
   }
 
-  // Fallback — texto simples
+  // Texto padrão
   return (
     <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: textColor }}>
-      {cleanText(msg.body || `[${type}]`)}
+      {cleanText(msg.body || '')}
     </p>
   )
 }
@@ -248,6 +266,7 @@ export default function InboxPage() {
 
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
+  const channelId = selectedConv?.channel_id
 
   return (
     <div style={{ display: 'flex', height: '100%', background: '#f6f8fa' }}>
@@ -269,16 +288,7 @@ export default function InboxPage() {
 
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '4px' }}>
           {statusFilters.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              style={{
-                padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-                border: 'none', cursor: 'pointer', transition: 'all 0.1s',
-                background: statusFilter === f.key ? '#16a34a' : 'transparent',
-                color: statusFilter === f.key ? '#fff' : '#6b7280',
-              }}
-            >
+            <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: statusFilter === f.key ? '#16a34a' : 'transparent', color: statusFilter === f.key ? '#fff' : '#6b7280' }}>
               {f.label}
             </button>
           ))}
@@ -286,9 +296,7 @@ export default function InboxPage() {
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loadingConvs ? (
-            <div style={{ padding: '40px', textAlign: 'center' }}>
-              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
-            </div>
+            <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
           ) : conversations.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center' }}>
               <MessageSquare size={24} color="#e5e7eb" style={{ margin: '0 auto 8px' }} />
@@ -302,17 +310,7 @@ export default function InboxPage() {
               const lastMsg = conv.last_message || 'Sem mensagens'
               const lastMsgPreview = lastMsg.startsWith('[') ? lastMsg : cleanText(lastMsg).split('\n')[0]
               return (
-                <div
-                  key={conv.id}
-                  onClick={() => handleSelectConv(conv.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '11px 14px', borderBottom: '1px solid #f9fafb',
-                    cursor: 'pointer',
-                    background: isSelected ? '#f0fdf4' : 'transparent',
-                    borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent',
-                    transition: 'background 0.1s',
-                  }}
+                <div key={conv.id} onClick={() => handleSelectConv(conv.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : 'transparent', borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent', transition: 'background 0.1s' }}
                   onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                   onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                 >
@@ -321,24 +319,12 @@ export default function InboxPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {name || '??'}
-                      </span>
-                      {conv.last_message_at && (
-                        <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0, marginLeft: '6px' }}>
-                          {new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
+                      {conv.last_message_at && <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0, marginLeft: '6px' }}>{new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
-                    <div style={{ color: '#9ca3af', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {lastMsgPreview}
-                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lastMsgPreview}</div>
                   </div>
-                  {conv.unread_count > 0 && (
-                    <div style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', flexShrink: 0, minWidth: '18px', textAlign: 'center' }}>
-                      {conv.unread_count}
-                    </div>
-                  )}
+                  {conv.unread_count > 0 && <div style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', flexShrink: 0, minWidth: '18px', textAlign: 'center' }}>{conv.unread_count}</div>}
                 </div>
               )
             })
@@ -370,27 +356,11 @@ export default function InboxPage() {
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {selectedConv?.status !== 'closed' ? (
-                  <button
-                    onClick={async () => {
-                      await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' })
-                      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-                      queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
-                    }}
-                    style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 500 }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
-                  >
+                  <button onClick={async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }} style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 500 }} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
                     Fechar conversa
                   </button>
                 ) : (
-                  <button
-                    onClick={async () => {
-                      await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' })
-                      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-                      queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
-                    }}
-                    style={{ padding: '6px 14px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}
-                  >
+                  <button onClick={async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }} style={{ padding: '6px 14px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>
                     Reabrir
                   </button>
                 )}
@@ -400,26 +370,17 @@ export default function InboxPage() {
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
               {loadingMessages ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
-                </div>
+                <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
               ) : messages?.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '40px' }}>Nenhuma mensagem ainda</p>
               ) : (
                 messages?.map((msg: any) => {
                   const isOut = msg.direction === 'outbound'
-                  const hasMedia = msg.content_type !== 'text' || msg.media_url
+                  const isMedia = msg.content_type !== 'text'
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        maxWidth: hasMedia ? '280px' : '65%',
-                        padding: '10px 14px',
-                        borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                        background: isOut ? '#16a34a' : '#fff',
-                        color: isOut ? '#fff' : '#111827',
-                        boxShadow: '0 1px 2px rgba(0,0,0,.06)',
-                      }}>
-                        <MediaMessage msg={msg} isOut={isOut} />
+                      <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '10px 14px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#16a34a' : '#fff', color: isOut ? '#fff' : '#111827', boxShadow: '0 1px 2px rgba(0,0,0,.06)' }}>
+                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>
                             {msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -438,30 +399,12 @@ export default function InboxPage() {
             {selectedConv?.status !== 'closed' ? (
               <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                 <form onSubmit={handleSend} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827' }}
-                    placeholder="Digite uma mensagem..."
-                    value={messageText}
-                    onChange={e => setMessageText(e.target.value)}
-                    autoFocus
+                  <input style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827' }} placeholder="Digite uma mensagem..." value={messageText} onChange={e => setMessageText(e.target.value)} autoFocus
                     onFocus={e => { (e.currentTarget as HTMLInputElement).style.borderColor = '#16a34a'; (e.currentTarget as HTMLInputElement).style.background = '#fff' }}
                     onBlur={e => { (e.currentTarget as HTMLInputElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLInputElement).style.background = '#f9fafb' }}
                   />
-                  <button
-                    type="submit"
-                    disabled={sendMutation.isPending || !messageText.trim()}
-                    style={{
-                      width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                      background: messageText.trim() ? '#16a34a' : '#e5e7eb',
-                      border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    {sendMutation.isPending
-                      ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
-                      : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />
-                    }
+                  <button type="submit" disabled={sendMutation.isPending || !messageText.trim()} style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
+                    {sendMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />}
                   </button>
                 </form>
               </div>

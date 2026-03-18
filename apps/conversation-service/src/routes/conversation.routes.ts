@@ -3,12 +3,75 @@ import { z } from 'zod'
 import { conversationService } from '../services/conversation.service'
 import { requireAuth, validate } from '../middleware/conversation.middleware'
 import { ok, paginationSchema } from '@autozap/utils'
+import { db } from '../lib/db'
 
 const router = Router()
+
+// ─── Media proxy — NÃO requer auth JWT (usa channelId + mediaId) ──────────────
+// GET /conversations/media/:mediaId?channelId=xxx
+router.get('/conversations/media/:mediaId', async (req, res, next) => {
+  try {
+    const { mediaId } = req.params
+    const { channelId } = req.query as any
+
+    if (!channelId) {
+      res.status(400).json({ error: 'channelId required' })
+      return
+    }
+
+    // Busca as credenciais do canal
+    const { data: channel } = await db
+      .from('channels')
+      .select('credentials, type')
+      .eq('id', channelId)
+      .single()
+
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' })
+      return
+    }
+
+    const apiKey = channel.credentials?.apiKey
+
+    if (!apiKey) {
+      res.status(400).json({ error: 'No apiKey found for channel' })
+      return
+    }
+
+    // Proxy da mídia do Gupshup
+    const mediaResponse = await fetch(
+      `https://api.gupshup.io/wa/api/v1/media/${mediaId}`,
+      {
+        headers: {
+          'apikey': apiKey,
+        },
+      }
+    )
+
+    if (!mediaResponse.ok) {
+      res.status(mediaResponse.status).json({ error: 'Failed to fetch media' })
+      return
+    }
+
+    // Passa os headers de content-type e content-length
+    const contentType = mediaResponse.headers.get('content-type')
+    const contentLength = mediaResponse.headers.get('content-length')
+
+    if (contentType) res.setHeader('Content-Type', contentType)
+    if (contentLength) res.setHeader('Content-Length', contentLength)
+    res.setHeader('Cache-Control', 'public, max-age=86400') // Cache 24h
+
+    // Stream da resposta para o frontend
+    const buffer = await mediaResponse.arrayBuffer()
+    res.send(Buffer.from(buffer))
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.use(requireAuth)
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
-
 const updateStatusSchema = z.object({
   status: z.enum(['open', 'waiting', 'closed']),
 })
@@ -23,7 +86,6 @@ const pipelineSchema = z.object({
 
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-// GET /conversations
 router.get('/conversations', async (req, res, next) => {
   try {
     const { page, limit } = paginationSchema.parse(req.query)
@@ -35,7 +97,6 @@ router.get('/conversations', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /conversations/pipeline — kanban board
 router.get('/conversations/pipeline', async (req, res, next) => {
   try {
     const board = await conversationService.getPipelineBoard(req.auth.tid)
@@ -43,7 +104,6 @@ router.get('/conversations/pipeline', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /conversations/search
 router.get('/conversations/search', async (req, res, next) => {
   try {
     const { q } = req.query as any
@@ -53,7 +113,6 @@ router.get('/conversations/search', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /conversations/:id
 router.get('/conversations/:id', async (req, res, next) => {
   try {
     const conv = await conversationService.getConversation(req.params.id, req.auth.tid)
@@ -61,7 +120,6 @@ router.get('/conversations/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /conversations/:id/status
 router.patch('/conversations/:id/status', validate(updateStatusSchema), async (req, res, next) => {
   try {
     const conv = await conversationService.updateStatus(req.params.id, req.auth.tid, req.body.status)
@@ -69,7 +127,6 @@ router.patch('/conversations/:id/status', validate(updateStatusSchema), async (r
   } catch (err) { next(err) }
 })
 
-// PATCH /conversations/:id/assign
 router.patch('/conversations/:id/assign', validate(assignSchema), async (req, res, next) => {
   try {
     const conv = await conversationService.assignConversation(req.params.id, req.auth.tid, req.body.userId)
@@ -77,7 +134,6 @@ router.patch('/conversations/:id/assign', validate(assignSchema), async (req, re
   } catch (err) { next(err) }
 })
 
-// PATCH /conversations/:id/pipeline
 router.patch('/conversations/:id/pipeline', validate(pipelineSchema), async (req, res, next) => {
   try {
     const conv = await conversationService.updatePipelineStage(req.params.id, req.auth.tid, req.body.stage)
@@ -85,7 +141,6 @@ router.patch('/conversations/:id/pipeline', validate(pipelineSchema), async (req
   } catch (err) { next(err) }
 })
 
-// POST /conversations/:id/read
 router.post('/conversations/:id/read', async (req, res, next) => {
   try {
     await conversationService.markAsRead(req.params.id, req.auth.tid)
@@ -93,7 +148,6 @@ router.post('/conversations/:id/read', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /conversations/:id/messages — paginated messages
 router.get('/conversations/:id/messages', async (req, res, next) => {
   try {
     const { cursor, limit } = req.query as any
