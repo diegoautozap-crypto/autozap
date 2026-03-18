@@ -57,6 +57,20 @@ interface ParsedCurl {
   channel: string
 }
 
+// ─── Verifica limite do plano ─────────────────────────────────────────────────
+async function checkPlanLimit(tenantId: string): Promise<boolean> {
+  try {
+    const { data } = await db.rpc('tenant_can_send', {
+      p_tenant_id: tenantId,
+      p_count: 1,
+    })
+    return !!data
+  } catch {
+    return true // em caso de erro, não bloqueia
+  }
+}
+
+// ─── CrmQueue ─────────────────────────────────────────────────────────────────
 class CrmQueue {
   private queue: (() => Promise<void>)[] = []
   private running = false
@@ -177,7 +191,6 @@ async function saveToCrm(
   await campaignService.markContactSent(contactId, messageUuid)
   await campaignService.incrementCounter(campaignId, 'sent_count')
 
-  // ✅ FIX: usar try/catch em vez de .catch() no rpc do Supabase
   try {
     await db.rpc('increment_message_count', { p_tenant_id: tenantId })
   } catch {}
@@ -260,6 +273,14 @@ export function startCampaignWorker(): Worker {
         throw new Error(`Failed to parse templateId from curl. source=${parsed.source}`)
       }
 
+      // ✅ Verifica limite ANTES de iniciar a campanha
+      const canStart = await checkPlanLimit(tenantId)
+      if (!canStart) {
+        await db.from('campaigns').update({ status: 'failed' }).eq('id', campaignId)
+        logger.warn('Campaign blocked — plan limit reached', { campaignId, tenantId })
+        return
+      }
+
       const crmQueue = new CrmQueue()
       const processedIds = new Set<string>()
       let processed = 0
@@ -279,9 +300,17 @@ export function startCampaignWorker(): Worker {
         }
 
         for (let i = 0; i < pending.length; i += PARALLEL_FETCHES) {
-          if (processed > 0 && processed % 100 === 0) {
+          // ✅ Verifica pausa E limite a cada 50 mensagens
+          if (processed > 0 && processed % 50 === 0) {
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
+
+            const canContinue = await checkPlanLimit(tenantId)
+            if (!canContinue) {
+              await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
+              logger.warn('Campaign paused — plan limit reached mid-run', { campaignId, tenantId, processed })
+              break
+            }
           }
 
           const chunk = pending.slice(i, i + PARALLEL_FETCHES)

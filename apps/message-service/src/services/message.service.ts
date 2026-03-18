@@ -50,6 +50,21 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
 export class MessageService {
 
   async queueMessage(input: QueueMessageInput): Promise<string> {
+    // ✅ Verifica limite do plano antes de enfileirar
+    try {
+      const { data: canSend } = await db.rpc('tenant_can_send', {
+        p_tenant_id: input.tenantId,
+        p_count: 1,
+      })
+      if (!canSend) {
+        throw new AppError('PLAN_LIMIT_EXCEEDED', 'Limite de mensagens do plano atingido. Faça upgrade para continuar enviando.', 429)
+      }
+    } catch (err: any) {
+      if (err.code === 'PLAN_LIMIT_EXCEEDED') throw err
+      // Se falhar a verificação por outro motivo, deixa passar
+      logger.warn('Failed to check plan limit', { tenantId: input.tenantId, err: err.message })
+    }
+
     const messageUuid = uuidv4()
 
     const { data, error } = await db.from('messages').insert({
@@ -112,20 +127,19 @@ export class MessageService {
       delivered_at: msg.timestamp,
     })
 
-    // ✅ 4. Update conversation — separado do increment_unread para não falhar
+    // 4. Update conversation — separado do increment_unread
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
       status: 'open',
     }).eq('id', conversation.id)
 
-    // ✅ 5. Incrementa unread em query separada
+    // 5. Incrementa unread em query separada
     try {
       await db.rpc('increment_unread', { p_conversation_id: conversation.id })
     } catch {
-      // Incrementa manualmente se a função não existir
       await db.from('conversations')
-        .update({ unread_count: conversation.unread_count ? conversation.unread_count + 1 : 1 })
+        .update({ unread_count: (conversation.unread_count || 0) + 1 })
         .eq('id', conversation.id)
     }
 
@@ -134,7 +148,7 @@ export class MessageService {
       last_interaction_at: msg.timestamp,
     }).eq('id', contact.id)
 
-    // ✅ 7. Emit Pusher — notifica frontend em tempo real
+    // 7. Emit Pusher — notifica frontend em tempo real
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,
       contactId: contact.id,
