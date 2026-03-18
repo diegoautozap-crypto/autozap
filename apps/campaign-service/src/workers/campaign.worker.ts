@@ -103,9 +103,6 @@ async function sendViaFetch(
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Usa JSON.stringify direto — message vem com \r como texto literal "\\r"
-    // JSON.stringify vai manter como "\\r" no JSON string
-    // encodeURIComponent vai encodar tudo corretamente
     const templateJson = JSON.stringify({
       id: parsed.templateId,
       params: [message],
@@ -258,11 +255,17 @@ export function startCampaignWorker(): Worker {
             const check = await campaignService.getProgress(campaignId, tenantId)
             if (check.status !== 'running') break
 
+            // ✅ FIX: o banco salva \\r (escape duplo), precisa virar \r simples
+            // para o Gupshup interpretar como quebra de linha
             const contactMessage = (
               contact.variables?.mensagem ||
               contact.variables?.copy ||
               ''
-            ).trim()
+            )
+              .replace(/\\r\\n/g, '\r\n')
+              .replace(/\\r/g, '\r')
+              .replace(/\\n/g, '\n')
+              .trim()
 
             const messageUuid = uuidv4()
             const result = await sendViaFetch(parsed, contact.phone, contactMessage)
