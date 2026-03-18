@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -106,9 +106,13 @@ export default function InboxPage() {
   const [showProfile, setShowProfile] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [pendingFile, setPendingFile] = useState<{ file: File; previewUrl: string; contentType: string } | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const audioInputRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
@@ -167,28 +171,79 @@ export default function InboxPage() {
     if (file.size > 15 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 15MB'); return }
     setPendingFile({ file, previewUrl: URL.createObjectURL(file), contentType: getContentType(file) })
     if (fileInputRef.current) fileInputRef.current.value = ''
-    if (audioInputRef.current) audioInputRef.current.value = ''
   }
 
-  const handleSendFile = async () => {
-    if (!pendingFile || !selectedConv) return
+  const uploadAndSend = async (file: File, contentType: string) => {
     setUploading(true)
     try {
-      const ext = pendingFile.file.name.split('.').pop()
+      const ext = file.name.split('.').pop() || 'bin'
       const path = `inbox/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from('media').upload(path, pendingFile.file, { contentType: pendingFile.file.type, upsert: false })
+      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
       if (error) throw error
       const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
-      await sendMutation.mutateAsync({ contentType: pendingFile.contentType, mediaUrl: publicData.publicUrl, body: messageText || undefined })
-      toast.success('Arquivo enviado!')
+      await sendMutation.mutateAsync({ contentType, mediaUrl: publicData.publicUrl })
+      toast.success('Enviado!')
     } catch (err: any) {
       toast.error('Erro ao enviar: ' + (err.message || 'tente novamente'))
     } finally { setUploading(false) }
   }
 
+  const handleSendFile = async () => {
+    if (!pendingFile) return
+    await uploadAndSend(pendingFile.file, pendingFile.contentType)
+    setPendingFile(null)
+  }
+
+  // ── Gravador de áudio ─────────────────────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const file = new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' })
+        stream.getTracks().forEach(t => t.stop())
+        setIsRecording(false)
+        setRecordingSeconds(0)
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+        await uploadAndSend(file, 'audio')
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      setRecordingSeconds(0)
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch {
+      toast.error('Não foi possível acessar o microfone')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+    }
+  }
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.ondataavailable = null
+      mediaRecorderRef.current.onstop = null
+      mediaRecorderRef.current.stop()
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      setIsRecording(false)
+      setRecordingSeconds(0)
+    }
+  }
+
+  const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
+
   const handleSendText = () => { if (messageText.trim()) sendMutation.mutate({ contentType: 'text', body: messageText }) }
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText() } }
-
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const handleSelectConv = async (convId: string) => {
@@ -300,7 +355,8 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {pendingFile && (
+            {/* Preview arquivo */}
+            {pendingFile && !isRecording && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {pendingFile.contentType === 'image'
                   ? <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
@@ -320,40 +376,52 @@ export default function InboxPage() {
 
             {selectedConv?.status !== 'closed' ? (
               <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                  {/* Input oculto para arquivos (imagem, vídeo, doc) */}
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
-                  {/* Input oculto para áudio */}
-                  <input ref={audioInputRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleFileSelect} />
 
-                  {/* Botão anexar arquivo */}
-                  <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
-                    <Paperclip size={16} />
-                  </button>
+                {/* Gravando áudio */}
+                {isRecording ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
+                    <span style={{ fontSize: '14px', color: '#ef4444', fontWeight: 600 }}>Gravando... {formatTime(recordingSeconds)}</span>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={cancelRecording} style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>
+                      Cancelar
+                    </button>
+                    <button onClick={stopRecording} disabled={uploading} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Square size={13} fill="#fff" />}
+                      {uploading ? 'Enviando...' : 'Parar e enviar'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                    <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
 
-                  {/* Botão anexar áudio */}
-                  <button onClick={() => audioInputRef.current?.click()} style={btnStyle} title="Enviar áudio"
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
-                    <Mic size={16} />
-                  </button>
+                    <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
+                      <Paperclip size={16} />
+                    </button>
 
-                  <textarea
-                    style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
-                    placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
-                    value={messageText}
-                    onChange={e => setMessageText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#fff' }}
-                    onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb' }}
-                  />
-                  <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()}
-                    style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {sendMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />}
-                  </button>
-                </div>
+                    <button onClick={startRecording} style={btnStyle} title="Gravar áudio"
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}>
+                      <Mic size={16} />
+                    </button>
+
+                    <textarea
+                      style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
+                      placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
+                      value={messageText}
+                      onChange={e => setMessageText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#fff' }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb' }}
+                    />
+                    <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()}
+                      style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {sendMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', background: '#fff', textAlign: 'center', flexShrink: 0 }}>
@@ -416,7 +484,10 @@ export default function InboxPage() {
         </div>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      `}</style>
     </div>
   )
 }
