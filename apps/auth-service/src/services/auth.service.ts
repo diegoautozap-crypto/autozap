@@ -26,8 +26,6 @@ import {
 } from '@autozap/utils'
 import type { AuthTokens, UserRole } from '@autozap/types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface RegisterInput {
   name: string
   email: string
@@ -48,15 +46,12 @@ interface TokenPair {
   requiresTwoFactor?: boolean
 }
 
-// ─── AuthService ──────────────────────────────────────────────────────────────
-
 export class AuthService {
-  // ── Register ────────────────────────────────────────────────────────────────
 
   async register(input: RegisterInput): Promise<{ userId: string; tenantId: string }> {
     const { name, email, password, tenantName } = input
 
-    // 1. Check if email already exists globally
+    // 1. Check if email already exists
     const { data: existingUser } = await db
       .from('users')
       .select('id')
@@ -65,7 +60,7 @@ export class AuthService {
 
     if (existingUser) throw new ConflictError('Email already registered')
 
-    // 2. Create tenant
+    // 2. Create tenant com plano trial
     const tenantId = generateId()
     const tenantSlug = await this.uniqueSlug(slugify(tenantName))
 
@@ -73,23 +68,32 @@ export class AuthService {
       id: tenantId,
       name: tenantName,
       slug: tenantSlug,
-      plan_slug: 'starter',
+      plan_slug: 'trial',
     })
     if (tenantError) throw new AppError('DB_ERROR', tenantError.message, 500)
 
-    // 3. Create starter subscription
-    const { data: starterPlan } = await db
+    // 3. Cria subscription trial — 7 dias, 100 mensagens
+    const { data: trialPlan } = await db
       .from('plans')
       .select('id')
-      .eq('slug', 'starter')
-      .single()
+      .eq('slug', 'trial')
+      .maybeSingle()
 
-    await db.from('subscriptions').insert({
-      tenant_id: tenantId,
-      plan_id: starterPlan!.id,
-      status: 'trialing',
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
-    })
+    // Se não tiver plano trial, usa starter como fallback
+    const planToUse = trialPlan || (await db.from('plans').select('id').eq('slug', 'starter').single()).data
+
+    if (planToUse) {
+      await db.from('subscriptions').insert({
+        id: generateId(),
+        tenant_id: tenantId,
+        plan_id: planToUse.id,
+        status: 'trialing',
+        current_period_start: new Date(),
+        current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
+        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        cancel_at_period_end: false,
+      })
+    }
 
     // 4. Create user (owner)
     const userId = generateId()
@@ -105,8 +109,8 @@ export class AuthService {
       role: 'owner' as UserRole,
       email_verify_token: emailVerifyToken,
     })
+
     if (userError) {
-      // Rollback tenant if user creation fails
       await db.from('tenants').delete().eq('id', tenantId)
       throw new AppError('DB_ERROR', userError.message, 500)
     }
@@ -116,16 +120,13 @@ export class AuthService {
       logger.error('Failed to send verification email', { err }),
     )
 
-    logger.info('User registered', { userId, tenantId, email })
+    logger.info('User registered with trial', { userId, tenantId, email })
     return { userId, tenantId }
   }
-
-  // ── Login ────────────────────────────────────────────────────────────────────
 
   async login(input: LoginInput): Promise<TokenPair> {
     const { email, password, totpCode, userAgent, ipAddress } = input
 
-    // 1. Find user
     const { data: user } = await db
       .from('users')
       .select('id, tenant_id, email, name, password_hash, role, two_factor_enabled, two_factor_secret, is_active, email_verified')
@@ -135,21 +136,17 @@ export class AuthService {
     if (!user) throw new UnauthorizedError('Invalid email or password')
     if (!user.is_active) throw new UnauthorizedError('Account suspended')
 
-    // 2. Check password
     const valid = await comparePassword(password, user.password_hash)
     if (!valid) throw new UnauthorizedError('Invalid email or password')
 
-    // 3. 2FA check
     if (user.two_factor_enabled) {
       if (!totpCode) {
-        // Signal the frontend to show the 2FA input
         return { tokens: {} as AuthTokens, requiresTwoFactor: true }
       }
       const ok = verifyTotpCode(user.two_factor_secret!, totpCode)
       if (!ok) throw new UnauthorizedError('Invalid 2FA code')
     }
 
-    // 4. Issue tokens
     const tokens = await this.issueTokens({
       userId: user.id,
       tenantId: user.tenant_id,
@@ -159,22 +156,16 @@ export class AuthService {
       ipAddress,
     })
 
-    // 5. Update last login (non-blocking)
     db.from('users').update({ last_login_at: new Date() }).eq('id', user.id).then()
-
-    // 6. Audit log
     this.audit(user.tenant_id, user.id, 'user.login', 'user', user.id, { ipAddress })
 
     logger.info('User logged in', { userId: user.id, tenantId: user.tenant_id })
     return { tokens }
   }
 
-  // ── Refresh Token ─────────────────────────────────────────────────────────────
-
   async refresh(rawToken: string, ipAddress?: string): Promise<AuthTokens> {
     const tokenHash = hashToken(rawToken)
 
-    // 1. Find token in DB
     const { data: stored } = await db
       .from('refresh_tokens')
       .select('id, user_id, tenant_id, family, revoked_at, expires_at')
@@ -183,21 +174,17 @@ export class AuthService {
 
     if (!stored) throw new UnauthorizedError('Invalid refresh token')
 
-    // 2. Check if revoked — if so, revoke entire family (token theft detection)
     if (stored.revoked_at) {
       await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('family', stored.family)
       throw new UnauthorizedError('Refresh token reuse detected — all sessions revoked')
     }
 
-    // 3. Check expiry
     if (new Date(stored.expires_at) < new Date()) {
       throw new UnauthorizedError('Refresh token expired')
     }
 
-    // 4. Revoke current token (rotation)
     await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('id', stored.id)
 
-    // 5. Get user info
     const { data: user } = await db
       .from('users')
       .select('id, tenant_id, email, role, is_active')
@@ -206,7 +193,6 @@ export class AuthService {
 
     if (!user || !user.is_active) throw new UnauthorizedError('Account not found or suspended')
 
-    // 6. Issue new tokens (same family)
     return this.issueTokens({
       userId: user.id,
       tenantId: user.tenant_id,
@@ -216,8 +202,6 @@ export class AuthService {
       ipAddress,
     })
   }
-
-  // ── Logout ────────────────────────────────────────────────────────────────────
 
   async logout(rawToken: string): Promise<void> {
     const tokenHash = hashToken(rawToken)
@@ -231,8 +215,6 @@ export class AuthService {
       .eq('user_id', userId)
       .is('revoked_at', null)
   }
-
-  // ── Verify Email ──────────────────────────────────────────────────────────────
 
   async verifyEmail(token: string): Promise<void> {
     const { data: user } = await db
@@ -249,14 +231,11 @@ export class AuthService {
       email_verify_token: null,
     }).eq('id', user.id)
 
-    // Send welcome email (non-blocking)
     const { data: tenant } = await db.from('tenants').select('name').eq('id', user.tenant_id).single()
     sendWelcomeEmail({ to: user.email, name: user.name, tenantName: tenant?.name || 'sua empresa' }).catch(() => {})
 
     logger.info('Email verified', { userId: user.id })
   }
-
-  // ── Forgot Password ───────────────────────────────────────────────────────────
 
   async forgotPassword(email: string): Promise<void> {
     const { data: user } = await db
@@ -265,11 +244,10 @@ export class AuthService {
       .eq('email', email.toLowerCase())
       .maybeSingle()
 
-    // Always return success to avoid user enumeration
     if (!user) return
 
     const token = randomBytes(32).toString('hex')
-    const expires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+    const expires = new Date(Date.now() + 60 * 60 * 1000)
 
     await db.from('users').update({
       password_reset_token: token,
@@ -280,8 +258,6 @@ export class AuthService {
       logger.error('Failed to send password reset email', { err }),
     )
   }
-
-  // ── Reset Password ────────────────────────────────────────────────────────────
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const { data: user } = await db
@@ -302,13 +278,9 @@ export class AuthService {
       password_reset_expires: null,
     }).eq('id', user.id)
 
-    // Revoke all refresh tokens for security
     await this.logoutAllSessions(user.id)
-
     logger.info('Password reset', { userId: user.id })
   }
-
-  // ── 2FA Setup ─────────────────────────────────────────────────────────────────
 
   async setup2FA(userId: string): Promise<{ qrCodeUrl: string; secret: string }> {
     const { data: user } = await db
@@ -321,10 +293,7 @@ export class AuthService {
     if (user.two_factor_enabled) throw new ConflictError('2FA already enabled')
 
     const { qrCodeUrl, secret, encryptedSecret } = await generateTwoFactorSetup(user.email)
-
-    // Store encrypted secret temporarily (not enabled yet — user must confirm with code)
     await db.from('users').update({ two_factor_secret: encryptedSecret }).eq('id', userId)
-
     return { qrCodeUrl, secret }
   }
 
@@ -363,8 +332,6 @@ export class AuthService {
     }).eq('id', userId)
   }
 
-  // ── Private Helpers ───────────────────────────────────────────────────────────
-
   private async issueTokens(opts: {
     userId: string
     tenantId: string
@@ -394,7 +361,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: rawRefresh,
-      expiresIn: 15 * 60, // 15 minutes in seconds
+      expiresIn: 15 * 60,
     }
   }
 
@@ -409,14 +376,7 @@ export class AuthService {
     }
   }
 
-  private audit(
-    tenantId: string,
-    userId: string,
-    action: string,
-    resource: string,
-    resourceId: string,
-    metadata?: object,
-  ): void {
+  private audit(tenantId: string, userId: string, action: string, resource: string, resourceId: string, metadata?: object): void {
     db.from('audit_logs').insert({ tenant_id: tenantId, user_id: userId, action, resource, resource_id: resourceId, metadata }).then()
   }
 }

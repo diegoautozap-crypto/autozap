@@ -1,6 +1,6 @@
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
-export type PlanSlug = 'starter' | 'pro' | 'enterprise' | 'unlimited'
+export type PlanSlug = 'trial' | 'starter' | 'pro' | 'enterprise' | 'unlimited'
 
 export interface Plan {
   id: string
@@ -12,6 +12,7 @@ export interface Plan {
 }
 
 export const PLAN_LIMITS: Record<PlanSlug, number | null> = {
+  trial: 100,
   starter: 10_000,
   pro: 50_000,
   enterprise: 100_000,

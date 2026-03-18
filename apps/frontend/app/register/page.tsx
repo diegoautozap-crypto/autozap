@@ -1,103 +1,214 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
-import { campaignApi, conversationApi, contactApi } from '@/lib/api'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Megaphone, Users, MessageSquare, Zap } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
+import { toast } from 'sonner'
+import { Loader2, MessageSquareMore, ArrowRight, Check } from 'lucide-react'
 
-const card = (style?: object) => ({
-  background: 'var(--card-bg)',
-  border: '1px solid var(--card-border)',
-  borderRadius: '10px',
-  padding: '24px',
-  boxShadow: 'var(--shadow)',
-  ...style,
-})
+const benefits = [
+  '7 dias grátis, sem cartão',
+  '100 mensagens para testar',
+  'Inbox em tempo real',
+  'Campanhas em massa',
+]
 
-export default function DashboardPage() {
+export default function RegisterPage() {
   const router = useRouter()
+  const { register, login, isLoading } = useAuthStore()
+  const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
+  const [step, setStep] = useState<'form' | 'success'>('form')
 
-  const { data: campaigns } = useQuery({
-    queryKey: ['campaigns'],
-    queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data },
-  })
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (form.password.length < 8) {
+      toast.error('Senha deve ter pelo menos 8 caracteres')
+      return
+    }
+    try {
+      await register(form.name, form.email, form.password, form.tenantName)
+      // Login automático após registro
+      await login(form.email, form.password)
+      toast.success('Conta criada! Bem-vindo ao AutoZap 🎉')
+      router.push('/dashboard')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Erro ao criar conta')
+    }
+  }
 
-  const { data: conversations } = useQuery({
-    queryKey: ['conversations', 'open'],
-    queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data },
-  })
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 14px',
+    background: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    color: '#111827', fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.15s',
+  }
 
-  const { data: contactsMeta } = useQuery({
-    queryKey: ['contacts-count'],
-    queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta },
-  })
-
-  const metrics = [
-    {
-      label: 'Campanhas',
-      sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento`,
-      value: campaigns?.length ?? 0,
-      icon: Megaphone,
-      iconBg: '#4f87ff',
-      href: '/dashboard/campaigns',
-    },
-    {
-      label: 'Contatos',
-      sub: 'na sua base',
-      value: contactsMeta?.total ?? 0,
-      icon: Users,
-      iconBg: '#a855f7',
-      href: '/dashboard/contacts',
-    },
-    {
-      label: 'Conversas abertas',
-      sub: `${conversations?.filter((c: any) => c.status === 'waiting').length || 0} aguardando`,
-      value: conversations?.length ?? 0,
-      icon: MessageSquare,
-      iconBg: '#25d366',
-      href: '/dashboard/inbox',
-    },
-    {
-      label: 'Automações ativas',
-      sub: 'em execução',
-      value: 0,
-      icon: Zap,
-      iconBg: '#f97316',
-      href: '/dashboard/automations',
-    },
-  ]
+  const labelStyle: React.CSSProperties = {
+    display: 'block', color: '#6b7280',
+    fontSize: '12px', fontWeight: 500, marginBottom: '6px',
+  }
 
   return (
-    <div style={{ padding: '32px' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>Dashboard</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>Visão geral da sua conta</p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-        {metrics.map(({ label, sub, value, icon: Icon, iconBg, href }) => (
-          <div
-            key={label}
-            onClick={() => router.push(href)}
-            style={{ ...card(), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0' }}
-            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'}
-            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{label}</span>
-              <div style={{
-                width: '40px', height: '40px', borderRadius: '10px',
-                background: iconBg,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon size={20} color="#fff" />
-              </div>
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      background: '#f6f8fa',
+    }}>
+      {/* Left — benefits */}
+      <div style={{
+        display: 'none',
+        width: '45%', background: '#16a34a',
+        padding: '48px', flexDirection: 'column', justifyContent: 'center',
+      }}
+        className="register-left"
+      >
+        <div style={{ marginBottom: '48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
+            <div style={{ width: '36px', height: '36px', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MessageSquareMore size={20} color="#fff" />
             </div>
-            <div style={{ fontSize: '36px', fontWeight: 700, color: 'var(--text)', lineHeight: 1, marginBottom: '6px' }}>
-              {value.toLocaleString()}
-            </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{sub}</div>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: '18px' }}>AutoZap</span>
           </div>
-        ))}
+          <h2 style={{ color: '#fff', fontSize: '32px', fontWeight: 700, lineHeight: 1.2, marginBottom: '16px' }}>
+            WhatsApp CRM para escalar suas vendas
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '15px', lineHeight: 1.6 }}>
+            Dispare campanhas em massa, gerencie leads e responda clientes — tudo em um só lugar.
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {benefits.map(b => (
+            <div key={b} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Check size={13} color="#fff" />
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px' }}>{b}</span>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Right — form */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+
+          {/* Logo mobile */}
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ width: '48px', height: '48px', background: '#16a34a', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(22,163,74,0.3)' }}>
+              <MessageSquareMore size={24} color="#fff" />
+            </div>
+            <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
+              Crie sua conta grátis
+            </h1>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>
+              7 dias grátis • 100 mensagens • Sem cartão
+            </p>
+          </div>
+
+          {/* Card */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={labelStyle}>Seu nome *</label>
+                <input
+                  style={inputStyle}
+                  placeholder="João Silva"
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  required
+                  autoFocus
+                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={labelStyle}>Nome da empresa *</label>
+                <input
+                  style={inputStyle}
+                  placeholder="Minha Empresa"
+                  value={form.tenantName}
+                  onChange={e => setForm({ ...form, tenantName: e.target.value })}
+                  required
+                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={labelStyle}>Email *</label>
+                <input
+                  type="email"
+                  style={inputStyle}
+                  placeholder="joao@empresa.com"
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  required
+                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={labelStyle}>Senha *</label>
+                <input
+                  type="password"
+                  style={inputStyle}
+                  placeholder="Mínimo 8 caracteres"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  required
+                  minLength={8}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  width: '100%', padding: '12px',
+                  background: '#16a34a', color: '#fff',
+                  border: 'none', borderRadius: '8px',
+                  fontSize: '14px', fontWeight: 600,
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.7 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+              >
+                {isLoading
+                  ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <ArrowRight size={16} />
+                }
+                Criar conta grátis
+              </button>
+
+              <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
+                Ao criar uma conta você concorda com nossos{' '}
+                <a href="#" style={{ color: '#16a34a', textDecoration: 'none' }}>Termos de Uso</a>
+              </p>
+            </form>
+          </div>
+
+          <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '13px', marginTop: '20px' }}>
+            Já tem conta?{' '}
+            <a href="/login" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>
+              Entrar
+            </a>
+          </p>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media (min-width: 768px) { .register-left { display: flex !important; } }
+      `}</style>
     </div>
   )
 }
