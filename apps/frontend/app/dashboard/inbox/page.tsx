@@ -265,7 +265,7 @@ export default function InboxPage() {
   const channelId = selectedConv?.channel_id
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: '#f6f8fa' }}>
+    <div style={{ display: 'flex', height: '100%', background: '#f6f8fa', overflow: 'hidden' }}>
 
       {/* ── Left: conversation list ── */}
       <div style={{ width: '280px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
