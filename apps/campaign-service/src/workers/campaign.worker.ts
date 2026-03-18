@@ -113,7 +113,7 @@ async function ensureContactAndConversation(
 // ─── Parseia curl ─────────────────────────────────────────────────────────────
 interface ParsedCurl {
   apiKey: string
-  bodyTemplate: string // body original com destination substituído por __PHONE__
+  bodyTemplate: string
 }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
@@ -126,7 +126,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const apiKeyMatch = curlStr.match(/apikey:\s*([^\s"'\\]+)/)
   const apiKey = apiKeyMatch?.[1] || ''
 
-  // Extrai body original sem modificar nada
   const singleQuoteMatch = curlStr.match(/-d\s+'([^']+)'/)
   let bodyRaw = ''
   if (singleQuoteMatch) {
@@ -144,18 +143,35 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
 
   logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...' })
-
   return { apiKey, bodyTemplate }
 }
 
-// ─── Envia via fetch — body original, só troca destination ───────────────────
+// ─── Envia via fetch ──────────────────────────────────────────────────────────
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
+  message: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Usa o body original exatamente como está, só troca o número
-    const body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
+    // Substitui o destination
+    let body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
+
+    // Substitui o params do template com a mensagem do CSV
+    if (message) {
+      // Decodifica o template do body
+      const templateMatch = body.match(/template=([^&]*)/)
+      if (templateMatch) {
+        try {
+          const templateObj = JSON.parse(decodeURIComponent(templateMatch[1]))
+          // Substitui os params com a mensagem — mantém \r real para quebra de linha no WhatsApp
+          templateObj.params = [message]
+          const newTemplateEncoded = encodeURIComponent(JSON.stringify(templateObj))
+          body = body.replace(/template=[^&]*/, 'template=' + newTemplateEncoded)
+        } catch (e) {
+          logger.warn('Failed to replace template params, using original', { error: (e as any).message })
+        }
+      }
+    }
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
@@ -168,7 +184,7 @@ async function sendViaFetch(
     })
 
     const data = await response.json() as any
-    logger.debug('Gupshup response', { phone, status: data.status })
+    logger.debug('Gupshup response', { phone, status: data.status, response: JSON.stringify(data).slice(0, 300) })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
@@ -188,19 +204,25 @@ async function processContact(
 ): Promise<'sent' | 'failed'> {
   try {
     const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
+
+    // Converte os escapes literais do banco em caracteres reais
+    // \r é a quebra de linha do WhatsApp nos templates
     const contactMessage = rawMessage
-      .replace(/\\r\\n/g, '\n')
-      .replace(/\\r/g, '\n')
+      .replace(/\\r\\n/g, '\r')
+      .replace(/\\r/g, '\r')
       .replace(/\\n/g, '\n')
       .trim()
 
     const messageUuid = uuidv4()
-    const result = await sendViaFetch(parsed, contact.phone)
+    const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (result.ok) {
       const { contactId, conversationId } = await ensureContactAndConversation(
         tenantId, channelId, contact.phone
       )
+
+      // Salva no banco com quebras de linha legíveis
+      const bodyForDb = contactMessage.replace(/\r/g, '\n')
 
       await db.from('messages').insert({
         id: generateId(),
@@ -211,14 +233,14 @@ async function processContact(
         contact_id: contactId,
         direction: 'outbound',
         content_type: 'text',
-        body: contactMessage || '(template)',
+        body: bodyForDb || '(template)',
         status: 'sent',
         sent_at: new Date(),
         campaign_id: campaignId,
       })
 
       await db.from('conversations').update({
-        last_message: contactMessage || '(template)',
+        last_message: bodyForDb || '(template)',
         last_message_at: new Date(),
       }).eq('id', conversationId)
 
@@ -245,7 +267,6 @@ export function startCampaignWorker(): Worker {
       const { campaignId, tenantId, channelId, batchSize } = job.data
       logger.info('Campaign worker started', { campaignId })
 
-      // ✅ Verifica limite ANTES de iniciar
       const canStart = await checkPlanLimit(tenantId)
       if (!canStart) {
         await db.from('campaigns').update({ status: 'failed' }).eq('id', campaignId)
@@ -253,7 +274,6 @@ export function startCampaignWorker(): Worker {
         return
       }
 
-      // Parseia curl uma única vez
       const campaign = await campaignService.getCampaign(campaignId, tenantId)
       const curlTemplate = (campaign as any).curl_template
       if (!curlTemplate) throw new Error('No curl template configured')
@@ -278,7 +298,6 @@ export function startCampaignWorker(): Worker {
           const check = await campaignService.getProgress(campaignId, tenantId)
           if (check.status !== 'running') break
 
-          // ✅ Verifica limite a cada 50 mensagens
           if (processed > 0 && processed % 50 === 0) {
             const canContinue = await checkPlanLimit(tenantId)
             if (!canContinue) {
