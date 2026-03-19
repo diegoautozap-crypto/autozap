@@ -12,8 +12,42 @@ import {
 import { PLAN_LIMITS } from '@autozap/types'
 import type { Tenant, PlanSlug, TenantSettings } from '@autozap/types'
 
+const ASAAS_API_URL = 'https://api.asaas.com/v3'
+const ASAAS_API_KEY = process.env.ASAAS_API_KEY!
+
+const PLAN_PRICES: Record<string, number> = {
+  starter:    97,
+  pro:        197,
+  enterprise: 397,
+  unlimited:  697,
+}
+
+const PLAN_NAMES: Record<string, string> = {
+  starter:    'AutoZap Starter',
+  pro:        'AutoZap Pro',
+  enterprise: 'AutoZap Enterprise',
+  unlimited:  'AutoZap Unlimited',
+}
+
+async function asaasRequest(method: string, path: string, body?: object) {
+  const response = await fetch(`${ASAAS_API_URL}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'access_token': ASAAS_API_KEY,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await response.json() as any
+  if (!response.ok) {
+    logger.error('Asaas API error', { path, status: response.status, data })
+    throw new AppError('ASAAS_ERROR', data?.errors?.[0]?.description || 'Asaas API error', 500)
+  }
+  return data
+}
+
 export class TenantService {
-  // ── Get tenant ───────────────────────────────────────────────────────────────
+  // ── Get tenant ────────────────────────────────────────────────────────────
 
   async getTenant(tenantId: string): Promise<Tenant> {
     const { data, error } = await db
@@ -26,7 +60,7 @@ export class TenantService {
     return this.mapRow(data)
   }
 
-  // ── Update tenant settings ───────────────────────────────────────────────────
+  // ── Update tenant settings ────────────────────────────────────────────────
 
   async updateSettings(tenantId: string, settings: Partial<TenantSettings>): Promise<Tenant> {
     const current = await this.getTenant(tenantId)
@@ -44,7 +78,7 @@ export class TenantService {
     return this.mapRow(data)
   }
 
-  // ── Update name ───────────────────────────────────────────────────────────────
+  // ── Update name ───────────────────────────────────────────────────────────
 
   async updateName(tenantId: string, name: string): Promise<Tenant> {
     const { data, error } = await db
@@ -58,7 +92,7 @@ export class TenantService {
     return this.mapRow(data)
   }
 
-  // ── List users in tenant ─────────────────────────────────────────────────────
+  // ── List users in tenant ──────────────────────────────────────────────────
 
   async listUsers(tenantId: string, page = 1, limit = 20) {
     const offset = (page - 1) * limit
@@ -78,7 +112,7 @@ export class TenantService {
     }
   }
 
-  // ── Invite / update user role ─────────────────────────────────────────────────
+  // ── Invite / update user role ─────────────────────────────────────────────
 
   async updateUserRole(tenantId: string, userId: string, role: string): Promise<void> {
     const { error } = await db
@@ -101,18 +135,17 @@ export class TenantService {
     if (error) throw new AppError('DB_ERROR', error.message, 500)
   }
 
-  // ── Plan & limits ─────────────────────────────────────────────────────────────
+  // ── Plan & limits ─────────────────────────────────────────────────────────
 
   async getSubscription(tenantId: string) {
-    const { data, error } = await db
+    const { data } = await db
       .from('subscriptions')
       .select('*, plans(*)')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (error) throw new NotFoundError('Subscription')
     return data
   }
 
@@ -142,7 +175,6 @@ export class TenantService {
   }
 
   async resetPeriodCounts(): Promise<void> {
-    // Called by a scheduled job at the start of each billing period
     const { error } = await db
       .from('tenants')
       .update({ messages_sent_this_period: 0 })
@@ -152,7 +184,181 @@ export class TenantService {
     else logger.info('Period message counts reset for all tenants')
   }
 
-  // ── Private ──────────────────────────────────────────────────────────────────
+  // ── Billing: criar ou buscar cliente no Asaas ─────────────────────────────
+
+  async getOrCreateAsaasCustomer(tenantId: string, email: string, name: string, cpfCnpj?: string): Promise<string> {
+    // Verifica se já tem customer_id salvo
+    const { data: existingSub } = await db
+      .from('subscriptions')
+      .select('asaas_customer_id')
+      .eq('tenant_id', tenantId)
+      .not('asaas_customer_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingSub?.asaas_customer_id) {
+      return existingSub.asaas_customer_id
+    }
+
+    // Cria novo cliente no Asaas
+    const customer = await asaasRequest('POST', '/customers', {
+      name,
+      email,
+      ...(cpfCnpj ? { cpfCnpj } : {}),
+      externalReference: tenantId,
+    })
+
+    logger.info('Asaas customer created', { tenantId, customerId: customer.id })
+    return customer.id
+  }
+
+  // ── Billing: criar assinatura no Asaas ───────────────────────────────────
+
+  async createSubscription(tenantId: string, planSlug: string, userEmail: string, userName: string, cpfCnpj?: string): Promise<{ paymentUrl: string; subscriptionId: string }> {
+    const price = PLAN_PRICES[planSlug]
+    if (!price) throw new AppError('INVALID_PLAN', 'Plano inválido', 400)
+
+    const planName = PLAN_NAMES[planSlug]
+
+    // Busca ou cria cliente
+    const customerId = await this.getOrCreateAsaasCustomer(tenantId, userEmail, userName, cpfCnpj)
+
+    // Busca o plan_id no banco
+    const { data: plan } = await db
+      .from('plans')
+      .select('id')
+      .eq('slug', planSlug)
+      .single()
+
+    if (!plan) throw new AppError('PLAN_NOT_FOUND', 'Plano não encontrado', 404)
+
+    // Cria assinatura recorrente mensal no Asaas
+    const today = new Date()
+    const nextDue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    const asaasSubscription = await asaasRequest('POST', '/subscriptions', {
+      customer: customerId,
+      billingType: 'UNDEFINED', // aceita PIX e cartão
+      value: price,
+      nextDueDate: nextDue,
+      cycle: 'MONTHLY',
+      description: `${planName} - AutoZap`,
+      externalReference: `${tenantId}:${planSlug}`,
+    })
+
+    logger.info('Asaas subscription created', {
+      tenantId,
+      planSlug,
+      subscriptionId: asaasSubscription.id,
+    })
+
+    // Salva no banco com status pending
+    await db.from('subscriptions').insert({
+      id: generateId(),
+      tenant_id: tenantId,
+      plan_id: plan.id,
+      status: 'pending',
+      asaas_subscription_id: asaasSubscription.id,
+      asaas_customer_id: customerId,
+      payment_method: 'asaas',
+      current_period_start: new Date(),
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    })
+
+    // URL de pagamento
+    const paymentUrl = asaasSubscription.invoiceUrl || `https://www.asaas.com/c/${asaasSubscription.id}`
+
+    return {
+      paymentUrl,
+      subscriptionId: asaasSubscription.id,
+    }
+  }
+
+  // ── Billing: processar webhook do Asaas ──────────────────────────────────
+
+  async processAsaasWebhook(event: string, payload: any): Promise<void> {
+    logger.info('Asaas webhook received', { event })
+
+    // Pagamento confirmado → ativa plano
+    if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
+      const externalRef = payload.payment?.externalReference || payload.subscription?.externalReference
+      if (!externalRef) return
+
+      const [tenantId, planSlug] = externalRef.split(':')
+      if (!tenantId || !planSlug) return
+
+      // Atualiza plano do tenant
+      await db.from('tenants')
+        .update({ plan_slug: planSlug })
+        .eq('id', tenantId)
+
+      // Atualiza subscription para active
+      await db.from('subscriptions')
+        .update({ status: 'active' })
+        .eq('tenant_id', tenantId)
+        .eq('asaas_subscription_id', payload.subscription?.id || payload.payment?.subscription)
+
+      logger.info('Plan activated via Asaas webhook', { tenantId, planSlug })
+    }
+
+    // Pagamento atrasado → avisa mas não bloqueia imediatamente
+    if (event === 'PAYMENT_OVERDUE') {
+      const externalRef = payload.payment?.externalReference
+      if (!externalRef) return
+      const [tenantId] = externalRef.split(':')
+
+      await db.from('subscriptions')
+        .update({ status: 'past_due' })
+        .eq('tenant_id', tenantId)
+
+      logger.warn('Payment overdue', { tenantId })
+    }
+
+    // Assinatura cancelada → volta para trial
+    if (event === 'SUBSCRIPTION_CANCELLED' || event === 'PAYMENT_DELETED') {
+      const externalRef = payload.subscription?.externalReference || payload.payment?.externalReference
+      if (!externalRef) return
+      const [tenantId] = externalRef.split(':')
+
+      await db.from('tenants')
+        .update({ plan_slug: 'trial' })
+        .eq('id', tenantId)
+
+      await db.from('subscriptions')
+        .update({ status: 'cancelled', canceled_at: new Date() })
+        .eq('tenant_id', tenantId)
+
+      logger.info('Subscription cancelled, tenant downgraded to trial', { tenantId })
+    }
+  }
+
+  // ── Billing: cancelar assinatura ─────────────────────────────────────────
+
+  async cancelSubscription(tenantId: string): Promise<void> {
+    const { data: sub } = await db
+      .from('subscriptions')
+      .select('asaas_subscription_id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (sub?.asaas_subscription_id) {
+      await asaasRequest('DELETE', `/subscriptions/${sub.asaas_subscription_id}`)
+    }
+
+    await db.from('tenants')
+      .update({ plan_slug: 'trial' })
+      .eq('id', tenantId)
+
+    await db.from('subscriptions')
+      .update({ status: 'cancelled', canceled_at: new Date() })
+      .eq('tenant_id', tenantId)
+
+    logger.info('Subscription cancelled', { tenantId })
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────────
 
   private mapRow(row: any): Tenant {
     return {

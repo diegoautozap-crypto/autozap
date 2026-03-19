@@ -3,7 +3,7 @@ import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
-import tenantRoutes from './routes/tenant.routes'
+import tenantRoutes, { asaasWebhookRouter } from './routes/tenant.routes'
 import { errorHandler } from './middleware/tenant.middleware'
 import { logger } from './lib/logger'
 
@@ -14,14 +14,18 @@ app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
 app.use(express.json({ limit: '100kb' }))
-
 app.use(rateLimit({ windowMs: 60_000, max: 120 }))
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'tenant-service' })
 })
 
+// ✅ Webhook do Asaas — público, sem autenticação, registrado ANTES do /tenant
+app.use('/tenant', asaasWebhookRouter)
+
+// Rotas normais com autenticação
 app.use('/tenant', tenantRoutes)
+
 app.use(errorHandler)
 
 app.listen(PORT, () => {
