@@ -16,7 +16,6 @@ const PLAN_LIMITS: Record<string, number | null> = {
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
-
 const updateNameSchema = z.object({
   name: z.string().min(2).max(255),
 })
@@ -38,7 +37,6 @@ const subscribeSchema = z.object({
 })
 
 // ─── Webhook do Asaas (público — sem auth) ────────────────────────────────────
-// IMPORTANTE: essa rota deve ficar ANTES do router.use(requireAuth)
 const asaasWebhookRouter = Router()
 
 asaasWebhookRouter.post('/billing/webhook/asaas', async (req, res) => {
@@ -48,7 +46,7 @@ asaasWebhookRouter.post('/billing/webhook/asaas', async (req, res) => {
     res.json({ success: true })
   } catch (err) {
     console.error('Asaas webhook error:', err)
-    res.json({ success: true }) // sempre retorna 200 para o Asaas não retentar
+    res.json({ success: true })
   }
 })
 
@@ -99,14 +97,63 @@ router.get('/usage', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ✅ GET /tenant/analytics — dados para o dashboard
+router.get('/analytics', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const tenantId = req.auth.tid
+
+    const since = new Date()
+    since.setDate(since.getDate() - 29)
+    since.setHours(0, 0, 0, 0)
+
+    const { data: messages } = await db
+      .from('messages')
+      .select('created_at, status, direction')
+      .eq('tenant_id', tenantId)
+      .eq('direction', 'outbound')
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: true })
+
+    const msgs = messages || []
+
+    // Agrupa por dia
+    const byDay: Record<string, { sent: number; delivered: number; read: number }> = {}
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().split('T')[0]
+      byDay[key] = { sent: 0, delivered: 0, read: 0 }
+    }
+
+    for (const m of msgs) {
+      const day = m.created_at?.split('T')[0]
+      if (!day || !byDay[day]) continue
+      byDay[day].sent++
+      if (m.status === 'delivered' || m.status === 'read') byDay[day].delivered++
+      if (m.status === 'read') byDay[day].read++
+    }
+
+    const totalSent = msgs.length
+    const totalDelivered = msgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
+    const totalRead = msgs.filter((m: any) => m.status === 'read').length
+
+    res.json(ok({
+      totalSent,
+      totalDelivered,
+      totalRead,
+      deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
+      readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
+      byDay,
+    }))
+  } catch (err) { next(err) }
+})
+
 // ─── Billing ──────────────────────────────────────────────────────────────────
 
-// POST /tenant/billing/subscribe — cria assinatura no Asaas e retorna link de pagamento
 router.post('/billing/subscribe', validate(subscribeSchema), async (req, res, next) => {
   try {
     const { planSlug, cpfCnpj } = req.body
-
-    // Busca dados do usuário logado
     const { db } = await import('../lib/db')
     const { data: user } = await db
       .from('users')
@@ -120,18 +167,12 @@ router.post('/billing/subscribe', validate(subscribeSchema), async (req, res, ne
     }
 
     const result = await tenantService.createSubscription(
-      req.auth.tid,
-      planSlug,
-      user.email,
-      user.name,
-      cpfCnpj,
+      req.auth.tid, planSlug, user.email, user.name, cpfCnpj,
     )
-
     res.json(ok(result))
   } catch (err) { next(err) }
 })
 
-// GET /tenant/billing/plans — lista planos com preços do banco
 router.get('/billing/plans', async (_req, res, next) => {
   try {
     const { db } = await import('../lib/db')
@@ -145,7 +186,6 @@ router.get('/billing/plans', async (_req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// DELETE /tenant/billing/cancel — cancela assinatura
 router.delete('/billing/cancel', requireRole('owner'), async (req, res, next) => {
   try {
     await tenantService.cancelSubscription(req.auth.tid)

@@ -1,15 +1,8 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
 import { campaignApi, conversationApi, contactApi, tenantApi } from '@/lib/api'
-import { useAuthStore } from '@/store/auth.store'
 import { useRouter } from 'next/navigation'
-import { Megaphone, Users, MessageSquare, Zap, ArrowUpRight, TrendingUp, Send, CheckCheck, Eye } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+import { Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp, CheckCheck, Eye } from 'lucide-react'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -18,79 +11,46 @@ function getGreeting() {
   return 'Boa noite'
 }
 
-function getLast30Days() {
-  const days = []
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(d.toISOString().split('T')[0])
-  }
-  return days
-}
-
 export default function DashboardPage() {
   const router = useRouter()
-  const { user } = useAuthStore()
-  const tenantId = (user as any)?.tenantId || (user as any)?.tid
 
   const { data: campaigns } = useQuery({
     queryKey: ['campaigns'],
     queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data },
+    refetchInterval: 15000,
   })
 
   const { data: conversations } = useQuery({
     queryKey: ['conversations', 'open'],
     queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data },
+    refetchInterval: 15000,
   })
 
   const { data: contactsMeta } = useQuery({
     queryKey: ['contacts-count'],
     queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta },
+    refetchInterval: 15000,
   })
 
   const { data: usage } = useQuery({
     queryKey: ['usage'],
     queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data },
+    refetchInterval: 15000,
   })
 
-  // ✅ Busca mensagens dos últimos 30 dias para o gráfico
-  const { data: messageStats } = useQuery({
-    queryKey: ['message-stats', tenantId],
-    queryFn: async () => {
-      if (!tenantId) return []
-      const since = new Date()
-      since.setDate(since.getDate() - 29)
-      since.setHours(0, 0, 0, 0)
-
-      const { data } = await supabase
-        .from('messages')
-        .select('created_at, status, direction')
-        .eq('tenant_id', tenantId)
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: true })
-
-      return data || []
-    },
-    enabled: !!tenantId,
-    refetchInterval: 60000,
+  // ✅ Busca analytics via backend — sem depender de ANON KEY
+  const { data: analytics } = useQuery({
+    queryKey: ['analytics'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/analytics'); return data.data },
+    refetchInterval: 15000,
   })
 
-  // Agrupa mensagens por dia
-  const days = getLast30Days()
-  const chartData = days.map(day => {
-    const dayMsgs = (messageStats || []).filter((m: any) => m.created_at?.startsWith(day))
-    const sent = dayMsgs.filter((m: any) => m.direction === 'outbound').length
-    const delivered = dayMsgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
-    const read = dayMsgs.filter((m: any) => m.status === 'read').length
-    return { day, sent, delivered, read, label: day.slice(5) }
-  })
-
-  const maxVal = Math.max(...chartData.map(d => d.sent), 1)
-  const totalSent = (messageStats || []).filter((m: any) => m.direction === 'outbound').length
-  const totalDelivered = (messageStats || []).filter((m: any) => m.status === 'delivered' || m.status === 'read').length
-  const totalRead = (messageStats || []).filter((m: any) => m.status === 'read').length
-  const deliveryRate = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0
-  const readRate = totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0
+  const totalSent = analytics?.totalSent ?? 0
+  const deliveryRate = analytics?.deliveryRate ?? 0
+  const readRate = analytics?.readRate ?? 0
+  const byDay = analytics?.byDay || {}
+  const days = Object.keys(byDay).sort()
+  const maxVal = Math.max(...days.map(d => byDay[d]?.sent || 0), 1)
 
   const metricCards = [
     { label: 'Campanhas', value: campaigns?.length ?? 0, sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento`, icon: Megaphone, color: '#2563eb', bg: '#eff6ff', href: '/dashboard/campaigns' },
@@ -101,14 +61,9 @@ export default function DashboardPage() {
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px' }}>
-      {/* Header */}
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>
-          {getGreeting()}! 👋
-        </h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Aqui está o resumo da sua conta hoje.
-        </p>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
+        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
       </div>
 
       {/* Metric cards */}
@@ -125,19 +80,17 @@ export default function DashboardPage() {
               </div>
               <ArrowUpRight size={14} color="#d1d5db" />
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>
-              {value.toLocaleString()}
-            </div>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>{value.toLocaleString()}</div>
             <div style={{ fontSize: '13px', color: '#374151', fontWeight: 500, marginBottom: '2px' }}>{label}</div>
             <div style={{ fontSize: '12px', color: '#9ca3af' }}>{sub}</div>
           </div>
         ))}
       </div>
 
-      {/* ✅ Cards de taxa */}
+      {/* Cards de taxa */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '24px' }}>
         {[
-          { label: 'Enviadas (30 dias)', value: totalSent, icon: Send, color: '#2563eb' },
+          { label: 'Enviadas (30 dias)', value: totalSent.toLocaleString(), icon: Send, color: '#2563eb' },
           { label: 'Taxa de entrega', value: `${deliveryRate}%`, icon: CheckCheck, color: '#16a34a' },
           { label: 'Taxa de leitura', value: `${readRate}%`, icon: Eye, color: '#7c3aed' },
         ].map(({ label, value, icon: Icon, color }) => (
@@ -146,57 +99,42 @@ export default function DashboardPage() {
               <Icon size={18} color={color} />
             </div>
             <div>
-              <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>{value}</div>
               <div style={{ fontSize: '12px', color: '#6b7280' }}>{label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ✅ Gráfico de mensagens dos últimos 30 dias */}
+      {/* Gráfico */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111827', margin: 0 }}>Mensagens enviadas</h3>
             <p style={{ fontSize: '12px', color: '#9ca3af', margin: '2px 0 0' }}>Últimos 30 dias</p>
           </div>
-          <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#6b7280' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#16a34a' }} /> Enviadas</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#93c5fd' }} /> Entregues</div>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: '#6b7280' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#16a34a' }} /> Enviadas
           </div>
         </div>
 
-        {/* Barras */}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '140px', paddingBottom: '24px', position: 'relative' }}>
-          {/* Linhas de grade */}
           {[0.25, 0.5, 0.75, 1].map(p => (
             <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 116}px`, borderTop: '1px dashed #f3f4f6', zIndex: 0 }} />
           ))}
-
-          {chartData.map((d, i) => (
-            <div key={d.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', position: 'relative', zIndex: 1 }}>
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                {/* Barra enviadas */}
-                <div
-                  title={`${d.day}: ${d.sent} enviadas, ${d.delivered} entregues`}
-                  style={{
-                    width: '100%', maxWidth: '20px',
-                    height: `${Math.max(d.sent / maxVal * 116, d.sent > 0 ? 3 : 0)}px`,
-                    background: '#16a34a', borderRadius: '2px 2px 0 0',
-                    transition: 'height 0.3s ease',
-                    cursor: 'pointer',
-                    position: 'relative',
-                  }}
+          {days.map((day, i) => {
+            const sent = byDay[day]?.sent || 0
+            return (
+              <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                <div title={`${day}: ${sent} enviadas`}
+                  style={{ width: '100%', maxWidth: '20px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#16a34a', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
                 />
+                {i % 5 === 0 && (
+                  <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: '#d1d5db', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>
+                )}
               </div>
-              {/* Label dia — mostra a cada 5 dias */}
-              {i % 5 === 0 && (
-                <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: '#d1d5db', whiteSpace: 'nowrap' }}>
-                  {d.label}
-                </span>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {totalSent === 0 && (
