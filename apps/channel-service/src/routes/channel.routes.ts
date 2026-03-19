@@ -4,6 +4,7 @@ import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
 import { ok } from '@autozap/utils'
 import { logger } from '../lib/logger'
+import { db } from '../lib/db'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import { PassThrough } from 'stream'
@@ -62,6 +63,56 @@ router.get('/channels/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ✅ PATCH /channels/:id — editar canal
+router.patch('/channels/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const { name, phoneNumber, credentials } = req.body
+
+    // Busca credenciais atuais para fazer merge
+    const { data: current } = await db
+      .from('channels')
+      .select('credentials')
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .single()
+
+    if (!current) {
+      res.status(404).json({ success: false, error: { message: 'Channel not found' } })
+      return
+    }
+
+    // Merge: mantém metaToken atual se não enviar novo
+    const mergedCredentials = {
+      ...current.credentials,
+      ...credentials,
+    }
+    if (credentials?.metaToken === '' || credentials?.metaToken === undefined) {
+      delete mergedCredentials.metaToken
+      mergedCredentials.metaToken = current.credentials?.metaToken
+    }
+
+    const updateData: any = { credentials: mergedCredentials }
+    if (name) updateData.name = name
+    if (phoneNumber) updateData.phone_number = phoneNumber
+
+    const { data, error } = await db
+      .from('channels')
+      .update(updateData)
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select()
+      .single()
+
+    if (error || !data) {
+      res.status(500).json({ success: false, error: { message: 'Failed to update channel' } })
+      return
+    }
+
+    logger.info('Channel updated', { channelId: req.params.id, tenantId: req.auth.tid })
+    res.json(ok(safeChannel(data)))
+  } catch (err) { next(err) }
+})
+
 // DELETE /channels/:id
 router.delete('/channels/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
@@ -71,9 +122,6 @@ router.delete('/channels/:id', requireRole('admin', 'owner'), async (req, res, n
 })
 
 // ─── Audio Proxy com conversão para MP3 (public) ──────────────────────────────
-// O WhatsApp não aceita URLs do Supabase para áudio ogg.
-// Essa rota baixa o ogg do Supabase, converte para MP3 real com ffmpeg
-// e serve via URL do Railway que o WhatsApp aceita.
 router.get('/audio-proxy', async (req, res) => {
   try {
     const { url } = req.query
@@ -96,7 +144,6 @@ router.get('/audio-proxy', async (req, res) => {
     const buffer = await audioResponse.arrayBuffer()
     const inputBuffer = Buffer.from(buffer)
 
-    // Converte ogg/webm → mp3 via ffmpeg
     res.setHeader('Content-Type', 'audio/mpeg')
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.setHeader('Accept-Ranges', 'bytes')

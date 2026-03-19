@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff } from 'lucide-react'
+import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil } from 'lucide-react'
 
 const WEBHOOK_BASE = process.env.NEXT_PUBLIC_CHANNEL_SERVICE_URL || ''
 
@@ -20,17 +20,14 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.04em',
 }
 
+const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '' }
+
 export default function ChannelsPage() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({})
-  const [form, setForm] = useState({
-    name: '',
-    apiKey: '',
-    source: '',
-    srcName: '',
-    metaToken: '',
-  })
+  const [form, setForm] = useState(emptyForm)
 
   const { data: channels, isLoading } = useQuery({
     queryKey: ['channels'],
@@ -59,9 +56,33 @@ export default function ChannelsPage() {
       toast.success('Canal criado!')
       queryClient.invalidateQueries({ queryKey: ['channels'] })
       setShowForm(false)
-      setForm({ name: '', apiKey: '', source: '', srcName: '', metaToken: '' })
+      setForm(emptyForm)
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao criar canal'),
+  })
+
+  // ✅ Mutação de editar canal
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      await channelApi.patch(`/channels/${editingId}`, {
+        name: form.name,
+        phoneNumber: form.source,
+        credentials: {
+          apiKey: form.apiKey,
+          source: form.source,
+          srcName: form.srcName,
+          metaToken: form.metaToken || undefined,
+        },
+      })
+    },
+    onSuccess: () => {
+      toast.success('Canal atualizado!')
+      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      setShowForm(false)
+      setEditingId(null)
+      setForm(emptyForm)
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar canal'),
   })
 
   const deleteMutation = useMutation({
@@ -75,6 +96,24 @@ export default function ChannelsPage() {
     onError: () => toast.error('Erro ao remover canal'),
   })
 
+  const openEdit = (ch: any) => {
+    setForm({
+      name: ch.name || '',
+      apiKey: ch.webhookApiKey || '',
+      source: ch.phoneNumber || '',
+      srcName: ch.srcName || '',
+      metaToken: '',
+    })
+    setEditingId(ch.id)
+    setShowForm(true)
+  }
+
+  const closeForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(emptyForm)
+  }
+
   const copyWebhook = (channelId: string, apiKey: string) => {
     const url = `${WEBHOOK_BASE}/webhook/gupshup/${apiKey}`
     navigator.clipboard.writeText(url)
@@ -85,6 +124,16 @@ export default function ChannelsPage() {
     setShowApiKey(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  const handleSubmit = () => {
+    if (editingId) {
+      editMutation.mutate()
+    } else {
+      createMutation.mutate()
+    }
+  }
+
+  const isPending = createMutation.isPending || editMutation.isPending
+
   return (
     <div style={{ padding: '32px', maxWidth: '900px' }}>
       {/* Header */}
@@ -94,7 +143,7 @@ export default function ChannelsPage() {
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Configure seus números do WhatsApp via Gupshup</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { closeForm(); setShowForm(true) }}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
@@ -115,12 +164,14 @@ export default function ChannelsPage() {
         </ol>
       </div>
 
-      {/* Form */}
+      {/* Form criar/editar */}
       {showForm && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Novo canal Gupshup</h3>
-            <button onClick={() => setShowForm(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>
+              {editingId ? '✏️ Editar canal' : 'Novo canal Gupshup'}
+            </h3>
+            <button onClick={closeForm} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
               <X size={16} />
             </button>
           </div>
@@ -144,7 +195,6 @@ export default function ChannelsPage() {
             </div>
           </div>
 
-          {/* Meta Token — opcional */}
           <div style={{ marginBottom: '18px', padding: '14px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #f3f4f6' }}>
             <label style={{ ...labelStyle, marginBottom: '4px' }}>Token do Meta (opcional — para visualizar mídias recebidas)</label>
             <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
@@ -153,7 +203,7 @@ export default function ChannelsPage() {
             <input
               style={inputStyle}
               type="password"
-              placeholder="EAAxxxxxxx..."
+              placeholder={editingId ? 'Deixe em branco para manter o atual' : 'EAAxxxxxxx...'}
               value={form.metaToken}
               onChange={e => setForm({ ...form, metaToken: e.target.value })}
             />
@@ -161,14 +211,14 @@ export default function ChannelsPage() {
 
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !form.name || !form.apiKey || !form.source}
+              onClick={handleSubmit}
+              disabled={isPending || !form.name || !form.apiKey || !form.source}
               style={{ padding: '9px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.name || !form.apiKey || !form.source ? 0.5 : 1 }}
             >
-              {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              Criar canal
+              {isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+              {editingId ? 'Salvar alterações' : 'Criar canal'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+            <button onClick={closeForm} style={{ padding: '9px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
               Cancelar
             </button>
           </div>
@@ -209,6 +259,16 @@ export default function ChannelsPage() {
                     <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '2px 10px', borderRadius: '99px' }}>
                       Ativo
                     </span>
+                    {/* ✅ Botão editar */}
+                    <button
+                      onClick={() => openEdit(ch)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                      title="Editar canal"
+                    >
+                      <Pencil size={14} />
+                    </button>
                     <button
                       onClick={() => { if (confirm('Remover canal?')) deleteMutation.mutate(ch.id) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
