@@ -12,7 +12,11 @@ import {
 import { PLAN_LIMITS } from '@autozap/types'
 import type { Tenant, PlanSlug, TenantSettings } from '@autozap/types'
 
+import { Resend } from 'resend'
+
 const ASAAS_API_URL = 'https://api.asaas.com/v3'
+const resend = new Resend(process.env.RESEND_API_KEY)
+const RESEND_FROM = process.env.RESEND_FROM || 'onboarding@resend.dev'
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!
 
 const PLAN_PRICES: Record<string, number> = {
@@ -317,6 +321,56 @@ export class TenantService {
         .eq('asaas_subscription_id', payload.subscription?.id || payload.payment?.subscription)
 
       logger.info('Plan activated via Asaas webhook', { tenantId, planSlug })
+
+      // ✅ Envia email de confirmação de assinatura
+      try {
+        const { data: userData } = await db
+          .from('users')
+          .select('email, name')
+          .eq('tenant_id', tenantId)
+          .eq('role', 'owner')
+          .single()
+
+        if (userData?.email) {
+          const planNames: Record<string, string> = {
+            starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited'
+          }
+          const planPrices: Record<string, string> = {
+            starter: 'R$ 97', pro: 'R$ 197', enterprise: 'R$ 397', unlimited: 'R$ 697'
+          }
+          await resend.emails.send({
+            from: RESEND_FROM,
+            to: userData.email,
+            subject: ,
+            html: `
+              <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+                <h1 style="color: #16a34a; font-size: 24px; margin-bottom: 8px;">Assinatura confirmada!</h1>
+                <p style="color: #374151; font-size: 16px;">Olá, ${userData.name || 'cliente'}!</p>
+                <p style="color: #374151; font-size: 15px;">
+                  Seu pagamento foi confirmado e sua assinatura do plano 
+                  <strong>${planNames[planSlug]}</strong> está ativa.
+                </p>
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                  <p style="margin: 0 0 8px; color: #15803d; font-weight: 600;">Detalhes do plano</p>
+                  <p style="margin: 0; color: #374151;">Plano: <strong>${planNames[planSlug]}</strong></p>
+                  <p style="margin: 4px 0 0; color: #374151;">Valor: <strong>${planPrices[planSlug]}/mês</strong></p>
+                </div>
+                <a href="https://frontend-production-795a.up.railway.app/dashboard" 
+                   style="display: inline-block; background: #16a34a; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                  Acessar AutoZap
+                </a>
+                <p style="color: #9ca3af; font-size: 13px; margin-top: 24px;">
+                  Dúvidas? Entre em contato pelo WhatsApp: 
+                  <a href="https://wa.me/5547999497488" style="color: #16a34a;">5547999497488</a>
+                </p>
+              </div>
+            `,
+          })
+          logger.info('Confirmation email sent', { tenantId, email: userData.email })
+        }
+      } catch (emailErr) {
+        logger.error('Failed to send confirmation email', { tenantId, emailErr })
+      }
     }
 
     // Pagamento atrasado → avisa mas não bloqueia imediatamente
