@@ -180,7 +180,7 @@ async function sendViaFetch(
     })
 
     const data = await response.json() as any
-    logger.info('Gupshup response', { phone, status: data.status, messageId: data.messageId, response: JSON.stringify(data).slice(0, 300) })
+    logger.debug('Gupshup response', { phone, status: data.status, messageId: data.messageId }))
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') {
