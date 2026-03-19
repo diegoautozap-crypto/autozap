@@ -109,7 +109,7 @@ router.get('/audio-proxy', async (req, res) => {
     const passThrough = new PassThrough()
 
     ffmpeg(inputStream)
-      .inputFormat('ogg')
+      .inputFormat('webm')
       .audioCodec('libmp3lame')
       .audioBitrate('128k')
       .format('mp3')
