@@ -1,20 +1,11 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { logger } from './logger'
 
-const transport = nodemailer.createTransport({
-  host: process.env.SMTP_HOST!,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER!,
-    pass: process.env.SMTP_PASS!,
-  },
-})
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM = process.env.SMTP_FROM || 'AutoZap <onboarding@resend.dev>'
+const APP_URL = process.env.APP_URL || 'https://frontend-production-795a.up.railway.app'
 
-const FROM = process.env.SMTP_FROM || 'AutoZap <no-reply@autozap.app>'
-const APP_URL = process.env.APP_URL || 'https://app.autozap.app'
-
-// ─── Templates ───────────────────────────────────────────────────────────────
+// ─── Templates ────────────────────────────────────────────────────────────────
 
 function baseLayout(content: string): string {
   return `
@@ -26,11 +17,11 @@ function baseLayout(content: string): string {
   <style>
     body { font-family: -apple-system, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
     .container { max-width: 560px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; }
-    .header { background: #1a1a2e; padding: 28px 32px; }
+    .header { background: #16a34a; padding: 28px 32px; }
     .header h1 { color: #fff; margin: 0; font-size: 22px; }
-    .header span { color: #5a8dee; }
+    .header span { color: #bbf7d0; }
     .body { padding: 32px; color: #333; line-height: 1.6; }
-    .btn { display: inline-block; background: #5a8dee; color: #fff; padding: 12px 28px;
+    .btn { display: inline-block; background: #16a34a; color: #fff; padding: 12px 28px;
            border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
     .footer { padding: 20px 32px; font-size: 12px; color: #999; border-top: 1px solid #eee; }
   </style>
@@ -61,13 +52,14 @@ export async function sendVerificationEmail(opts: {
     <p>Se você não criou uma conta, ignore este email.</p>
   `)
 
-  await transport.sendMail({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: opts.to,
     subject: 'Confirme seu email — AutoZap',
     html,
   })
 
+  if (error) throw new Error(error.message)
   logger.info('Verification email sent', { to: opts.to })
 }
 
@@ -84,13 +76,14 @@ export async function sendPasswordResetEmail(opts: {
     <p>Este link expira em <strong>1 hora</strong>. Se você não solicitou, ignore este email.</p>
   `)
 
-  await transport.sendMail({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: opts.to,
     subject: 'Redefinição de senha — AutoZap',
     html,
   })
 
+  if (error) throw new Error(error.message)
   logger.info('Password reset email sent', { to: opts.to })
 }
 
@@ -103,13 +96,16 @@ export async function sendWelcomeEmail(opts: {
     <p>Olá, <strong>${opts.name}</strong>!</p>
     <p>Sua conta <strong>${opts.tenantName}</strong> no AutoZap está pronta. 🚀</p>
     <p>Comece conectando seu WhatsApp e enviando sua primeira campanha.</p>
-    <a href="${APP_URL}/onboarding" class="btn">Começar agora</a>
+    <a href="${APP_URL}/dashboard" class="btn">Começar agora</a>
   `)
 
-  await transport.sendMail({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: opts.to,
     subject: `Bem-vindo ao AutoZap, ${opts.name}!`,
     html,
   })
+
+  if (error) throw new Error(error.message)
+  logger.info('Welcome email sent', { to: opts.to })
 }
