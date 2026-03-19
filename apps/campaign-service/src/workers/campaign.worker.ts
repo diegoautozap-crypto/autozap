@@ -11,7 +11,7 @@ const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-const PARALLEL_BATCH = 30
+const PARALLEL_BATCH = 50
 const BATCH_DELAY_MS = 0
 
 function getRedisConnection() {
@@ -48,7 +48,6 @@ export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   },
 })
 
-// ─── Verifica limite do plano ─────────────────────────────────────────────────
 async function checkPlanLimit(tenantId: string): Promise<boolean> {
   try {
     const { data } = await db.rpc('tenant_can_send', { p_tenant_id: tenantId, p_count: 1 })
@@ -58,7 +57,6 @@ async function checkPlanLimit(tenantId: string): Promise<boolean> {
   }
 }
 
-// ─── Garante contato e conversa no banco ──────────────────────────────────────
 async function ensureContactAndConversation(
   tenantId: string,
   channelId: string,
@@ -110,7 +108,6 @@ async function ensureContactAndConversation(
   return { contactId, conversationId }
 }
 
-// ─── Parseia curl ─────────────────────────────────────────────────────────────
 interface ParsedCurl {
   apiKey: string
   bodyTemplate: string
@@ -145,8 +142,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   return { apiKey, bodyTemplate }
 }
 
-// ─── Envia via fetch ──────────────────────────────────────────────────────────
-// ✅ Agora retorna o messageId do Gupshup para salvar como external_id
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
@@ -164,7 +159,7 @@ async function sendViaFetch(
           const newTemplateEncoded = encodeURIComponent(JSON.stringify(templateObj))
           body = body.replace(/template=[^&]*/, 'template=' + newTemplateEncoded)
         } catch (e) {
-          logger.warn('Failed to replace template params, using original', { error: (e as any).message })
+          logger.warn('Failed to replace template params', { error: (e as any).message })
         }
       }
     }
@@ -184,7 +179,6 @@ async function sendViaFetch(
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
     if (data.status === 'submitted' || data.messageId || data.status === 'success') {
-      // ✅ Retorna o messageId para salvar como external_id
       return { ok: true, messageId: data.messageId || data.id || undefined }
     }
     return { ok: false, error: JSON.stringify(data) }
@@ -193,7 +187,6 @@ async function sendViaFetch(
   }
 }
 
-// ─── Processa um contato ──────────────────────────────────────────────────────
 async function processContact(
   contact: any,
   campaignId: string,
@@ -203,7 +196,6 @@ async function processContact(
 ): Promise<'sent' | 'failed'> {
   try {
     const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
-
     const contactMessage = rawMessage
       .replace(/\\r\\n/g, '\r')
       .replace(/\\r/g, '\r')
@@ -211,31 +203,40 @@ async function processContact(
       .trim()
 
     const messageUuid = uuidv4()
+    const bodyForDb = contactMessage.replace(/\r/g, '\n')
+
+    // ✅ PASSO 1: Garante contato e conversa ANTES de enviar
+    const { contactId, conversationId } = await ensureContactAndConversation(
+      tenantId, channelId, contact.phone
+    )
+
+    // ✅ PASSO 2: Salva mensagem no banco com status 'queued' e sem external_id ainda
+    const messageId = generateId()
+    await db.from('messages').insert({
+      id: messageId,
+      message_uuid: messageUuid,
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      channel_id: channelId,
+      contact_id: contactId,
+      direction: 'outbound',
+      content_type: 'text',
+      body: bodyForDb || '(template)',
+      status: 'queued',
+      campaign_id: campaignId,
+      external_id: null,
+    })
+
+    // ✅ PASSO 3: Envia para o Gupshup
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (result.ok) {
-      const { contactId, conversationId } = await ensureContactAndConversation(
-        tenantId, channelId, contact.phone
-      )
-
-      const bodyForDb = contactMessage.replace(/\r/g, '\n')
-
-      // ✅ Salva external_id (messageId do Gupshup) para rastrear status delivered/read
-      await db.from('messages').insert({
-        id: generateId(),
-        message_uuid: messageUuid,
-        tenant_id: tenantId,
-        conversation_id: conversationId,
-        channel_id: channelId,
-        contact_id: contactId,
-        direction: 'outbound',
-        content_type: 'text',
-        body: bodyForDb || '(template)',
+      // ✅ PASSO 4: Atualiza external_id e status imediatamente após envio bem sucedido
+      await db.from('messages').update({
         status: 'sent',
+        external_id: result.messageId || null,
         sent_at: new Date(),
-        campaign_id: campaignId,
-        external_id: result.messageId || null, // ✅ salva o messageId do Gupshup
-      })
+      }).eq('id', messageId)
 
       await db.from('conversations').update({
         last_message: bodyForDb || '(template)',
@@ -247,6 +248,11 @@ async function processContact(
       try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
       return 'sent'
     } else {
+      // Falhou — atualiza status da mensagem para failed
+      await db.from('messages').update({
+        status: 'failed',
+        error_message: result.error || 'Gupshup error',
+      }).eq('id', messageId)
       throw new Error(result.error || 'Gupshup error')
     }
   } catch (err: any) {
@@ -257,7 +263,6 @@ async function processContact(
   }
 }
 
-// ─── Worker principal ─────────────────────────────────────────────────────────
 export function startCampaignWorker(): Worker {
   const worker = new Worker<CampaignJob>(
     'campaign_queue',
