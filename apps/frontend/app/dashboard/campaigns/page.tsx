@@ -109,9 +109,11 @@ export default function CampaignsPage() {
   const total = prog?.total || prog?.total_contacts || 0
   const sent = prog?.sent || prog?.sent_count || 0
   const delivered = prog?.delivered || prog?.delivered_count || 0
+  const read = prog?.read || prog?.read_count || 0
   const failed = prog?.failed || prog?.failed_count || 0
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0
   const deliveryRate = sent > 0 ? Math.round((delivered / sent) * 100) : 0
+  const readRate = sent > 0 ? Math.round((read / sent) * 100) : 0
 
   const label = (text: string) => (
     <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>{text}</label>
@@ -262,6 +264,7 @@ export default function CampaignsPage() {
                   { label: 'Total', value: total, color: '#6b7280', icon: BarChart2 },
                   { label: 'Enviadas', value: sent, color: '#2563eb', icon: Send },
                   { label: 'Entregues', value: delivered, color: '#16a34a', icon: CheckCheck },
+                  { label: 'Lidas', value: read, color: '#7c3aed', icon: TrendingUp },
                   { label: 'Falhas', value: failed, color: '#dc2626', icon: AlertCircle },
                 ].map(({ label, value, color, icon: Icon }) => (
                   <div key={label} style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
@@ -274,13 +277,22 @@ export default function CampaignsPage() {
                 ))}
               </div>
 
-              {/* Taxa de entrega */}
+              {/* Taxas */}
               {sent > 0 && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <TrendingUp size={14} color="#16a34a" />
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>{deliveryRate}% entregues</div>
-                    <div style={{ fontSize: '11px', color: '#6b7280' }}>de {sent.toLocaleString()} enviadas</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCheck size={13} color="#16a34a" />
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803d' }}>{deliveryRate}% entregues</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>de {sent.toLocaleString()} enviadas</div>
+                    </div>
+                  </div>
+                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrendingUp size={13} color="#7c3aed" />
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#6d28d9' }}>{readRate}% lidas</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>de {sent.toLocaleString()} enviadas</div>
+                    </div>
                   </div>
                 </div>
               )}
