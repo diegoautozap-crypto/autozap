@@ -91,7 +91,8 @@ export default function LoginPage() {
                 <div style={{ marginBottom: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 500 }}>Senha</label>
-                    <a href="#" style={{ color: 'var(--accent)', fontSize: '12px', textDecoration: 'none' }}>Esqueceu?</a>
+                    {/* ✅ Link correto para recuperação de senha */}
+                    <a href="/forgot-password" style={{ color: 'var(--accent)', fontSize: '12px', textDecoration: 'none' }}>Esqueceu?</a>
                   </div>
                   <input
                     type="password"
