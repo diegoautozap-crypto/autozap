@@ -11,7 +11,7 @@ const PUSHER_KEY = process.env.PUSHER_KEY
 const PUSHER_SECRET = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-const PARALLEL_BATCH = 10
+const PARALLEL_BATCH = 5
 const BATCH_DELAY_MS = 0
 
 function getRedisConnection() {
