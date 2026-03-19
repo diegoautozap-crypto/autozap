@@ -70,6 +70,21 @@ export class MessageService {
     }).select('id').single()
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
+
+    // ✅ Atualiza last_message da conversa imediatamente ao enfileirar
+    const lastMsg = input.body || `[${input.contentType}]`
+    await db.from('conversations').update({
+      last_message: lastMsg,
+      last_message_at: new Date(),
+    }).eq('id', input.conversationId)
+
+    // ✅ Emite Pusher para o frontend atualizar a lista de conversas
+    emitPusher(input.tenantId, 'conversation.updated', {
+      conversationId: input.conversationId,
+      lastMessage: lastMsg,
+      lastMessageAt: new Date(),
+    })
+
     logger.debug('Message queued', { messageUuid, tenantId: input.tenantId })
     return messageUuid
   }
@@ -113,14 +128,14 @@ export class MessageService {
       delivered_at: msg.timestamp,
     })
 
-    // ✅ 4. Update conversation — separado do increment_unread
+    // 4. Update conversation
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
       status: 'open',
     }).eq('id', conversation.id)
 
-    // ✅ 5. Incrementa unread em query separada
+    // 5. Incrementa unread
     try {
       await db.rpc('increment_unread', { p_conversation_id: conversation.id })
     } catch {
@@ -134,7 +149,7 @@ export class MessageService {
       last_interaction_at: msg.timestamp,
     }).eq('id', contact.id)
 
-    // ✅ 7. Emit Pusher — notifica frontend em tempo real
+    // 7. Emit Pusher
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,
       contactId: contact.id,
@@ -159,15 +174,29 @@ export class MessageService {
       updateData.failed_at = timestamp
       updateData.error_message = errorMessage
     }
-    const { error } = await db
+
+    const { data: updated, error } = await db
       .from('messages')
       .update(updateData)
       .eq('external_id', externalId)
       .eq('tenant_id', tenantId)
+      .select('conversation_id, tenant_id')
+      .maybeSingle()
+
     if (error) {
       logger.error('Failed to update message status', { externalId, status, error })
       return
     }
+
+    // ✅ Emite Pusher para o frontend atualizar o status da mensagem em tempo real
+    if (updated?.conversation_id) {
+      emitPusher(tenantId, 'message.status', {
+        externalId,
+        status,
+        conversationId: updated.conversation_id,
+      })
+    }
+
     logger.debug('Message status updated', { externalId, status })
   }
 
