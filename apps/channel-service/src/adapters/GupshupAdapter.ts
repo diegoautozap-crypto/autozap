@@ -179,7 +179,7 @@ export class GupshupAdapter implements IChannelAdapter {
         console.log('[GupshupAdapter] status update v3:', statusObj.id, '->', status)
 
         return {
-          externalId: statusObj.id,
+          externalId: statusObj.gs_id || statusObj.id,
           status,
           timestamp: new Date(Number(statusObj.timestamp) * 1000),
           errorMessage,
