@@ -31,7 +31,7 @@ function getLast30Days() {
 export default function DashboardPage() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const tenantId = (user as any)?.tid || (user as any)?.tenantId
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid
 
   const { data: campaigns } = useQuery({
     queryKey: ['campaigns'],
