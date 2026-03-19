@@ -1,8 +1,10 @@
 'use client'
+import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
 import { tenantApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 const PLAN_NAMES: Record<string, string> = {
   trial:      'Trial',
@@ -10,13 +12,6 @@ const PLAN_NAMES: Record<string, string> = {
   pro:        'Pro',
   enterprise: 'Enterprise',
   unlimited:  'Unlimited',
-}
-
-const PLAN_PRICES: Record<string, string> = {
-  starter:    'R$ 97/mês',
-  pro:        'R$ 197/mês',
-  enterprise: 'R$ 397/mês',
-  unlimited:  'R$ 797/mês',
 }
 
 const PLAN_MSGS: Record<string, string> = {
@@ -35,6 +30,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
+  const [subscribing, setSubscribing] = useState<string | null>(null)
 
   const { data: usage } = useQuery({
     queryKey: ['usage'],
@@ -61,23 +57,57 @@ export default function SettingsPage() {
     },
   })
 
+  const { data: plans } = useQuery({
+    queryKey: ['billing-plans'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant/billing/plans')
+      return data.data
+    },
+  })
+
   const sent = usage?.sent ?? 0
   const limit = usage?.limit ?? 0
   const pct = usage?.percentUsed ?? 0
-  const planSlug = tenant?.planSlug ?? 'starter'
+  const planSlug = tenant?.planSlug ?? 'trial'
   const planName = PLAN_NAMES[planSlug] ?? planSlug
   const isWarning = pct > 80
   const isTrial = planSlug === 'trial'
   const isTrialExpired = isTrial && (pct >= 100)
 
-  // Dias restantes do trial
   const trialEndsAt = subscription?.trial_ends_at || subscription?.current_period_end
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null
   const isTrialExpiredByDate = trialDaysLeft !== null && trialDaysLeft === 0
-
   const trialExpired = isTrialExpired || isTrialExpiredByDate
+
+  // ✅ Clica em Assinar → chama API → abre link de pagamento do Asaas
+  const handleSubscribe = async (slug: string) => {
+    setSubscribing(slug)
+    try {
+      const { data } = await tenantApi.post('/tenant/billing/subscribe', { planSlug: slug })
+      const paymentUrl = data.data?.paymentUrl
+      if (paymentUrl) {
+        window.open(paymentUrl, '_blank')
+        toast.success('Redirecionando para o pagamento...')
+      } else {
+        toast.error('Erro ao gerar link de pagamento')
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Erro ao criar assinatura')
+    } finally {
+      setSubscribing(null)
+    }
+  }
+
+  const getPlanPrice = (slug: string) => {
+    if (!plans) {
+      const prices: Record<string, string> = { starter: 'R$ 97', pro: 'R$ 197', enterprise: 'R$ 397', unlimited: 'R$ 697' }
+      return prices[slug] || ''
+    }
+    const plan = plans.find((p: any) => p.slug === slug)
+    return plan ? `R$ ${Number(plan.price_monthly).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : ''
+  }
 
   const card: React.CSSProperties = {
     background: '#fff',
@@ -107,7 +137,7 @@ export default function SettingsPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-        {/* ── Banner trial expirado ── */}
+        {/* Banner trial expirado */}
         {isTrial && trialExpired && (
           <div style={{
             background: '#fef2f2', border: '1px solid #fecaca',
@@ -131,7 +161,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ── Banner trial ativo com aviso ── */}
+        {/* Banner trial ativo */}
         {isTrial && !trialExpired && (
           <div style={{
             background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4',
@@ -153,6 +183,23 @@ export default function SettingsPage() {
             <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
               <Zap size={13} /> Fazer upgrade
             </a>
+          </div>
+        )}
+
+        {/* Plano ativo com status da assinatura */}
+        {!isTrial && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>
+                ✅ Plano {planName} ativo
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '13px' }}>
+                {subscription?.status === 'active' ? 'Assinatura recorrente ativa' : 'Aguardando confirmação de pagamento'}
+              </p>
+            </div>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#15803d', background: '#dcfce7', padding: '4px 12px', borderRadius: '99px' }}>
+              {getPlanPrice(planSlug)}/mês
+            </span>
           </div>
         )}
 
@@ -206,15 +253,16 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Planos */}
+        {/* Cards de planos */}
         <div style={card} id="planos">
           <span style={label}>
             {isTrial ? '🚀 Escolha seu plano' : 'Planos disponíveis'}
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map((slug, i) => {
+            {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map((slug) => {
               const isActive = planSlug === slug
               const isPopular = slug === 'pro'
+              const isLoading = subscribing === slug
               return (
                 <div
                   key={slug}
@@ -223,10 +271,9 @@ export default function SettingsPage() {
                     borderRadius: '12px', padding: '18px',
                     background: isActive ? '#f0fdf4' : '#fff',
                     position: 'relative',
-                    cursor: isTrial ? 'pointer' : 'default',
                     transition: 'box-shadow 0.15s',
                   }}
-                  onMouseEnter={e => { if (isTrial) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none' }}
                 >
                   {isActive && (
@@ -246,7 +293,7 @@ export default function SettingsPage() {
                     {PLAN_MSGS[slug]}
                   </p>
                   <p style={{ fontWeight: 800, fontSize: '18px', color: '#111827', marginBottom: '12px' }}>
-                    {PLAN_PRICES[slug]}
+                    {getPlanPrice(slug)}<span style={{ fontSize: '13px', fontWeight: 400, color: '#6b7280' }}>/mês</span>
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
                     {PLAN_FEATURES[slug]?.map(f => (
@@ -256,33 +303,41 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-                  {isTrial && !isActive && (
+                  {/* ✅ Botão Assinar funcional */}
+                  {!isActive && (
                     <button
-                      onClick={() => alert('Em breve! Entre em contato pelo WhatsApp para assinar.')}
+                      onClick={() => handleSubscribe(slug)}
+                      disabled={!!subscribing}
                       style={{
                         width: '100%', padding: '8px',
-                        background: isPopular ? '#6366f1' : '#16a34a',
-                        color: '#fff', border: 'none',
-                        borderRadius: '6px', fontSize: '13px',
-                        fontWeight: 600, cursor: 'pointer',
+                        background: subscribing ? '#e5e7eb' : isPopular ? '#6366f1' : '#16a34a',
+                        color: subscribing ? '#9ca3af' : '#fff',
+                        border: 'none', borderRadius: '6px',
+                        fontSize: '13px', fontWeight: 600,
+                        cursor: subscribing ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                       }}
                     >
-                      Assinar {PLAN_NAMES[slug]}
+                      {isLoading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gerando link...</> : `Assinar ${PLAN_NAMES[slug]}`}
                     </button>
+                  )}
+                  {isActive && !isTrial && (
+                    <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '6px 0' }}>
+                      ✓ Plano ativo
+                    </div>
                   )}
                 </div>
               )
             })}
           </div>
-
-          {isTrial && (
-            <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
-              Para assinar entre em contato: <a href="https://wa.me/5547999497488" target="_blank" rel="noopener noreferrer" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>WhatsApp</a>
-            </p>
-          )}
+          <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
+            Pagamento seguro via PIX ou cartão de crédito • Cancele quando quiser
+          </p>
         </div>
 
       </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
