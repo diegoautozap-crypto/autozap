@@ -137,7 +137,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     }
   }
 
-  // Substitui apenas o placeholder do destination
   const bodyTemplate = bodyRaw
     .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
@@ -147,23 +146,20 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
 }
 
 // ─── Envia via fetch ──────────────────────────────────────────────────────────
+// ✅ Agora retorna o messageId do Gupshup para salvar como external_id
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
   message: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   try {
-    // Substitui o destination
     let body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
 
-    // Substitui o params do template com a mensagem do CSV
     if (message) {
-      // Decodifica o template do body
       const templateMatch = body.match(/template=([^&]*)/)
       if (templateMatch) {
         try {
           const templateObj = JSON.parse(decodeURIComponent(templateMatch[1]))
-          // Substitui os params com a mensagem — mantém \r real para quebra de linha no WhatsApp
           templateObj.params = [message]
           const newTemplateEncoded = encodeURIComponent(JSON.stringify(templateObj))
           body = body.replace(/template=[^&]*/, 'template=' + newTemplateEncoded)
@@ -187,7 +183,10 @@ async function sendViaFetch(
     logger.debug('Gupshup response', { phone, status: data.status, response: JSON.stringify(data).slice(0, 300) })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
-    if (data.status === 'submitted' || data.messageId || data.status === 'success') return { ok: true }
+    if (data.status === 'submitted' || data.messageId || data.status === 'success') {
+      // ✅ Retorna o messageId para salvar como external_id
+      return { ok: true, messageId: data.messageId || data.id || undefined }
+    }
     return { ok: false, error: JSON.stringify(data) }
   } catch (err: any) {
     return { ok: false, error: err.message }
@@ -205,8 +204,6 @@ async function processContact(
   try {
     const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
 
-    // Converte os escapes literais do banco em caracteres reais
-    // \r é a quebra de linha do WhatsApp nos templates
     const contactMessage = rawMessage
       .replace(/\\r\\n/g, '\r')
       .replace(/\\r/g, '\r')
@@ -221,9 +218,9 @@ async function processContact(
         tenantId, channelId, contact.phone
       )
 
-      // Salva no banco com quebras de linha legíveis
       const bodyForDb = contactMessage.replace(/\r/g, '\n')
 
+      // ✅ Salva external_id (messageId do Gupshup) para rastrear status delivered/read
       await db.from('messages').insert({
         id: generateId(),
         message_uuid: messageUuid,
@@ -237,6 +234,7 @@ async function processContact(
         status: 'sent',
         sent_at: new Date(),
         campaign_id: campaignId,
+        external_id: result.messageId || null, // ✅ salva o messageId do Gupshup
       })
 
       await db.from('conversations').update({
