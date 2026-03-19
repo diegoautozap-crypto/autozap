@@ -54,6 +54,10 @@ export class GupshupAdapter implements IChannelAdapter {
       message: JSON.stringify(message),
     })
 
+    // ✅ DEBUG: ver exatamente o que está sendo enviado para o Gupshup
+    console.log('[GupshupAdapter] audio payload:', JSON.stringify(message))
+    console.log('[GupshupAdapter] params:', params.toString().slice(0, 500))
+
     const response = await fetch(`${GUPSHUP_API_URL}/msg`, {
       method: 'POST',
       headers: {
