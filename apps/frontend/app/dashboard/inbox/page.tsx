@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -56,6 +56,21 @@ function playNotificationSound() {
     gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3)
   } catch {}
+}
+
+// ✅ Ícone de status da mensagem — igual ao WhatsApp
+function MessageStatusIcon({ status }: { status: string }) {
+  if (status === 'read') {
+    return <CheckCheck size={11} color="#93c5fd" />  // azul claro = lido
+  }
+  if (status === 'delivered') {
+    return <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />  // dois checks brancos = entregue
+  }
+  if (status === 'sent') {
+    return <Check size={11} color="#fff" style={{ opacity: 0.65 }} />  // um check = enviado
+  }
+  // queued / failed
+  return <Check size={11} color="#fff" style={{ opacity: 0.3 }} />
 }
 
 function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; channelId?: string }) {
@@ -124,12 +139,24 @@ export default function InboxPage() {
     const tenantId = (user as any)?.tenantId || (user as any)?.tid
     if (!tenantId) return
     const channel = pusher.subscribe(`tenant-${tenantId}`)
+
     channel.bind('inbound.message', (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       playNotificationSound()
     })
-    channel.bind('conversation.updated', () => queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }))
+
+    channel.bind('conversation.updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+    })
+
+    // ✅ Atualiza status da mensagem em tempo real (delivered, read)
+    channel.bind('message.status', (data: any) => {
+      if (data?.conversationId === selectedConvId) {
+        queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
+      }
+    })
+
     return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
   }, [user, selectedConvId, queryClient])
 
@@ -178,7 +205,6 @@ export default function InboxPage() {
     try {
       const ext = file.name.split('.').pop() || 'bin'
       const path = `inbox/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      // ✅ FIX: cacheControl garante URL pública acessível pelo Gupshup
       const { error } = await supabase.storage.from('media').upload(path, file, {
         contentType: file.type,
         upsert: false,
@@ -199,40 +225,27 @@ export default function InboxPage() {
     setPendingFile(null)
   }
 
-  // ── Gravador de áudio ─────────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-      // ✅ FIX: Chrome não suporta audio/ogg — grava em webm/opus que é o
-      // codec compatível. No onstop forçamos a extensão .ogg e content-type
-      // audio/ogg pois o codec opus é idêntico nos dois containers.
-      // O Gupshup/WhatsApp aceita ogg+opus corretamente.
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
         : 'audio/mp4'
-
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
-
       mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-
       mediaRecorder.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
-
-        // ✅ FIX: força .ogg e audio/ogg — formato que o WhatsApp/Gupshup aceita
         const file = new File([blob], `audio-${Date.now()}.ogg`, { type: 'audio/ogg' })
-
         stream.getTracks().forEach(t => t.stop())
         setIsRecording(false)
         setRecordingSeconds(0)
         if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
         await uploadAndSend(file, 'audio')
       }
-
       mediaRecorder.start()
       setIsRecording(true)
       setRecordingSeconds(0)
@@ -261,7 +274,6 @@ export default function InboxPage() {
   }
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
-
   const handleSendText = () => { if (messageText.trim()) sendMutation.mutate({ contentType: 'text', body: messageText }) }
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText() } }
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -365,7 +377,8 @@ export default function InboxPage() {
                         <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                          {isOut && <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />}
+                          {/* ✅ Ícone de status igual ao WhatsApp */}
+                          {isOut && <MessageStatusIcon status={msg.status} />}
                         </div>
                       </div>
                     </div>
@@ -396,16 +409,12 @@ export default function InboxPage() {
 
             {selectedConv?.status !== 'closed' ? (
               <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
-
-                {/* Gravando áudio */}
                 {isRecording ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
                     <span style={{ fontSize: '14px', color: '#ef4444', fontWeight: 600 }}>Gravando... {formatTime(recordingSeconds)}</span>
                     <div style={{ flex: 1 }} />
-                    <button onClick={cancelRecording} style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>
-                      Cancelar
-                    </button>
+                    <button onClick={cancelRecording} style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>Cancelar</button>
                     <button onClick={stopRecording} disabled={uploading} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Square size={13} fill="#fff" />}
                       {uploading ? 'Enviando...' : 'Parar e enviar'}
@@ -414,19 +423,8 @@ export default function InboxPage() {
                 ) : (
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                     <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
-
-                    <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
-                      <Paperclip size={16} />
-                    </button>
-
-                    <button onClick={startRecording} style={btnStyle} title="Gravar áudio"
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}>
-                      <Mic size={16} />
-                    </button>
-
+                    <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}><Paperclip size={16} /></button>
+                    <button onClick={startRecording} style={btnStyle} title="Gravar áudio" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}><Mic size={16} /></button>
                     <textarea
                       style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                       placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
