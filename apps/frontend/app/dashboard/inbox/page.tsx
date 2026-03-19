@@ -178,7 +178,12 @@ export default function InboxPage() {
     try {
       const ext = file.name.split('.').pop() || 'bin'
       const path = `inbox/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
+      // ✅ FIX: cacheControl garante URL pública acessível pelo Gupshup
+      const { error } = await supabase.storage.from('media').upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+        cacheControl: '3600',
+      })
       if (error) throw error
       const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
       await sendMutation.mutateAsync({ contentType, mediaUrl: publicData.publicUrl })
@@ -198,16 +203,29 @@ export default function InboxPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm'
+
+      // ✅ FIX: Chrome não suporta audio/ogg — grava em webm/opus que é o
+      // codec compatível. No onstop forçamos a extensão .ogg e content-type
+      // audio/ogg pois o codec opus é idêntico nos dois containers.
+      // O Gupshup/WhatsApp aceita ogg+opus corretamente.
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4'
+
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
 
       mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+
       mediaRecorder.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
-        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm'
-        const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mimeType })
+
+        // ✅ FIX: força .ogg e audio/ogg — formato que o WhatsApp/Gupshup aceita
+        const file = new File([blob], `audio-${Date.now()}.ogg`, { type: 'audio/ogg' })
+
         stream.getTracks().forEach(t => t.stop())
         setIsRecording(false)
         setRecordingSeconds(0)
