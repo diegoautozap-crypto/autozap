@@ -34,10 +34,9 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'image') {
       message = { type: 'image', originalUrl: mediaUrl, caption: body || '' }
     } else if (contentType === 'audio') {
-      // ✅ FIX: Gupshup Meta v3 exige 'url' para áudio.
-      // O frontend já envia o arquivo como audio/ogg (codec opus),
-      // que é o único formato aceito pelo WhatsApp para mensagens de voz.
-      message = { type: 'audio', url: mediaUrl }
+      // ✅ FIX: 'voice' envia como nota de voz no WhatsApp.
+      // 'audio' envia como arquivo genérico que o WhatsApp descarta silenciosamente.
+      message = { type: 'voice', url: mediaUrl }
     } else if (contentType === 'video') {
       message = { type: 'video', url: mediaUrl, caption: body || '' }
     } else if (contentType === 'document') {
