@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
@@ -53,7 +53,6 @@ export default function CampaignsPage() {
     refetchInterval: 3000,
   })
 
-  // ✅ Paginação
   const totalCampaigns = campaigns?.length ?? 0
   const totalPages = Math.ceil(totalCampaigns / PAGE_SIZE)
   const paginatedCampaigns = campaigns?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? []
@@ -109,14 +108,17 @@ export default function CampaignsPage() {
   const prog = progress || selectedCamp
   const total = prog?.total || prog?.total_contacts || 0
   const sent = prog?.sent || prog?.sent_count || 0
+  const delivered = prog?.delivered || prog?.delivered_count || 0
+  const failed = prog?.failed || prog?.failed_count || 0
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0
+  const deliveryRate = sent > 0 ? Math.round((delivered / sent) * 100) : 0
 
   const label = (text: string) => (
     <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>{text}</label>
   )
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px' }}>
+    <div style={{ padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
@@ -127,137 +129,187 @@ export default function CampaignsPage() {
           <button onClick={() => refetch()}
             style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
-          >
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
             <RefreshCw size={13} /> Atualizar
           </button>
           <button onClick={() => setShowModal(true)}
             style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
-          >
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
             <Plus size={14} /> Nova campanha
           </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
-        {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
-          </div>
-        ) : campaigns?.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '14px' }}>Nenhuma campanha ainda</p>
-            <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              + Nova campanha
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
-              {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
-                <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-              ))}
-            </div>
+      {/* ✅ Layout split: lista esquerda + progresso direita */}
+      <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
 
-            {paginatedCampaigns.map((camp: any) => {
-              const s = S[camp.status] || S.draft
-              const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
-              const isSelected = selectedCamp?.id === camp.id
-              return (
-                <div key={camp.id} onClick={() => setSelectedCamp(camp)}
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', gap: '12px', padding: '14px 20px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center' }}
-                  onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-                  onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 500, color: '#111827', fontSize: '14px', marginBottom: '5px' }}>{camp.name}</div>
-                    <div style={{ height: '3px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '99px', transition: 'width 0.3s' }} />
+        {/* Lista de campanhas */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', flex: 1 }}>
+            {isLoading ? (
+              <div style={{ padding: '60px', textAlign: 'center' }}>
+                <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
+              </div>
+            ) : campaigns?.length === 0 ? (
+              <div style={{ padding: '60px', textAlign: 'center' }}>
+                <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '14px' }}>Nenhuma campanha ainda</p>
+                <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  + Nova campanha
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 100px 100px', gap: '8px', padding: '11px 16px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
+                  {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
+                    <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                  ))}
+                </div>
+
+                {paginatedCampaigns.map((camp: any) => {
+                  const s = S[camp.status] || S.draft
+                  const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
+                  const isSelected = selectedCamp?.id === camp.id
+                  return (
+                    <div key={camp.id} onClick={() => setSelectedCamp(camp)}
+                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 100px 100px', gap: '8px', padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent' }}
+                      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
+                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px', marginBottom: '4px' }}>{camp.name}</div>
+                        <div style={{ height: '2px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+                          <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '99px' }} />
+                        </div>
+                      </div>
+                      <span style={{ color: '#374151', fontSize: '13px' }}>{camp.total_contacts.toLocaleString()}</span>
+                      <span style={{ color: '#374151', fontSize: '13px' }}>{camp.sent_count.toLocaleString()} <span style={{ color: '#9ca3af', fontSize: '11px' }}>({p}%)</span></span>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: s.color, background: s.bg, padding: '2px 8px', borderRadius: '99px', display: 'inline-block' }}>{s.label}</span>
+                      <div onClick={e => e.stopPropagation()}>
+                        {camp.status === 'running' ? (
+                          <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', color: '#6b7280' }}>
+                            <Pause size={10} /> Pausar
+                          </button>
+                        ) : ['draft', 'paused'].includes(camp.status) ? (
+                          <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '4px 10px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Play size={10} /> Disparar
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Paginação */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                      {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns}
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                        style={{ padding: '4px 8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '5px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
+                        <ChevronLeft size={13} />
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <button key={p} onClick={() => setPage(p)}
+                          style={{ padding: '4px 8px', background: p === page ? '#16a34a' : '#fff', border: `1px solid ${p === page ? '#16a34a' : '#e5e7eb'}`, borderRadius: '5px', cursor: 'pointer', color: p === page ? '#fff' : '#374151', fontSize: '12px', fontWeight: p === page ? 600 : 400, minWidth: '28px' }}>
+                          {p}
+                        </button>
+                      ))}
+                      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                        style={{ padding: '4px 8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '5px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
+                        <ChevronRight size={13} />
+                      </button>
                     </div>
                   </div>
-                  <span style={{ color: '#374151', fontSize: '14px' }}>{camp.total_contacts.toLocaleString()}</span>
-                  <span style={{ color: '#374151', fontSize: '14px' }}>{camp.sent_count.toLocaleString()} <span style={{ color: '#9ca3af' }}>({p}%)</span></span>
-                  <div>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: s.color, background: s.bg, padding: '2px 10px', borderRadius: '99px', display: 'inline-block' }}>
-                      {s.label}
-                    </span>
-                  </div>
-                  <div onClick={e => e.stopPropagation()}>
-                    {camp.status === 'running' ? (
-                      <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280' }}>
-                        <Pause size={11} /> Pausar
-                      </button>
-                    ) : ['draft', 'paused'].includes(camp.status) ? (
-                      <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '5px 12px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Play size={11} /> Disparar
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* ✅ Paginação */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #f3f4f6' }}>
-                <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                  {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns} campanhas
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                    <button key={p} onClick={() => setPage(p)}
-                      style={{ padding: '6px 10px', background: p === page ? '#16a34a' : '#fff', border: `1px solid ${p === page ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', cursor: 'pointer', color: p === page ? '#fff' : '#374151', fontSize: '13px', fontWeight: p === page ? 600 : 400, minWidth: '32px' }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
-
-      {/* Progress */}
-      {selectedCamp && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginTop: '12px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '14px' }}>{selectedCamp.name} — Progresso</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
-            {[
-              { label: 'Total',     value: prog?.total || prog?.total_contacts || 0,     color: '#2563eb' },
-              { label: 'Enviadas',  value: prog?.sent || prog?.sent_count || 0,           color: '#16a34a' },
-              { label: 'Entregues', value: prog?.delivered || prog?.delivered_count || 0, color: '#0891b2' },
-              { label: 'Falhas',    value: prog?.failed || prog?.failed_count || 0,       color: '#dc2626' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', padding: '14px' }}>
-                <div style={{ fontSize: '24px', fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>{value.toLocaleString()}</div>
-                <div style={{ color: '#9ca3af', fontSize: '12px', fontWeight: 500 }}>{label}</div>
-              </div>
-            ))}
           </div>
-          <div style={{ height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a', borderRadius: '99px', transition: 'width 0.4s' }} />
-          </div>
-          <div style={{ textAlign: 'right', color: '#6b7280', fontSize: '12px', marginTop: '5px' }}>{pct}% concluído</div>
         </div>
-      )}
+
+        {/* ✅ Painel de progresso — lado direito fixo */}
+        <div style={{ width: '280px', flexShrink: 0 }}>
+          {selectedCamp ? (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', position: 'sticky', top: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0, marginBottom: '2px' }}>{selectedCamp.name}</p>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: S[selectedCamp.status]?.color || '#6b7280', background: S[selectedCamp.status]?.bg || '#f9fafb', padding: '1px 8px', borderRadius: '99px' }}>
+                    {S[selectedCamp.status]?.label || 'Rascunho'}
+                  </span>
+                </div>
+                <button onClick={() => setSelectedCamp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '2px' }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Barra de progresso */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>Progresso</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#111827' }}>{pct}%</span>
+                </div>
+                <div style={{ height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a', borderRadius: '99px', transition: 'width 0.4s' }} />
+                </div>
+              </div>
+
+              {/* Métricas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                {[
+                  { label: 'Total', value: total, color: '#6b7280', icon: BarChart2 },
+                  { label: 'Enviadas', value: sent, color: '#2563eb', icon: Send },
+                  { label: 'Entregues', value: delivered, color: '#16a34a', icon: CheckCheck },
+                  { label: 'Falhas', value: failed, color: '#dc2626', icon: AlertCircle },
+                ].map(({ label, value, color, icon: Icon }) => (
+                  <div key={label} style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+                      <Icon size={12} color={color} />
+                      <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>{label}</span>
+                    </div>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color, letterSpacing: '-0.02em' }}>{value.toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Taxa de entrega */}
+              {sent > 0 && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <TrendingUp size={14} color="#16a34a" />
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>{deliveryRate}% entregues</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280' }}>de {sent.toLocaleString()} enviadas</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Botões de ação */}
+              <div style={{ marginTop: '14px' }}>
+                {selectedCamp.status === 'running' && (
+                  <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
+                    style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#6b7280', fontWeight: 500 }}>
+                    <Pause size={13} /> Pausar campanha
+                  </button>
+                )}
+                {['draft', 'paused'].includes(selectedCamp.status) && (
+                  <button onClick={() => startMutation.mutate(selectedCamp.id)}
+                    style={{ width: '100%', padding: '8px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <Play size={13} /> Disparar campanha
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '32px 20px', textAlign: 'center' }}>
+              <BarChart2 size={28} color="#e5e7eb" style={{ margin: '0 auto 10px' }} />
+              <p style={{ color: '#9ca3af', fontSize: '13px' }}>Clique em uma campanha para ver o progresso</p>
+            </div>
+          )}
+        </div>
+
+      </div>
 
       {/* Modal */}
       {showModal && (
@@ -288,8 +340,7 @@ export default function CampaignsPage() {
               <div onClick={() => fileRef.current?.click()}
                 style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#16a34a'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-              >
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}>
                 <Upload size={16} color="#9ca3af" style={{ margin: '0 auto 6px' }} />
                 <p style={{ fontSize: '13px', color: '#6b7280' }}>Clique para upload do <strong style={{ color: '#111827' }}>.csv</strong></p>
               </div>
@@ -314,8 +365,7 @@ export default function CampaignsPage() {
               </button>
               <button onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || !campaignName || !selectedChannel || !curlText}
-                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
+                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 {createMutation.isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} />}
                 Criar campanha
               </button>
