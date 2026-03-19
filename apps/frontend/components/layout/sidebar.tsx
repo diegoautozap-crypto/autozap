@@ -45,7 +45,7 @@ function UsageBar() {
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
-        <span style={{ fontSize: '11px', color: '#d1d5db' }}>{sent.toLocaleString()} msgs</span>
+        <span style={{ fontSize: '11px', color: '#d1d5db' }}>{sent.toLocaleString()} Mensagens</span>
         <span style={{ fontSize: '11px', color: '#d1d5db' }}>{limit ? limit.toLocaleString() : '∞'}</span>
       </div>
     </div>

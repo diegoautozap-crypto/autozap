@@ -96,7 +96,7 @@ export default function DashboardPage() {
     { label: 'Campanhas', value: campaigns?.length ?? 0, sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento`, icon: Megaphone, color: '#2563eb', bg: '#eff6ff', href: '/dashboard/campaigns' },
     { label: 'Contatos', value: contactsMeta?.total ?? 0, sub: 'na sua base', icon: Users, color: '#7c3aed', bg: '#f5f3ff', href: '/dashboard/contacts' },
     { label: 'Conversas abertas', value: conversations?.length ?? 0, sub: `${conversations?.filter((c: any) => c.unread_count > 0).length || 0} não lidas`, icon: MessageSquare, color: '#16a34a', bg: '#f0fdf4', href: '/dashboard/inbox' },
-    { label: 'Msgs este mês', value: usage?.sent ?? 0, sub: `de ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} disponíveis`, icon: Send, color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
+    { label: 'Mensagens este mês', value: usage?.sent ?? 0, sub: `de ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} disponíveis`, icon: Send, color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
   ]
 
   return (
