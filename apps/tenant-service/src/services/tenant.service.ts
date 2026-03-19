@@ -341,7 +341,7 @@ export class TenantService {
           await resend.emails.send({
             from: RESEND_FROM,
             to: userData.email,
-            subject: ,
+            subject: `✅ Assinatura AutoZap ${planNames[planSlug]} confirmada!`,
             html: `
               <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
                 <h1 style="color: #16a34a; font-size: 24px; margin-bottom: 8px;">Assinatura confirmada!</h1>
