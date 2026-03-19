@@ -112,6 +112,7 @@ router.get('/analytics', async (req, res, next) => {
       .select('created_at, status, direction')
       .eq('tenant_id', tenantId)
       .eq('direction', 'outbound')
+      .not('campaign_id', 'is', null)
       .gte('created_at', since.toISOString())
       .order('created_at', { ascending: true })
 
