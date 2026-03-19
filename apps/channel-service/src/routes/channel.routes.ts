@@ -4,6 +4,11 @@ import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
 import { ok } from '@autozap/utils'
 import { logger } from '../lib/logger'
+import ffmpeg from 'fluent-ffmpeg'
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import { PassThrough } from 'stream'
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path)
 
 const router = Router()
 
@@ -65,10 +70,10 @@ router.delete('/channels/:id', requireRole('admin', 'owner'), async (req, res, n
   } catch (err) { next(err) }
 })
 
-// ─── Audio Proxy (public) ──────────────────────────────────────────────────────
-// O WhatsApp não aceita URLs do Supabase para áudio.
-// Essa rota baixa o áudio do Supabase e serve com Content-Type correto
-// via URL do Railway que o WhatsApp aceita.
+// ─── Audio Proxy com conversão para MP3 (public) ──────────────────────────────
+// O WhatsApp não aceita URLs do Supabase para áudio ogg.
+// Essa rota baixa o ogg do Supabase, converte para MP3 real com ffmpeg
+// e serve via URL do Railway que o WhatsApp aceita.
 router.get('/audio-proxy', async (req, res) => {
   try {
     const { url } = req.query
@@ -77,7 +82,6 @@ router.get('/audio-proxy', async (req, res) => {
       return
     }
 
-    // Valida que é uma URL do Supabase (segurança)
     if (!url.includes('supabase.co')) {
       res.status(403).json({ error: 'Only Supabase URLs are allowed' })
       return
@@ -90,16 +94,40 @@ router.get('/audio-proxy', async (req, res) => {
     }
 
     const buffer = await audioResponse.arrayBuffer()
+    const inputBuffer = Buffer.from(buffer)
 
-    // Serve com Content-Type que o WhatsApp aceita
+    // Converte ogg/webm → mp3 via ffmpeg
     res.setHeader('Content-Type', 'audio/mpeg')
-    res.setHeader('Content-Length', buffer.byteLength)
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.setHeader('Accept-Ranges', 'bytes')
-    res.send(Buffer.from(buffer))
+
+    const { Readable } = await import('stream')
+    const inputStream = new Readable()
+    inputStream.push(inputBuffer)
+    inputStream.push(null)
+
+    const passThrough = new PassThrough()
+
+    ffmpeg(inputStream)
+      .inputFormat('ogg')
+      .audioCodec('libmp3lame')
+      .audioBitrate('128k')
+      .format('mp3')
+      .on('error', (err) => {
+        logger.error('ffmpeg conversion error', { err: err.message })
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Conversion failed' })
+        }
+      })
+      .pipe(passThrough)
+
+    passThrough.pipe(res)
+
   } catch (err) {
     logger.error('Audio proxy error', { err })
-    res.status(500).json({ error: 'Internal error' })
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal error' })
+    }
   }
 })
 
