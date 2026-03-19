@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
@@ -16,12 +16,12 @@ const S: Record<string, { color: string; bg: string; label: string }> = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fff',
-  border: '1px solid #e5e7eb',
+  background: '#fff', border: '1px solid #e5e7eb',
   borderRadius: '6px', fontSize: '14px', outline: 'none',
-  color: '#111827',
-  transition: 'border-color 0.15s',
+  color: '#111827', transition: 'border-color 0.15s',
 }
+
+const PAGE_SIZE = 10
 
 export default function CampaignsPage() {
   const queryClient = useQueryClient()
@@ -32,6 +32,7 @@ export default function CampaignsPage() {
   const [selectedChannel, setSelectedChannel] = useState('')
   const [messagesPerMin, setMessagesPerMin] = useState(60)
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
+  const [page, setPage] = useState(1)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -51,6 +52,11 @@ export default function CampaignsPage() {
     enabled: !!selectedCamp?.id,
     refetchInterval: 3000,
   })
+
+  // ✅ Paginação
+  const totalCampaigns = campaigns?.length ?? 0
+  const totalPages = Math.ceil(totalCampaigns / PAGE_SIZE)
+  const paginatedCampaigns = campaigns?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? []
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -80,7 +86,7 @@ export default function CampaignsPage() {
       return campData.data
     },
     onSuccess: (camp) => {
-      toast.success(`Campanha criada!`)
+      toast.success('Campanha criada!')
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false)
       setSelectedCamp(camp)
@@ -106,9 +112,7 @@ export default function CampaignsPage() {
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0
 
   const label = (text: string) => (
-    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
-      {text}
-    </label>
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>{text}</label>
   )
 
   return (
@@ -120,17 +124,15 @@ export default function CampaignsPage() {
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Gerencie seus disparos em massa</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => refetch()}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+          <button onClick={() => refetch()}
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
           >
             <RefreshCw size={13} /> Atualizar
           </button>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+          <button onClick={() => setShowModal(true)}
+            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
           >
@@ -159,23 +161,14 @@ export default function CampaignsPage() {
                 <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
               ))}
             </div>
-            {campaigns?.map((camp: any) => {
+
+            {paginatedCampaigns.map((camp: any) => {
               const s = S[camp.status] || S.draft
               const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
               const isSelected = selectedCamp?.id === camp.id
               return (
-                <div
-                  key={camp.id}
-                  onClick={() => setSelectedCamp(camp)}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px',
-                    gap: '12px', padding: '14px 20px',
-                    borderBottom: '1px solid #f9fafb',
-                    cursor: 'pointer',
-                    background: isSelected ? '#f0fdf4' : '#fff',
-                    transition: 'background 0.1s',
-                    alignItems: 'center',
-                  }}
+                <div key={camp.id} onClick={() => setSelectedCamp(camp)}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', gap: '12px', padding: '14px 20px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center' }}
                   onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                   onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
                 >
@@ -206,6 +199,38 @@ export default function CampaignsPage() {
                 </div>
               )
             })}
+
+            {/* ✅ Paginação */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #f3f4f6' }}>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                  {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns} campanhas
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => setPage(p)}
+                      style={{ padding: '6px 10px', background: p === page ? '#16a34a' : '#fff', border: `1px solid ${p === page ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', cursor: 'pointer', color: p === page ? '#fff' : '#374151', fontSize: '13px', fontWeight: p === page ? 600 : 400, minWidth: '32px' }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -216,10 +241,10 @@ export default function CampaignsPage() {
           <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '14px' }}>{selectedCamp.name} — Progresso</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
             {[
-              { label: 'Total',     value: prog?.total || prog?.total_contacts || 0,    color: '#2563eb' },
-              { label: 'Enviadas',  value: prog?.sent || prog?.sent_count || 0,          color: '#16a34a' },
+              { label: 'Total',     value: prog?.total || prog?.total_contacts || 0,     color: '#2563eb' },
+              { label: 'Enviadas',  value: prog?.sent || prog?.sent_count || 0,           color: '#16a34a' },
               { label: 'Entregues', value: prog?.delivered || prog?.delivered_count || 0, color: '#0891b2' },
-              { label: 'Falhas',    value: prog?.failed || prog?.failed_count || 0,      color: '#dc2626' },
+              { label: 'Falhas',    value: prog?.failed || prog?.failed_count || 0,       color: '#dc2626' },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', padding: '14px' }}>
                 <div style={{ fontSize: '24px', fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '4px' }}>{value.toLocaleString()}</div>
@@ -237,7 +262,7 @@ export default function CampaignsPage() {
       {/* Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)', animation: 'fadeIn 0.15s ease' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#111827' }}>Nova Campanha</h2>
               <button onClick={() => setShowModal(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '6px', display: 'flex' }}>
@@ -260,9 +285,8 @@ export default function CampaignsPage() {
 
             <div style={{ marginBottom: '16px' }}>
               {label('Contatos — formato: numero,mensagem')}
-              <div
-                onClick={() => fileRef.current?.click()}
-                style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa', transition: 'all 0.1s' }}
+              <div onClick={() => fileRef.current?.click()}
+                style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#16a34a'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
               >
@@ -288,8 +312,7 @@ export default function CampaignsPage() {
               <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', color: '#374151', fontWeight: 500 }}>
                 Cancelar
               </button>
-              <button
-                onClick={() => createMutation.mutate()}
+              <button onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || !campaignName || !selectedChannel || !curlText}
                 style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
@@ -303,7 +326,6 @@ export default function CampaignsPage() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         input:focus, textarea:focus, select:focus { border-color: #16a34a !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.1) !important; outline: none; }
       `}</style>
     </div>

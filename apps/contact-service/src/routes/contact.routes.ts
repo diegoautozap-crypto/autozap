@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { contactService } from '../services/contact.service'
 import { requireAuth, requireRole, validate } from '../middleware/contact.middleware'
 import { ok, paginationSchema } from '@autozap/utils'
+import { db } from '../lib/db'
 
 const router = Router()
 router.use(requireAuth)
@@ -66,6 +67,19 @@ router.get('/contacts/export', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ✅ DELETE /contacts/all — excluir todos os contatos do tenant
+router.delete('/contacts/all', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const { error, count } = await db
+      .from('contacts')
+      .delete({ count: 'exact' })
+      .eq('tenant_id', req.auth.tid)
+
+    if (error) throw new Error(error.message)
+    res.json(ok({ message: 'All contacts deleted', count }))
+  } catch (err) { next(err) }
+})
+
 // GET /contacts/:id
 router.get('/contacts/:id', async (req, res, next) => {
   try {
@@ -90,7 +104,7 @@ router.delete('/contacts/:id', requireRole('admin', 'owner'), async (req, res, n
   } catch (err) { next(err) }
 })
 
-// POST /contacts/:id/tags — add tags
+// POST /contacts/:id/tags
 router.post('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next) => {
   try {
     await contactService.addTags(req.params.id, req.body.tagIds)
@@ -98,7 +112,7 @@ router.post('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next
   } catch (err) { next(err) }
 })
 
-// DELETE /contacts/:id/tags — remove tags
+// DELETE /contacts/:id/tags
 router.delete('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next) => {
   try {
     await contactService.removeTags(req.params.id, req.body.tagIds)
@@ -108,7 +122,6 @@ router.delete('/contacts/:id/tags', validate(addTagsSchema), async (req, res, ne
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-// GET /tags
 router.get('/tags', async (req, res, next) => {
   try {
     const tags = await contactService.listTags(req.auth.tid)
@@ -116,7 +129,6 @@ router.get('/tags', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /tags
 router.post('/tags', validate(tagSchema), async (req, res, next) => {
   try {
     const tag = await contactService.createTag(req.auth.tid, req.body.name, req.body.color)
@@ -124,7 +136,6 @@ router.post('/tags', validate(tagSchema), async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// DELETE /tags/:id
 router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     await contactService.deleteTag(req.params.id, req.auth.tid)
@@ -134,7 +145,6 @@ router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next)
 
 // ─── Import CSV ───────────────────────────────────────────────────────────────
 
-// POST /contacts/import
 router.post('/contacts/import', async (req, res, next) => {
   try {
     const { rows } = req.body

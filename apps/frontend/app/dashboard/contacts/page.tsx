@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -89,6 +89,20 @@ export default function ContactsPage() {
     onError: () => toast.error('Erro ao excluir'),
   })
 
+  // ✅ Excluir TODOS os contatos de uma vez
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await contactApi.delete('/contacts/all')
+    },
+    onSuccess: () => {
+      toast.success('Todos os contatos foram excluídos!')
+      setSelected(new Set())
+      setPage(1)
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    },
+    onError: () => toast.error('Erro ao excluir todos os contatos'),
+  })
+
   const handleExport = async () => {
     const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' })
     const url = URL.createObjectURL(data)
@@ -103,6 +117,12 @@ export default function ContactsPage() {
 
   const handleDeleteSelected = () => {
     if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected))
+  }
+
+  const handleDeleteAll = () => {
+    if (confirm(`⚠️ Tem certeza que deseja excluir TODOS os ${meta?.total?.toLocaleString()} contatos? Essa ação não pode ser desfeita.`)) {
+      deleteAllMutation.mutate()
+    }
   }
 
   const startEdit = (c: any) => {
@@ -129,6 +149,7 @@ export default function ContactsPage() {
   const contacts = data?.data || []
   const meta = data?.meta
   const allSelected = contacts.length > 0 && selected.size === contacts.length
+  const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px' }}>
@@ -143,28 +164,29 @@ export default function ContactsPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {selected.size > 0 && (
-            <button
-              onClick={handleDeleteSelected}
-              disabled={deleteMutation.isPending}
-              style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
+            <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
+              style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Trash2 size={13} /> Excluir {selected.size}
             </button>
           )}
-          <button
-            onClick={handleExport}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+          {/* ✅ Botão excluir todos */}
+          {meta?.total > 0 && (
+            <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
+              style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
+              Excluir todos
+            </button>
+          )}
+          <button onClick={handleExport}
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
-          >
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
             <Download size={13} /> Exportar CSV
           </button>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}
+          <button onClick={() => setShowCreate(!showCreate)}
+            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
-          >
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
             <Plus size={13} /> Novo contato
           </button>
         </div>
@@ -198,11 +220,8 @@ export default function ContactsPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={!form.phone || createMutation.isPending}
-              style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.phone ? 0.5 : 1 }}
-            >
+            <button onClick={() => createMutation.mutate()} disabled={!form.phone || createMutation.isPending}
+              style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.phone ? 0.5 : 1 }}>
               {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               Criar contato
             </button>
@@ -216,8 +235,7 @@ export default function ContactsPage() {
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-        <input
-          style={{ ...inputStyle, paddingLeft: '36px', background: '#fff' }}
+        <input style={{ ...inputStyle, paddingLeft: '36px', background: '#fff' }}
           placeholder="Buscar por nome ou número..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -237,7 +255,6 @@ export default function ContactsPage() {
           </div>
         ) : (
           <>
-            {/* Table header */}
             <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center' }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
               {['Nome', 'Telefone', 'Email', 'Última interação', ''].map(h => (
@@ -249,89 +266,57 @@ export default function ContactsPage() {
               const isEditing = editingId === c.id
               const av = getAvatarColor(c.name)
               return (
-                <div
-                  key={c.id}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px',
-                    gap: '12px', padding: isEditing ? '10px 20px' : '13px 20px',
-                    borderBottom: '1px solid #f9fafb', alignItems: 'center',
-                    background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff',
-                    transition: 'background 0.1s',
-                  }}
-                >
+                <div key={c.id}
+                  style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '13px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
 
-                  {/* Nome */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
                       {getInitials(c.name)}
                     </div>
                     {isEditing ? (
-                      <input
-                        style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '13px' }}
-                        value={editForm.name}
-                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                        autoFocus
-                      />
+                      <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
                     ) : (
                       <span style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</span>
                     )}
                   </div>
 
-                  {/* Telefone */}
                   <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
 
-                  {/* Email */}
                   {isEditing ? (
-                    <input
-                      style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }}
-                      placeholder="email@exemplo.com"
-                      value={editForm.email}
-                      onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                    />
+                    <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
                   ) : (
                     <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>
                   )}
 
-                  {/* Última interação */}
                   <span style={{ color: '#9ca3af', fontSize: '12px' }}>
                     {c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}
                   </span>
 
-                  {/* Ações */}
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                       <>
-                        <button
-                          onClick={saveEdit}
-                          disabled={updateMutation.isPending}
-                          style={{ background: '#16a34a', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}
-                        >
+                        <button onClick={saveEdit} disabled={updateMutation.isPending}
+                          style={{ background: '#16a34a', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}>
                           {updateMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
                         </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          style={{ background: '#f3f4f6', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#6b7280', padding: '5px', display: 'flex' }}
-                        >
+                        <button onClick={() => setEditingId(null)}
+                          style={{ background: '#f3f4f6', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#6b7280', padding: '5px', display: 'flex' }}>
                           <X size={13} />
                         </button>
                       </>
                     ) : (
                       <>
-                        <button
-                          onClick={() => startEdit(c)}
-                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex', transition: 'all 0.1s' }}
+                        <button onClick={() => startEdit(c)}
+                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
-                        >
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
                           <Pencil size={13} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(c.id, c.name || c.phone)}
-                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex', transition: 'all 0.1s' }}
+                        <button onClick={() => handleDelete(c.id, c.name || c.phone)}
+                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
-                        >
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
                           <Trash2 size={13} />
                         </button>
                       </>
@@ -344,26 +329,23 @@ export default function ContactsPage() {
         )}
       </div>
 
-      {/* Pagination */}
+      {/* ✅ Paginação melhorada */}
       {meta && meta.total > 20 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
           <span style={{ color: '#6b7280', fontSize: '13px' }}>
-            Página {meta.page} de {Math.ceil(meta.total / meta.limit)}
+            {((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos
           </span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-              style={{ padding: '7px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
-            >
-              Anterior
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+              style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
+              <ChevronLeft size={14} />
             </button>
-            <button
-              disabled={!meta.hasMore}
-              onClick={() => setPage(p => p + 1)}
-              style={{ padding: '7px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', opacity: !meta.hasMore ? 0.5 : 1 }}
-            >
-              Próxima
+            <span style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#374151' }}>
+              {page} / {totalPages}
+            </span>
+            <button disabled={!meta.hasMore} onClick={() => setPage(p => p + 1)}
+              style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', color: !meta.hasMore ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
+              <ChevronRight size={14} />
             </button>
           </div>
         </div>
