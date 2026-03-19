@@ -37,9 +37,6 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'image') {
       message = { type: 'image', originalUrl: mediaUrl, caption: body || '' }
     } else if (contentType === 'audio') {
-      // ✅ FIX: O WhatsApp não aceita URLs do Supabase para áudio.
-      // Passamos a URL pelo proxy do Railway que serve com Content-Type audio/mpeg
-      // que o WhatsApp aceita normalmente.
       const proxyUrl = `${CHANNEL_SERVICE_PUBLIC_URL}/audio-proxy?url=${encodeURIComponent(mediaUrl || '')}`
       console.log('[GupshupAdapter] audio proxy URL:', proxyUrl)
       message = { type: 'audio', url: proxyUrl }
@@ -155,16 +152,54 @@ export class GupshupAdapter implements IChannelAdapter {
   parseStatusUpdate(rawPayload: unknown): MessageStatusUpdate | null {
     const payload = rawPayload as any
 
+    console.log('[GupshupAdapter] parseStatusUpdate payload:', JSON.stringify(payload).slice(0, 300))
+
+    // ✅ Meta (v3) format — status chegam dentro de entry[].changes[].value.statuses[]
+    if (payload?.object === 'whatsapp_business_account') {
+      try {
+        const entry = payload.entry?.[0]
+        const change = entry?.changes?.[0]
+        const value = change?.value
+        const statusObj = value?.statuses?.[0]
+
+        if (!statusObj) return null
+
+        const statusMap: Record<string, MessageStatus> = {
+          sent:      'sent',
+          delivered: 'delivered',
+          read:      'read',
+          failed:    'failed',
+        }
+
+        const status = statusMap[statusObj.status]
+        if (!status) return null
+
+        const errorMessage = statusObj.errors?.[0]?.message || undefined
+
+        console.log('[GupshupAdapter] status update v3:', statusObj.id, '->', status)
+
+        return {
+          externalId: statusObj.id,
+          status,
+          timestamp: new Date(Number(statusObj.timestamp) * 1000),
+          errorMessage,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    // Gupshup (v2) format
     if (payload?.type !== 'message-event') return null
 
     const event = payload.payload
     if (!event) return null
 
     const statusMap: Record<string, MessageStatus> = {
-      'sent':      'sent',
-      'delivered': 'delivered',
-      'read':      'read',
-      'failed':    'failed',
+      sent:      'sent',
+      delivered: 'delivered',
+      read:      'read',
+      failed:    'failed',
     }
 
     const status = statusMap[event.type]

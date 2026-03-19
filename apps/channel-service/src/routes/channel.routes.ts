@@ -147,7 +147,34 @@ router.post('/webhook/gupshup/:apikey', async (req, res, next) => {
     }
 
     const isMetaV3 = payload?.object === 'whatsapp_business_account'
-    if (payload?.type === 'message' || isMetaV3) {
+
+    if (isMetaV3) {
+      const value = payload?.entry?.[0]?.changes?.[0]?.value
+
+      if (value?.messages?.length > 0) {
+        const normalized = await channelService.parseInbound('gupshup', payload)
+        if (normalized) {
+          normalized.channelId = channel.id
+          await notifyMessageService('inbound', {
+            tenantId: channel.tenantId,
+            channelId: channel.id,
+            message: normalized,
+          })
+        }
+      }
+
+      if (value?.statuses?.length > 0) {
+        const statusUpdate = await channelService.parseStatusUpdate('gupshup', payload)
+        if (statusUpdate) {
+          await notifyMessageService('status_update', {
+            tenantId: channel.tenantId,
+            channelId: channel.id,
+            statusUpdate,
+          })
+        }
+      }
+
+    } else if (payload?.type === 'message') {
       const normalized = await channelService.parseInbound('gupshup', payload)
       if (normalized) {
         normalized.channelId = channel.id
