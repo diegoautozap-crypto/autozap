@@ -10,53 +10,12 @@ import type {
 } from './IChannelAdapter'
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1'
-const META_GRAPH_URL = 'https://graph.facebook.com/v19.0'
+
+// URL pública do channel-service no Railway — o WhatsApp aceita essa URL para áudio
+const CHANNEL_SERVICE_PUBLIC_URL = 'https://autozapchannel-service-production.up.railway.app'
 
 export class GupshupAdapter implements IChannelAdapter {
   readonly channelType = 'gupshup' as const
-
-  // ─── Upload áudio para o Meta e retorna media_id ──────────────────────────
-
-  private async uploadAudioToMeta(audioUrl: string, metaToken: string, phoneNumberId: string): Promise<string | null> {
-    try {
-      // 1. Baixa o arquivo de áudio da URL do Supabase
-      const audioResponse = await fetch(audioUrl)
-      if (!audioResponse.ok) {
-        console.error('[GupshupAdapter] Failed to fetch audio from storage:', audioResponse.status)
-        return null
-      }
-
-      const audioBuffer = await audioResponse.arrayBuffer()
-      const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg' })
-
-      // 2. Faz upload para a API do Meta
-      const formData = new FormData()
-      formData.append('file', audioBlob, 'audio.ogg')
-      formData.append('type', 'audio/ogg')
-      formData.append('messaging_product', 'whatsapp')
-
-      const uploadResponse = await fetch(`${META_GRAPH_URL}/${phoneNumberId}/media`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${metaToken}`,
-        },
-        body: formData,
-      })
-
-      const uploadData = await uploadResponse.json() as any
-      console.log('[GupshupAdapter] Meta media upload response:', JSON.stringify(uploadData))
-
-      if (uploadData?.id) {
-        return uploadData.id
-      }
-
-      console.error('[GupshupAdapter] Meta upload failed:', JSON.stringify(uploadData))
-      return null
-    } catch (err: any) {
-      console.error('[GupshupAdapter] Error uploading audio to Meta:', err.message)
-      return null
-    }
-  }
 
   // ─── Send ─────────────────────────────────────────────────────────────────
 
@@ -78,25 +37,12 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'image') {
       message = { type: 'image', originalUrl: mediaUrl, caption: body || '' }
     } else if (contentType === 'audio') {
-      // ✅ FIX: Upload para o Meta primeiro para obter media_id
-      // O WhatsApp não aceita URLs externas para áudio — exige media_id do próprio Meta
-      const metaToken = creds.metaToken
-      const phoneNumberId = creds.phoneNumberId || creds.source
-
-      if (metaToken && phoneNumberId && mediaUrl) {
-        const mediaId = await this.uploadAudioToMeta(mediaUrl, metaToken, phoneNumberId)
-        if (mediaId) {
-          console.log('[GupshupAdapter] Using Meta media_id for audio:', mediaId)
-          message = { type: 'audio', id: mediaId }
-        } else {
-          // Fallback: tenta enviar com URL direta
-          console.warn('[GupshupAdapter] Meta upload failed, falling back to URL')
-          message = { type: 'voice', url: mediaUrl }
-        }
-      } else {
-        // Sem metaToken: fallback com URL
-        message = { type: 'voice', url: mediaUrl }
-      }
+      // ✅ FIX: O WhatsApp não aceita URLs do Supabase para áudio.
+      // Passamos a URL pelo proxy do Railway que serve com Content-Type audio/mpeg
+      // que o WhatsApp aceita normalmente.
+      const proxyUrl = `${CHANNEL_SERVICE_PUBLIC_URL}/audio-proxy?url=${encodeURIComponent(mediaUrl || '')}`
+      console.log('[GupshupAdapter] audio proxy URL:', proxyUrl)
+      message = { type: 'audio', url: proxyUrl }
     } else if (contentType === 'video') {
       message = { type: 'video', url: mediaUrl, caption: body || '' }
     } else if (contentType === 'document') {
