@@ -267,7 +267,24 @@ export class TenantService {
     })
 
     // URL de pagamento
-    const paymentUrl = asaasSubscription.invoiceUrl || `https://www.asaas.com/c/${asaasSubscription.id}`
+    // ✅ Busca a primeira fatura gerada pela assinatura
+    let paymentUrl = ''
+    try {
+      await new Promise(r => setTimeout(r, 1500))
+      const payments = await asaasRequest('GET', `/subscriptions/${asaasSubscription.id}/payments`)
+      const firstPayment = payments?.data?.[0]
+      if (firstPayment?.invoiceUrl) {
+        paymentUrl = firstPayment.invoiceUrl
+      } else if (firstPayment?.id) {
+        paymentUrl = `https://www.asaas.com/c/${firstPayment.id}`
+      } else {
+        paymentUrl = `https://www.asaas.com/c/${asaasSubscription.id}`
+      }
+    } catch {
+      paymentUrl = `https://www.asaas.com/c/${asaasSubscription.id}`
+    }
+
+    logger.info('Payment URL generated', { tenantId, paymentUrl: paymentUrl.slice(0, 60) })
 
     return {
       paymentUrl,
