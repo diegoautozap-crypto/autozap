@@ -96,6 +96,8 @@ export class MessageService {
 
     const row = Array.isArray(rows) ? rows[0] : rows
 
+    logger.info('update_message_status result', { externalId, status, updated: row?.updated, campaignId: row?.campaign_id })
+
     if (!row?.updated) {
       const { data: exists } = await db.from('messages').select('id, status')
         .eq('external_id', externalId).eq('tenant_id', tenantId).maybeSingle()
@@ -113,6 +115,7 @@ export class MessageService {
 
     if (row.campaign_id && (status === 'delivered' || status === 'read' || status === 'failed')) {
       const field = status === 'delivered' ? 'delivered_count' : status === 'read' ? 'read_count' : 'failed_count'
+      logger.info('Incrementing campaign counter', { status, field, campaignId: row.campaign_id, externalId })
       try {
         const { data: incremented } = await db.rpc('increment_campaign_counter_safe', {
           p_external_id: externalId,
