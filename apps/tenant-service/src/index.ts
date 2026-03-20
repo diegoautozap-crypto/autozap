@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import tenantRoutes, { asaasWebhookRouter } from './routes/tenant.routes'
+import adminRoutes from './routes/admin.routes'
 import { errorHandler } from './middleware/tenant.middleware'
 import { logger } from './lib/logger'
 
@@ -20,12 +21,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'tenant-service' })
 })
 
-// ✅ Webhook do Asaas — público, sem autenticação, registrado ANTES do /tenant
 app.use('/tenant', asaasWebhookRouter)
-
-// Rotas normais com autenticação
 app.use('/tenant', tenantRoutes)
-
+app.use('/admin', adminRoutes)
 app.use(errorHandler)
 
 app.listen(PORT, () => {
@@ -33,3 +31,8 @@ app.listen(PORT, () => {
 })
 
 export default app
+```
+
+Salva. Agora vai no Railway → **tenant-service** → Variables e adiciona:
+```
+ADMIN_SECRET=escolhe_uma_senha_forte_aqui
