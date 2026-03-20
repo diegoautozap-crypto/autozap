@@ -92,5 +92,11 @@ router.post('/campaigns/:id/pause', requireRole('admin', 'owner'), async (req, r
     res.json(ok({ message: 'Campaign paused' }))
   } catch (err) { next(err) }
 })
-
+router.delete('/campaigns/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    await campaignService.deleteCampaign(req.params.id, req.auth.tid)
+    res.json(ok({ message: 'Campaign deleted' }))
+  } catch (err) { next(err) }
+})
 export default router
+ 
