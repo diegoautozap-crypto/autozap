@@ -43,7 +43,7 @@ async function pollSentMessages(): Promise<void> {
       .eq('status', 'sent')
       .not('external_id', 'is', null)
       .lt('updated_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(50)
+      .limit(200)
 
     if (error || !stale || stale.length === 0) return
 
