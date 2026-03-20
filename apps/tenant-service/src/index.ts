@@ -33,6 +33,3 @@ app.listen(PORT, () => {
 export default app
 ```
 
-Salva. Agora vai no Railway → **tenant-service** → Variables e adiciona:
-```
-ADMIN_SECRET=escolhe_uma_senha_forte_aqui
