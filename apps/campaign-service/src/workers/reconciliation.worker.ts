@@ -184,4 +184,4 @@ export function startReconciliationJob(): void {
   logger.info('Starting reconciliation job', { interval: '30s', batchSize: BATCH_SIZE, maxAttempts: MAX_ATTEMPTS, temporalFilter: '5s' })
   runStatusReconciliation().catch(err => logger.error('Initial reconciliation failed', { err }))
   setInterval(runStatusReconciliation, INTERVAL_MS)
-}S
+}
