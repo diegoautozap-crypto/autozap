@@ -73,13 +73,11 @@ export class MessageService {
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 
-  // ─── updateStatus: SQL atômico + idempotente + contador sem duplicidade ──────
   async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage } = update
 
     logger.info('Webhook status received', { externalId, status, tenantId })
 
-    // ✅ Função SQL atômica — anti-race, progressão garantida
     const { data: rows, error: rpcError } = await db.rpc('update_message_status', {
       p_external_id:  externalId,
       p_tenant_id:    tenantId,
@@ -113,11 +111,8 @@ export class MessageService {
 
     logger.info('Message status updated', { externalId, newStatus: status, campaignId: row.campaign_id })
 
-    // ✅ Incrementa contador de campanha de forma IDEMPOTENTE
-    // Usa campaign_status_events para garantir que não duplica mesmo se
-    // webhook e reconciliation tentarem incrementar ao mesmo tempo
-    if (row.campaign_id && (status === 'delivered' || status === 'read')) {
-      const field = status === 'delivered' ? 'delivered_count' : 'read_count'
+    if (row.campaign_id && (status === 'delivered' || status === 'read' || status === 'failed')) {
+      const field = status === 'delivered' ? 'delivered_count' : status === 'read' ? 'read_count' : 'failed_count'
       try {
         const { data: incremented } = await db.rpc('increment_campaign_counter_safe', {
           p_external_id: externalId,
@@ -140,7 +135,6 @@ export class MessageService {
     }
   }
 
-  // ─── Salva em pending (idempotente via unique index) ──────────────────────
   private async savePending(
     externalId: string,
     tenantId: string,

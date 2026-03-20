@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2 } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
@@ -105,6 +105,16 @@ export default function CampaignsPage() {
     onSuccess: () => { toast.success('Pausada'); queryClient.invalidateQueries({ queryKey: ['campaigns'] }) },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => { await campaignApi.delete(`/campaigns/${id}`) },
+    onSuccess: () => {
+      toast.success('Campanha deletada!')
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+      setSelectedCamp(null)
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao deletar'),
+  })
+
   const prog = progress || selectedCamp
   const total = prog?.total || prog?.total_contacts || 0
   const sent = prog?.sent || prog?.sent_count || 0
@@ -143,7 +153,6 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      {/* ✅ Layout split: lista esquerda + progresso direita */}
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
 
         {/* Lista de campanhas */}
@@ -202,7 +211,6 @@ export default function CampaignsPage() {
                   )
                 })}
 
-                {/* Paginação */}
                 {totalPages > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -231,7 +239,7 @@ export default function CampaignsPage() {
           </div>
         </div>
 
-        {/* ✅ Painel de progresso — lado direito fixo */}
+        {/* Painel de progresso */}
         <div style={{ width: '280px', flexShrink: 0 }}>
           {selectedCamp ? (
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', position: 'sticky', top: 0 }}>
@@ -247,7 +255,6 @@ export default function CampaignsPage() {
                 </button>
               </div>
 
-              {/* Barra de progresso */}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>Progresso</span>
@@ -258,7 +265,6 @@ export default function CampaignsPage() {
                 </div>
               </div>
 
-              {/* Métricas */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
                 {[
                   { label: 'Total', value: total, color: '#6b7280', icon: BarChart2 },
@@ -277,7 +283,6 @@ export default function CampaignsPage() {
                 ))}
               </div>
 
-              {/* Taxas */}
               {sent > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -297,8 +302,7 @@ export default function CampaignsPage() {
                 </div>
               )}
 
-              {/* Botões de ação */}
-              <div style={{ marginTop: '14px' }}>
+              <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {selectedCamp.status === 'running' && (
                   <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
                     style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#6b7280', fontWeight: 500 }}>
@@ -309,6 +313,19 @@ export default function CampaignsPage() {
                   <button onClick={() => startMutation.mutate(selectedCamp.id)}
                     style={{ width: '100%', padding: '8px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                     <Play size={13} /> Disparar campanha
+                  </button>
+                )}
+                {['draft', 'paused', 'completed', 'failed'].includes(selectedCamp.status) && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Deletar "${selectedCamp.name}"? Esta ação não pode ser desfeita.`)) {
+                        deleteMutation.mutate(selectedCamp.id)
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
+                    style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '13px', cursor: deleteMutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#dc2626', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}>
+                    {deleteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
+                    Deletar campanha
                   </button>
                 )}
               </div>

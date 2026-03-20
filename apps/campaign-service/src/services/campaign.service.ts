@@ -3,8 +3,6 @@ import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { AppError, NotFoundError, generateId, paginationMeta, randomBetween, sleep } from '@autozap/utils'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface CreateCampaignInput {
   tenantId: string
   channelId: string
@@ -25,11 +23,7 @@ export interface CampaignContact {
   variables?: Record<string, string>
 }
 
-// ─── CampaignService ──────────────────────────────────────────────────────────
-
 export class CampaignService {
-
-  // ── Create campaign ──────────────────────────────────────────────────────
 
   async createCampaign(input: CreateCampaignInput) {
     const { tenantId, channelId, name, messageTemplate, contentType, mediaUrl, scheduledAt, batchSize, messagesPerMin, curlTemplate, createdBy } = input
@@ -55,8 +49,6 @@ export class CampaignService {
     return data
   }
 
-  // ── Add contacts to campaign ─────────────────────────────────────────────
-
   async addContacts(campaignId: string, tenantId: string, contacts: CampaignContact[]) {
     const rows = contacts.map(c => ({
       id: generateId(),
@@ -68,7 +60,6 @@ export class CampaignService {
       status: 'pending',
     }))
 
-    // Insert in batches of 1000 to avoid DB limits
     const chunkSize = 1000
     for (let i = 0; i < rows.length; i += chunkSize) {
       const chunk = rows.slice(i, i + chunkSize)
@@ -76,7 +67,6 @@ export class CampaignService {
       if (error) throw new AppError('DB_ERROR', error.message, 500)
     }
 
-    // Update total count
     await db.from('campaigns')
       .update({ total_contacts: rows.length })
       .eq('id', campaignId)
@@ -84,8 +74,6 @@ export class CampaignService {
     logger.info('Contacts added to campaign', { campaignId, count: rows.length })
     return rows.length
   }
-
-  // ── Import contacts from CSV rows ────────────────────────────────────────
 
   async importContactsFromCSV(
     campaignId: string,
@@ -107,8 +95,6 @@ export class CampaignService {
     return this.addContacts(campaignId, tenantId, contacts)
   }
 
-  // ── Get campaign ─────────────────────────────────────────────────────────
-
   async getCampaign(campaignId: string, tenantId: string) {
     const { data, error } = await db
       .from('campaigns')
@@ -120,8 +106,6 @@ export class CampaignService {
     if (error || !data) throw new NotFoundError('Campaign')
     return data
   }
-
-  // ── List campaigns ───────────────────────────────────────────────────────
 
   async listCampaigns(tenantId: string, page = 1, limit = 20) {
     const offset = (page - 1) * limit
@@ -136,8 +120,6 @@ export class CampaignService {
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return { campaigns: data || [], meta: paginationMeta(count || 0, page, limit) }
   }
-
-  // ── Start campaign ───────────────────────────────────────────────────────
 
   async startCampaign(campaignId: string, tenantId: string) {
     const campaign = await this.getCampaign(campaignId, tenantId)
@@ -157,14 +139,23 @@ export class CampaignService {
     return campaign
   }
 
-  // ── Pause campaign ───────────────────────────────────────────────────────
-
   async pauseCampaign(campaignId: string, tenantId: string) {
     await db.from('campaigns').update({ status: 'paused' })
       .eq('id', campaignId).eq('tenant_id', tenantId)
   }
 
-  // ── Get pending contacts for processing ──────────────────────────────────
+  async deleteCampaign(campaignId: string, tenantId: string) {
+    const campaign = await this.getCampaign(campaignId, tenantId)
+    if (campaign.status === 'running') {
+      throw new AppError('INVALID_STATUS', 'Pause a campanha antes de deletar.', 400)
+    }
+    await db.from('campaign_contacts').delete().eq('campaign_id', campaignId)
+    await db.from('campaign_status_events').delete().eq('campaign_id', campaignId)
+    await db.from('messages').update({ campaign_id: null }).eq('campaign_id', campaignId).eq('tenant_id', tenantId)
+    const { error } = await db.from('campaigns').delete().eq('id', campaignId).eq('tenant_id', tenantId)
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    logger.info('Campaign deleted', { campaignId, tenantId })
+  }
 
   async getPendingContacts(campaignId: string, batchSize: number) {
     const { data } = await db
@@ -176,8 +167,6 @@ export class CampaignService {
 
     return data || []
   }
-
-  // ── Mark contact as sent/failed ───────────────────────────────────────────
 
   async markContactSent(contactId: string, messageUuid: string) {
     await db.from('campaign_contacts').update({
@@ -194,8 +183,6 @@ export class CampaignService {
     }).eq('id', contactId)
   }
 
-  // ── Update campaign counters ──────────────────────────────────────────────
-
   async incrementCounter(campaignId: string, field: 'sent_count' | 'delivered_count' | 'read_count' | 'failed_count') {
     await db.rpc('increment_campaign_counter', {
       p_campaign_id: campaignId,
@@ -203,8 +190,6 @@ export class CampaignService {
       p_count: 1,
     })
   }
-
-  // ── Check if campaign is complete ─────────────────────────────────────────
 
   async checkCompletion(campaignId: string) {
     const { data } = await db
@@ -226,13 +211,9 @@ export class CampaignService {
     }
   }
 
-  // ── Interpolate variables in message template ─────────────────────────────
-
   interpolateMessage(template: string, variables: Record<string, string>): string {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] || '')
   }
-
-  // ── Get campaign progress ─────────────────────────────────────────────────
 
   async getProgress(campaignId: string, tenantId: string) {
     const campaign = await this.getCampaign(campaignId, tenantId)
