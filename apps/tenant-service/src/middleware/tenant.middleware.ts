@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from '../lib/jwt'
 import { AppError, fail } from '@autozap/utils'
 import type { JwtPayload, UserRole } from '@autozap/types'
+import { db } from '../lib/db'
 
 declare global {
   namespace Express {
@@ -44,28 +45,30 @@ export function requireRole(...roles: UserRole[]) {
   }
 }
 
-export function requireSuperAdmin(req: Request, res: Response, next: NextFunction): void {
-  const { db } = require('../lib/db')
-  db.from('users')
-    .select('is_superadmin')
-    .eq('id', req.auth?.sub)
-    .single()
-    .then(({ data }: any) => {
-      if (!data?.is_superadmin) {
-        res.status(403).json(fail('FORBIDDEN', 'Super admin access required'))
-        return
-      }
-      const adminSecret = req.headers['x-admin-secret']
-      const expectedSecret = process.env.ADMIN_SECRET
-      if (!expectedSecret || adminSecret !== expectedSecret) {
-        res.status(403).json(fail('FORBIDDEN', 'Invalid admin secret'))
-        return
-      }
-      next()
-    })
-    .catch(() => {
-      res.status(403).json(fail('FORBIDDEN', 'Super admin check failed'))
-    })
+export async function requireSuperAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { data } = await db
+      .from('users')
+      .select('is_superadmin')
+      .eq('id', req.auth?.sub)
+      .single()
+
+    if (!data?.is_superadmin) {
+      res.status(403).json(fail('FORBIDDEN', 'Super admin access required'))
+      return
+    }
+
+    const adminSecret = req.headers['x-admin-secret']
+    const expectedSecret = process.env.ADMIN_SECRET
+    if (!expectedSecret || adminSecret !== expectedSecret) {
+      res.status(403).json(fail('FORBIDDEN', 'Invalid admin secret'))
+      return
+    }
+
+    next()
+  } catch {
+    res.status(403).json(fail('FORBIDDEN', 'Super admin check failed'))
+  }
 }
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
