@@ -2,7 +2,9 @@ import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { channelRouter } from '../adapters/ChannelRouter'
 import { AppError, NotFoundError, generateId } from '@autozap/utils'
+import { PLAN_CHANNEL_LIMITS } from '@autozap/types'
 import type { ChannelType, SendMessageInput, SendMessageResult, NormalizedMessage } from '../adapters/IChannelAdapter'
+import type { PlanSlug } from '@autozap/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,30 @@ export class ChannelService {
     // Validate adapter exists
     channelRouter.resolve(type)
 
+    // Check channel limit for plan
+    const { data: tenant } = await db
+      .from('tenants')
+      .select('plan_slug')
+      .eq('id', tenantId)
+      .single()
+
+    if (tenant) {
+      const limit = PLAN_CHANNEL_LIMITS[tenant.plan_slug as PlanSlug] ?? 1
+      const { count } = await db
+        .from('channels')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+
+      if ((count || 0) >= limit) {
+        throw new AppError(
+          'PLAN_LIMIT',
+          `Seu plano permite no máximo ${limit} canal${limit > 1 ? 'is' : ''}. Faça upgrade para adicionar mais.`,
+          403,
+        )
+      }
+    }
+
     const { data, error } = await db
       .from('channels')
       .insert({
@@ -51,7 +77,7 @@ export class ChannelService {
         name,
         type,
         phone_number: phoneNumber,
-        credentials,   // TODO: encrypt in production
+        credentials,
         settings: settings || {},
         status: 'active',
       })
@@ -168,7 +194,6 @@ export class ChannelService {
   private async checkDailyLimit(channel: Channel): Promise<void> {
     const limit = (channel.settings as any).messagesPerDay || 1000
 
-    // Reset counter if it's a new day
     const lastReset = (channel as any).lastResetAt
     if (lastReset && new Date(lastReset).toDateString() !== new Date().toDateString()) {
       await db.from('channels').update({

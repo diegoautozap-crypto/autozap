@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { channelApi } from '@/lib/api'
+import { channelApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil } from 'lucide-react'
 
@@ -18,6 +18,10 @@ const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '12px', fontWeight: 600,
   color: '#6b7280', marginBottom: '5px',
   textTransform: 'uppercase', letterSpacing: '0.04em',
+}
+
+const CHANNEL_LIMITS: Record<string, number> = {
+  trial: 1, starter: 1, pro: 3, enterprise: 10, unlimited: 99,
 }
 
 const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '' }
@@ -36,6 +40,18 @@ export default function ChannelsPage() {
       return data.data
     },
   })
+
+  const { data: tenant } = useQuery({
+    queryKey: ['tenant'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant')
+      return data.data
+    },
+  })
+
+  const channelLimit = CHANNEL_LIMITS[tenant?.planSlug || 'trial'] ?? 1
+  const channelCount = channels?.length ?? 0
+  const atLimit = channelCount >= channelLimit
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -61,7 +77,6 @@ export default function ChannelsPage() {
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao criar canal'),
   })
 
-  // ✅ Mutação de editar canal
   const editMutation = useMutation({
     mutationFn: async () => {
       await channelApi.patch(`/channels/${editingId}`, {
@@ -142,14 +157,30 @@ export default function ChannelsPage() {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Canais</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Configure seus números do WhatsApp via Gupshup</p>
         </div>
-        <button
-          onClick={() => { closeForm(); setShowForm(true) }}
-          style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
-        >
-          <Plus size={14} /> Novo canal
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{
+            fontSize: '12px', color: atLimit ? '#dc2626' : '#6b7280',
+            background: atLimit ? '#fef2f2' : '#f3f4f6',
+            padding: '4px 10px', borderRadius: '99px', fontWeight: 500,
+          }}>
+            {channelCount}/{channelLimit} canal{channelLimit > 1 ? 'is' : ''}
+          </span>
+          <button
+            onClick={() => {
+              if (atLimit) {
+                toast.error(`Seu plano permite ${channelLimit} canal${channelLimit > 1 ? 'is' : ''}. Faça upgrade para adicionar mais.`)
+                return
+              }
+              closeForm()
+              setShowForm(true)
+            }}
+            style={{ padding: '8px 16px', background: atLimit ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onMouseEnter={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
+            onMouseLeave={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+          >
+            <Plus size={14} /> Novo canal
+          </button>
+        </div>
       </div>
 
       {/* Guia rápido */}
@@ -259,7 +290,6 @@ export default function ChannelsPage() {
                     <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '2px 10px', borderRadius: '99px' }}>
                       Ativo
                     </span>
-                    {/* ✅ Botão editar */}
                     <button
                       onClick={() => openEdit(ch)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}

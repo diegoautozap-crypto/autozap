@@ -12,11 +12,19 @@ export interface Plan {
 }
 
 export const PLAN_LIMITS: Record<PlanSlug, number | null> = {
-  trial: 100,
-  starter: 10_000,
-  pro: 50_000,
+  trial:      100,
+  starter:    10_000,
+  pro:        50_000,
   enterprise: 100_000,
-  unlimited: null,
+  unlimited:  null,
+}
+
+export const PLAN_CHANNEL_LIMITS: Record<PlanSlug, number> = {
+  trial:      1,
+  starter:    1,
+  pro:        3,
+  enterprise: 10,
+  unlimited:  99,
 }
 
 // ─── Tenant ──────────────────────────────────────────────────────────────────
