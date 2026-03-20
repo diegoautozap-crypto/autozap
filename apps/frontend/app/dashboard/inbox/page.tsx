@@ -58,18 +58,10 @@ function playNotificationSound() {
   } catch {}
 }
 
-// ✅ Ícone de status da mensagem — igual ao WhatsApp
 function MessageStatusIcon({ status }: { status: string }) {
-  if (status === 'read') {
-    return <CheckCheck size={11} color="#93c5fd" />  // azul claro = lido
-  }
-  if (status === 'delivered') {
-    return <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />  // dois checks brancos = entregue
-  }
-  if (status === 'sent') {
-    return <Check size={11} color="#fff" style={{ opacity: 0.65 }} />  // um check = enviado
-  }
-  // queued / failed
+  if (status === 'read') return <CheckCheck size={11} color="#93c5fd" />
+  if (status === 'delivered') return <CheckCheck size={11} color="#fff" style={{ opacity: 0.65 }} />
+  if (status === 'sent') return <Check size={11} color="#fff" style={{ opacity: 0.65 }} />
   return <Check size={11} color="#fff" style={{ opacity: 0.3 }} />
 }
 
@@ -123,6 +115,9 @@ export default function InboxPage() {
   const [pendingFile, setPendingFile] = useState<{ file: File; previewUrl: string; contentType: string } | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [convPage, setConvPage] = useState(1)
+  const [allConvs, setAllConvs] = useState<any[]>([])
+  const [hasMoreConvs, setHasMoreConvs] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -139,32 +134,63 @@ export default function InboxPage() {
     const tenantId = (user as any)?.tenantId || (user as any)?.tid
     if (!tenantId) return
     const channel = pusher.subscribe(`tenant-${tenantId}`)
-
     channel.bind('inbound.message', (data: any) => {
+      setConvPage(1)
+      setAllConvs([])
+      setHasMoreConvs(true)
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       playNotificationSound()
     })
-
     channel.bind('conversation.updated', () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
     })
-
-    // ✅ Atualiza status da mensagem em tempo real (delivered, read)
     channel.bind('message.status', (data: any) => {
-      if (data?.conversationId === selectedConvId) {
-        queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
-      }
+      if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
     })
-
     return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
   }, [user, selectedConvId, queryClient])
 
+  // Reset ao trocar filtro
+  useEffect(() => {
+    setAllConvs([])
+    setConvPage(1)
+    setHasMoreConvs(true)
+  }, [statusFilter])
+
   const { data: convData, isLoading: loadingConvs } = useQuery({
-    queryKey: ['conversations', statusFilter],
-    queryFn: async () => { const url = statusFilter === 'all' ? '/conversations?limit=50' : `/conversations?status=${statusFilter}&limit=50`; const { data } = await conversationApi.get(url); return data.data },
-    refetchInterval: 5000,
+    queryKey: ['conversations', statusFilter, convPage],
+    queryFn: async () => {
+      const url = statusFilter === 'all'
+        ? `/conversations?limit=50&page=${convPage}`
+        : `/conversations?status=${statusFilter}&limit=50&page=${convPage}`
+      const { data } = await conversationApi.get(url)
+      return data.data
+    },
+    refetchInterval: convPage === 1 ? 5000 : false,
   })
+
+  useEffect(() => {
+    if (!convData) return
+    if (convPage === 1) {
+      setAllConvs(convData)
+    } else {
+      setAllConvs(prev => {
+        const ids = new Set(prev.map((c: any) => c.id))
+        return [...prev, ...convData.filter((c: any) => !ids.has(c.id))]
+      })
+    }
+    if (convData.length < 50) setHasMoreConvs(false)
+  }, [convData, convPage])
+
+  const handleConvScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    if (!hasMoreConvs || loadingConvs) return
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+      setConvPage(p => p + 1)
+    }
+  }
+
   const { data: selectedConv } = useQuery({
     queryKey: ['conversation', selectedConvId],
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}`); return data.data },
@@ -205,11 +231,7 @@ export default function InboxPage() {
     try {
       const ext = file.name.split('.').pop() || 'bin'
       const path = `inbox/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from('media').upload(path, file, {
-        contentType: file.type,
-        upsert: false,
-        cacheControl: '3600',
-      })
+      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' })
       if (error) throw error
       const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
       await sendMutation.mutateAsync({ contentType, mediaUrl: publicData.publicUrl })
@@ -219,20 +241,12 @@ export default function InboxPage() {
     } finally { setUploading(false) }
   }
 
-  const handleSendFile = async () => {
-    if (!pendingFile) return
-    await uploadAndSend(pendingFile.file, pendingFile.contentType)
-    setPendingFile(null)
-  }
+  const handleSendFile = async () => { if (!pendingFile) return; await uploadAndSend(pendingFile.file, pendingFile.contentType); setPendingFile(null) }
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/mp4'
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
@@ -241,35 +255,21 @@ export default function InboxPage() {
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
         const file = new File([blob], `audio-${Date.now()}.ogg`, { type: 'audio/ogg' })
         stream.getTracks().forEach(t => t.stop())
-        setIsRecording(false)
-        setRecordingSeconds(0)
+        setIsRecording(false); setRecordingSeconds(0)
         if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
         await uploadAndSend(file, 'audio')
       }
-      mediaRecorder.start()
-      setIsRecording(true)
-      setRecordingSeconds(0)
+      mediaRecorder.start(); setIsRecording(true); setRecordingSeconds(0)
       recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
-    } catch {
-      toast.error('Não foi possível acessar o microfone')
-    }
+    } catch { toast.error('Não foi possível acessar o microfone') }
   }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
-    }
-  }
-
+  const stopRecording = () => { if (mediaRecorderRef.current && isRecording) { mediaRecorderRef.current.stop(); if (recordingTimerRef.current) clearInterval(recordingTimerRef.current) } }
   const cancelRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.ondataavailable = null
-      mediaRecorderRef.current.onstop = null
-      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current.ondataavailable = null; mediaRecorderRef.current.onstop = null; mediaRecorderRef.current.stop()
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
-      setIsRecording(false)
-      setRecordingSeconds(0)
+      setIsRecording(false); setRecordingSeconds(0)
     }
   }
 
@@ -284,13 +284,12 @@ export default function InboxPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
-  const conversations = (convData || []).filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
+  const conversations = allConvs.filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
   const channelId = selectedConv?.channel_id
   const closeConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }
   const openConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }) }
-
   const btnStyle = { width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0 as const, background: '#f9fafb', border: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }
 
   return (
@@ -308,9 +307,11 @@ export default function InboxPage() {
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: statusFilter === f.key ? '#16a34a' : 'transparent', color: statusFilter === f.key ? '#fff' : '#6b7280' }}>{f.label}</button>)}
         </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loadingConvs ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
-            : conversations.length === 0 ? <div style={{ padding: '40px', textAlign: 'center' }}><MessageSquare size={24} color="#e5e7eb" style={{ margin: '0 auto 8px' }} /><p style={{ color: '#9ca3af', fontSize: '13px' }}>Nenhuma conversa</p></div>
+        <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
+          {loadingConvs && convPage === 1
+            ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
+            : conversations.length === 0
+            ? <div style={{ padding: '40px', textAlign: 'center' }}><MessageSquare size={24} color="#e5e7eb" style={{ margin: '0 auto 8px' }} /><p style={{ color: '#9ca3af', fontSize: '13px' }}>Nenhuma conversa</p></div>
             : conversations.map((conv: any) => {
               const isSel = selectedConvId === conv.id
               const name = conv.contacts?.name || conv.contacts?.phone || undefined
@@ -333,7 +334,13 @@ export default function InboxPage() {
                   {conv.unread_count > 0 && <div style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', flexShrink: 0, minWidth: '18px', textAlign: 'center' }}>{conv.unread_count}</div>}
                 </div>
               )
-            })}
+            })
+          }
+          {hasMoreConvs && loadingConvs && convPage > 1 && (
+            <div style={{ padding: '12px', textAlign: 'center' }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -366,8 +373,10 @@ export default function InboxPage() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
-              {loadingMessages ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
-                : messages?.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '40px' }}>Nenhuma mensagem ainda</p>
+              {loadingMessages
+                ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
+                : messages?.length === 0
+                ? <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', padding: '40px' }}>Nenhuma mensagem ainda</p>
                 : messages?.map((msg: any) => {
                   const isOut = msg.direction === 'outbound'
                   const isMedia = msg.content_type !== 'text'
@@ -377,7 +386,6 @@ export default function InboxPage() {
                         <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#9ca3af' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                          {/* ✅ Ícone de status igual ao WhatsApp */}
                           {isOut && <MessageStatusIcon status={msg.status} />}
                         </div>
                       </div>
@@ -388,7 +396,6 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Preview arquivo */}
             {pendingFile && !isRecording && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {pendingFile.contentType === 'image'
