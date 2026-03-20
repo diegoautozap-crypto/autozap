@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001
 
 // ─── Security Middleware ──────────────────────────────────────────────────────
 
-app.set('trust proxy', 1) // trust Railway/Vercel reverse proxy for real IP
+app.set('trust proxy', 1)
 
 app.use(helmet())
 
@@ -27,18 +27,22 @@ app.use(
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 
-// Strict limit on auth endpoints to prevent brute force
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  windowMs: 15 * 60 * 1000,
+  max: 300,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many requests, try again later' } },
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-// Very strict limit on password reset to prevent abuse
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many registration attempts, try again later' } },
+})
+
 const passwordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 5,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many attempts' } },
 })
@@ -56,11 +60,10 @@ app.get('/health', (_req, res) => {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
-app.use('/auth', authLimiter, authRoutes)
-
-// Extra strict limits on sensitive routes
+app.use('/auth/register', registerLimiter)
 app.use('/auth/forgot-password', passwordLimiter)
 app.use('/auth/reset-password', passwordLimiter)
+app.use('/auth', authLimiter, authRoutes)
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 
