@@ -5,7 +5,9 @@ import cors from 'cors'
 import campaignRoutes from './routes/campaign.routes'
 import { errorHandler } from './middleware/campaign.middleware'
 import { logger } from './lib/logger'
-import { startCampaignWorker } from './workers/campaign.worker'
+import { startCampaignWorker }    from './workers/campaign.worker'
+import { startInboxWorker }       from './workers/inbox.worker'
+import { startReconciliationJob } from './workers/reconciliation.worker'
 
 const app = express()
 const PORT = process.env.PORT || 3007
@@ -22,7 +24,9 @@ app.use(errorHandler)
 app.listen(PORT, () => {
   logger.info(`campaign-service running on port ${PORT}`)
   startCampaignWorker()
-  logger.info('Campaign worker started')
+  startInboxWorker()
+  startReconciliationJob()
+  logger.info('All workers started')
 })
 
 export default app
