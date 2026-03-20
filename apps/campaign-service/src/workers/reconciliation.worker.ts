@@ -161,7 +161,7 @@ export async function runStatusReconciliation(): Promise<void> {
     // Polling de mensagens sent sem webhook
     await pollSentMessages()
 
-    await runCleanup()S
+    await runCleanup()
 
   } catch (err: any) {
     logger.error('Reconciliation: unexpected error', { error: err.message })
