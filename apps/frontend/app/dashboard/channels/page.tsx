@@ -21,7 +21,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const CHANNEL_LIMITS: Record<string, number> = {
-  trial: 1, starter: 1, pro: 3, enterprise: 10, unlimited: 99,
+  trial: 1, starter: 1, pro: 5, enterprise: 10, unlimited: 999,
 }
 
 const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '' }

@@ -24,7 +24,7 @@ export const PLAN_CHANNEL_LIMITS: Record<PlanSlug, number> = {
   starter:    1,
   pro:        3,
   enterprise: 10,
-  unlimited:  99,
+  unlimited:  999,
 }
 
 // ─── Tenant ──────────────────────────────────────────────────────────────────
