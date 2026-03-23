@@ -4,7 +4,6 @@ import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
 import { ok } from '@autozap/utils'
-import { v4 as uuidv4 } from 'uuid'
 
 const router = Router()
 
@@ -19,13 +18,24 @@ function requireAuthOrInternal(req: any, res: any, next: any): void {
   requireAuth(req, res, next)
 }
 
+function parseTimestamp(ts: any): Date {
+  if (!ts) return new Date()
+  if (ts instanceof Date) return ts
+  if (typeof ts === 'number') {
+    return new Date(ts > 1e12 ? ts : ts * 1000)
+  }
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return new Date()
+  return d
+}
+
 // Internal Routes
 router.post('/internal/inbound', requireInternal, async (req, res, next) => {
   try {
     const { tenantId, channelId, message } = req.body
     await messageService.processInbound(tenantId, channelId, {
       ...message,
-      timestamp: new Date(message.timestamp),
+      timestamp: parseTimestamp(message.timestamp),
     })
     res.json(ok({ message: 'Inbound message processed' }))
   } catch (err) { next(err) }
@@ -36,7 +46,7 @@ router.post('/internal/status_update', requireInternal, async (req, res, next) =
     const { tenantId, channelId, statusUpdate } = req.body
     await messageService.updateStatus(tenantId, channelId, {
       ...statusUpdate,
-      timestamp: new Date(statusUpdate.timestamp),
+      timestamp: parseTimestamp(statusUpdate.timestamp),
     })
     res.json(ok({ message: 'Status updated' }))
   } catch (err) { next(err) }
