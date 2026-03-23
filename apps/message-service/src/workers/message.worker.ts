@@ -1,169 +1,117 @@
-import { Worker, Queue } from 'bullmq'
-import { logger } from '../lib/logger'
+import { Router } from 'express'
+import { z } from 'zod'
 import { messageService } from '../services/message.service'
-import { db } from '../lib/db'
-import { sleep, randomBetween } from '@autozap/utils'
-import type { SendMessageJob } from '../services/types'
+import { messageQueue } from '../workers/message.worker'
+import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
+import { ok } from '@autozap/utils'
 
-const REDIS_URL = process.env.REDIS_URL!
-const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
+const router = Router()
+
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
 
-function getRedisConnection() {
+function requireAuthOrInternal(req: any, res: any, next: any): void {
+  const secret = req.headers['x-internal-secret']
+  if (secret === INTERNAL_SECRET) {
+    next()
+    return
+  }
+  requireAuth(req, res, next)
+}
+
+function parseTimestamp(ts: any): Date {
+  if (!ts) return new Date()
+  if (ts instanceof Date) return ts
+  if (typeof ts === 'number') {
+    return new Date(ts > 1e12 ? ts : ts * 1000)
+  }
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return new Date()
+  return d
+}
+
+// Internal Routes
+router.post('/internal/inbound', requireInternal, async (req, res, next) => {
   try {
-    const url = new URL(REDIS_URL)
-    return {
-      host: url.hostname,
-      port: Number(url.port) || 6379,
-      password: url.password || undefined,
-      username: url.username || undefined,
-      tls: url.protocol === 'rediss:' ? {} : undefined,
-    }
-  } catch {
-    return { host: 'localhost', port: 6379 }
-  }
-}
-
-const connection = getRedisConnection()
-
-export const messageQueue = new Queue<SendMessageJob>('message_queue', {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'custom',
-    },
-    removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 5000 },
-  },
+    const { tenantId, channelId, message } = req.body
+    await messageService.processInbound(tenantId, channelId, {
+      ...message,
+      timestamp: parseTimestamp(message.timestamp),
+    })
+    res.json(ok({ message: 'Inbound message processed' }))
+  } catch (err) { next(err) }
 })
 
-export const retryQueue = new Queue<SendMessageJob>('retry_queue', {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: { count: 500 },
-    removeOnFail: { count: 1000 },
-  },
+router.post('/internal/status_update', requireInternal, async (req, res, next) => {
+  try {
+    const { tenantId, channelId, statusUpdate } = req.body
+    await messageService.updateStatus(tenantId, channelId, {
+      ...statusUpdate,
+      timestamp: parseTimestamp(statusUpdate.timestamp),
+    })
+    res.json(ok({ message: 'Status updated' }))
+  } catch (err) { next(err) }
 })
 
-export function startMessageWorker(): Worker {
-  const worker = new Worker<SendMessageJob>(
-    'message_queue',
-    async (job) => {
-      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount, campaignId } = job.data
+const sendSchema = z.object({
+  channelId: z.string().uuid(),
+  contactId: z.string().uuid(),
+  conversationId: z.string().uuid(),
+  tenantId: z.string().uuid().optional(),
+  to: z.string().min(1),
+  contentType: z.enum(['text', 'image', 'audio', 'video', 'document', 'template']),
+  body: z.string().optional(),
+  mediaUrl: z.string().url().optional(),
+  campaignId: z.string().uuid().optional(),
+})
 
-      logger.debug('Processing message job', { messageUuid, to, attempt: retryCount })
+// POST /messages/send — accepts JWT or internal secret
+router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async (req, res, next) => {
+  try {
+    const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, campaignId } = req.body
+    const secret = req.headers['x-internal-secret']
+    const tenantId = secret === INTERNAL_SECRET
+      ? (req.body.tenantId || req.auth?.tid)
+      : req.auth.tid
 
-      const delay = randomBetween(1000, 3000)
-      await sleep(delay)
+    const messageUuid = await messageService.queueMessage({
+      tenantId,
+      channelId,
+      contactId,
+      conversationId,
+      to,
+      contentType,
+      body,
+      mediaUrl,
+      campaignId,
+    })
 
-      try {
-        const response = await fetch(`${CHANNEL_SERVICE_URL}/internal/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': INTERNAL_SECRET,
-          },
-          body: JSON.stringify({
-            messageUuid,
-            channelId,
-            tenantId,
-            to,
-            contentType,
-            body,
-            mediaUrl,
-          }),
-        })
+    await messageQueue.add('send', {
+      messageUuid,
+      tenantId,
+      channelId,
+      to,
+      contentType,
+      body,
+      mediaUrl,
+      retryCount: 0,
+    })
 
-        const result = await response.json() as any
+    res.json(ok({ messageUuid, status: 'queued' }))
+  } catch (err) { next(err) }
+})
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.error?.message || `HTTP ${response.status}`)
-        }
+// GET /messages/:conversationId
+router.get('/messages/:conversationId', requireAuth, async (req, res, next) => {
+  try {
+    const { cursor, limit } = req.query
+    const messages = await messageService.listMessages(
+      req.params.conversationId,
+      req.auth.tid,
+      cursor as string | undefined,
+      Number(limit) || 30,
+    )
+    res.json(ok(messages))
+  } catch (err) { next(err) }
+})
 
-        // Mark as sent in DB
-        await messageService.markSent(messageUuid, result.data.externalId)
-
-        // Incrementa contador de uso do tenant (somente campanhas)
-        if (campaignId) {
-          await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
-        }
-
-        logger.info('Message sent successfully', {
-          messageUuid,
-          externalId: result.data.externalId,
-          tenantId,
-        })
-
-      } catch (err: any) {
-        const newRetryCount = retryCount + 1
-        const errMsg = err.message || 'Unknown error'
-
-        logger.warn('Message send failed', { messageUuid, retryCount: newRetryCount, error: errMsg })
-
-        if (newRetryCount >= 3) {
-          await messageService.markFailed(messageUuid, errMsg, newRetryCount)
-          logger.error('Message permanently failed', { messageUuid, error: errMsg })
-          return
-        }
-
-        const delays = [10_000, 30_000, 120_000]
-        const retryDelay = delays[newRetryCount - 1] || 120_000
-
-        await messageService.markFailed(messageUuid, errMsg, newRetryCount)
-
-        await retryQueue.add(
-          'retry',
-          { ...job.data, retryCount: newRetryCount },
-          { delay: retryDelay },
-        )
-      }
-    },
-    {
-      connection,
-      concurrency: 5,
-      limiter: {
-        max: 20,
-        duration: 60_000,
-      },
-    },
-  )
-
-  worker.on('completed', (job) => {
-    logger.debug('Job completed', { jobId: job.id })
-  })
-
-  worker.on('failed', (job, err) => {
-    logger.error('Job failed', { jobId: job?.id, error: err.message })
-  })
-
-  logger.info('Message worker started')
-  return worker
-}
-
-export function startRetryWorker(): Worker {
-  const worker = new Worker<SendMessageJob>(
-    'retry_queue',
-    async (job) => {
-      await messageQueue.add('send', job.data, { priority: 1 })
-    },
-    { connection },
-  )
-
-  logger.info('Retry worker started')
-  return worker
-}
-
-export async function startReconciliationJob(): Promise<void> {
-  const run = async () => {
-    try {
-      logger.debug('Running reconciliation job')
-      logger.debug('Reconciliation job completed')
-    } catch (err) {
-      logger.error('Reconciliation job error', { err })
-    }
-  }
-
-  await run()
-  setInterval(run, 5 * 60 * 1000)
-}
+export default router

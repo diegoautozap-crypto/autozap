@@ -11,8 +11,17 @@ import type {
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1'
 
-// URL pública do channel-service no Railway — o WhatsApp aceita essa URL para áudio
 const CHANNEL_SERVICE_PUBLIC_URL = 'https://autozapchannel-service-production.up.railway.app'
+
+// ─── Converte timestamp do Gupshup/Meta corretamente ─────────────────────────
+// Meta envia em segundos (Unix), mas alguns payloads vêm em ms
+function parseGupshupTimestamp(ts: any): Date {
+  if (!ts) return new Date()
+  const n = Number(ts)
+  if (isNaN(n)) return new Date()
+  // Se for maior que 1e12 já está em ms, senão está em segundos
+  return new Date(n > 1e12 ? n : n * 1000)
+}
 
 export class GupshupAdapter implements IChannelAdapter {
   readonly channelType = 'gupshup' as const
@@ -52,7 +61,7 @@ export class GupshupAdapter implements IChannelAdapter {
       channel: 'whatsapp',
       source: creds.source!,
       destination: to,
-      'src.name': creds.source!,
+      'src.name': creds.srcName || creds.source!,
       message: JSON.stringify(message),
     })
 
@@ -116,7 +125,7 @@ export class GupshupAdapter implements IChannelAdapter {
           body: msg.text?.body || msg.caption || undefined,
           mediaUrl: msg.image?.id || msg.audio?.id || msg.video?.id || msg.document?.id || undefined,
           mediaMimeType: msg.image?.mime_type || msg.audio?.mime_type || undefined,
-          timestamp: new Date(Number(msg.timestamp) * 1000),
+          timestamp: parseGupshupTimestamp(msg.timestamp),
           raw: rawPayload,
         }
       } catch {
@@ -142,7 +151,7 @@ export class GupshupAdapter implements IChannelAdapter {
       body: msg.payload?.text || msg.payload?.caption || undefined,
       mediaUrl: msg.payload?.url || undefined,
       mediaMimeType: msg.payload?.contentType || undefined,
-      timestamp: new Date(payload.timestamp || Date.now()),
+      timestamp: parseGupshupTimestamp(payload.timestamp),
       raw: rawPayload,
     }
   }
@@ -154,7 +163,7 @@ export class GupshupAdapter implements IChannelAdapter {
 
     console.log('[GupshupAdapter] parseStatusUpdate payload:', JSON.stringify(payload).slice(0, 300))
 
-    // ✅ Meta (v3) format — status chegam dentro de entry[].changes[].value.statuses[]
+    // Meta (v3) format
     if (payload?.object === 'whatsapp_business_account') {
       try {
         const entry = payload.entry?.[0]
@@ -174,16 +183,19 @@ export class GupshupAdapter implements IChannelAdapter {
         const status = statusMap[statusObj.status]
         if (!status) return null
 
+        const errorCode    = statusObj.errors?.[0]?.code
         const errorMessage = statusObj.errors?.[0]?.message || undefined
 
         console.log('[GupshupAdapter] status update v3:', statusObj.id, '->', status)
 
         return {
-          externalId: statusObj.gs_id || statusObj.id,
+          externalId:   statusObj.gs_id || statusObj.id,
           status,
-          timestamp: new Date(Number(statusObj.timestamp) * 1000),
+          timestamp:    parseGupshupTimestamp(statusObj.timestamp),
           errorMessage,
-        }
+          errorCode,
+          phone: statusObj.recipient_id,
+        } as any
       } catch {
         return null
       }
@@ -206,9 +218,9 @@ export class GupshupAdapter implements IChannelAdapter {
     if (!status) return null
 
     return {
-      externalId: event.id || payload.payload?.gsId || '',
+      externalId:   event.id || payload.payload?.gsId || '',
       status,
-      timestamp: new Date(payload.timestamp || Date.now()),
+      timestamp:    parseGupshupTimestamp(payload.timestamp),
       errorMessage: event.type === 'failed' ? event.payload?.reason : undefined,
     }
   }
