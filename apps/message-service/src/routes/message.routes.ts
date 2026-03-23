@@ -33,8 +33,8 @@ router.post('/internal/inbound', requireInternal, async (req, res, next) => {
 
 router.post('/internal/status_update', requireInternal, async (req, res, next) => {
   try {
-    const { tenantId, statusUpdate } = req.body
-    await messageService.updateStatus(tenantId, {
+    const { tenantId, channelId, statusUpdate } = req.body
+    await messageService.updateStatus(tenantId, channelId, {
       ...statusUpdate,
       timestamp: new Date(statusUpdate.timestamp),
     })
