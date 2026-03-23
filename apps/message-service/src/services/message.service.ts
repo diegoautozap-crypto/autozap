@@ -30,6 +30,31 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }
 
+// ─── Salva erro na tabela message_errors ──────────────────────────────────────
+async function saveMessageError(params: {
+  tenantId: string
+  channelId?: string
+  phone?: string
+  errorCode?: string
+  errorMessage?: string
+  messageId?: string
+  rawPayload?: object
+}): Promise<void> {
+  try {
+    await db.from('message_errors').insert({
+      tenant_id:     params.tenantId,
+      channel_id:    params.channelId || null,
+      phone:         params.phone || null,
+      error_code:    params.errorCode || null,
+      error_message: params.errorMessage || null,
+      message_id:    params.messageId || null,
+      raw_payload:   params.rawPayload || null,
+    })
+  } catch (err) {
+    logger.error('Failed to save message error', { err })
+  }
+}
+
 export class MessageService {
 
   async queueMessage(input: QueueMessageInput): Promise<string> {
@@ -73,10 +98,24 @@ export class MessageService {
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 
-  async updateStatus(tenantId: string, update: MessageStatusUpdate): Promise<void> {
-    const { externalId, status, timestamp, errorMessage } = update
+  async updateStatus(tenantId: string, channelId: string, update: MessageStatusUpdate): Promise<void> {
+    const { externalId, status, timestamp, errorMessage, errorCode, phone } = update as any
 
     logger.info('Webhook status received', { externalId, status, tenantId })
+
+    // ✅ Salva erro automaticamente se status for failed
+    if (status === 'failed' && errorCode) {
+      await saveMessageError({
+        tenantId,
+        channelId,
+        phone,
+        errorCode:    String(errorCode),
+        errorMessage: errorMessage || 'Unknown error',
+        messageId:    externalId,
+        rawPayload:   update as any,
+      })
+      logger.info('Message error saved', { externalId, errorCode, errorMessage })
+    }
 
     const { data: rows, error: rpcError } = await db.rpc('update_message_status', {
       p_external_id:  externalId,
