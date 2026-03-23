@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { campaignService } from '../services/campaign.service'
 import { campaignQueue } from '../workers/campaign.worker'
 import { requireAuth, requireRole, validate } from '../middleware/campaign.middleware'
-import { ok, paginationSchema } from '@autozap/utils'
+import { ok, paginationSchema, AppError } from '@autozap/utils'
+import { db } from '../lib/db'
 
 const router = Router()
 router.use(requireAuth)
@@ -38,11 +39,39 @@ router.get('/campaigns', async (req, res, next) => {
 
 router.post('/campaigns', requireRole('admin', 'owner'), validate(createCampaignSchema), async (req, res, next) => {
   try {
+    let { curlTemplate, channelId, ...rest } = req.body
+
+    // Busca credenciais do canal no banco
+    const { data: channel } = await db
+      .from('channels')
+      .select('credentials')
+      .eq('id', channelId)
+      .eq('tenant_id', req.auth.tid)
+      .single()
+
+    if (!channel) throw new AppError('NOT_FOUND', 'Canal não encontrado', 404)
+
+    const { apiKey, source, srcName } = channel.credentials
+
+    // Substitui placeholders pela chave real do canal
+    // Funciona com {{api_key}}, {{source}}, {{src_name}} ou qualquer variante
+    if (curlTemplate) {
+      curlTemplate = curlTemplate
+        .replace(/\{\{api_key\}\}/gi, apiKey)
+        .replace(/\{\{apikey\}\}/gi, apiKey)
+        .replace(/\{\{source\}\}/gi, source)
+        .replace(/\{\{src_name\}\}/gi, srcName || '')
+        .replace(/\{\{srcname\}\}/gi, srcName || '')
+    }
+
     const campaign = await campaignService.createCampaign({
       tenantId: req.auth.tid,
       createdBy: req.auth.sub,
-      ...req.body,
+      channelId,
+      curlTemplate,
+      ...rest,
     })
+
     res.status(201).json(ok(campaign))
   } catch (err) { next(err) }
 })
@@ -92,11 +121,12 @@ router.post('/campaigns/:id/pause', requireRole('admin', 'owner'), async (req, r
     res.json(ok({ message: 'Campaign paused' }))
   } catch (err) { next(err) }
 })
+
 router.delete('/campaigns/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     await campaignService.deleteCampaign(req.params.id, req.auth.tid)
     res.json(ok({ message: 'Campaign deleted' }))
   } catch (err) { next(err) }
 })
+
 export default router
- 
