@@ -255,4 +255,4 @@ export class GupshupAdapter implements IChannelAdapter {
   }
 }
 
-export const gupshupAdapter = new GupshupAdapter()
+export const gupshupAdapter = new GupshupAdapter()// 
