@@ -127,7 +127,6 @@ export default function InboxPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
-  // Busca canais para o filtro
   const { data: channels } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
@@ -142,34 +141,24 @@ export default function InboxPage() {
     if (!tenantId) return
     const channel = pusher.subscribe(`tenant-${tenantId}`)
     channel.bind('inbound.message', (data: any) => {
-      setConvPage(1)
-      setAllConvs([])
-      setHasMoreConvs(true)
+      setConvPage(1); setAllConvs([]); setHasMoreConvs(true)
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       playNotificationSound()
     })
-    channel.bind('conversation.updated', () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-    })
+    channel.bind('conversation.updated', () => { queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) })
     channel.bind('message.status', (data: any) => {
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
     })
     return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
   }, [user, selectedConvId, queryClient])
 
-  useEffect(() => {
-    setAllConvs([])
-    setConvPage(1)
-    setHasMoreConvs(true)
-  }, [statusFilter, channelFilter])
+  useEffect(() => { setAllConvs([]); setConvPage(1); setHasMoreConvs(true) }, [statusFilter, channelFilter])
 
   const { data: convData, isLoading: loadingConvs } = useQuery({
     queryKey: ['conversations', statusFilter, channelFilter, convPage],
     queryFn: async () => {
-      let url = statusFilter === 'all'
-        ? `/conversations?limit=50&page=${convPage}`
-        : `/conversations?status=${statusFilter}&limit=50&page=${convPage}`
+      let url = statusFilter === 'all' ? `/conversations?limit=50&page=${convPage}` : `/conversations?status=${statusFilter}&limit=50&page=${convPage}`
       if (channelFilter !== 'all') url += `&channelId=${channelFilter}`
       const { data } = await conversationApi.get(url)
       return data.data
@@ -179,13 +168,8 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!convData) return
-    if (convPage === 1) {
-      setAllConvs(convData)
-    } else {
-      setAllConvs(prev => {
-        const ids = new Set(prev.map((c: any) => c.id))
-        return [...prev, ...convData.filter((c: any) => !ids.has(c.id))]
-      })
+    if (convPage === 1) { setAllConvs(convData) } else {
+      setAllConvs(prev => { const ids = new Set(prev.map((c: any) => c.id)); return [...prev, ...convData.filter((c: any) => !ids.has(c.id))] })
     }
     if (convData.length < 50) setHasMoreConvs(false)
   }, [convData, convPage])
@@ -193,9 +177,7 @@ export default function InboxPage() {
   const handleConvScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     if (!hasMoreConvs || loadingConvs) return
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
-      setConvPage(p => p + 1)
-    }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) setConvPage(p => p + 1)
   }
 
   const { data: selectedConv } = useQuery({
@@ -291,12 +273,8 @@ export default function InboxPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
-  // Filtra conversas por busca (canal já filtrado na query)
   const conversations = allConvs.filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
-
-  // Nome do canal da conversa selecionada
   const selectedChannelName = channels?.find((ch: any) => ch.id === selectedConv?.channel_id)?.name
-
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
   const channelId = selectedConv?.channel_id
@@ -317,30 +295,23 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* Filtro por canal */}
+        {/* ── Filtro por canal — dropdown ── */}
         {channels && channels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
-              <button
-                onClick={() => setChannelFilter('all')}
-                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: channelFilter === 'all' ? '#111827' : '#f3f4f6', color: channelFilter === 'all' ? '#fff' : '#6b7280' }}
-              >
-                Todos
-              </button>
+            <select
+              value={channelFilter}
+              onChange={e => setChannelFilter(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#111827', outline: 'none', cursor: 'pointer', appearance: 'auto' }}
+            >
+              <option value="all">Todos os canais</option>
               {channels.map((ch: any) => (
-                <button
-                  key={ch.id}
-                  onClick={() => setChannelFilter(ch.id)}
-                  style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: channelFilter === ch.id ? '#16a34a' : '#f3f4f6', color: channelFilter === ch.id ? '#fff' : '#6b7280' }}
-                >
-                  {ch.name}
-                </button>
+                <option key={ch.id} value={ch.id}>{ch.name}</option>
               ))}
-            </div>
+            </select>
           </div>
         )}
 
-        {/* Filtro por status */}
+        {/* ── Filtro por status ── */}
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: statusFilter === f.key ? '#16a34a' : 'transparent', color: statusFilter === f.key ? '#fff' : '#6b7280' }}>{f.label}</button>)}
         </div>
@@ -381,9 +352,7 @@ export default function InboxPage() {
             })
           }
           {hasMoreConvs && loadingConvs && convPage > 1 && (
-            <div style={{ padding: '12px', textAlign: 'center' }}>
-              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
-            </div>
+            <div style={{ padding: '12px', textAlign: 'center' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
           )}
         </div>
       </div>
@@ -561,10 +530,10 @@ export default function InboxPage() {
         </div>
       )}
 
-      <style>{`
+      <style>{\`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-      `}</style>
+      \`}</style>
     </div>
   )
 }
