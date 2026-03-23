@@ -115,7 +115,7 @@ export default function ChannelsPage() {
     setForm({
       name: ch.name || '',
       apiKey: ch.webhookApiKey || '',
-      source: ch.phoneNumber || '',
+      source: ch.source || ch.phoneNumber || '',
       srcName: ch.srcName || '',
       metaToken: '',
     })

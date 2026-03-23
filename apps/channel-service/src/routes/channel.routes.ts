@@ -29,6 +29,8 @@ function safeChannel(channel: any) {
     ...rest,
     webhookApiKey: credentials?.apiKey || null,
     hasMetaToken: !!(credentials?.metaToken),
+    srcName: credentials?.srcName || '',
+    source: credentials?.source || '',
   }
 }
 

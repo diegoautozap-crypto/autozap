@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, messageApi, contactApi } from '@/lib/api'
+import { conversationApi, messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square } from 'lucide-react'
@@ -110,6 +110,7 @@ export default function InboxPage() {
   const [search, setSearch] = useState('')
   const [messageText, setMessageText] = useState('')
   const [statusFilter, setStatusFilter] = useState('open')
+  const [channelFilter, setChannelFilter] = useState('all')
   const [showProfile, setShowProfile] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [pendingFile, setPendingFile] = useState<{ file: File; previewUrl: string; contentType: string } | null>(null)
@@ -125,6 +126,12 @@ export default function InboxPage() {
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+
+  // Busca canais para o filtro
+  const { data: channels } = useQuery({
+    queryKey: ['channels'],
+    queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
+  })
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
@@ -151,19 +158,19 @@ export default function InboxPage() {
     return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
   }, [user, selectedConvId, queryClient])
 
-  // Reset ao trocar filtro
   useEffect(() => {
     setAllConvs([])
     setConvPage(1)
     setHasMoreConvs(true)
-  }, [statusFilter])
+  }, [statusFilter, channelFilter])
 
   const { data: convData, isLoading: loadingConvs } = useQuery({
-    queryKey: ['conversations', statusFilter, convPage],
+    queryKey: ['conversations', statusFilter, channelFilter, convPage],
     queryFn: async () => {
-      const url = statusFilter === 'all'
+      let url = statusFilter === 'all'
         ? `/conversations?limit=50&page=${convPage}`
         : `/conversations?status=${statusFilter}&limit=50&page=${convPage}`
+      if (channelFilter !== 'all') url += `&channelId=${channelFilter}`
       const { data } = await conversationApi.get(url)
       return data.data
     },
@@ -284,7 +291,12 @@ export default function InboxPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
+  // Filtra conversas por busca (canal já filtrado na query)
   const conversations = allConvs.filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
+
+  // Nome do canal da conversa selecionada
+  const selectedChannelName = channels?.find((ch: any) => ch.id === selectedConv?.channel_id)?.name
+
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
   const channelId = selectedConv?.channel_id
@@ -304,9 +316,35 @@ export default function InboxPage() {
             <input style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', color: '#111827' }} placeholder="Buscar contato..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
+
+        {/* Filtro por canal */}
+        {channels && channels.length > 1 && (
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
+              <button
+                onClick={() => setChannelFilter('all')}
+                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: channelFilter === 'all' ? '#111827' : '#f3f4f6', color: channelFilter === 'all' ? '#fff' : '#6b7280' }}
+              >
+                Todos
+              </button>
+              {channels.map((ch: any) => (
+                <button
+                  key={ch.id}
+                  onClick={() => setChannelFilter(ch.id)}
+                  style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: channelFilter === ch.id ? '#16a34a' : '#f3f4f6', color: channelFilter === ch.id ? '#fff' : '#6b7280' }}
+                >
+                  {ch.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filtro por status */}
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: statusFilter === f.key ? '#16a34a' : 'transparent', color: statusFilter === f.key ? '#fff' : '#6b7280' }}>{f.label}</button>)}
         </div>
+
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
           {loadingConvs && convPage === 1
             ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
@@ -317,6 +355,7 @@ export default function InboxPage() {
               const name = conv.contacts?.name || conv.contacts?.phone || undefined
               const av = getAvatarColor(name)
               const preview = (conv.last_message || 'Sem mensagens').startsWith('[') ? conv.last_message : cleanText(conv.last_message || '').split('\n')[0]
+              const convChannelName = channels?.find((ch: any) => ch.id === conv.channel_id)?.name
               return (
                 <div key={conv.id} onClick={() => handleSelectConv(conv.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSel ? '#f0fdf4' : 'transparent', borderLeft: isSel ? '3px solid #16a34a' : '3px solid transparent' }}
@@ -328,6 +367,11 @@ export default function InboxPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
                       {conv.last_message_at && <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0, marginLeft: '4px' }}>{new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                      {convChannelName && channelFilter === 'all' && (
+                        <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>{convChannelName}</span>
+                      )}
                     </div>
                     <div style={{ color: '#9ca3af', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>
                   </div>
@@ -357,7 +401,12 @@ export default function InboxPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 }}>{getInitials(contactName)}</div>
                 <div>
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2, margin: 0 }}>{contactName || '??'}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2, margin: 0 }}>{contactName || '??'}</p>
+                    {selectedChannelName && (
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 7px', borderRadius: '4px' }}>{selectedChannelName}</span>
+                    )}
+                  </div>
                   <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{selectedConv?.contacts?.phone}</p>
                 </div>
               </div>
@@ -429,7 +478,7 @@ export default function InboxPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                    <input ref={fileInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
+                    <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
                     <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}><Paperclip size={16} /></button>
                     <button onClick={startRecording} style={btnStyle} title="Gravar áudio" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}><Mic size={16} /></button>
                     <textarea
@@ -464,6 +513,9 @@ export default function InboxPage() {
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, margin: '0 auto 10px' }}>{getInitials(contactName)}</div>
             <p style={{ fontWeight: 700, fontSize: '14px', color: '#111827', marginBottom: '2px' }}>{contactName || '??'}</p>
             <p style={{ fontSize: '12px', color: '#9ca3af' }}>{selectedConv?.contacts?.phone}</p>
+            {selectedChannelName && (
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>{selectedChannelName}</span>
+            )}
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
             <p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Informações</p>
