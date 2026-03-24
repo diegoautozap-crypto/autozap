@@ -52,7 +52,7 @@ export default function PipelinePage() {
       const { data } = await conversationApi.get(url)
       return data.data || []
     },
-    refetchInterval: 10000,
+    staleTime: 30000,
   })
 
   const moveMutation = useMutation({
