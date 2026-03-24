@@ -185,18 +185,25 @@ export default function InboxPage() {
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}`); return data.data },
     enabled: !!selectedConvId,
   })
+
   const { data: messages, isLoading: loadingMessages } = useQuery({
     queryKey: ['messages', selectedConvId],
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}/messages`); return data.data },
     enabled: !!selectedConvId,
     refetchInterval: 3000,
   })
+
   const contactId = selectedConv?.contact_id
   const { data: contactDetail } = useQuery({
     queryKey: ['contact', contactId],
     queryFn: async () => { const { data } = await contactApi.get(`/contacts/${contactId}`); return data.data },
     enabled: !!contactId,
   })
+
+  // Tags do contato
+  const contactTags = (contactDetail?.contact_tags || [])
+    .map((ct: any) => ct.tags)
+    .filter(Boolean)
 
   const sendMutation = useMutation({
     mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
@@ -285,7 +292,7 @@ export default function InboxPage() {
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f6f8fa' }}>
 
-      {/* ── Left ── */}
+      {/* Left */}
       <div style={{ width: '280px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Inbox</h2>
@@ -295,23 +302,16 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── Filtro por canal — dropdown ── */}
         {channels && channels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
-            <select
-              value={channelFilter}
-              onChange={e => setChannelFilter(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#111827', outline: 'none', cursor: 'pointer', appearance: 'auto' }}
-            >
+            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#111827', outline: 'none', cursor: 'pointer', appearance: 'auto' }}>
               <option value="all">Todos os canais</option>
-              {channels.map((ch: any) => (
-                <option key={ch.id} value={ch.id}>{ch.name}</option>
-              ))}
+              {channels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
             </select>
           </div>
         )}
 
-        {/* ── Filtro por status ── */}
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: statusFilter === f.key ? '#16a34a' : 'transparent', color: statusFilter === f.key ? '#fff' : '#6b7280' }}>{f.label}</button>)}
         </div>
@@ -331,19 +331,16 @@ export default function InboxPage() {
                 <div key={conv.id} onClick={() => handleSelectConv(conv.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSel ? '#f0fdf4' : 'transparent', borderLeft: isSel ? '3px solid #16a34a' : '3px solid transparent' }}
                   onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-                  onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
-                >
+                  onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
                   <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
                       {conv.last_message_at && <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0, marginLeft: '4px' }}>{new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-                      {convChannelName && channelFilter === 'all' && (
-                        <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>{convChannelName}</span>
-                      )}
-                    </div>
+                    {convChannelName && channelFilter === 'all' && (
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', display: 'inline-block', marginBottom: '2px' }}>{convChannelName}</span>
+                    )}
                     <div style={{ color: '#9ca3af', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>
                   </div>
                   {conv.unread_count > 0 && <div style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', flexShrink: 0, minWidth: '18px', textAlign: 'center' }}>{conv.unread_count}</div>}
@@ -357,7 +354,7 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* ── Center ── */}
+      {/* Center */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {!selectedConvId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
@@ -372,16 +369,14 @@ export default function InboxPage() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2, margin: 0 }}>{contactName || '??'}</p>
-                    {selectedChannelName && (
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 7px', borderRadius: '4px' }}>{selectedChannelName}</span>
-                    )}
+                    {selectedChannelName && <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 7px', borderRadius: '4px' }}>{selectedChannelName}</span>}
                   </div>
                   <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{selectedConv?.contacts?.phone}</p>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {selectedConv?.status !== 'closed'
-                  ? <button onClick={closeConv} style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>Fechar</button>
+                  ? <button onClick={closeConv} style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>Fechar</button>
                   : <button onClick={openConv} style={{ padding: '5px 12px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Reabrir</button>
                 }
                 <button onClick={() => setShowProfile(p => !p)} style={{ padding: '5px 8px', background: showProfile ? '#f0fdf4' : '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: showProfile ? '#16a34a' : '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -422,7 +417,7 @@ export default function InboxPage() {
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '13px', fontWeight: 500, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.file.name}</p>
-                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{(pendingFile.file.size / 1024).toFixed(0)} KB • {pendingFile.contentType}</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{(pendingFile.file.size / 1024).toFixed(0)} KB · {pendingFile.contentType}</p>
                 </div>
                 <button onClick={handleSendFile} disabled={uploading} style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}
@@ -448,8 +443,8 @@ export default function InboxPage() {
                 ) : (
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                     <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
-                    <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}><Paperclip size={16} /></button>
-                    <button onClick={startRecording} style={btnStyle} title="Gravar áudio" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}><Mic size={16} /></button>
+                    <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"><Paperclip size={16} /></button>
+                    <button onClick={startRecording} style={btnStyle} title="Gravar áudio"><Mic size={16} /></button>
                     <textarea
                       style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                       placeholder="Digite uma mensagem... (Enter envia, Shift+Enter nova linha)"
@@ -475,7 +470,7 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* ── Right: perfil ── */}
+      {/* Right: perfil */}
       {selectedConvId && showProfile && (
         <div style={{ width: '240px', flexShrink: 0, background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6', textAlign: 'center', flexShrink: 0 }}>
@@ -501,7 +496,7 @@ export default function InboxPage() {
               )}
               {contactDetail?.company && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Tag size={13} color="#9ca3af" />
+                  <User size={13} color="#9ca3af" />
                   <div><p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Empresa</p><p style={{ fontSize: '13px', color: '#111827', margin: 0 }}>{contactDetail.company}</p></div>
                 </div>
               )}
@@ -518,7 +513,30 @@ export default function InboxPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Tags do contato */}
+              {contactTags.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Tag size={13} color="#9ca3af" />
+                    <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Tags</p>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                    {contactTags.map((tag: any) => (
+                      <span key={tag.id} style={{
+                        fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
+                        background: `${tag.color || '#6b7280'}18`,
+                        color: tag.color || '#6b7280',
+                        border: `1px solid ${tag.color || '#6b7280'}40`,
+                      }}>
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
               <a href="/dashboard/contacts" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#f9fafb', borderRadius: '6px', textDecoration: 'none', color: '#374151', fontSize: '13px', fontWeight: 500 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f3f4f6' }}
