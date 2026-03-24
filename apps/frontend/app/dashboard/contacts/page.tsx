@@ -117,7 +117,7 @@ export default function ContactsPage() {
       let allContacts: any[] = []
       let p = 1
       while (true) {
-        const { data } = await contactApi.get(`/contacts?page=${p}&limit=500`)
+        const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`)
         const rows = data?.data || []
         allContacts = [...allContacts, ...rows]
         if (!data?.meta?.hasMore) break
