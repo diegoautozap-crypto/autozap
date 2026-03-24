@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Loader2, MessageSquare } from 'lucide-react'
+import { Loader2, MessageSquare, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const STAGES = [
@@ -32,37 +32,38 @@ function getAvatarColor(n: string | undefined | null) {
 export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const [channelFilter, setChannelFilter] = useState('all')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
+  // Estado local otimista do board
+  const [localBoard, setLocalBoard] = useState<Record<string, any[]> | null>(null)
 
-  const { data: channels = [] } = useQuery({
-    queryKey: ['channels'],
+  const { data: board, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['pipeline-board'],
     queryFn: async () => {
-      const { data } = await channelApi.get('/channels')
-      return data.data || []
+      const { data } = await conversationApi.get('/conversations/pipeline')
+      return data.data as Record<string, any[]>
     },
+    staleTime: 60000,
   })
 
-  const { data: conversations = [], isLoading } = useQuery({
-    queryKey: ['pipeline-conversations', channelFilter],
-    queryFn: async () => {
-      let url = '/conversations?status=open&limit=200'
-      if (channelFilter !== 'all') url += `&channelId=${channelFilter}`
-      const { data } = await conversationApi.get(url)
-      return data.data || []
-    },
-    staleTime: 30000,
-  })
+  const displayBoard = localBoard ?? board
+
+  const totalConvs = displayBoard
+    ? Object.values(displayBoard).reduce((acc, arr) => acc + arr.length, 0)
+    : 0
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       await conversationApi.patch(`/conversations/${id}/pipeline`, { stage })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline-conversations'] })
+      setLocalBoard(null)
+      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
     },
-    onError: () => toast.error('Erro ao mover conversa'),
+    onError: () => {
+      setLocalBoard(null)
+      toast.error('Erro ao mover conversa')
+    },
   })
 
   const handleDragStart = (e: React.DragEvent, convId: string) => {
@@ -76,13 +77,29 @@ export default function PipelinePage() {
     setOverStage(stageKey)
   }
 
-  const handleDrop = (e: React.DragEvent, stageKey: string) => {
+  const handleDrop = (e: React.DragEvent, targetStage: string) => {
     e.preventDefault()
-    if (!draggingId) return
-    const conv = conversations.find((c: any) => c.id === draggingId)
-    if (conv && conv.pipeline_stage !== stageKey) {
-      moveMutation.mutate({ id: draggingId, stage: stageKey })
+    if (!draggingId || !displayBoard) return
+
+    // Encontra em qual stage está o card
+    let sourceStage = ''
+    let movedConv: any = null
+    for (const [stage, cards] of Object.entries(displayBoard)) {
+      const found = cards.find((c: any) => c.id === draggingId)
+      if (found) { sourceStage = stage; movedConv = found; break }
     }
+
+    if (!movedConv || sourceStage === targetStage) {
+      setDraggingId(null); setOverStage(null); return
+    }
+
+    // Atualização otimista
+    const newBoard = { ...displayBoard }
+    newBoard[sourceStage] = newBoard[sourceStage].filter((c: any) => c.id !== draggingId)
+    newBoard[targetStage] = [{ ...movedConv, pipeline_stage: targetStage }, ...newBoard[targetStage]]
+    setLocalBoard(newBoard)
+
+    moveMutation.mutate({ id: draggingId, stage: targetStage })
     setDraggingId(null)
     setOverStage(null)
   }
@@ -91,9 +108,6 @@ export default function PipelinePage() {
     setDraggingId(null)
     setOverStage(null)
   }
-
-  const convsByStage = (stageKey: string) =>
-    conversations.filter((c: any) => (c.pipeline_stage || 'lead') === stageKey)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -104,20 +118,18 @@ export default function PipelinePage() {
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Pipeline</h1>
             <p style={{ color: '#6b7280', fontSize: '13px', marginTop: '2px' }}>
-              {conversations.length} conversas abertas
+              {totalConvs} conversas abertas
             </p>
           </div>
-          {channels.length > 1 && (
-            <select
-              value={channelFilter}
-              onChange={e => setChannelFilter(e.target.value)}
-              style={{ padding: '7px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
-              <option value="all">Todos os canais</option>
-              {channels.map((ch: any) => (
-                <option key={ch.id} value={ch.id}>{ch.name}</option>
-              ))}
-            </select>
-          )}
+          <button
+            onClick={() => { setLocalBoard(null); refetch() }}
+            disabled={isFetching}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
+            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
+            Atualizar
+          </button>
         </div>
       </div>
 
@@ -130,7 +142,7 @@ export default function PipelinePage() {
         <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '20px 24px' }}>
           <div style={{ display: 'flex', gap: '14px', height: '100%', minWidth: 'max-content' }}>
             {STAGES.map(stage => {
-              const cards = convsByStage(stage.key)
+              const cards = displayBoard?.[stage.key] || []
               const isOver = overStage === stage.key
               return (
                 <div
@@ -150,7 +162,6 @@ export default function PipelinePage() {
                     transition: 'border-color 0.15s, background 0.15s',
                   }}>
 
-                  {/* Coluna header */}
                   <div style={{ padding: '12px 14px', borderBottom: `1px solid ${stage.border}`, background: stage.bg, flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -163,8 +174,7 @@ export default function PipelinePage() {
                     </div>
                   </div>
 
-                  {/* Cards */}
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {cards.length === 0 ? (
                       <div style={{ padding: '24px 10px', textAlign: 'center' }}>
                         <MessageSquare size={20} color="#d1d5db" style={{ margin: '0 auto 6px' }} />
@@ -181,7 +191,7 @@ export default function PipelinePage() {
                             draggable
                             onDragStart={e => handleDragStart(e, conv.id)}
                             onDragEnd={handleDragEnd}
-                            onClick={() => router.push(`/dashboard/inbox?conv=${conv.id}`)}
+                            onClick={() => router.push(`/dashboard/inbox`)}
                             style={{
                               background: '#fff',
                               border: '1px solid #e5e7eb',
