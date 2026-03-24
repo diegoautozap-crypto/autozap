@@ -12,9 +12,9 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-const LOGICAL_BATCH = 50   // contatos por slice
-const CONCURRENCY   = 10   // máx simultâneos reais (p-limit)
-const MESSAGE_ID_RETRIES = 2  // retries se messageId não vier
+const LOGICAL_BATCH = 50
+const CONCURRENCY   = 10
+const MESSAGE_ID_RETRIES = 2
 
 function getRedisConnection() {
   try {
@@ -66,16 +66,43 @@ interface ParsedCurl { apiKey: string; bodyTemplate: string; messagesPerMin?: nu
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
+
+  // Tenta pegar body de -d '...' (aspas simples)
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
-  let bodyRaw = ''
-  if (singleQ) { bodyRaw = singleQ[1] } else {
-    const dq = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
-    if (dq) bodyRaw = dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  // Tenta pegar body de -d "..." (aspas duplas)
+  const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
+  // Tenta pegar campos --data-urlencode "campo=valor"
+  const dataUrlencodeMatches = [...curlStr.matchAll(/--data-urlencode\s+['"]([^'"]+)['"]/g)]
+
+  let bodyTemplate = ''
+
+  if (singleQ) {
+    bodyTemplate = singleQ[1]
+  } else if (doubleQ) {
+    bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  } else if (dataUrlencodeMatches.length > 0) {
+    // --data-urlencode — monta body codificando cada campo
+    const fields = dataUrlencodeMatches.map(m => {
+      const raw = m[1]
+      const eqIdx = raw.indexOf('=')
+      if (eqIdx === -1) return encodeURIComponent(raw)
+      const key = raw.slice(0, eqIdx)
+      const val = raw.slice(eqIdx + 1)
+      return `${encodeURIComponent(key)}=${encodeURIComponent(val)}`
+    })
+    bodyTemplate = fields.join('&')
   }
-  const bodyTemplate = bodyRaw
+
+  // Normaliza placeholder do número — aceita qualquer variante
+  bodyTemplate = bodyTemplate
     .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
-  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...' })
+    .replace(/%7B%7Bphone%7D%7D/gi, '__PHONE__')
+    .replace(/\{\{phone\}\}/gi, '__PHONE__')
+    .replace(/\{\{numero\}\}/gi, '__PHONE__')
+    .replace(/\{\{telefone\}\}/gi, '__PHONE__')
+
+  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...', hasPhone: bodyTemplate.includes('__PHONE__') })
   return { apiKey, bodyTemplate }
 }
 
@@ -115,7 +142,6 @@ async function sendViaFetch(
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
 
     if (data.status === 'submitted' || data.messageId || data.status === 'success') {
-      // ✅ Se messageId ausente, tenta mais 2x antes de falhar
       if (!data.messageId) {
         if (attempt < MESSAGE_ID_RETRIES) {
           logger.warn('Gupshup response missing messageId — retrying', { phone, attempt: attempt + 1 })
@@ -149,7 +175,6 @@ async function processContact(
   const messageDbId = generateId()
 
   try {
-    // PASSO 1: Envia para Gupshup (com retry para messageId)
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
@@ -159,7 +184,6 @@ async function processContact(
       return 'failed'
     }
 
-    // PASSO 2: Persiste IMEDIATAMENTE — usa upsert para segurança em retry
     const { error: upsertError } = await db.from('messages').upsert({
       id:           messageDbId,
       message_uuid: messageUuid,
@@ -171,8 +195,8 @@ async function processContact(
       status:       'sent',
       sent_at:      new Date(),
       campaign_id:  campaignId,
-      external_id:  result.messageId, // ✅ sempre presente aqui
-    }, { onConflict: 'external_id' }) // ✅ retry não duplica
+      external_id:  result.messageId,
+    }, { onConflict: 'external_id' })
 
     if (upsertError) {
       logger.error('Failed to persist message', { phone: contact.phone, messageId: result.messageId, error: upsertError.message })
@@ -183,14 +207,12 @@ async function processContact(
 
     logger.info('Message persisted', { phone: contact.phone, messageDbId, externalId: result.messageId })
 
-    // PASSO 3: Inbox assíncrono via BullMQ
     inboxQueue.add('create-inbox', {
       tenantId, channelId,
       phone:       contact.phone.replace(/^\+/, ''),
       messageDbId, body: bodyForDb || '(template)', campaignId,
     }).catch(err => logger.warn('Failed to enqueue inbox job', { phone: contact.phone, err: err.message }))
 
-    // PASSO 4: Contadores
     await campaignService.markContactSent(contact.id, messageUuid)
     await campaignService.incrementCounter(campaignId, 'sent_count')
     try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
@@ -222,11 +244,10 @@ export function startCampaignWorker(): Worker {
     if (!curlTemplate) throw new Error('No curl template configured')
     const parsed = parseCurlTemplate(curlTemplate)
 
-    // ✅ Rate limit: calcula delay entre mensagens baseado em messagesPerMin
     const delayPerMessage = messagesPerMin > 0 ? Math.floor(60000 / messagesPerMin) : 0
     logger.info('Rate limit configured', { messagesPerMin, delayPerMessageMs: delayPerMessage })
 
-    const limit = pLimit(CONCURRENCY) // controla concorrência real
+    const limit = pLimit(CONCURRENCY)
     let processed = 0
 
     while (true) {
@@ -256,14 +277,10 @@ export function startCampaignWorker(): Worker {
 
         const chunk = contacts.slice(i, i + LOGICAL_BATCH)
 
-        // ✅ p-limit controla concorrência + delay por mensagem para rate limit
         const results = await Promise.all(
           chunk.map((contact, idx) =>
             limit(async () => {
-              // ✅ Rate limit: distribui delay entre mensagens do batch
-              if (delayPerMessage > 0 && idx > 0) {
-                await sleep(delayPerMessage)
-              }
+              if (delayPerMessage > 0 && idx > 0) await sleep(delayPerMessage)
               return processContact(contact, campaignId, tenantId, channelId, parsed)
             })
           )
