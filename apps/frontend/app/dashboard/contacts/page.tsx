@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const inputStyle: React.CSSProperties = {
@@ -17,6 +17,11 @@ const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '12px', fontWeight: 500,
   color: '#6b7280', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em',
 }
+
+const TAG_COLORS = [
+  '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706',
+  '#0891b2', '#ea580c', '#65a30d', '#0284c7', '#9333ea',
+]
 
 function getInitials(name: string | undefined | null) {
   return ((name || '??').trim().slice(0, 2)).toUpperCase()
@@ -39,10 +44,13 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
+  const [showTags, setShowTags] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', email: '', company: '' })
   const [form, setForm] = useState({ phone: '', name: '', email: '', company: '' })
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0])
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -53,6 +61,38 @@ export default function ContactsPage() {
       const { data } = await contactApi.get(`/contacts?${params}`)
       return data
     },
+  })
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data } = await contactApi.get('/tags')
+      return data.data || []
+    },
+  })
+
+  const createTagMutation = useMutation({
+    mutationFn: async () => {
+      await contactApi.post('/tags', { name: newTagName, color: newTagColor })
+    },
+    onSuccess: () => {
+      toast.success('Tag criada!')
+      queryClient.invalidateQueries({ queryKey: ['tags'] })
+      setNewTagName('')
+      setNewTagColor(TAG_COLORS[0])
+    },
+    onError: () => toast.error('Erro ao criar tag'),
+  })
+
+  const deleteTagMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await contactApi.delete(`/tags/${id}`)
+    },
+    onSuccess: () => {
+      toast.success('Tag excluída!')
+      queryClient.invalidateQueries({ queryKey: ['tags'] })
+    },
+    onError: () => toast.error('Erro ao excluir tag'),
   })
 
   const createMutation = useMutation({
@@ -101,8 +141,6 @@ export default function ContactsPage() {
     onError: () => toast.error('Erro ao excluir todos os contatos'),
   })
 
-
-
   const handleExport = async () => {
     const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' })
     const url = URL.createObjectURL(data)
@@ -113,7 +151,6 @@ export default function ContactsPage() {
 
   const handleExportExcel = async () => {
     try {
-      // Busca todos via paginação
       let allContacts: any[] = []
       let p = 1
       while (true) {
@@ -123,24 +160,18 @@ export default function ContactsPage() {
         if (!data?.meta?.hasMore) break
         p++
       }
-
       if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
-
       const rows = allContacts.map((c: any) => ({
-        telefone: c.phone || '',
-        nome: c.name || '',
-        email: c.email || '',
+        telefone: c.phone || '', nome: c.name || '', email: c.email || '',
         empresa: c.company || '',
         ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
       }))
-
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
       XLSX.writeFile(wb, 'contatos.xlsx')
       toast.success(`${allContacts.length} contatos exportados!`)
     } catch (err) {
-      console.error(err)
       toast.error('Erro ao exportar Excel')
     }
   }
@@ -222,8 +253,12 @@ export default function ContactsPage() {
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
             <FileSpreadsheet size={13} /> Exportar Excel
           </button>
-
-
+          <button onClick={() => setShowTags(!showTags)}
+            style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = showTags ? '#f0fdf4' : '#fff' }}>
+            <Tag size={13} /> Tags {tags.length > 0 && `(${tags.length})`}
+          </button>
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
@@ -232,6 +267,62 @@ export default function ContactsPage() {
           </button>
         </div>
       </div>
+
+      {/* Painel de tags */}
+      {showTags && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Gerenciar tags</h3>
+            <button onClick={() => setShowTags(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Criar nova tag */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <label style={labelStyle}>Nome da tag</label>
+              <input style={inputStyle} placeholder="Ex: Lead quente, Cliente VIP..."
+                value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Cor</label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '220px' }}>
+                {TAG_COLORS.map(c => (
+                  <div key={c} onClick={() => setNewTagColor(c)}
+                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? '#111827' : 'transparent'}`, transition: 'border 0.1s' }} />
+                ))}
+              </div>
+            </div>
+            <button onClick={() => createTagMutation.mutate()} disabled={!newTagName || createTagMutation.isPending}
+              style={{ padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newTagName ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+              {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
+              Criar tag
+            </button>
+          </div>
+
+          {/* Lista de tags existentes */}
+          {tags.length === 0 ? (
+            <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag criada ainda.</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {tags.map((tag: any) => (
+                <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}15`, border: `1px solid ${tag.color || '#6b7280'}40` }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>{tag.name}</span>
+                  <button onClick={() => { if (confirm(`Excluir tag "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: '#9ca3af', marginLeft: '2px' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Create form */}
       {showCreate && (
@@ -272,7 +363,6 @@ export default function ContactsPage() {
           </div>
         </div>
       )}
-
 
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
