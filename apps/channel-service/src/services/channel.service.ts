@@ -1,5 +1,6 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
+import { encryptCredentials, decryptCredentials } from '../lib/crypto'
 import { channelRouter } from '../adapters/ChannelRouter'
 import { AppError, NotFoundError, generateId } from '@autozap/utils'
 import { PLAN_CHANNEL_LIMITS } from '@autozap/types'
@@ -77,7 +78,7 @@ export class ChannelService {
         name,
         type,
         phone_number: phoneNumber,
-        credentials,
+        credentials: encryptCredentials(credentials),
         settings: settings || {},
         status: 'active',
       })
@@ -220,7 +221,7 @@ export class ChannelService {
       type: row.type,
       status: row.status,
       phoneNumber: row.phone_number,
-      credentials: row.credentials,
+      credentials: decryptCredentials(row.credentials),
       settings: row.settings,
       warmupEnabled: row.warmup_enabled,
       warmupDay: row.warmup_day,

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
 import { ok } from '@autozap/utils'
+import { encryptCredentials } from '../lib/crypto'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
 import ffmpeg from 'fluent-ffmpeg'
@@ -93,7 +94,7 @@ router.patch('/channels/:id', requireRole('admin', 'owner'), async (req, res, ne
       mergedCredentials.metaToken = current.credentials?.metaToken
     }
 
-    const updateData: any = { credentials: mergedCredentials }
+    const updateData: any = { credentials: encryptCredentials(mergedCredentials) }
     if (name) updateData.name = name
     if (phoneNumber) updateData.phone_number = phoneNumber
 
