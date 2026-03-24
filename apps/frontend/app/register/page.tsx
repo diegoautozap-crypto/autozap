@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Loader2, MessageSquareMore, ArrowRight, Check } from 'lucide-react'
+import { Loader2, MessageSquareMore, ArrowRight, Check, Mail } from 'lucide-react'
 
 const benefits = [
   '7 dias grátis, sem cartão',
@@ -15,9 +15,9 @@ const benefits = [
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { register, login, isLoading } = useAuthStore()
+  const { register, isLoading } = useAuthStore()
   const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
-  const [step, setStep] = useState<'form' | 'success'>('form')
+  const [step, setStep] = useState<'form' | 'verify'>('form')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,10 +27,7 @@ export default function RegisterPage() {
     }
     try {
       await register(form.name, form.email, form.password, form.tenantName)
-      // Login automático após registro
-      await login(form.email, form.password)
-      toast.success('Conta criada! Bem-vindo ao AutoZap 🎉')
-      router.push('/dashboard')
+      setStep('verify')
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Erro ao criar conta')
     }
@@ -38,12 +35,9 @@ export default function RegisterPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 14px',
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    color: '#111827', fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.15s',
+    background: '#f9fafb', border: '1px solid #e5e7eb',
+    borderRadius: '8px', color: '#111827', fontSize: '14px',
+    outline: 'none', transition: 'border-color 0.15s',
   }
 
   const labelStyle: React.CSSProperties = {
@@ -51,19 +45,44 @@ export default function RegisterPage() {
     fontSize: '12px', fontWeight: 500, marginBottom: '6px',
   }
 
+  if (step === 'verify') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 16px rgba(0,0,0,.06)', textAlign: 'center' }}>
+            <div style={{ width: '64px', height: '64px', background: '#eff6ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Mail size={28} color="#2563eb" />
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Verifique seu email</h2>
+            <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '8px' }}>
+              Enviamos um link de confirmação para:
+            </p>
+            <p style={{ color: '#111827', fontWeight: 600, fontSize: '15px', marginBottom: '24px' }}>{form.email}</p>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 16px', marginBottom: '24px', textAlign: 'left' }}>
+              <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, marginBottom: '6px' }}>📋 O que fazer agora:</p>
+              <ol style={{ fontSize: '13px', color: '#374151', paddingLeft: '18px', lineHeight: 1.8, margin: 0 }}>
+                <li>Abra seu email</li>
+                <li>Clique em <strong>Confirmar email</strong></li>
+                <li>Faça login e comece a usar</li>
+              </ol>
+            </div>
+            <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>
+              Não recebeu? Verifique a caixa de spam ou{' '}
+              <a href="/register" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>tente novamente</a>
+            </p>
+            <a href="/login" style={{ display: 'block', width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
+              Ir para o login
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex',
-      background: '#f6f8fa',
-    }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#f6f8fa' }}>
       {/* Left — benefits */}
-      <div style={{
-        display: 'none',
-        width: '45%', background: '#16a34a',
-        padding: '48px', flexDirection: 'column', justifyContent: 'center',
-      }}
-        className="register-left"
-      >
+      <div style={{ display: 'none', width: '45%', background: '#16a34a', padding: '48px', flexDirection: 'column', justifyContent: 'center' }} className="register-left">
         <div style={{ marginBottom: '48px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
             <div style={{ width: '36px', height: '36px', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -93,102 +112,39 @@ export default function RegisterPage() {
       {/* Right — form */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ width: '100%', maxWidth: '420px' }}>
-
-          {/* Logo mobile */}
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div style={{ width: '48px', height: '48px', background: '#16a34a', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(22,163,74,0.3)' }}>
               <MessageSquareMore size={24} color="#fff" />
             </div>
-            <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Crie sua conta grátis
-            </h1>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>
-              7 dias grátis • 100 mensagens • Sem cartão
-            </p>
+            <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>Crie sua conta grátis</h1>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>7 dias grátis · 100 mensagens · Sem cartão</p>
           </div>
 
-          {/* Card */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Seu nome *</label>
-                <input
-                  style={inputStyle}
-                  placeholder="João Silva"
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  required
-                  autoFocus
-                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
-                />
+                <input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required autoFocus onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
-
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Nome da empresa *</label>
-                <input
-                  style={inputStyle}
-                  placeholder="Minha Empresa"
-                  value={form.tenantName}
-                  onChange={e => setForm({ ...form, tenantName: e.target.value })}
-                  required
-                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
-                />
+                <input style={inputStyle} placeholder="Minha Empresa" value={form.tenantName} onChange={e => setForm({ ...form, tenantName: e.target.value })} required onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
-
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Email *</label>
-                <input
-                  type="email"
-                  style={inputStyle}
-                  placeholder="joao@empresa.com"
-                  value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
-                  required
-                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
-                />
+                <input type="email" style={inputStyle} placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
-
               <div style={{ marginBottom: '24px' }}>
                 <label style={labelStyle}>Senha *</label>
-                <input
-                  type="password"
-                  style={inputStyle}
-                  placeholder="Mínimo 8 caracteres"
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  required
-                  minLength={8}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
-                />
+                <input type="password" style={inputStyle} placeholder="Mínimo 8 caracteres" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={8} onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  width: '100%', padding: '12px',
-                  background: '#16a34a', color: '#fff',
-                  border: 'none', borderRadius: '8px',
-                  fontSize: '14px', fontWeight: 600,
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.7 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'background 0.1s',
-                }}
+              <button type="submit" disabled={isLoading}
+                style={{ width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
-              >
-                {isLoading
-                  ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                  : <ArrowRight size={16} />
-                }
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
+                {isLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
                 Criar conta grátis
               </button>
-
               <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
                 Ao criar uma conta você concorda com nossos{' '}
                 <a href="#" style={{ color: '#16a34a', textDecoration: 'none' }}>Termos de Uso</a>
@@ -198,9 +154,7 @@ export default function RegisterPage() {
 
           <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '13px', marginTop: '20px' }}>
             Já tem conta?{' '}
-            <a href="/login" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>
-              Entrar
-            </a>
+            <a href="/login" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>Entrar</a>
           </p>
         </div>
       </div>

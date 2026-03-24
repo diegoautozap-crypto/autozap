@@ -96,6 +96,16 @@ router.post('/verify-email', validate(verifyEmailSchema), async (req, res, next)
   }
 })
 
+// POST /auth/resend-verification
+router.post('/resend-verification', validate(forgotSchema), async (req, res, next) => {
+  try {
+    await authService.resendVerificationEmail(req.body.email)
+    res.json(ok({ message: 'If the email exists and is unverified, a new link was sent' }))
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ─── Protected Routes (require valid access token) ────────────────────────────
 
 // GET /auth/me

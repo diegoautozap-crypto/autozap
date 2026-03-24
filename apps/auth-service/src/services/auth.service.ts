@@ -135,6 +135,7 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedError('Invalid email or password')
     if (!user.is_active) throw new UnauthorizedError('Account suspended')
+    if (!user.email_verified) throw new AppError('EMAIL_NOT_VERIFIED', 'Verifique seu email antes de entrar', 403)
 
     const valid = await comparePassword(password, user.password_hash)
     if (!valid) throw new UnauthorizedError('Invalid email or password')
@@ -330,6 +331,22 @@ export class AuthService {
       two_factor_enabled: false,
       two_factor_secret: null,
     }).eq('id', userId)
+  }
+
+  async resendVerificationEmail(email: string): Promise<void> {
+    const { data: user } = await db
+      .from('users')
+      .select('id, name, email, email_verified')
+      .eq('email', email.toLowerCase())
+      .maybeSingle()
+
+    if (!user || user.email_verified) return
+
+    const emailVerifyToken = randomBytes(32).toString('hex')
+    await db.from('users').update({ email_verify_token: emailVerifyToken }).eq('id', user.id)
+
+    sendVerificationEmail({ to: user.email, name: user.name, token: emailVerifyToken })
+      .catch(err => logger.error('Failed to resend verification email', { err }))
   }
 
   private async issueTokens(opts: {
