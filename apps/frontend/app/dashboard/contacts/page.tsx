@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Upload } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -42,6 +43,8 @@ export default function ContactsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', email: '', company: '' })
   const [form, setForm] = useState({ phone: '', name: '', email: '', company: '' })
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -89,11 +92,8 @@ export default function ContactsPage() {
     onError: () => toast.error('Erro ao excluir'),
   })
 
-  // ✅ Excluir TODOS os contatos de uma vez
   const deleteAllMutation = useMutation({
-    mutationFn: async () => {
-      await contactApi.delete('/contacts/all')
-    },
+    mutationFn: async () => { await contactApi.delete('/contacts/all') },
     onSuccess: () => {
       toast.success('Todos os contatos foram excluídos!')
       setSelected(new Set())
@@ -102,6 +102,89 @@ export default function ContactsPage() {
     },
     onError: () => toast.error('Erro ao excluir todos os contatos'),
   })
+
+  const importMutation = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const chunks = []
+      for (let i = 0; i < rows.length; i += 500) chunks.push(rows.slice(i, i + 500))
+      for (const chunk of chunks) {
+        await contactApi.post('/contacts/import', { rows: chunk })
+      }
+      return rows.length
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} contatos importados!`)
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
+  })
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImporting(true)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result
+        const workbook = XLSX.read(data, { type: 'binary' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        const raw: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+        if (raw.length === 0) {
+          toast.error('Planilha vazia ou formato inválido')
+          setImporting(false)
+          return
+        }
+
+        // Normaliza colunas — aceita variações de nome
+        const rows = raw
+          .map(row => {
+            // Busca coluna de telefone com variações
+            const phone = String(
+              row.phone || row.Phone || row.telefone || row.Telefone ||
+              row.numero || row.Numero || row.cel || row.celular ||
+              row.whatsapp || row.WhatsApp || ''
+            ).replace(/\D/g, '')
+
+            const name = String(
+              row.name || row.Name || row.nome || row.Nome || ''
+            ).trim()
+
+            const email = String(
+              row.email || row.Email || row.e_mail || ''
+            ).trim()
+
+            const company = String(
+              row.company || row.Company || row.empresa || row.Empresa || ''
+            ).trim()
+
+            const message = String(
+              row.message || row.Message || row.mensagem || row.Mensagem ||
+              row.msg || row.copy || ''
+            ).trim()
+
+            return { phone, name, email, company, message }
+          })
+          .filter(r => r.phone.length >= 8)
+
+        if (rows.length === 0) {
+          toast.error('Nenhum número válido encontrado. Verifique se a coluna se chama "telefone", "phone" ou "numero"')
+          setImporting(false)
+          return
+        }
+
+        importMutation.mutate(rows)
+      } catch {
+        toast.error('Erro ao ler o arquivo Excel')
+      } finally {
+        setImporting(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+    reader.readAsBinaryString(file)
+  }
 
   const handleExport = async () => {
     const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' })
@@ -169,7 +252,6 @@ export default function ContactsPage() {
               <Trash2 size={13} /> Excluir {selected.size}
             </button>
           )}
-          {/* ✅ Botão excluir todos */}
           {meta?.total > 0 && (
             <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
               style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -183,6 +265,27 @@ export default function ContactsPage() {
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
             <Download size={13} /> Exportar CSV
           </button>
+
+          {/* Importar Excel */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+            onChange={handleImportExcel}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing || importMutation.isPending}
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #16a34a', borderRadius: '6px', color: '#16a34a', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: importing || importMutation.isPending ? 0.7 : 1 }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+            {importing || importMutation.isPending
+              ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              : <FileSpreadsheet size={13} />}
+            Importar Excel
+          </button>
+
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
@@ -232,6 +335,12 @@ export default function ContactsPage() {
         </div>
       )}
 
+      {/* Dica de importação */}
+      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontSize: '12px', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <FileSpreadsheet size={14} />
+        <span>Excel: colunas aceitas — <strong>telefone</strong> (obrigatório), nome, email, empresa, mensagem. Aceita .xlsx, .xls e .csv</span>
+      </div>
+
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
@@ -269,7 +378,6 @@ export default function ContactsPage() {
                 <div key={c.id}
                   style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '13px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
-
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
                       {getInitials(c.name)}
@@ -280,19 +388,15 @@ export default function ContactsPage() {
                       <span style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</span>
                     )}
                   </div>
-
                   <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
-
                   {isEditing ? (
                     <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
                   ) : (
                     <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>
                   )}
-
                   <span style={{ color: '#9ca3af', fontSize: '12px' }}>
                     {c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}
                   </span>
-
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                       <>
@@ -329,7 +433,6 @@ export default function ContactsPage() {
         )}
       </div>
 
-      {/* ✅ Paginação melhorada */}
       {meta && meta.total > 20 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
           <span style={{ color: '#6b7280', fontSize: '13px' }}>
