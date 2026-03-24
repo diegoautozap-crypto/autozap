@@ -14,6 +14,7 @@ const createCampaignSchema = z.object({
   name: z.string().min(2).max(255),
   messageTemplate: z.string().optional().default(' '),
   curlTemplate: z.string().optional(),
+  templateId: z.string().uuid().optional(),
   contentType: z.enum(['text', 'image', 'video', 'document', 'audio']).optional(),
   mediaUrl: z.string().url().optional(),
   scheduledAt: z.string().datetime().optional(),
@@ -29,6 +30,87 @@ const importContactsSchema = z.object({
   })).min(1),
 })
 
+const createTemplateSchema = z.object({
+  channelId: z.string().uuid(),
+  name: z.string().min(2).max(255),
+  templateId: z.string().min(1),
+  body: z.string().min(1),
+  variables: z.array(z.string()).optional().default([]),
+  category: z.enum(['marketing', 'utility', 'authentication']).optional().default('marketing'),
+})
+
+// ─── Templates CRUD ───────────────────────────────────────────────────────────
+
+router.get('/templates', async (req, res, next) => {
+  try {
+    const channelId = req.query.channelId as string | undefined
+    let query = db
+      .from('templates')
+      .select('*')
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false })
+    if (channelId) query = query.eq('channel_id', channelId)
+    const { data, error } = await query
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.post('/templates', requireRole('admin', 'owner'), validate(createTemplateSchema), async (req, res, next) => {
+  try {
+    const { channelId, name, templateId, body, variables, category } = req.body
+    const { data: channel } = await db
+      .from('channels')
+      .select('id')
+      .eq('id', channelId)
+      .eq('tenant_id', req.auth.tid)
+      .single()
+    if (!channel) throw new AppError('NOT_FOUND', 'Canal não encontrado', 404)
+    const { data, error } = await db
+      .from('templates')
+      .insert({ tenant_id: req.auth.tid, channel_id: channelId, name, template_id: templateId, body, variables, category })
+      .select()
+      .single()
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/templates/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const { name, templateId, body, variables, category } = req.body
+    const update: any = {}
+    if (name) update.name = name
+    if (templateId) update.template_id = templateId
+    if (body) update.body = body
+    if (variables !== undefined) update.variables = variables
+    if (category) update.category = category
+    const { data, error } = await db
+      .from('templates')
+      .update(update)
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select()
+      .single()
+    if (error || !data) throw new AppError('NOT_FOUND', 'Template não encontrado', 404)
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/templates/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const { error } = await db
+      .from('templates')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    res.json(ok({ message: 'Template deleted' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+
 router.get('/campaigns', async (req, res, next) => {
   try {
     const { page, limit } = paginationSchema.parse(req.query)
@@ -39,9 +121,8 @@ router.get('/campaigns', async (req, res, next) => {
 
 router.post('/campaigns', requireRole('admin', 'owner'), validate(createCampaignSchema), async (req, res, next) => {
   try {
-    let { curlTemplate, channelId, ...rest } = req.body
+    let { curlTemplate, channelId, templateId, ...rest } = req.body
 
-    // Busca credenciais do canal no banco
     const { data: channel } = await db
       .from('channels')
       .select('credentials')
@@ -53,8 +134,25 @@ router.post('/campaigns', requireRole('admin', 'owner'), validate(createCampaign
 
     const { apiKey, source, srcName } = channel.credentials
 
-    // Substitui placeholders pela chave real do canal
-    // Funciona com {{api_key}}, {{source}}, {{src_name}} ou qualquer variante
+    // Se veio templateId, busca template e monta cURL automaticamente
+    if (templateId && !curlTemplate) {
+      const { data: tmpl } = await db
+        .from('templates')
+        .select('*')
+        .eq('id', templateId)
+        .eq('tenant_id', req.auth.tid)
+        .single()
+
+      if (!tmpl) throw new AppError('NOT_FOUND', 'Template não encontrado', 404)
+
+      // Monta os params dinamicamente com os placeholders {{1}}, {{2}}, etc
+      const params = (tmpl.variables || []).map((_: any, i: number) => `{{${i + 1}}}`)
+      const templateParam = JSON.stringify({ id: tmpl.template_id, params })
+
+      curlTemplate = `curl -X POST "https://api.gupshup.io/wa/api/v1/template/msg" -H "apikey: ${apiKey}" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "channel=whatsapp" --data-urlencode "source=${source}" --data-urlencode "destination={{phone}}" --data-urlencode "src.name=${srcName || source}" --data-urlencode "template=${templateParam}"`
+    }
+
+    // Substitui placeholders se veio cURL manual
     if (curlTemplate) {
       curlTemplate = curlTemplate
         .replace(/\{\{api_key\}\}/gi, apiKey)

@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, ChevronDown } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
@@ -33,6 +33,9 @@ export default function CampaignsPage() {
   const [messagesPerMin, setMessagesPerMin] = useState(60)
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
   const [page, setPage] = useState(1)
+  const [useTemplate, setUseTemplate] = useState(true)
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [templateVars, setTemplateVars] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -46,6 +49,15 @@ export default function CampaignsPage() {
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
   })
 
+  const { data: templates } = useQuery({
+    queryKey: ['templates', selectedChannel],
+    queryFn: async () => {
+      const { data } = await campaignApi.get(`/templates?channelId=${selectedChannel}`)
+      return data.data
+    },
+    enabled: !!selectedChannel,
+  })
+
   const { data: progress } = useQuery({
     queryKey: ['progress', selectedCamp?.id],
     queryFn: async () => { const { data } = await campaignApi.get(`/campaigns/${selectedCamp.id}/progress`); return data.data },
@@ -57,6 +69,15 @@ export default function CampaignsPage() {
   const totalPages = Math.ceil(totalCampaigns / PAGE_SIZE)
   const paginatedCampaigns = campaigns?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? []
 
+  const selectedTemplateObj = templates?.find((t: any) => t.id === selectedTemplate)
+
+  const handleTemplateChange = (id: string) => {
+    setSelectedTemplate(id)
+    const tmpl = templates?.find((t: any) => t.id === id)
+    if (tmpl) setTemplateVars(new Array(tmpl.variables?.length || 0).fill(''))
+    else setTemplateVars([])
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -65,15 +86,26 @@ export default function CampaignsPage() {
     reader.readAsText(file)
   }
 
+  const resetModal = () => {
+    setCampaignName(''); setContactsText(''); setCurlText('')
+    setSelectedChannel(''); setSelectedTemplate(''); setTemplateVars([])
+    setUseTemplate(true)
+  }
+
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { data: campData } = await campaignApi.post('/campaigns', {
+      const payload: any = {
         channelId: selectedChannel,
         name: campaignName,
         messageTemplate: ' ',
-        curlTemplate: curlText.trim().replace(/ \\\n/g, ' ').replace(/ \\\r\n/g, ' ').replace(/'/g, '"'),
         messagesPerMin,
-      })
+      }
+      if (useTemplate && selectedTemplate) {
+        payload.templateId = selectedTemplate
+      } else {
+        payload.curlTemplate = curlText.trim().replace(/ \\\n/g, ' ').replace(/ \\\r\n/g, ' ').replace(/'/g, '"')
+      }
+      const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
       const rows = contactsText.split('\n').filter(Boolean).map(line => {
         const parts = line.split(',')
@@ -89,7 +121,7 @@ export default function CampaignsPage() {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false)
       setSelectedCamp(camp)
-      setCampaignName(''); setContactsText(''); setCurlText(''); setSelectedChannel('')
+      resetModal()
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao criar campanha'),
   })
@@ -124,6 +156,8 @@ export default function CampaignsPage() {
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0
   const deliveryRate = sent > 0 ? Math.round((delivered / sent) * 100) : 0
   const readRate = sent > 0 ? Math.round((read / sent) * 100) : 0
+
+  const isValid = campaignName && selectedChannel && (useTemplate ? !!selectedTemplate : !!curlText)
 
   const label = (text: string) => (
     <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>{text}</label>
@@ -176,7 +210,6 @@ export default function CampaignsPage() {
                     <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
                 </div>
-
                 {paginatedCampaigns.map((camp: any) => {
                   const s = S[camp.status] || S.draft
                   const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
@@ -185,8 +218,7 @@ export default function CampaignsPage() {
                     <div key={camp.id} onClick={() => setSelectedCamp(camp)}
                       style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 100px 100px', gap: '8px', padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent' }}
                       onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
-                    >
+                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
                       <div>
                         <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px', marginBottom: '4px' }}>{camp.name}</div>
                         <div style={{ height: '2px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
@@ -210,7 +242,6 @@ export default function CampaignsPage() {
                     </div>
                   )
                 })}
-
                 {totalPages > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -254,7 +285,6 @@ export default function CampaignsPage() {
                   <X size={14} />
                 </button>
               </div>
-
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>Progresso</span>
@@ -264,7 +294,6 @@ export default function CampaignsPage() {
                   <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a', borderRadius: '99px', transition: 'width 0.4s' }} />
                 </div>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
                 {[
                   { label: 'Total', value: total, color: '#6b7280', icon: BarChart2 },
@@ -282,7 +311,6 @@ export default function CampaignsPage() {
                   </div>
                 ))}
               </div>
-
               {sent > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -301,7 +329,6 @@ export default function CampaignsPage() {
                   </div>
                 </div>
               )}
-
               <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {selectedCamp.status === 'running' && (
                   <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
@@ -317,11 +344,7 @@ export default function CampaignsPage() {
                 )}
                 {['draft', 'paused', 'completed', 'failed'].includes(selectedCamp.status) && (
                   <button
-                    onClick={() => {
-                      if (window.confirm(`Deletar "${selectedCamp.name}"? Esta ação não pode ser desfeita.`)) {
-                        deleteMutation.mutate(selectedCamp.id)
-                      }
-                    }}
+                    onClick={() => { if (window.confirm(`Deletar "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                     disabled={deleteMutation.isPending}
                     style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '13px', cursor: deleteMutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#dc2626', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}>
                     {deleteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
@@ -337,33 +360,112 @@ export default function CampaignsPage() {
             </div>
           )}
         </div>
-
       </div>
 
-      {/* Modal */}
+      {/* ── Modal Nova Campanha ── */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#111827' }}>Nova Campanha</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '6px', display: 'flex' }}>
+              <button onClick={() => { setShowModal(false); resetModal() }} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '6px', display: 'flex' }}>
                 <X size={16} />
               </button>
             </div>
 
+            {/* Nome */}
             <div style={{ marginBottom: '16px' }}>
               {label('Nome da campanha')}
               <input style={inputStyle} placeholder="Ex: Promoção Black Friday" value={campaignName} onChange={e => setCampaignName(e.target.value)} />
             </div>
 
+            {/* Canal */}
             <div style={{ marginBottom: '16px' }}>
               {label('Canal WhatsApp')}
-              <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedChannel} onChange={e => setSelectedChannel(e.target.value)}>
+              <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedChannel} onChange={e => { setSelectedChannel(e.target.value); setSelectedTemplate(''); setTemplateVars([]) }}>
                 <option value="">Selecionar canal...</option>
                 {channels?.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             </div>
 
+            {/* Toggle template vs cURL */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '3px', gap: '2px', marginBottom: '14px' }}>
+                <button
+                  onClick={() => setUseTemplate(true)}
+                  style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate ? '#fff' : 'transparent', color: useTemplate ? '#111827' : '#6b7280', boxShadow: useTemplate ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
+                  Usar template salvo
+                </button>
+                <button
+                  onClick={() => setUseTemplate(false)}
+                  style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: !useTemplate ? '#fff' : 'transparent', color: !useTemplate ? '#111827' : '#6b7280', boxShadow: !useTemplate ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
+                  Colar cURL manual
+                </button>
+              </div>
+
+              {useTemplate ? (
+                selectedChannel ? (
+                  templates?.length === 0 ? (
+                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '14px 16px' }}>
+                      <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 500, margin: '0 0 4px' }}>Nenhum template cadastrado para este canal</p>
+                      <p style={{ fontSize: '12px', color: '#b45309', margin: 0 }}>
+                        Vá em <strong>Canais → {channels?.find((c: any) => c.id === selectedChannel)?.name} → Templates</strong> para cadastrar.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      {label('Template')}
+                      <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedTemplate} onChange={e => handleTemplateChange(e.target.value)}>
+                        <option value="">Selecionar template...</option>
+                        {templates?.map((t: any) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                      {selectedTemplateObj && (
+                        <div style={{ marginTop: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                            <FileText size={13} color="#6b7280" />
+                            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>Preview do template</span>
+                            <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: '99px', fontWeight: 600, marginLeft: 'auto' }}>
+                              {selectedTemplateObj.category}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '13px', color: '#111827', lineHeight: 1.6, margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{selectedTemplateObj.body}</p>
+                          {selectedTemplateObj.variables?.length > 0 && (
+                            <div>
+                              <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>
+                                Variáveis ({selectedTemplateObj.variables.length})
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {selectedTemplateObj.variables.map((v: string, i: number) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '60px' }}>{`{{${i + 1}}}`} = <em>{v}</em></span>
+                                  </div>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', fontStyle: 'italic' }}>
+                                As variáveis são preenchidas automaticamente pela coluna correspondente do CSV.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div style={{ background: '#f3f4f6', borderRadius: '8px', padding: '14px 16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '13px', color: '#9ca3af' }}>Selecione um canal para ver os templates</p>
+                  </div>
+                )
+              ) : (
+                <div>
+                  {label('cURL do Gupshup')}
+                  <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.6 } as any} placeholder="curl -X POST https://api.gupshup.io/..." value={curlText} onChange={e => setCurlText(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            {/* Contatos */}
             <div style={{ marginBottom: '16px' }}>
               {label('Contatos — formato: numero,mensagem')}
               <div onClick={() => fileRef.current?.click()}
@@ -378,23 +480,19 @@ export default function CampaignsPage() {
               {contactsText && <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '4px', fontWeight: 500 }}>{contactsText.split('\n').filter(Boolean).length} contatos detectados</p>}
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              {label('cURL do Gupshup')}
-              <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.6 } as any} placeholder="curl -X POST https://api.gupshup.io/..." value={curlText} onChange={e => setCurlText(e.target.value)} />
-            </div>
-
+            {/* Velocidade */}
             <div style={{ marginBottom: '22px' }}>
               {label('Mensagens por minuto (anti-ban)')}
               <input type="number" min="1" max="300" style={{ ...inputStyle, width: '100px' } as any} value={messagesPerMin} onChange={e => setMessagesPerMin(Number(e.target.value))} />
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', color: '#374151', fontWeight: 500 }}>
+              <button onClick={() => { setShowModal(false); resetModal() }} style={{ flex: 1, padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', color: '#374151', fontWeight: 500 }}>
                 Cancelar
               </button>
               <button onClick={() => createMutation.mutate()}
-                disabled={createMutation.isPending || !campaignName || !selectedChannel || !curlText}
-                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !campaignName || !selectedChannel || !curlText ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                disabled={createMutation.isPending || !isValid}
+                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !isValid ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !isValid ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 {createMutation.isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} />}
                 Criar campanha
               </button>
