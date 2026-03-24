@@ -1,7 +1,13 @@
 import { Resend } from 'resend'
 import { logger } from './logger'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy — só instancia quando for usar, evita crash no startup sem RESEND_API_KEY
+function getResend(): Resend {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY not configured')
+  }
+  return new Resend(process.env.RESEND_API_KEY)
+}
 const FROM = process.env.SMTP_FROM || 'AutoZap <onboarding@resend.dev>'
 const APP_URL = process.env.APP_URL || 'https://frontend-production-795a.up.railway.app'
 
@@ -77,7 +83,7 @@ export async function sendCampaignCompletedEmail(opts: {
     <a href="${APP_URL}/dashboard/campaigns" class="btn">Ver campanha</a>
   `)
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to,
     subject: `✅ Campanha "${campaignName}" concluída — AutoZap`,
@@ -112,7 +118,7 @@ export async function sendTrialExpiringEmail(opts: {
     ? '⚠️ Seu trial expira hoje — AutoZap'
     : `⏰ Seu trial expira em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} — AutoZap`
 
-  const { error } = await resend.emails.send({ from: FROM, to, subject, html })
+  const { error } = await getResend().emails.send({ from: FROM, to, subject, html })
   if (error) throw new Error(error.message)
   logger.info('Trial expiring email sent', { to, daysLeft })
 }
