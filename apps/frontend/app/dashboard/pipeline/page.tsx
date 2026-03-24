@@ -32,18 +32,30 @@ function getAvatarColor(n: string | undefined | null) {
 export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [channelFilter, setChannelFilter] = useState('all')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
-  // Estado local otimista do board
   const [localBoard, setLocalBoard] = useState<Record<string, any[]> | null>(null)
 
-  const { data: board, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['pipeline-board'],
+  const { data: channels = [] } = useQuery({
+    queryKey: ['channels'],
     queryFn: async () => {
-      const { data } = await conversationApi.get('/conversations/pipeline')
+      const { data } = await channelApi.get('/channels')
+      return data.data || []
+    },
+  })
+
+  const { data: board, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['pipeline-board', channelFilter],
+    queryFn: async () => {
+      let url = '/conversations/pipeline'
+      if (channelFilter !== 'all') url += `?channelId=${channelFilter}`
+      const { data } = await conversationApi.get(url)
       return data.data as Record<string, any[]>
     },
-    staleTime: 60000,
+    staleTime: 30000,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   })
 
   const displayBoard = localBoard ?? board
@@ -81,7 +93,6 @@ export default function PipelinePage() {
     e.preventDefault()
     if (!draggingId || !displayBoard) return
 
-    // Encontra em qual stage está o card
     let sourceStage = ''
     let movedConv: any = null
     for (const [stage, cards] of Object.entries(displayBoard)) {
@@ -121,15 +132,28 @@ export default function PipelinePage() {
               {totalConvs} conversas abertas
             </p>
           </div>
-          <button
-            onClick={() => { setLocalBoard(null); refetch() }}
-            disabled={isFetching}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}
-            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
-            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
-            Atualizar
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {(channels as any[]).length > 1 && (
+              <select
+                value={channelFilter}
+                onChange={e => { setChannelFilter(e.target.value); setLocalBoard(null) }}
+                style={{ padding: '7px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
+                <option value="all">Todos os canais</option>
+                {(channels as any[]).map((ch: any) => (
+                  <option key={ch.id} value={ch.id}>{ch.name}</option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => { setLocalBoard(null); refetch() }}
+              disabled={isFetching}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
+              <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
+              Atualizar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -191,7 +215,7 @@ export default function PipelinePage() {
                             draggable
                             onDragStart={e => handleDragStart(e, conv.id)}
                             onDragEnd={handleDragEnd}
-                            onClick={() => router.push(`/dashboard/inbox`)}
+                            onClick={() => router.push('/dashboard/inbox')}
                             style={{
                               background: '#fff',
                               border: '1px solid #e5e7eb',
