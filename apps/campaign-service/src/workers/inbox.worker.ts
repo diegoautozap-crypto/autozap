@@ -11,18 +11,13 @@ function getRedisConnection() {
   } catch { return { host: 'localhost', port: 6379 } }
 }
 
-// ─── Inbox Worker ─────────────────────────────────────────────────────────────
-// Cria contato e conversa de forma assíncrona após envio
-// - Upsert em tudo → sem race condition com 50+ paralelos
-// - BullMQ gerencia retry com backoff exponencial (2s, 4s, 8s, 16s, 32s)
-// - Idempotente: pode rodar múltiplas vezes sem efeito colateral
 export function startInboxWorker(): Worker<InboxJob> {
   const worker = new Worker<InboxJob>('inbox_queue', async (job) => {
-    const { tenantId, channelId, phone, messageDbId, body } = job.data
+    const { tenantId, channelId, phone, messageDbId, body, campaignId } = job.data
     const cleanPhone = phone.replace(/^\+/, '')
     logger.info('InboxWorker: processing', { phone: cleanPhone, messageDbId, attempt: job.attemptsMade })
 
-    // ✅ Upsert contato — índice (tenant_id, phone) garante performance em alta escala
+    // Upsert contato
     const { data: contactResult, error: contactError } = await db.from('contacts')
       .upsert({ id: generateId(), tenant_id: tenantId, phone: cleanPhone, name: cleanPhone, origin: 'campaign', status: 'active' }, { onConflict: 'tenant_id,phone', ignoreDuplicates: false })
       .select('id').single()
@@ -36,9 +31,20 @@ export function startInboxWorker(): Worker<InboxJob> {
       resolvedContactId = contactResult.id
     }
 
-    // ✅ Upsert conversa
+    // Upsert conversa — agora com campaign_id
     const { data: convResult, error: convError } = await db.from('conversations')
-      .upsert({ id: generateId(), tenant_id: tenantId, contact_id: resolvedContactId, channel_id: channelId, channel_type: 'gupshup', status: 'open', pipeline_stage: 'lead', last_message: body, last_message_at: new Date() }, { onConflict: 'tenant_id,contact_id,channel_id', ignoreDuplicates: false })
+      .upsert({
+        id: generateId(),
+        tenant_id: tenantId,
+        contact_id: resolvedContactId,
+        channel_id: channelId,
+        channel_type: 'gupshup',
+        status: 'open',
+        pipeline_stage: 'lead',
+        last_message: body,
+        last_message_at: new Date(),
+        campaign_id: campaignId || null,
+      }, { onConflict: 'tenant_id,contact_id,channel_id', ignoreDuplicates: false })
       .select('id').single()
 
     let resolvedConversationId: string
@@ -46,17 +52,22 @@ export function startInboxWorker(): Worker<InboxJob> {
       const { data: existingConv } = await db.from('conversations').select('id').eq('tenant_id', tenantId).eq('contact_id', resolvedContactId).eq('channel_id', channelId).maybeSingle()
       if (!existingConv) throw new Error(`Failed to upsert conversation: ${convError?.message}`)
       resolvedConversationId = existingConv.id
+
+      // Atualiza campaign_id se a conversa já existia
+      if (campaignId) {
+        await db.from('conversations').update({ campaign_id: campaignId }).eq('id', resolvedConversationId)
+      }
     } else {
       resolvedConversationId = convResult.id
     }
 
-    // ✅ Atualiza mensagem — idempotente (WHERE conversation_id IS NULL)
+    // Atualiza mensagem
     await db.from('messages').update({ contact_id: resolvedContactId, conversation_id: resolvedConversationId })
       .eq('id', messageDbId).is('conversation_id', null)
 
     await db.from('conversations').update({ last_message: body, last_message_at: new Date() }).eq('id', resolvedConversationId)
 
-    logger.info('InboxWorker: completed', { phone: cleanPhone, contactId: resolvedContactId, conversationId: resolvedConversationId })
+    logger.info('InboxWorker: completed', { phone: cleanPhone, contactId: resolvedContactId, conversationId: resolvedConversationId, campaignId })
   },
   { connection: getRedisConnection(), concurrency: 20 })
 
