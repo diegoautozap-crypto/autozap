@@ -15,6 +15,7 @@ const automationSchema = z.object({
   action_type: z.enum(['send_message', 'assign_agent', 'add_tag', 'move_pipeline']),
   action_value: z.record(z.any()).optional().default({}),
   is_active: z.boolean().optional().default(true),
+  cooldown_minutes: z.number().nullable().optional(),
 })
 
 // GET /automations
@@ -33,13 +34,14 @@ router.get('/automations', async (req, res, next) => {
 // POST /automations
 router.post('/automations', validate(automationSchema), async (req, res, next) => {
   try {
-    const { name, channelId, trigger_type, trigger_value, action_type, action_value, is_active } = req.body
+    const { name, channelId, trigger_type, trigger_value, action_type, action_value, is_active, cooldown_minutes } = req.body
     const { data, error } = await db
       .from('automations')
       .insert({
         tenant_id: req.auth.tid,
         channel_id: channelId || null,
         name, trigger_type, trigger_value, action_type, action_value, is_active,
+        cooldown_minutes: cooldown_minutes ?? null,
       })
       .select()
       .single()
@@ -52,13 +54,12 @@ router.post('/automations', validate(automationSchema), async (req, res, next) =
 router.patch('/automations/:id', async (req, res, next) => {
   try {
     const update: any = {}
-    const allowed = ['name', 'channel_id', 'trigger_type', 'trigger_value', 'action_type', 'action_value', 'is_active']
+    const allowed = ['name', 'channel_id', 'trigger_type', 'trigger_value', 'action_type', 'action_value', 'is_active', 'cooldown_minutes']
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key]
     }
-    // handle channelId -> channel_id
     if (req.body.channelId !== undefined) update.channel_id = req.body.channelId || null
-
+    if (req.body.cooldown_minutes !== undefined) update.cooldown_minutes = req.body.cooldown_minutes ?? null
     update.updated_at = new Date()
     const { data, error } = await db
       .from('automations')
