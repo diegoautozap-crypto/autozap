@@ -64,33 +64,40 @@ async function checkPlanLimit(tenantId: string): Promise<boolean> {
 interface ParsedCurl { apiKey: string; bodyTemplate: string; messagesPerMin?: number }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
+  // Junta linhas quebradas com \
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
 
-  // Tenta pegar body de -d '...' (aspas simples)
-  const singleQ = curlStr.match(/-d\s+'([^']+)'/)
-  // Tenta pegar body de -d "..." (aspas duplas)
-  const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
-  // Tenta pegar campos --data-urlencode "campo=valor"
-  const dataUrlencodeMatches = [...curlStr.matchAll(/--data-urlencode\s+['"]([^'"]+)['"]/g)]
-
   let bodyTemplate = ''
+
+  // Caso 1: -d 'body' aspas simples
+  const singleQ = curlStr.match(/-d\s+'([^']+)'/)
+  // Caso 2: -d "body" aspas duplas
+  const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
 
   if (singleQ) {
     bodyTemplate = singleQ[1]
   } else if (doubleQ) {
     bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
-  } else if (dataUrlencodeMatches.length > 0) {
-    // --data-urlencode — monta body codificando cada campo
-    const fields = dataUrlencodeMatches.map(m => {
-      const raw = m[1]
+  } else if (curlStr.includes('--data-urlencode')) {
+    // Caso 3: --data-urlencode "campo=valor"
+    // Percorre a string campo a campo para suportar valores com aspas internas (ex: JSON no campo template)
+    const fields: string[] = []
+    let remaining = curlStr
+    const fieldRegex = /--data-urlencode\s+"((?:[^"\\]|\\.)*)"/g
+    let m: RegExpExecArray | null
+    while ((m = fieldRegex.exec(curlStr)) !== null) {
+      const raw = m[1].replace(/\\"/g, '"')
       const eqIdx = raw.indexOf('=')
-      if (eqIdx === -1) return encodeURIComponent(raw)
-      const key = raw.slice(0, eqIdx)
-      const val = raw.slice(eqIdx + 1)
-      return `${encodeURIComponent(key)}=${encodeURIComponent(val)}`
-    })
-    bodyTemplate = fields.join('&')
+      if (eqIdx === -1) {
+        fields.push(encodeURIComponent(raw))
+      } else {
+        const key = raw.slice(0, eqIdx)
+        const val = raw.slice(eqIdx + 1)
+        fields.push(encodeURIComponent(key) + '=' + encodeURIComponent(val))
+      }
+    }
+    if (fields.length > 0) bodyTemplate = fields.join('&')
   }
 
   // Normaliza placeholder do número — aceita qualquer variante
