@@ -85,6 +85,8 @@ export default function AutomationsPage() {
         action_type: form.action_type,
         action_value: form.action_type === 'send_message'
           ? { message: form.action_value.message, delay: form.action_value.delay }
+          : form.action_type === 'assign_agent'
+          ? { message: form.action_value.message, delay: form.action_value.delay }
           : form.action_type === 'move_pipeline'
           ? { stage: form.action_value.stage }
           : {},
