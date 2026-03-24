@@ -215,7 +215,7 @@ export default function TemplatesPage() {
               value={form.body}
               onChange={e => setForm({ ...form, body: e.target.value })}
             />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{'}'1{'}}'}}, {'{{'}'2{'}}'}}, etc. para marcar as variáveis</p>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{1}}'}, {'{{2}}'}, etc. para marcar as variáveis</p>
           </div>
 
           <div style={{ marginBottom: '18px' }}>
