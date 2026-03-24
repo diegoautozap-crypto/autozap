@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth, validate } from '../middleware/message.middleware'
-import { ok, AppError, generateId } from '@autozap/utils'
+import { ok, AppError } from '@autozap/utils'
 import { db } from '../lib/db'
 
 const router = Router()
@@ -74,7 +74,7 @@ router.post('/flows', validate(flowSchema), async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /flows/:id — retorna flow completo com nodes e edges
+// GET /flows/:id
 router.get('/flows/:id', async (req, res, next) => {
   try {
     const { data: flow, error } = await db
@@ -99,7 +99,7 @@ router.get('/flows/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /flows/:id — atualiza metadados
+// PATCH /flows/:id
 router.patch('/flows/:id', async (req, res, next) => {
   try {
     const update: any = {}
@@ -122,24 +122,32 @@ router.patch('/flows/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PUT /flows/:id/graph — salva nodes + edges (replace completo)
+// PUT /flows/:id/graph
 router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => {
   try {
     const { nodes, edges } = req.body
 
-    // Verifica que o flow pertence ao tenant
+    console.log('[FLOW GRAPH] saving', { flowId: req.params.id, nodeCount: nodes.length, edgeCount: edges.length })
+
     const { data: flow, error: flowError } = await db
       .from('flows')
       .select('id')
       .eq('id', req.params.id)
       .eq('tenant_id', req.auth.tid)
       .single()
-    if (flowError || !flow) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
 
-    // Deleta nodes e edges anteriores (cascade deleta edges automaticamente)
-    await db.from('flow_nodes').delete().eq('flow_id', req.params.id)
+    if (flowError || !flow) {
+      console.error('[FLOW GRAPH] flow not found', flowError)
+      throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
+    }
 
-    // Insere novos nodes
+    // Deleta edges primeiro, depois nodes
+    const { error: delEdgesError } = await db.from('flow_edges').delete().eq('flow_id', req.params.id)
+    if (delEdgesError) console.error('[FLOW GRAPH] delete edges error', delEdgesError)
+
+    const { error: delNodesError } = await db.from('flow_nodes').delete().eq('flow_id', req.params.id)
+    if (delNodesError) console.error('[FLOW GRAPH] delete nodes error', delNodesError)
+
     if (nodes.length > 0) {
       const nodeRows = nodes.map((n: any) => ({
         id: n.id,
@@ -150,11 +158,14 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
         position_y: n.position_y,
         data: n.data || {},
       }))
+      console.log('[FLOW GRAPH] inserting nodes', nodeRows.map((n: any) => n.id))
       const { error: nodesError } = await db.from('flow_nodes').insert(nodeRows)
-      if (nodesError) throw new AppError('DB_ERROR', nodesError.message, 500)
+      if (nodesError) {
+        console.error('[FLOW GRAPH] nodes insert error', nodesError)
+        throw new AppError('DB_ERROR', nodesError.message, 500)
+      }
     }
 
-    // Insere novas edges
     if (edges.length > 0) {
       const edgeRows = edges.map((e: any) => ({
         id: e.id,
@@ -163,15 +174,22 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
         target_node: e.target_node,
         source_handle: e.source_handle || null,
       }))
+      console.log('[FLOW GRAPH] inserting edges', edgeRows.map((e: any) => e.id))
       const { error: edgesError } = await db.from('flow_edges').insert(edgeRows)
-      if (edgesError) throw new AppError('DB_ERROR', edgesError.message, 500)
+      if (edgesError) {
+        console.error('[FLOW GRAPH] edges insert error', edgesError)
+        throw new AppError('DB_ERROR', edgesError.message, 500)
+      }
     }
 
-    // Atualiza updated_at do flow
     await db.from('flows').update({ updated_at: new Date() }).eq('id', req.params.id)
 
+    console.log('[FLOW GRAPH] saved successfully')
     res.json(ok({ message: 'Grafo salvo com sucesso' }))
-  } catch (err) { next(err) }
+  } catch (err) {
+    console.error('[FLOW GRAPH] unexpected error', err)
+    next(err)
+  }
 })
 
 // DELETE /flows/:id
