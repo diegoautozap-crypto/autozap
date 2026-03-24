@@ -5,6 +5,7 @@ import { campaignQueue } from '../workers/campaign.worker'
 import { requireAuth, requireRole, validate } from '../middleware/campaign.middleware'
 import { ok, paginationSchema, AppError } from '@autozap/utils'
 import { db } from '../lib/db'
+import { decryptCredentials } from '../lib/crypto'
 
 const router = Router()
 router.use(requireAuth)
@@ -132,7 +133,8 @@ router.post('/campaigns', requireRole('admin', 'owner'), validate(createCampaign
 
     if (!channel) throw new AppError('NOT_FOUND', 'Canal não encontrado', 404)
 
-    const { apiKey, source, srcName } = channel.credentials
+    // Decripta credenciais antes de usar
+    const { apiKey, source, srcName } = decryptCredentials(channel.credentials)
 
     // Se veio templateId, busca template e monta cURL automaticamente
     if (templateId && !curlTemplate) {
@@ -145,7 +147,6 @@ router.post('/campaigns', requireRole('admin', 'owner'), validate(createCampaign
 
       if (!tmpl) throw new AppError('NOT_FOUND', 'Template não encontrado', 404)
 
-      // Monta os params dinamicamente com os placeholders {{1}}, {{2}}, etc
       const params = (tmpl.variables || []).map((_: any, i: number) => `{{${i + 1}}}`)
       const templateParam = JSON.stringify({ id: tmpl.template_id, params })
 
