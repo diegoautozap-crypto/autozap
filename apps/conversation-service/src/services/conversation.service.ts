@@ -16,8 +16,6 @@ export interface ConversationFilter {
 
 export class ConversationService {
 
-  // ── List conversations ───────────────────────────────────────────────────
-
   async listConversations(tenantId: string, filter: ConversationFilter = {}) {
     const { status, assignedTo, channelId, page = 1, limit = 30 } = filter
     const offset = (page - 1) * limit
@@ -47,8 +45,6 @@ export class ConversationService {
     }
   }
 
-  // ── Get conversation ─────────────────────────────────────────────────────
-
   async getConversation(conversationId: string, tenantId: string) {
     const { data, error } = await db
       .from('conversations')
@@ -66,8 +62,6 @@ export class ConversationService {
     return data
   }
 
-  // ── Update status ─────────────────────────────────────────────────────────
-
   async updateStatus(conversationId: string, tenantId: string, status: ConversationStatus) {
     const { data, error } = await db
       .from('conversations')
@@ -82,8 +76,6 @@ export class ConversationService {
     return data
   }
 
-  // ── Assign to agent ───────────────────────────────────────────────────────
-
   async assignConversation(conversationId: string, tenantId: string, userId: string | null) {
     const { data, error } = await db
       .from('conversations')
@@ -96,8 +88,6 @@ export class ConversationService {
     if (error || !data) throw new NotFoundError('Conversation')
     return data
   }
-
-  // ── Update pipeline stage ─────────────────────────────────────────────────
 
   async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage) {
     const { data, error } = await db
@@ -112,8 +102,6 @@ export class ConversationService {
     return data
   }
 
-  // ── Mark as read ──────────────────────────────────────────────────────────
-
   async markAsRead(conversationId: string, tenantId: string) {
     await db
       .from('conversations')
@@ -121,8 +109,6 @@ export class ConversationService {
       .eq('id', conversationId)
       .eq('tenant_id', tenantId)
   }
-
-  // ── Get messages in conversation ──────────────────────────────────────────
 
   async getMessages(conversationId: string, tenantId: string, cursor?: string, limit = 30) {
     let query = db
@@ -138,37 +124,39 @@ export class ConversationService {
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    return (data || []).reverse() // Return chronological order
+    return (data || []).reverse()
   }
 
-  // ── Get pipeline board ────────────────────────────────────────────────────
-
-  async getPipelineBoard(tenantId: string) {
+  // ─── Pipeline board com filtros ───────────────────────────────────────────
+  async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string) {
     const stages: PipelineStage[] = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
-    const { data, error } = await db
+    let query = db
       .from('conversations')
       .select(`
-        id, pipeline_stage, last_message, last_message_at, unread_count,
-        contacts(id, name, phone, avatar_url)
+        id, pipeline_stage, last_message, last_message_at, unread_count, channel_id, campaign_id,
+        contacts(id, name, phone, avatar_url),
+        channels(id, name)
       `)
       .eq('tenant_id', tenantId)
       .in('status', ['open', 'waiting'])
       .order('last_message_at', { ascending: false })
 
+    if (channelId) query = query.eq('channel_id', channelId)
+    if (campaignId) query = query.eq('campaign_id', campaignId)
+
+    const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Group by stage
     const board: Record<string, any[]> = {}
     stages.forEach(s => board[s] = [])
     ;(data || []).forEach((conv: any) => {
-      if (board[conv.pipeline_stage]) board[conv.pipeline_stage].push(conv)
+      const stage = conv.pipeline_stage || 'lead'
+      if (board[stage]) board[stage].push(conv)
     })
 
     return board
   }
-
-  // ── Search conversations ──────────────────────────────────────────────────
 
   async searchConversations(tenantId: string, search: string) {
     const { data } = await db

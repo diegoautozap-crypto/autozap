@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, channelApi } from '@/lib/api'
+import { conversationApi, channelApi, campaignApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Loader2, MessageSquare, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -33,9 +33,12 @@ export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [channelFilter, setChannelFilter] = useState('all')
+  const [campaignFilter, setCampaignFilter] = useState('all')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
-  const [localBoard, setLocalBoard] = useState<Record<string, any[]> | null>(null)
+  // Ref para board local otimista — não causa re-render
+  const localBoardRef = useRef<Record<string, any[]> | null>(null)
+  const [, forceRender] = useState(0)
 
   const { data: channels = [] } = useQuery({
     queryKey: ['channels'],
@@ -45,20 +48,33 @@ export default function PipelinePage() {
     },
   })
 
-  const { data: board, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['pipeline-board', channelFilter],
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns-list'],
     queryFn: async () => {
-      let url = '/conversations/pipeline'
-      if (channelFilter !== 'all') url += `?channelId=${channelFilter}`
-      const { data } = await conversationApi.get(url)
-      return data.data as Record<string, any[]>
+      const { data } = await campaignApi.get('/campaigns?limit=100')
+      return data.data || []
     },
-    staleTime: 30000,
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
   })
 
-  const displayBoard = localBoard ?? board
+  const { data: board, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['pipeline-board', channelFilter, campaignFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (channelFilter !== 'all') params.set('channelId', channelFilter)
+      if (campaignFilter !== 'all') params.set('campaignId', campaignFilter)
+      const url = `/conversations/pipeline${params.toString() ? '?' + params.toString() : ''}`
+      const { data } = await conversationApi.get(url)
+      // Quando dados chegam do servidor, limpa o board local
+      localBoardRef.current = null
+      return data.data as Record<string, any[]>
+    },
+    staleTime: 15000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
+    placeholderData: (prev) => prev, // mantém dados anteriores durante refetch — sem piscar
+  })
+
+  const displayBoard = localBoardRef.current ?? board
 
   const totalConvs = displayBoard
     ? Object.values(displayBoard).reduce((acc, arr) => acc + arr.length, 0)
@@ -69,11 +85,12 @@ export default function PipelinePage() {
       await conversationApi.patch(`/conversations/${id}/pipeline`, { stage })
     },
     onSuccess: () => {
-      setLocalBoard(null)
+      localBoardRef.current = null
       queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
     },
     onError: () => {
-      setLocalBoard(null)
+      localBoardRef.current = null
+      forceRender(n => n + 1)
       toast.error('Erro ao mover conversa')
     },
   })
@@ -104,11 +121,17 @@ export default function PipelinePage() {
       setDraggingId(null); setOverStage(null); return
     }
 
-    // Atualização otimista
-    const newBoard = { ...displayBoard }
-    newBoard[sourceStage] = newBoard[sourceStage].filter((c: any) => c.id !== draggingId)
-    newBoard[targetStage] = [{ ...movedConv, pipeline_stage: targetStage }, ...newBoard[targetStage]]
-    setLocalBoard(newBoard)
+    // Atualização otimista via ref — sem re-render do React Query
+    const newBoard: Record<string, any[]> = {}
+    for (const [s, cards] of Object.entries(displayBoard)) {
+      newBoard[s] = s === sourceStage
+        ? cards.filter((c: any) => c.id !== draggingId)
+        : s === targetStage
+        ? [{ ...movedConv, pipeline_stage: targetStage }, ...cards]
+        : [...cards]
+    }
+    localBoardRef.current = newBoard
+    forceRender(n => n + 1)
 
     moveMutation.mutate({ id: draggingId, stage: targetStage })
     setDraggingId(null)
@@ -124,29 +147,28 @@ export default function PipelinePage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
       {/* Header */}
-      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Pipeline</h1>
-            <p style={{ color: '#6b7280', fontSize: '13px', marginTop: '2px' }}>
-              {totalConvs} conversas abertas
-            </p>
+            <p style={{ color: '#6b7280', fontSize: '13px', marginTop: '2px' }}>{totalConvs} conversas abertas</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
-              <select
-                value={channelFilter}
-                onChange={e => { setChannelFilter(e.target.value); setLocalBoard(null) }}
+              <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }}
                 style={{ padding: '7px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todos os canais</option>
-                {(channels as any[]).map((ch: any) => (
-                  <option key={ch.id} value={ch.id}>{ch.name}</option>
-                ))}
+                {(channels as any[]).map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             )}
-            <button
-              onClick={() => { setLocalBoard(null); refetch() }}
-              disabled={isFetching}
+            {(campaigns as any[]).length > 0 && (
+              <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }}
+                style={{ padding: '7px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
+                <option value="all">Todas as campanhas</option>
+                {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+            <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
@@ -169,20 +191,15 @@ export default function PipelinePage() {
               const cards = displayBoard?.[stage.key] || []
               const isOver = overStage === stage.key
               return (
-                <div
-                  key={stage.key}
+                <div key={stage.key}
                   onDragOver={e => handleDragOver(e, stage.key)}
                   onDrop={e => handleDrop(e, stage.key)}
                   onDragLeave={() => setOverStage(null)}
                   style={{
-                    width: '240px',
-                    flexShrink: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
+                    width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column',
                     background: isOver ? stage.bg : '#f6f8fa',
                     border: `2px solid ${isOver ? stage.color : '#e5e7eb'}`,
-                    borderRadius: '12px',
-                    overflow: 'hidden',
+                    borderRadius: '12px', overflow: 'hidden',
                     transition: 'border-color 0.15s, background 0.15s',
                   }}>
 
@@ -204,61 +221,54 @@ export default function PipelinePage() {
                         <MessageSquare size={20} color="#d1d5db" style={{ margin: '0 auto 6px' }} />
                         <p style={{ fontSize: '12px', color: '#d1d5db' }}>Sem conversas</p>
                       </div>
-                    ) : (
-                      cards.map((conv: any) => {
-                        const name = conv.contacts?.name || conv.contacts?.phone || '??'
-                        const av = getAvatarColor(name)
-                        const isDragging = draggingId === conv.id
-                        return (
-                          <div
-                            key={conv.id}
-                            draggable
-                            onDragStart={e => handleDragStart(e, conv.id)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => router.push('/dashboard/inbox')}
-                            style={{
-                              background: '#fff',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '9px',
-                              padding: '11px 12px',
-                              cursor: 'grab',
-                              opacity: isDragging ? 0.4 : 1,
-                              boxShadow: isDragging ? 'none' : '0 1px 3px rgba(0,0,0,.06)',
-                              transition: 'opacity 0.15s, box-shadow 0.15s',
-                              userSelect: 'none',
-                            }}
-                            onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.1)' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.06)' }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
-                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
-                                {getInitials(name)}
-                              </div>
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {name}
-                              </span>
+                    ) : cards.map((conv: any) => {
+                      const name = conv.contacts?.name || conv.contacts?.phone || '??'
+                      const av = getAvatarColor(name)
+                      const isDragging = draggingId === conv.id
+                      return (
+                        <div key={conv.id} draggable
+                          onDragStart={e => handleDragStart(e, conv.id)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => router.push('/dashboard/inbox')}
+                          style={{
+                            background: '#fff', border: '1px solid #e5e7eb', borderRadius: '9px',
+                            padding: '11px 12px', cursor: 'grab',
+                            opacity: isDragging ? 0.4 : 1,
+                            boxShadow: isDragging ? 'none' : '0 1px 3px rgba(0,0,0,.06)',
+                            transition: 'opacity 0.15s, box-shadow 0.15s',
+                            userSelect: 'none',
+                          }}
+                          onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.1)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.06)' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
+                              {getInitials(name)}
                             </div>
-                            {conv.last_message && (
-                              <p style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '7px' }}>
-                                {conv.last_message}
-                              </p>
-                            )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              {conv.last_message_at && (
-                                <span style={{ fontSize: '10px', color: '#d1d5db' }}>
-                                  {new Date(conv.last_message_at).toLocaleDateString('pt-BR')}
-                                </span>
-                              )}
-                              {conv.unread_count > 0 && (
-                                <span style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px' }}>
-                                  {conv.unread_count}
-                                </span>
-                              )}
-                            </div>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {name}
+                            </span>
                           </div>
-                        )
-                      })
-                    )}
+                          {conv.last_message && (
+                            <p style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '7px' }}>
+                              {conv.last_message}
+                            </p>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {conv.channels?.name && (
+                              <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px' }}>
+                                {conv.channels.name}
+                              </span>
+                            )}
+                            {conv.unread_count > 0 && (
+                              <span style={{ background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', marginLeft: 'auto' }}>
+                                {conv.unread_count}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
