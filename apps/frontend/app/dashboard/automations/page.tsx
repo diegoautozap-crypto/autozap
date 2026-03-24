@@ -46,6 +46,7 @@ function emptyForm() {
     trigger_value: { keywords: '', start: 9, end: 18, days: [1,2,3,4,5] },
     action_type: 'send_message',
     action_value: { message: '', delay: 0, stage: 'lead' },
+    cooldown_minutes: null as number | null,
   }
 }
 
@@ -92,6 +93,7 @@ export default function AutomationsPage() {
           : form.action_type === 'move_pipeline'
           ? { stage: form.action_value.stage }
           : {},
+        cooldown_minutes: form.cooldown_minutes,
       }
       if (editingId) {
         await messageApi.patch(`/automations/${editingId}`, payload)
@@ -146,6 +148,7 @@ export default function AutomationsPage() {
         delay: a.action_value?.delay || 0,
         stage: a.action_value?.stage || 'lead',
       },
+      cooldown_minutes: a.cooldown_minutes ?? null,
     })
     setShowForm(true)
   }
@@ -309,6 +312,27 @@ export default function AutomationsPage() {
                 </select>
               </div>
             )}
+          </div>
+
+          {/* Cooldown */}
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⏱ Frequência — quantas vezes disparar</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {[
+                { label: 'Sempre', desc: 'Toda vez que a condição for atendida', value: null },
+                { label: '24 horas', desc: 'Máximo 1x por dia por contato', value: 1440 },
+                { label: '7 dias', desc: 'Máximo 1x por semana por contato', value: 10080 },
+                { label: '15 dias', desc: 'Máximo 1x a cada 15 dias por contato', value: 21600 },
+                { label: '30 dias', desc: 'Máximo 1x por mês por contato', value: 43200 },
+                { label: 'Nunca mais', desc: 'Dispara apenas 1 vez por contato', value: 0 },
+              ].map(opt => (
+                <div key={String(opt.value)} onClick={() => setForm({ ...form, cooldown_minutes: opt.value })}
+                  style={{ border: `2px solid ${form.cooldown_minutes === opt.value ? '#16a34a' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', background: form.cooldown_minutes === opt.value ? '#f0fdf4' : '#fff' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: form.cooldown_minutes === opt.value ? '#15803d' : '#111827', marginBottom: '3px' }}>{opt.label}</p>
+                  <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>{opt.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>

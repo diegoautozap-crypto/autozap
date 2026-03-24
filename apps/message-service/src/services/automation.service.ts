@@ -33,6 +33,12 @@ export class AutomationService {
       for (const automation of automations) {
         const matches = await this.checkTrigger(automation, ctx)
         if (matches) {
+          // Verifica cooldown antes de executar
+          const canRun = await this.checkCooldown(automation, ctx)
+          if (!canRun) {
+            logger.info('Automation skipped — cooldown active', { automationId: automation.id, contactId: ctx.contactId })
+            continue
+          }
           await this.executeAction(automation, ctx)
           break
         }
@@ -129,6 +135,33 @@ export class AutomationService {
       default:
         logger.warn('Unknown action type', { actionType: action_type })
     }
+  }
+
+  private async checkCooldown(automation: any, ctx: AutomationContext): Promise<boolean> {
+    const cooldown = automation.cooldown_minutes // null = sem cooldown, 0 = nunca mais, >0 = minutos
+
+    if (cooldown === null || cooldown === undefined) return true // sem cooldown configurado
+    if (cooldown === 0) {
+      // Nunca mais — verifica se já executou alguma vez
+      const { count } = await db
+        .from('automation_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('automation_id', automation.id)
+        .eq('contact_id', ctx.contactId)
+        .eq('status', 'success')
+      return (count || 0) === 0
+    }
+
+    // Cooldown em minutos — verifica se executou recentemente
+    const since = new Date(Date.now() - cooldown * 60 * 1000).toISOString()
+    const { count } = await db
+      .from('automation_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('automation_id', automation.id)
+      .eq('contact_id', ctx.contactId)
+      .eq('status', 'success')
+      .gte('created_at', since)
+    return (count || 0) === 0
   }
 
   private interpolate(template: string, ctx: AutomationContext): string {
