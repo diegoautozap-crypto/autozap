@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd'
 import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Zap, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
+import { Zap, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react'
 
 const TRIGGER_TYPES = [
   { value: 'keyword', label: 'Palavra-chave recebida', desc: 'Dispara quando a mensagem contém uma palavra específica' },
@@ -54,6 +55,8 @@ export default function AutomationsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm())
+  // Lista local para atualização otimista durante o drag
+  const [localList, setLocalList] = useState<any[] | null>(null)
   const queryClient = useQueryClient()
 
   const { data: automations, isLoading } = useQuery({
@@ -63,6 +66,9 @@ export default function AutomationsPage() {
       return data.data || []
     },
   })
+
+  // Lista que a UI renderiza: usa versão local (durante drag) ou do servidor
+  const displayList: any[] = localList ?? automations ?? []
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
@@ -103,6 +109,7 @@ export default function AutomationsPage() {
     },
     onSuccess: () => {
       toast.success(editingId ? 'Automação atualizada!' : 'Automação criada!')
+      setLocalList(null)
       queryClient.invalidateQueries({ queryKey: ['automations'] })
       setShowForm(false)
       setEditingId(null)
@@ -125,10 +132,40 @@ export default function AutomationsPage() {
     },
     onSuccess: () => {
       toast.success('Automação excluída!')
+      setLocalList(null)
       queryClient.invalidateQueries({ queryKey: ['automations'] })
     },
     onError: () => toast.error('Erro ao excluir'),
   })
+
+  const reorderMutation = useMutation({
+    mutationFn: async (order: { id: string; sort_order: number }[]) => {
+      await messageApi.patch('/automations/reorder', { order })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automations'] })
+    },
+    onError: () => {
+      // Reverte para lista do servidor em caso de erro
+      setLocalList(null)
+      toast.error('Erro ao salvar nova ordem. Revertendo.')
+    },
+  })
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return
+    if (result.source.index === result.destination.index) return
+
+    const reordered = Array.from(displayList)
+    const [moved] = reordered.splice(result.source.index, 1)
+    reordered.splice(result.destination.index, 0, moved)
+
+    // Atualização otimista: aplica visualmente antes da resposta do servidor
+    setLocalList(reordered)
+
+    const order = reordered.map((a, index) => ({ id: a.id, sort_order: index }))
+    reorderMutation.mutate(order)
+  }
 
   const startEdit = (a: any) => {
     setEditingId(a.id)
@@ -354,54 +391,128 @@ export default function AutomationsPage() {
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
         </div>
-      ) : !automations?.length ? (
+      ) : !displayList.length ? (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '80px', textAlign: 'center' }}>
           <Zap size={36} color="#d1d5db" style={{ margin: '0 auto 12px' }} />
           <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>Nenhuma automação criada</p>
           <p style={{ color: '#d1d5db', fontSize: '12px' }}>Crie sua primeira automação para responder mensagens automaticamente</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {automations.map((a: any) => (
-            <div key={a.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: a.is_active ? '#f0fdf4' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Zap size={16} color={a.is_active ? '#16a34a' : '#d1d5db'} fill={a.is_active ? '#16a34a' : 'none'} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{a.name}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '99px', background: a.is_active ? '#dcfce7' : '#f3f4f6', color: a.is_active ? '#15803d' : '#9ca3af' }}>
-                    {a.is_active ? 'Ativa' : 'Pausada'}
-                  </span>
+        <>
+          {/* Hint de arrastar — só aparece quando há mais de 1 item */}
+          {displayList.length > 1 && (
+            <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <GripVertical size={12} /> Arraste para definir a ordem de execução. A primeira automação que bater é executada.
+            </p>
+          )}
+
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="automations-list">
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+                >
+                  {displayList.map((a: any, index: number) => (
+                    <Draggable key={a.id} draggableId={a.id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          style={{
+                            background: '#fff',
+                            border: `1px solid ${snapshot.isDragging ? '#16a34a' : '#e5e7eb'}`,
+                            borderRadius: '12px',
+                            padding: '16px 20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,.12)' : 'none',
+                            opacity: reorderMutation.isPending ? 0.7 : 1,
+                            transition: 'box-shadow 0.15s, border-color 0.15s',
+                            ...provided.draggableProps.style,
+                          }}
+                        >
+                          {/* Handle de drag */}
+                          <div
+                            {...provided.dragHandleProps}
+                            title="Arraste para reordenar"
+                            style={{
+                              cursor: 'grab',
+                              color: snapshot.isDragging ? '#16a34a' : '#d1d5db',
+                              display: 'flex',
+                              alignItems: 'center',
+                              flexShrink: 0,
+                              padding: '2px',
+                              borderRadius: '4px',
+                              transition: 'color 0.15s',
+                            }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.color = '#9ca3af' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.color = snapshot.isDragging ? '#16a34a' : '#d1d5db' }}
+                          >
+                            <GripVertical size={16} />
+                          </div>
+
+                          {/* Badge de índice */}
+                          <div style={{
+                            width: '22px', height: '22px', borderRadius: '50%',
+                            background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '11px', fontWeight: 700, color: '#6b7280', flexShrink: 0,
+                          }}>
+                            {index + 1}
+                          </div>
+
+                          {/* Ícone de status */}
+                          <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: a.is_active ? '#f0fdf4' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Zap size={16} color={a.is_active ? '#16a34a' : '#d1d5db'} fill={a.is_active ? '#16a34a' : 'none'} />
+                          </div>
+
+                          {/* Conteúdo */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{a.name}</span>
+                              <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '99px', background: a.is_active ? '#dcfce7' : '#f3f4f6', color: a.is_active ? '#15803d' : '#9ca3af' }}>
+                                {a.is_active ? 'Ativa' : 'Pausada'}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                              <span style={{ color: '#374151', fontWeight: 500 }}>Se: </span>{triggerLabel(a)}
+                              <span style={{ color: '#d1d5db', margin: '0 6px' }}>→</span>
+                              <span style={{ color: '#374151', fontWeight: 500 }}>Então: </span>{actionLabel(a)}
+                            </p>
+                          </div>
+
+                          {/* Ações */}
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button onClick={() => toggleMutation.mutate({ id: a.id, isActive: a.is_active })}
+                              title={a.is_active ? 'Pausar' : 'Ativar'}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: a.is_active ? '#16a34a' : '#d1d5db' }}>
+                              {a.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+                            </button>
+                            <button onClick={() => startEdit(a)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => { if (confirm(`Excluir "${a.name}"?`)) deleteMutation.mutate(a.id) }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
                 </div>
-                <p style={{ fontSize: '12px', color: '#6b7280' }}>
-                  <span style={{ color: '#374151', fontWeight: 500 }}>Se: </span>{triggerLabel(a)}
-                  <span style={{ color: '#d1d5db', margin: '0 6px' }}>→</span>
-                  <span style={{ color: '#374151', fontWeight: 500 }}>Então: </span>{actionLabel(a)}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button onClick={() => toggleMutation.mutate({ id: a.id, isActive: a.is_active })}
-                  title={a.is_active ? 'Pausar' : 'Ativar'}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: a.is_active ? '#16a34a' : '#d1d5db' }}>
-                  {a.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-                </button>
-                <button onClick={() => startEdit(a)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
-                  <Pencil size={14} />
-                </button>
-                <button onClick={() => { if (confirm(`Excluir "${a.name}"?`)) deleteMutation.mutate(a.id) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </>
       )}
 
       <style>{`

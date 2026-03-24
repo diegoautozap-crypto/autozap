@@ -18,6 +18,13 @@ const automationSchema = z.object({
   cooldown_minutes: z.number().nullable().optional(),
 })
 
+const reorderSchema = z.object({
+  order: z.array(z.object({
+    id: z.string().uuid(),
+    sort_order: z.number().int().min(0),
+  })).min(1),
+})
+
 // GET /automations
 router.get('/automations', async (req, res, next) => {
   try {
@@ -25,7 +32,8 @@ router.get('/automations', async (req, res, next) => {
       .from('automations')
       .select('*')
       .eq('tenant_id', req.auth.tid)
-      .order('created_at', { ascending: false })
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     res.json(ok(data || []))
   } catch (err) { next(err) }
@@ -35,6 +43,18 @@ router.get('/automations', async (req, res, next) => {
 router.post('/automations', validate(automationSchema), async (req, res, next) => {
   try {
     const { name, channelId, trigger_type, trigger_value, action_type, action_value, is_active, cooldown_minutes } = req.body
+
+    // sort_order = maior existente + 1
+    const { data: last } = await db
+      .from('automations')
+      .select('sort_order')
+      .eq('tenant_id', req.auth.tid)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .single()
+
+    const nextOrder = last?.sort_order != null ? last.sort_order + 1 : 0
+
     const { data, error } = await db
       .from('automations')
       .insert({
@@ -42,11 +62,46 @@ router.post('/automations', validate(automationSchema), async (req, res, next) =
         channel_id: channelId || null,
         name, trigger_type, trigger_value, action_type, action_value, is_active,
         cooldown_minutes: cooldown_minutes ?? null,
+        sort_order: nextOrder,
       })
       .select()
       .single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// PATCH /automations/reorder  ← NOVO: salva nova ordem em batch
+router.patch('/automations/reorder', validate(reorderSchema), async (req, res, next) => {
+  try {
+    const { order } = req.body as { order: { id: string; sort_order: number }[] }
+
+    // Verifica que todos os IDs pertencem ao tenant antes de atualizar
+    const ids = order.map(o => o.id)
+    const { data: owned, error: checkError } = await db
+      .from('automations')
+      .select('id')
+      .eq('tenant_id', req.auth.tid)
+      .in('id', ids)
+
+    if (checkError) throw new AppError('DB_ERROR', checkError.message, 500)
+    if (!owned || owned.length !== ids.length) {
+      throw new AppError('FORBIDDEN', 'Uma ou mais automações não pertencem a este tenant', 403)
+    }
+
+    // Atualiza sort_order de cada item individualmente
+    // (Supabase não suporta bulk update nativo com valores diferentes por linha)
+    await Promise.all(
+      order.map(({ id, sort_order }) =>
+        db
+          .from('automations')
+          .update({ sort_order, updated_at: new Date() })
+          .eq('id', id)
+          .eq('tenant_id', req.auth.tid)
+      )
+    )
+
+    res.json(ok({ message: 'Ordem salva com sucesso' }))
   } catch (err) { next(err) }
 })
 
