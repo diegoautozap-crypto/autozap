@@ -11,6 +11,45 @@ function getRedisConnection() {
   } catch { return { host: 'localhost', port: 6379 } }
 }
 
+// Busca ou cria uma tag com o nome da campanha e retorna o id
+async function getOrCreateCampaignTag(tenantId: string, campaignId: string, campaignName: string): Promise<string | null> {
+  try {
+    // Verifica se já existe uma tag para essa campanha
+    const { data: existing } = await db
+      .from('tags')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('name', campaignName)
+      .maybeSingle()
+
+    if (existing) return existing.id
+
+    // Cria a tag com uma cor azul padrão para campanhas
+    const { data: created } = await db
+      .from('tags')
+      .insert({ id: generateId(), tenant_id: tenantId, name: campaignName, color: '#2563eb' })
+      .select('id')
+      .single()
+
+    return created?.id || null
+  } catch (err) {
+    logger.warn('Failed to get/create campaign tag', { campaignId, err })
+    return null
+  }
+}
+
+// Adiciona tag ao contato (idempotente)
+async function addTagToContact(contactId: string, tagId: string): Promise<void> {
+  try {
+    await db.from('contact_tags').upsert(
+      { contact_id: contactId, tag_id: tagId },
+      { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
+    )
+  } catch (err) {
+    logger.warn('Failed to add tag to contact', { contactId, tagId, err })
+  }
+}
+
 export function startInboxWorker(): Worker<InboxJob> {
   const worker = new Worker<InboxJob>('inbox_queue', async (job) => {
     const { tenantId, channelId, phone, messageDbId, body, campaignId } = job.data
@@ -31,7 +70,7 @@ export function startInboxWorker(): Worker<InboxJob> {
       resolvedContactId = contactResult.id
     }
 
-    // Upsert conversa — agora com campaign_id
+    // Upsert conversa com campaign_id
     const { data: convResult, error: convError } = await db.from('conversations')
       .upsert({
         id: generateId(),
@@ -66,6 +105,23 @@ export function startInboxWorker(): Worker<InboxJob> {
       .eq('id', messageDbId).is('conversation_id', null)
 
     await db.from('conversations').update({ last_message: body, last_message_at: new Date() }).eq('id', resolvedConversationId)
+
+    // Adiciona tag automática com o nome da campanha
+    if (campaignId) {
+      const { data: campaign } = await db
+        .from('campaigns')
+        .select('name')
+        .eq('id', campaignId)
+        .single()
+
+      if (campaign?.name) {
+        const tagId = await getOrCreateCampaignTag(tenantId, campaignId, campaign.name)
+        if (tagId) {
+          await addTagToContact(resolvedContactId, tagId)
+          logger.info('InboxWorker: campaign tag added', { contactId: resolvedContactId, tagId, campaignName: campaign.name })
+        }
+      }
+    }
 
     logger.info('InboxWorker: completed', { phone: cleanPhone, contactId: resolvedContactId, conversationId: resolvedConversationId, campaignId })
   },
