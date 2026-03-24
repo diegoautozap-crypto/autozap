@@ -1,0 +1,279 @@
+import { db } from '../lib/db'
+import { logger } from '../lib/logger'
+import { generateId } from '@autozap/utils'
+
+const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+
+interface FlowContext {
+  tenantId: string
+  channelId: string
+  contactId: string
+  conversationId: string
+  phone: string
+  messageBody: string
+  isFirstMessage: boolean
+}
+
+export class FlowEngine {
+
+  async processFlows(ctx: FlowContext): Promise<void> {
+    try {
+      // Busca todos os flows ativos do tenant para esse canal
+      const { data: flows } = await db
+        .from('flows')
+        .select('*')
+        .eq('tenant_id', ctx.tenantId)
+        .eq('is_active', true)
+        .or(`channel_id.eq.${ctx.channelId},channel_id.is.null`)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+
+      if (!flows || flows.length === 0) return
+
+      for (const flow of flows) {
+        const triggered = await this.checkFlowTrigger(flow, ctx)
+        if (triggered) {
+          logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
+          await this.executeFlow(flow, ctx)
+          break // primeira flow que bater executa e para
+        }
+      }
+    } catch (err) {
+      logger.error('Flow engine error', { err, tenantId: ctx.tenantId })
+    }
+  }
+
+  private async checkFlowTrigger(flow: any, ctx: FlowContext): Promise<boolean> {
+    // Busca o nó gatilho do flow (tipo começa com trigger_)
+    const { data: nodes } = await db
+      .from('flow_nodes')
+      .select('*')
+      .eq('flow_id', flow.id)
+
+    if (!nodes || nodes.length === 0) return false
+
+    const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
+    if (!triggerNode) return false
+
+    return this.evaluateTrigger(triggerNode, ctx)
+  }
+
+  private evaluateTrigger(node: any, ctx: FlowContext): boolean {
+    const { type, data } = node
+
+    switch (type) {
+      case 'trigger_keyword': {
+        const keywords: string[] = data?.keywords || []
+        if (keywords.length === 0) return false
+        const body = (ctx.messageBody || '').toLowerCase()
+        return keywords.some((kw: string) => body.includes(kw.toLowerCase().trim()))
+      }
+      case 'trigger_first_message': {
+        if (!ctx.isFirstMessage) return false
+        const keywords: string[] = data?.keywords || []
+        if (keywords.length === 0) return true
+        const body = (ctx.messageBody || '').toLowerCase()
+        return keywords.some((kw: string) => body.includes(kw.toLowerCase().trim()))
+      }
+      case 'trigger_outside_hours': {
+        const start = data?.start ?? 9
+        const end = data?.end ?? 18
+        const days = data?.days ?? [1, 2, 3, 4, 5]
+        const now = new Date()
+        const day = now.getDay()
+        const hour = now.getHours()
+        return !days.includes(day) || hour < start || hour >= end
+      }
+      default:
+        return false
+    }
+  }
+
+  private async executeFlow(flow: any, ctx: FlowContext): Promise<void> {
+    // Carrega todos os nós e edges do flow
+    const { data: nodes } = await db
+      .from('flow_nodes')
+      .select('*')
+      .eq('flow_id', flow.id)
+
+    const { data: edges } = await db
+      .from('flow_edges')
+      .select('*')
+      .eq('flow_id', flow.id)
+
+    if (!nodes || nodes.length === 0) return
+
+    // Monta mapa de nós e edges para navegação rápida
+    const nodeMap = new Map(nodes.map((n: any) => [n.id, n]))
+    const edgeMap = new Map<string, any[]>()
+    for (const edge of (edges || [])) {
+      const key = `${edge.source_node}:${edge.source_handle || 'success'}`
+      if (!edgeMap.has(key)) edgeMap.set(key, [])
+      edgeMap.get(key)!.push(edge)
+    }
+
+    // Começa pelo nó gatilho
+    const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
+    if (!triggerNode) return
+
+    // Percorre o grafo a partir do gatilho
+    let currentNode = this.getNextNode(triggerNode.id, 'success', edgeMap, nodeMap)
+    let stepCount = 0
+    const MAX_STEPS = 50 // proteção contra loop infinito
+
+    while (currentNode && stepCount < MAX_STEPS) {
+      stepCount++
+      const result = await this.executeNode(currentNode, ctx, flow.id)
+      const nextHandle = result.success ? 'success' : 'error'
+      currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
+    }
+
+    logger.info('Flow executed', { flowId: flow.id, steps: stepCount, tenantId: ctx.tenantId })
+  }
+
+  private getNextNode(nodeId: string, handle: string, edgeMap: Map<string, any[]>, nodeMap: Map<string, any>): any | null {
+    const key = `${nodeId}:${handle}`
+    const edges = edgeMap.get(key)
+    if (!edges || edges.length === 0) return null
+    const targetId = edges[0].target_node
+    return nodeMap.get(targetId) || null
+  }
+
+  private async executeNode(node: any, ctx: FlowContext, flowId: string): Promise<{ success: boolean }> {
+    const { type, data } = node
+
+    try {
+      logger.info('Executing flow node', { nodeId: node.id, type, flowId })
+
+      switch (type) {
+        case 'send_message': {
+          const message = this.interpolate(data?.message || '', ctx)
+          if (!message) break
+          const delay = data?.delay || 0
+          if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
+          await this.sendMessage({
+            tenantId: ctx.tenantId,
+            channelId: ctx.channelId,
+            contactId: ctx.contactId,
+            conversationId: ctx.conversationId,
+            to: ctx.phone,
+            body: message,
+          })
+          break
+        }
+
+        case 'wait': {
+          const seconds = data?.seconds || 0
+          const minutes = data?.minutes || 0
+          const hours = data?.hours || 0
+          const totalMs = (seconds + minutes * 60 + hours * 3600) * 1000
+          if (totalMs > 0 && totalMs <= 300000) { // máx 5 minutos de wait síncrono
+            await new Promise(r => setTimeout(r, totalMs))
+          }
+          break
+        }
+
+        case 'add_tag': {
+          const tagId = data?.tagId
+          if (!tagId) break
+          await db.from('contact_tags').upsert(
+            { contact_id: ctx.contactId, tag_id: tagId },
+            { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
+          )
+          break
+        }
+
+        case 'move_pipeline': {
+          const stage = data?.stage
+          if (!stage) break
+          await db.from('conversations')
+            .update({ pipeline_stage: stage })
+            .eq('id', ctx.conversationId)
+          break
+        }
+
+        case 'assign_agent': {
+          const notifyMessage = data?.message
+          if (notifyMessage) {
+            const message = this.interpolate(notifyMessage, ctx)
+            const delay = data?.delay || 0
+            if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
+            await this.sendMessage({
+              tenantId: ctx.tenantId,
+              channelId: ctx.channelId,
+              contactId: ctx.contactId,
+              conversationId: ctx.conversationId,
+              to: ctx.phone,
+              body: message,
+            })
+          }
+          break
+        }
+
+        default:
+          logger.warn('Unknown node type in flow engine', { type, nodeId: node.id })
+      }
+
+      await this.logNode(flowId, node.id, ctx, 'success', `Nó ${type} executado`)
+      return { success: true }
+
+    } catch (err: any) {
+      logger.error('Flow node error', { nodeId: node.id, type, err: err.message })
+      await this.logNode(flowId, node.id, ctx, 'error', err.message)
+      return { success: false }
+    }
+  }
+
+  private interpolate(template: string, ctx: FlowContext): string {
+    return template
+      .replace(/\{\{phone\}\}/gi, ctx.phone)
+      .replace(/\{\{telefone\}\}/gi, ctx.phone)
+  }
+
+  private async sendMessage(opts: {
+    tenantId: string; channelId: string; contactId: string
+    conversationId: string; to: string; body: string
+  }): Promise<void> {
+    const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': INTERNAL_SECRET,
+      },
+      body: JSON.stringify({
+        tenantId: opts.tenantId,
+        channelId: opts.channelId,
+        contactId: opts.contactId,
+        conversationId: opts.conversationId,
+        to: opts.to,
+        contentType: 'text',
+        body: opts.body,
+      }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(`Failed to send flow message: ${JSON.stringify(err)}`)
+    }
+  }
+
+  private async logNode(
+    flowId: string, nodeId: string, ctx: FlowContext,
+    status: 'success' | 'error', detail: string
+  ): Promise<void> {
+    try {
+      await db.from('flow_logs').insert({
+        id: generateId(),
+        flow_id: flowId,
+        node_id: nodeId,
+        tenant_id: ctx.tenantId,
+        contact_id: ctx.contactId,
+        conversation_id: ctx.conversationId,
+        status,
+        detail,
+      })
+    } catch { }
+  }
+}
+
+export const flowEngine = new FlowEngine()

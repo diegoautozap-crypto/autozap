@@ -4,6 +4,7 @@ import { logger } from '../lib/logger'
 import { AppError, generateId } from '@autozap/utils'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
+import { flowEngine } from './flow.engine'
 
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
 const PUSHER_KEY     = process.env.PUSHER_KEY
@@ -99,8 +100,7 @@ export class MessageService {
 
     const isFirstMessage = (msgCount || 0) <= 1
 
-    // Executa automações (non-blocking — não bloqueia o fluxo principal)
-    automationService.processAutomations({
+    const automationCtx = {
       tenantId,
       channelId,
       contactId: contact.id,
@@ -109,7 +109,15 @@ export class MessageService {
       messageBody: msg.body || '',
       isFirstMessage,
       hour: new Date().getHours(),
-    }).catch(err => logger.error('Automation error', { err }))
+    }
+
+    // Executa automações antigas (non-blocking)
+    automationService.processAutomations(automationCtx)
+      .catch(err => logger.error('Automation error', { err }))
+
+    // Executa flows (non-blocking)
+    flowEngine.processFlows(automationCtx)
+      .catch(err => logger.error('Flow engine error', { err }))
 
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
