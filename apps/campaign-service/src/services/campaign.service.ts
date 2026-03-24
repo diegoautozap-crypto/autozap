@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { AppError, NotFoundError, generateId, paginationMeta, randomBetween, sleep } from '@autozap/utils'
+import { sendCampaignCompletedEmail } from '../lib/email'
 
 export interface CreateCampaignInput {
   tenantId: string
@@ -192,23 +193,53 @@ export class CampaignService {
   }
 
   async checkCompletion(campaignId: string) {
-    const { data } = await db
+    const { data: campaign } = await db
       .from('campaigns')
-      .select('total_contacts, sent_count, failed_count')
+      .select('id, tenant_id, name, total_contacts, sent_count, delivered_count, read_count, failed_count')
       .eq('id', campaignId)
       .single()
 
-    if (!data) return
+    if (!campaign) return
 
-    const processed = (data.sent_count || 0) + (data.failed_count || 0)
-    if (processed >= data.total_contacts) {
+    const processed = (campaign.sent_count || 0) + (campaign.failed_count || 0)
+    if (processed >= campaign.total_contacts) {
       await db.from('campaigns').update({
         status: 'completed',
         completed_at: new Date(),
       }).eq('id', campaignId)
 
       logger.info('Campaign completed', { campaignId })
+
+      // Envia email de notificação ao dono do tenant (non-blocking)
+      this.notifyCampaignCompleted(campaign).catch(err =>
+        logger.error('Failed to send campaign completed email', { err })
+      )
     }
+  }
+
+  private async notifyCampaignCompleted(campaign: any): Promise<void> {
+    // Busca o owner do tenant para enviar o email
+    const { data: owner } = await db
+      .from('users')
+      .select('name, email')
+      .eq('tenant_id', campaign.tenant_id)
+      .eq('role', 'owner')
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!owner?.email) return
+
+    await sendCampaignCompletedEmail({
+      to: owner.email,
+      name: owner.name,
+      campaignName: campaign.name,
+      total: campaign.total_contacts || 0,
+      sent: campaign.sent_count || 0,
+      delivered: campaign.delivered_count || 0,
+      read: campaign.read_count || 0,
+      failed: campaign.failed_count || 0,
+      campaignId: campaign.id,
+    })
   }
 
   interpolateMessage(template: string, variables: Record<string, string>): string {
