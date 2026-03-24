@@ -194,6 +194,31 @@ export default function ContactsPage() {
     toast.success('CSV exportado!')
   }
 
+  const handleExportExcel = async () => {
+    try {
+      // Busca todos os contatos sem paginação
+      const { data } = await contactApi.get('/contacts?limit=99999')
+      const allContacts = data?.data || []
+      if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
+
+      const rows = allContacts.map((c: any) => ({
+        telefone: c.phone || '',
+        nome: c.name || '',
+        email: c.email || '',
+        empresa: c.company || '',
+        ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
+      XLSX.writeFile(wb, 'contatos.xlsx')
+      toast.success(`${allContacts.length} contatos exportados!`)
+    } catch {
+      toast.error('Erro ao exportar Excel')
+    }
+  }
+
   const handleDelete = (id: string, name: string) => {
     if (confirm(`Excluir contato "${name}"?`)) deleteMutation.mutate([id])
   }
@@ -264,6 +289,12 @@ export default function ContactsPage() {
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
             <Download size={13} /> Exportar CSV
+          </button>
+          <button onClick={handleExportExcel}
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+            <FileSpreadsheet size={13} /> Exportar Excel
           </button>
 
           {/* Importar Excel */}
