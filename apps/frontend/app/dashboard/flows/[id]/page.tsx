@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -17,16 +17,17 @@ import {
   Panel,
   BackgroundVariant,
   MarkerType,
+  Handle,
+  Position,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { messageApi, channelApi, contactApi } from '@/lib/api'
+import { messageApi, contactApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
-  Save, ArrowLeft, Play, Loader2, Plus, Zap, MessageSquare,
+  Save, ArrowLeft, Loader2, Zap, MessageSquare,
   Clock, Tag, GitBranch, MoveRight, UserCheck, Workflow,
 } from 'lucide-react'
 
-// ─── Cores por tipo de nó ────────────────────────────────────────────────────
 const NODE_COLORS: Record<string, string> = {
   trigger_keyword:       '#16a34a',
   trigger_first_message: '#16a34a',
@@ -63,9 +64,6 @@ const NODE_LABELS: Record<string, string> = {
   condition:             'Condição',
 }
 
-// ─── Componente de nó customizado ────────────────────────────────────────────
-import { Handle, Position } from '@xyflow/react'
-
 function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const color = NODE_COLORS[data.type] || '#6b7280'
   const Icon = NODE_ICONS[data.type] || Zap
@@ -100,13 +98,9 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       transition: 'all 0.15s',
     }}>
       {!isTrigger && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          style={{ background: '#d1d5db', width: 10, height: 10, border: '2px solid #fff' }}
-        />
+        <Handle type="target" position={Position.Left}
+          style={{ background: '#d1d5db', width: 10, height: 10, border: '2px solid #fff' }} />
       )}
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
         <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Icon size={14} color={color} />
@@ -120,27 +114,16 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           </div>
         </div>
       </div>
-
       {subtitle() && (
         <div style={{ fontSize: '11px', color: '#9ca3af', background: '#f9fafb', borderRadius: '6px', padding: '5px 8px', wordBreak: 'break-word' }}>
           {subtitle()}
         </div>
       )}
-
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="success"
-        style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }}
-      />
-
+      <Handle type="source" position={Position.Right} id="success"
+        style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       {data.type === 'condition' && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="false"
-          style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff' }}
-        />
+        <Handle type="source" position={Position.Bottom} id="false"
+          style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff' }} />
       )}
     </div>
   )
@@ -148,21 +131,14 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
 
 const nodeTypes = { flowNode: FlowNode }
 
-// ─── Painel lateral de configuração ──────────────────────────────────────────
-function NodeConfigPanel({
-  node,
-  tags,
-  onUpdate,
-  onClose,
-  onDelete,
-}: {
-  node: Node
-  tags: any[]
+function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
+  node: Node; tags: any[]
   onUpdate: (id: string, data: any) => void
   onClose: () => void
   onDelete: (id: string) => void
 }) {
   const d = node.data as any
+  const color = NODE_COLORS[d.type] || '#6b7280'
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px',
     background: '#f9fafb', border: '1px solid #e5e7eb',
@@ -173,15 +149,8 @@ function NodeConfigPanel({
     color: '#6b7280', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em',
   }
 
-  const color = NODE_COLORS[d.type] || '#6b7280'
-
   return (
-    <div style={{
-      position: 'absolute', top: 0, right: 0, width: '300px', height: '100%',
-      background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10,
-      display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)',
-    }}>
-      {/* Header */}
+    <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}>
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
@@ -192,21 +161,15 @@ function NodeConfigPanel({
         <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', fontSize: '16px', lineHeight: 1 }}>✕</button>
       </div>
 
-      {/* Config */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-        {/* trigger_keyword */}
         {d.type === 'trigger_keyword' && (
           <div>
             <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
             <input style={inputStyle} placeholder="preço, valor, info"
               value={(d.keywords || []).join(', ')}
               onChange={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Dispara se a mensagem contiver qualquer uma das palavras</p>
           </div>
         )}
-
-        {/* trigger_first_message */}
         {d.type === 'trigger_first_message' && (
           <div>
             <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
@@ -215,26 +178,20 @@ function NodeConfigPanel({
               onChange={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
           </div>
         )}
-
-        {/* trigger_outside_hours */}
         {d.type === 'trigger_outside_hours' && (
           <>
             <div>
               <label style={labelStyle}>Início do expediente (hora)</label>
-              <input type="number" min="0" max="23" style={inputStyle}
-                value={d.start ?? 9}
+              <input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9}
                 onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} />
             </div>
             <div>
               <label style={labelStyle}>Fim do expediente (hora)</label>
-              <input type="number" min="0" max="23" style={inputStyle}
-                value={d.end ?? 18}
+              <input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18}
                 onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} />
             </div>
           </>
         )}
-
-        {/* send_message */}
         {d.type === 'send_message' && (
           <>
             <div>
@@ -252,32 +209,25 @@ function NodeConfigPanel({
             </div>
           </>
         )}
-
-        {/* wait */}
         {d.type === 'wait' && (
           <>
             <div>
               <label style={labelStyle}>Segundos</label>
-              <input type="number" min="0" style={inputStyle}
-                value={d.seconds ?? 0}
+              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0}
                 onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
             </div>
             <div>
               <label style={labelStyle}>Minutos</label>
-              <input type="number" min="0" style={inputStyle}
-                value={d.minutes ?? 0}
+              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0}
                 onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
             </div>
             <div>
               <label style={labelStyle}>Horas</label>
-              <input type="number" min="0" style={inputStyle}
-                value={d.hours ?? 0}
+              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0}
                 onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
             </div>
           </>
         )}
-
-        {/* add_tag */}
         {d.type === 'add_tag' && (
           <div>
             <label style={labelStyle}>Tag</label>
@@ -286,15 +236,8 @@ function NodeConfigPanel({
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {tags.map((tag: any) => (
-                  <div key={tag.id}
-                    onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '5px 10px', borderRadius: '99px', cursor: 'pointer',
-                      border: `2px solid ${d.tagId === tag.id ? (tag.color || '#0891b2') : '#e5e7eb'}`,
-                      background: d.tagId === tag.id ? `${tag.color || '#0891b2'}15` : '#fff',
-                      fontSize: '12px', fontWeight: 500,
-                    }}>
+                  <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `2px solid ${d.tagId === tag.id ? (tag.color || '#0891b2') : '#e5e7eb'}`, background: d.tagId === tag.id ? `${tag.color || '#0891b2'}15` : '#fff', fontSize: '12px', fontWeight: 500 }}>
                     <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
                     <span style={{ color: d.tagId === tag.id ? (tag.color || '#0891b2') : '#374151' }}>{tag.name}</span>
                   </div>
@@ -303,13 +246,10 @@ function NodeConfigPanel({
             )}
           </div>
         )}
-
-        {/* move_pipeline */}
         {d.type === 'move_pipeline' && (
           <div>
             <label style={labelStyle}>Etapa do funil</label>
-            <select style={{ ...inputStyle, background: '#fff' }}
-              value={d.stage || 'lead'}
+            <select style={{ ...inputStyle, background: '#fff' }} value={d.stage || 'lead'}
               onChange={e => onUpdate(node.id, { stage: e.target.value })}>
               {['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido'].map(s => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -317,8 +257,6 @@ function NodeConfigPanel({
             </select>
           </div>
         )}
-
-        {/* assign_agent */}
         {d.type === 'assign_agent' && (
           <div>
             <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
@@ -328,10 +266,8 @@ function NodeConfigPanel({
               onChange={e => onUpdate(node.id, { message: e.target.value })} />
           </div>
         )}
-
       </div>
 
-      {/* Footer */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
         <button onClick={() => onDelete(node.id)}
           style={{ width: '100%', padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
@@ -342,14 +278,13 @@ function NodeConfigPanel({
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
 export default function FlowEditorPage() {
   const { id } = useParams()
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
   const [flowName, setFlowName] = useState('')
   const [isDirty, setIsDirty] = useState(false)
@@ -362,7 +297,6 @@ export default function FlowEditorPage() {
     },
   })
 
-  // Carrega o flow
   const { isLoading } = useQuery({
     queryKey: ['flow', id],
     queryFn: async () => {
@@ -390,7 +324,6 @@ export default function FlowEditorPage() {
     },
   } as any)
 
-  // Salva o flow
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -429,19 +362,19 @@ export default function FlowEditorPage() {
   }, [setEdges])
 
   const addNode = (type: string) => {
-    const id = `node_${Date.now()}`
+    const nodeId = `node_${Date.now()}`
     const newNode: Node = {
-      id,
+      id: nodeId,
       type: 'flowNode',
       position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
       data: { type },
     }
-    setNodes(nds => [...nds, newNode])
+    setNodes((nds: Node[]) => [...nds, newNode])
     setIsDirty(true)
   }
 
   const updateNodeData = (nodeId: string, newData: any) => {
-    setNodes(nds => nds.map(n =>
+    setNodes((nds: Node[]) => nds.map(n =>
       n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n
     ))
     if (selectedNode?.id === nodeId) {
@@ -451,8 +384,8 @@ export default function FlowEditorPage() {
   }
 
   const deleteNode = (nodeId: string) => {
-    setNodes(nds => nds.filter(n => n.id !== nodeId))
-    setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId))
+    setNodes((nds: Node[]) => nds.filter(n => n.id !== nodeId))
+    setEdges((eds: Edge[]) => eds.filter(e => e.source !== nodeId && e.target !== nodeId))
     setSelectedNode(null)
     setIsDirty(true)
   }
@@ -482,8 +415,6 @@ export default function FlowEditorPage() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
-
-      {/* Topbar */}
       <div style={{ height: '56px', background: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '12px', flexShrink: 0, zIndex: 20 }}>
         <button onClick={() => router.push('/dashboard/flows')}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '13px', padding: '6px 8px', borderRadius: '6px' }}
@@ -491,23 +422,13 @@ export default function FlowEditorPage() {
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
           <ArrowLeft size={15} /> Flows
         </button>
-
         <div style={{ width: '1px', height: '20px', background: '#e5e7eb' }} />
-
         <Workflow size={16} color="#16a34a" />
-        <input
-          value={flowName}
-          onChange={e => { setFlowName(e.target.value); setIsDirty(true) }}
-          style={{ border: 'none', outline: 'none', fontSize: '15px', fontWeight: 600, color: '#111827', background: 'transparent', minWidth: '200px' }}
-        />
-
+        <input value={flowName} onChange={e => { setFlowName(e.target.value); setIsDirty(true) }}
+          style={{ border: 'none', outline: 'none', fontSize: '15px', fontWeight: 600, color: '#111827', background: 'transparent', minWidth: '200px' }} />
         {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● Não salvo</span>}
-
         <div style={{ flex: 1 }} />
-
-        <button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
           Salvar
@@ -515,8 +436,6 @@ export default function FlowEditorPage() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-
-        {/* Sidebar esquerda — blocos */}
         <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Gatilhos</p>
           {TRIGGER_NODES.map(n => {
@@ -527,12 +446,10 @@ export default function FlowEditorPage() {
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', marginBottom: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', textAlign: 'left' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = color; (e.currentTarget as HTMLButtonElement).style.background = `${color}10` }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
-                <Icon size={13} color={color} />
-                {n.label}
+                <Icon size={13} color={color} />{n.label}
               </button>
             )
           })}
-
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: '16px' }}>Ações</p>
           {ACTION_NODES.map(n => {
             const Icon = NODE_ICONS[n.type] || Zap
@@ -542,14 +459,12 @@ export default function FlowEditorPage() {
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', marginBottom: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', textAlign: 'left' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = color; (e.currentTarget as HTMLButtonElement).style.background = `${color}10` }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}>
-                <Icon size={13} color={color} />
-                {n.label}
+                <Icon size={13} color={color} />{n.label}
               </button>
             )
           })}
         </div>
 
-        {/* Canvas */}
         <div style={{ flex: 1, position: 'relative' }}>
           <ReactFlow
             nodes={nodes}
@@ -570,7 +485,6 @@ export default function FlowEditorPage() {
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
-
             {nodes.length === 0 && (
               <Panel position="top-center">
                 <div style={{ background: '#fff', border: '1px dashed #d1d5db', borderRadius: '12px', padding: '24px 40px', textAlign: 'center', marginTop: '60px' }}>
@@ -583,18 +497,13 @@ export default function FlowEditorPage() {
           </ReactFlow>
         </div>
 
-        {/* Painel de configuração do nó selecionado */}
         {selectedNode && (
-          <NodeConfigPanel
-            node={selectedNode}
-            tags={tags}
+          <NodeConfigPanel node={selectedNode} tags={tags}
             onUpdate={updateNodeData}
             onClose={() => setSelectedNode(null)}
-            onDelete={deleteNode}
-          />
+            onDelete={deleteNode} />
         )}
       </div>
-
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
