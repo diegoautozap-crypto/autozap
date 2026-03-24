@@ -1,14 +1,112 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { campaignApi, conversationApi, contactApi, tenantApi } from '@/lib/api'
+import { campaignApi, conversationApi, contactApi, tenantApi, channelApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
-import { Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp, CheckCheck, Eye } from 'lucide-react'
+import { Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp, CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check } from 'lucide-react'
 
 function getGreeting() {
   const h = new Date().getHours()
   if (h < 12) return 'Bom dia'
   if (h < 18) return 'Boa tarde'
   return 'Boa noite'
+}
+
+function OnboardingBanner({ channels, templates, campaigns }: { channels: any[]; templates: any[]; campaigns: any[] }) {
+  const router = useRouter()
+
+  const steps = [
+    {
+      id: 'channel',
+      label: 'Conectar canal WhatsApp',
+      desc: 'Configure seu número no Gupshup e cole o webhook',
+      icon: Radio,
+      done: channels.length > 0,
+      href: '/dashboard/channels',
+      btnLabel: 'Configurar canal',
+    },
+    {
+      id: 'template',
+      label: 'Cadastrar template',
+      desc: 'Adicione um template aprovado no Gupshup',
+      icon: FileText,
+      done: templates.length > 0,
+      href: '/dashboard/templates',
+      btnLabel: 'Cadastrar template',
+    },
+    {
+      id: 'campaign',
+      label: 'Criar sua primeira campanha',
+      desc: 'Importe contatos e dispare sua primeira mensagem',
+      icon: Megaphone,
+      done: campaigns.length > 0,
+      href: '/dashboard/campaigns',
+      btnLabel: 'Criar campanha',
+    },
+  ]
+
+  const completedCount = steps.filter(s => s.done).length
+  const allDone = completedCount === steps.length
+
+  if (allDone) return null
+
+  const pct = Math.round((completedCount / steps.length) * 100)
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Zap size={16} color="#16a34a" fill="#16a34a" />
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>Configure o AutoZap</h3>
+            <span style={{ fontSize: '11px', fontWeight: 600, background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: '99px' }}>
+              {completedCount}/{steps.length} concluídos
+            </span>
+          </div>
+          <p style={{ fontSize: '13px', color: '#6b7280' }}>Siga os passos abaixo para começar a disparar campanhas</p>
+        </div>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16a34a' }}>{pct}%</span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: '4px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden', marginBottom: '20px' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a', borderRadius: '99px', transition: 'width 0.4s ease' }} />
+      </div>
+
+      {/* Steps */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+        {steps.map((step, idx) => {
+          const Icon = step.icon
+          const isNext = !step.done && steps.slice(0, idx).every(s => s.done)
+          return (
+            <div key={step.id}
+              style={{ border: `1px solid ${step.done ? '#bbf7d0' : isNext ? '#16a34a' : '#e5e7eb'}`, borderRadius: '10px', padding: '14px', background: step.done ? '#f0fdf4' : isNext ? '#fff' : '#fafafa', opacity: !step.done && !isNext ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: step.done ? '#dcfce7' : isNext ? '#f0fdf4' : '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {step.done
+                    ? <Check size={16} color="#16a34a" />
+                    : <Icon size={16} color={isNext ? '#16a34a' : '#9ca3af'} />
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: step.done ? '#15803d' : '#111827', margin: '0 0 2px' }}>{step.label}</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 10px', lineHeight: 1.5 }}>{step.desc}</p>
+                  {!step.done && (
+                    <button
+                      onClick={() => router.push(step.href)}
+                      disabled={!isNext}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', background: isNext ? '#16a34a' : '#f3f4f6', color: isNext ? '#fff' : '#9ca3af', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: isNext ? 'pointer' : 'not-allowed' }}>
+                      {step.btnLabel} {isNext && <ChevronRight size={12} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function DashboardPage() {
@@ -18,6 +116,18 @@ export default function DashboardPage() {
     queryKey: ['campaigns'],
     queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data },
     refetchInterval: 15000,
+  })
+
+  const { data: channels } = useQuery({
+    queryKey: ['channels'],
+    queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
+    refetchInterval: 30000,
+  })
+
+  const { data: templates } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => { const { data } = await campaignApi.get('/templates'); return data.data },
+    refetchInterval: 30000,
   })
 
   const { data: conversations } = useQuery({
@@ -38,7 +148,6 @@ export default function DashboardPage() {
     refetchInterval: 15000,
   })
 
-  // ✅ Busca analytics via backend — sem depender de ANON KEY
   const { data: analytics } = useQuery({
     queryKey: ['analytics'],
     queryFn: async () => { const { data } = await tenantApi.get('/tenant/analytics'); return data.data },
@@ -65,6 +174,13 @@ export default function DashboardPage() {
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
       </div>
+
+      {/* Onboarding */}
+      <OnboardingBanner
+        channels={channels || []}
+        templates={templates || []}
+        campaigns={campaigns || []}
+      />
 
       {/* Metric cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
@@ -117,7 +233,6 @@ export default function DashboardPage() {
             <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#16a34a' }} /> Enviadas
           </div>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '140px', paddingBottom: '24px', position: 'relative' }}>
           {[0.25, 0.5, 0.75, 1].map(p => (
             <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 116}px`, borderTop: '1px dashed #f3f4f6', zIndex: 0 }} />
@@ -127,8 +242,7 @@ export default function DashboardPage() {
             return (
               <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
                 <div title={`${day}: ${sent} enviadas`}
-                  style={{ width: '100%', maxWidth: '20px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#16a34a', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
-                />
+                  style={{ width: '100%', maxWidth: '20px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#16a34a', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }} />
                 {i % 5 === 0 && (
                   <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: '#d1d5db', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>
                 )}
@@ -136,7 +250,6 @@ export default function DashboardPage() {
             )
           })}
         </div>
-
         {totalSent === 0 && (
           <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: '13px' }}>
             Nenhuma mensagem enviada nos últimos 30 dias
@@ -160,8 +273,7 @@ export default function DashboardPage() {
             <button key={href} onClick={() => router.push(href)}
               style={{ padding: '8px 14px', background: primary ? '#16a34a' : '#f9fafb', border: primary ? 'none' : '1px solid #e5e7eb', borderRadius: '6px', color: primary ? '#fff' : '#374151', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#15803d' : '#f3f4f6' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#16a34a' : '#f9fafb' }}
-            >
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#16a34a' : '#f9fafb' }}>
               {label}
             </button>
           ))}
