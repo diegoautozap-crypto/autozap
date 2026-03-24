@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, Zap, ChevronRight } from 'lucide-react'
+import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check } from 'lucide-react'
 
 export default function FlowsPage() {
   const router = useRouter()
@@ -13,6 +13,11 @@ export default function FlowsPage() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
+
+  // Estado do modal de edição
+  const [editingFlow, setEditingFlow] = useState<any | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editChannelId, setEditChannelId] = useState('')
 
   const { data: flows = [], isLoading } = useQuery({
     queryKey: ['flows'],
@@ -49,6 +54,21 @@ export default function FlowsPage() {
     onError: () => toast.error('Erro ao criar flow'),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      await messageApi.patch(`/flows/${editingFlow.id}`, {
+        name: editName,
+        channelId: editChannelId || null,
+      })
+    },
+    onSuccess: () => {
+      toast.success('Flow atualizado!')
+      queryClient.invalidateQueries({ queryKey: ['flows'] })
+      setEditingFlow(null)
+    },
+    onError: () => toast.error('Erro ao atualizar'),
+  })
+
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       await messageApi.patch(`/flows/${id}`, { is_active: !isActive })
@@ -68,10 +88,22 @@ export default function FlowsPage() {
     onError: () => toast.error('Erro ao excluir'),
   })
 
+  const openEdit = (f: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingFlow(f)
+    setEditName(f.name)
+    setEditChannelId(f.channel_id || '')
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px',
     background: '#f9fafb', border: '1px solid #e5e7eb',
     borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827',
+  }
+
+  const channelName = (channelId: string) => {
+    const ch = channels.find((c: any) => c.id === channelId)
+    return ch?.name || 'Todos os canais'
   }
 
   return (
@@ -97,13 +129,8 @@ export default function FlowsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Nome *</label>
-              <input
-                style={inputStyle}
-                placeholder="Ex: Boas-vindas com qualificação"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                autoFocus
-              />
+              <input style={inputStyle} placeholder="Ex: Boas-vindas com qualificação"
+                value={newName} onChange={e => setNewName(e.target.value)} autoFocus />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Canal (opcional)</label>
@@ -114,18 +141,58 @@ export default function FlowsPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={!newName || createMutation.isPending}
+            <button onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}
               style={{ padding: '9px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newName ? 0.5 : 1 }}>
               {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
               Criar e abrir editor
             </button>
-            <button
-              onClick={() => { setShowNew(false); setNewName('') }}
+            <button onClick={() => { setShowNew(false); setNewName('') }}
               style={{ padding: '9px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edição */}
+      {editingFlow && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setEditingFlow(null)}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px', width: '460px', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>Editar flow</h3>
+              <button onClick={() => setEditingFlow(null)}
+                style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+                <X size={15} color="#6b7280" />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Nome *</label>
+                <input style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Canal</label>
+                <select style={{ ...inputStyle, background: '#f9fafb' }} value={editChannelId} onChange={e => setEditChannelId(e.target.value)}>
+                  <option value="">Todos os canais</option>
+                  {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => updateMutation.mutate()} disabled={!editName || updateMutation.isPending}
+                style={{ padding: '10px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !editName ? 0.5 : 1 }}>
+                {updateMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+                Salvar
+              </button>
+              <button onClick={() => setEditingFlow(null)}
+                style={{ padding: '10px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -144,13 +211,12 @@ export default function FlowsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {flows.map((f: any) => (
-            <div
-              key={f.id}
+            <div key={f.id}
               style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onClick={() => router.push(`/dashboard/flows/${f.id}`)}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#16a34a'}
-              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'}
-            >
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb'}>
+
               <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: f.is_active ? '#f0fdf4' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Workflow size={16} color={f.is_active ? '#16a34a' : '#d1d5db'} />
               </div>
@@ -163,26 +229,23 @@ export default function FlowsPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-                  {f.node_count || 0} nós · {f.channel_name || 'Todos os canais'}
+                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : 'Todos os canais'}
                 </p>
               </div>
 
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                <button
-                  onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })}
+                <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })}
                   title={f.is_active ? 'Pausar' : 'Ativar'}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: f.is_active ? '#16a34a' : '#d1d5db' }}>
                   {f.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                 </button>
-                <button
-                  onClick={() => router.push(`/dashboard/flows/${f.id}`)}
+                <button onClick={(e) => openEdit(f, e)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
                   <Pencil size={14} />
                 </button>
-                <button
-                  onClick={() => { if (confirm(`Excluir "${f.name}"?`)) deleteMutation.mutate(f.id) }}
+                <button onClick={() => { if (confirm(`Excluir "${f.name}"?`)) deleteMutation.mutate(f.id) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
