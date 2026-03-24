@@ -6,16 +6,17 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { LayoutDashboard, Megaphone, Users, MessageSquare, Zap, Settings, LogOut, Zap as ZapIcon, Radio } from 'lucide-react'
+import { LayoutDashboard, Megaphone, Users, MessageSquare, Zap, Settings, LogOut, Zap as ZapIcon, Radio, FileText } from 'lucide-react'
 
 const nav = [
-  { href: '/dashboard',             label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/dashboard/campaigns',   label: 'Campanhas',  icon: Megaphone },
-  { href: '/dashboard/contacts',    label: 'CRM',        icon: Users },
-  { href: '/dashboard/inbox',       label: 'Inbox',      icon: MessageSquare },
-  { href: '/dashboard/automations', label: 'Automações', icon: Zap },
-  { href: '/dashboard/channels',    label: 'Canais',     icon: Radio },
-  { href: '/dashboard/settings',    label: 'Plano',      icon: Settings },
+  { href: '/dashboard',             label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/dashboard/campaigns',   label: 'Campanhas',   icon: Megaphone },
+  { href: '/dashboard/templates',   label: 'Templates',   icon: FileText },
+  { href: '/dashboard/contacts',    label: 'CRM',         icon: Users },
+  { href: '/dashboard/inbox',       label: 'Inbox',       icon: MessageSquare },
+  { href: '/dashboard/automations', label: 'Automações',  icon: Zap },
+  { href: '/dashboard/channels',    label: 'Canais',      icon: Radio },
+  { href: '/dashboard/settings',    label: 'Plano',       icon: Settings },
 ]
 
 function UsageBar() {
