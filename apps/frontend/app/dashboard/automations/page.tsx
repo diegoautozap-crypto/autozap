@@ -268,6 +268,24 @@ export default function AutomationsPage() {
               </div>
             )}
 
+            {form.action_type === 'assign_agent' && (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                <div>
+                  <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
+                  <textarea style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' as any }}
+                    placeholder="Ex: Aguarde, um de nossos atendentes irá te responder em breve."
+                    value={form.action_value.message}
+                    onChange={e => setForm({ ...form, action_value: { ...form.action_value, message: e.target.value } })} />
+                  <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Se preenchida, essa mensagem será enviada automaticamente ao cliente quando a automação for ativada.</p>
+                </div>
+                <div>
+                  <label style={labelStyle}>Delay antes de enviar (segundos)</label>
+                  <input type="number" min="0" max="60" style={{ ...inputStyle, maxWidth: '150px' }} value={form.action_value.delay}
+                    onChange={e => setForm({ ...form, action_value: { ...form.action_value, delay: Number(e.target.value) } })} />
+                </div>
+              </div>
+            )}
+
             {form.action_type === 'move_pipeline' && (
               <div>
                 <label style={labelStyle}>Etapa do funil</label>

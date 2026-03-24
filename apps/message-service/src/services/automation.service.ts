@@ -4,7 +4,6 @@ import { generateId } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
-const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
 
 interface AutomationContext {
   tenantId: string
@@ -21,7 +20,6 @@ export class AutomationService {
 
   async processAutomations(ctx: AutomationContext): Promise<void> {
     try {
-      // Busca automações ativas do tenant para esse canal (ou globais sem canal)
       const { data: automations } = await db
         .from('automations')
         .select('*')
@@ -36,7 +34,6 @@ export class AutomationService {
         const matches = await this.checkTrigger(automation, ctx)
         if (matches) {
           await this.executeAction(automation, ctx)
-          // Só executa a primeira automação que bater — evita spam
           break
         }
       }
@@ -54,22 +51,18 @@ export class AutomationService {
         const body = (ctx.messageBody || '').toLowerCase()
         return keywords.some(kw => body.includes(kw.toLowerCase().trim()))
       }
-
       case 'first_message': {
         return ctx.isFirstMessage
       }
-
       case 'outside_hours': {
         const start = trigger_value?.start ?? 9
         const end = trigger_value?.end ?? 18
-        const days = trigger_value?.days ?? [1, 2, 3, 4, 5] // seg-sex
+        const days = trigger_value?.days ?? [1, 2, 3, 4, 5]
         const now = new Date()
         const day = now.getDay()
         const hour = now.getHours()
-        const isOutside = !days.includes(day) || hour < start || hour >= end
-        return isOutside
+        return !days.includes(day) || hour < start || hour >= end
       }
-
       default:
         return false
     }
@@ -78,61 +71,52 @@ export class AutomationService {
   private async executeAction(automation: any, ctx: AutomationContext): Promise<void> {
     const { action_type, action_value } = automation
 
-    logger.info('Executing automation', {
-      automationId: automation.id,
-      actionType: action_type,
-      tenantId: ctx.tenantId,
-    })
+    logger.info('Executing automation', { automationId: automation.id, actionType: action_type, tenantId: ctx.tenantId })
 
     switch (action_type) {
       case 'send_message': {
         const message = this.interpolate(action_value?.message || '', ctx)
         if (!message) return
-
         const delay = action_value?.delay || 0
         if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
-
-        await this.sendMessage({
-          tenantId: ctx.tenantId,
-          channelId: ctx.channelId,
-          contactId: ctx.contactId,
-          conversationId: ctx.conversationId,
-          to: ctx.phone,
-          body: message,
-        })
-
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, body: message })
         await this.logAutomation(automation.id, ctx, 'success', `Mensagem enviada: ${message.slice(0, 50)}`)
         break
       }
 
       case 'assign_agent': {
         const userId = action_value?.userId
-        if (!userId) return
-        await db.from('conversations')
-          .update({ assigned_to: userId })
-          .eq('id', ctx.conversationId)
-        await this.logAutomation(automation.id, ctx, 'success', `Atribuído ao agente ${userId}`)
+        const notifyMessage = action_value?.message
+
+        // Atribui o agente na conversa
+        if (userId) {
+          await db.from('conversations').update({ assigned_to: userId }).eq('id', ctx.conversationId)
+        }
+
+        // Envia mensagem personalizada para o cliente (se configurada)
+        if (notifyMessage) {
+          const message = this.interpolate(notifyMessage, ctx)
+          const delay = action_value?.delay || 0
+          if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, body: message })
+        }
+
+        await this.logAutomation(automation.id, ctx, 'success', `Atribuído ao agente${notifyMessage ? ' + mensagem enviada' : ''}`)
         break
       }
 
       case 'add_tag': {
         const tagId = action_value?.tagId
         if (!tagId) return
-        await db.from('contact_tags').upsert({
-          contact_id: ctx.contactId,
-          tag_id: tagId,
-          tenant_id: ctx.tenantId,
-        }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
-        await this.logAutomation(automation.id, ctx, 'success', `Tag adicionada`)
+        await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: tagId, tenant_id: ctx.tenantId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
+        await this.logAutomation(automation.id, ctx, 'success', 'Tag adicionada')
         break
       }
 
       case 'move_pipeline': {
         const stage = action_value?.stage
         if (!stage) return
-        await db.from('conversations')
-          .update({ pipeline_stage: stage })
-          .eq('id', ctx.conversationId)
+        await db.from('conversations').update({ pipeline_stage: stage }).eq('id', ctx.conversationId)
         await this.logAutomation(automation.id, ctx, 'success', `Movido para ${stage}`)
         break
       }
@@ -148,29 +132,11 @@ export class AutomationService {
       .replace(/\{\{telefone\}\}/gi, ctx.phone)
   }
 
-  private async sendMessage(opts: {
-    tenantId: string
-    channelId: string
-    contactId: string
-    conversationId: string
-    to: string
-    body: string
-  }): Promise<void> {
+  private async sendMessage(opts: { tenantId: string; channelId: string; contactId: string; conversationId: string; to: string; body: string }): Promise<void> {
     const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': INTERNAL_SECRET,
-      },
-      body: JSON.stringify({
-        tenantId: opts.tenantId,
-        channelId: opts.channelId,
-        contactId: opts.contactId,
-        conversationId: opts.conversationId,
-        to: opts.to,
-        contentType: 'text',
-        body: opts.body,
-      }),
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
+      body: JSON.stringify({ tenantId: opts.tenantId, channelId: opts.channelId, contactId: opts.contactId, conversationId: opts.conversationId, to: opts.to, contentType: 'text', body: opts.body }),
     })
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
@@ -178,25 +144,10 @@ export class AutomationService {
     }
   }
 
-  private async logAutomation(
-    automationId: string,
-    ctx: AutomationContext,
-    status: 'success' | 'error',
-    detail: string,
-  ): Promise<void> {
+  private async logAutomation(automationId: string, ctx: AutomationContext, status: 'success' | 'error', detail: string): Promise<void> {
     try {
-      await db.from('automation_logs').insert({
-        id: generateId(),
-        automation_id: automationId,
-        tenant_id: ctx.tenantId,
-        contact_id: ctx.contactId,
-        conversation_id: ctx.conversationId,
-        status,
-        detail,
-      })
-    } catch {
-      // logs são não-críticos
-    }
+      await db.from('automation_logs').insert({ id: generateId(), automation_id: automationId, tenant_id: ctx.tenantId, contact_id: ctx.contactId, conversation_id: ctx.conversationId, status, detail })
+    } catch { }
   }
 }
 
