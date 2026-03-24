@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, channelApi, campaignApi } from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Loader2, MessageSquare, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Pusher from 'pusher-js'
 
 const STAGES = [
   { key: 'lead',         label: 'Lead',         color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
@@ -32,11 +34,11 @@ function getAvatarColor(n: string | undefined | null) {
 export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
   const [channelFilter, setChannelFilter] = useState('all')
   const [campaignFilter, setCampaignFilter] = useState('all')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
-  // Ref para board local otimista — não causa re-render
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
 
@@ -64,15 +66,41 @@ export default function PipelinePage() {
       if (campaignFilter !== 'all') params.set('campaignId', campaignFilter)
       const url = `/conversations/pipeline${params.toString() ? '?' + params.toString() : ''}`
       const { data } = await conversationApi.get(url)
-      // Quando dados chegam do servidor, limpa o board local
       localBoardRef.current = null
       return data.data as Record<string, any[]>
     },
-    staleTime: 15000,
-    refetchInterval: 15000,
-    refetchIntervalInBackground: false,
-    placeholderData: (prev) => prev, // mantém dados anteriores durante refetch — sem piscar
+    staleTime: Infinity, // nunca refetch automático — só via Pusher ou botão manual
+    placeholderData: (prev) => prev,
   })
+
+  // Pusher — atualiza pipeline silenciosamente quando chega mensagem nova
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
+    if (!key || !user) return
+
+    const pusher = new Pusher(key, { cluster })
+    const tenantId = (user as any)?.tenantId || (user as any)?.tid
+    if (!tenantId) return
+
+    const channel = pusher.subscribe(`tenant-${tenantId}`)
+
+    // Quando chega mensagem nova, invalida o cache silenciosamente
+    // placeholderData garante que o board atual continua visível durante o refetch
+    channel.bind('inbound.message', () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+    })
+
+    channel.bind('conversation.updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+    })
+
+    return () => {
+      channel.unbind_all()
+      pusher.unsubscribe(`tenant-${tenantId}`)
+      pusher.disconnect()
+    }
+  }, [user, queryClient])
 
   const displayBoard = localBoardRef.current ?? board
 
@@ -121,7 +149,6 @@ export default function PipelinePage() {
       setDraggingId(null); setOverStage(null); return
     }
 
-    // Atualização otimista via ref — sem re-render do React Query
     const newBoard: Record<string, any[]> = {}
     for (const [s, cards] of Object.entries(displayBoard)) {
       newBoard[s] = s === sourceStage
@@ -146,7 +173,6 @@ export default function PipelinePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -179,7 +205,6 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* Kanban */}
       {isLoading ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
