@@ -113,9 +113,17 @@ export default function ContactsPage() {
 
   const handleExportExcel = async () => {
     try {
-      // Busca todos os contatos sem paginação
-      const { data } = await contactApi.get('/contacts?limit=99999')
-      const allContacts = data?.data || []
+      // Busca todos via paginação
+      let allContacts: any[] = []
+      let p = 1
+      while (true) {
+        const { data } = await contactApi.get(`/contacts?page=${p}&limit=500`)
+        const rows = data?.data || []
+        allContacts = [...allContacts, ...rows]
+        if (!data?.meta?.hasMore) break
+        p++
+      }
+
       if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
 
       const rows = allContacts.map((c: any) => ({
@@ -131,7 +139,8 @@ export default function ContactsPage() {
       XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
       XLSX.writeFile(wb, 'contatos.xlsx')
       toast.success(`${allContacts.length} contatos exportados!`)
-    } catch {
+    } catch (err) {
+      console.error(err)
       toast.error('Erro ao exportar Excel')
     }
   }
