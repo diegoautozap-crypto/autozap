@@ -34,12 +34,19 @@ router.get('/flows', async (req, res, next) => {
   try {
     const { data, error } = await db
       .from('flows')
-      .select('*')
+      .select('*, flow_nodes(count)')
       .eq('tenant_id', req.auth.tid)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) throw new AppError('DB_ERROR', error.message, 500)
-    res.json(ok(data || []))
+
+    const flows = (data || []).map((f: any) => ({
+      ...f,
+      node_count: f.flow_nodes?.[0]?.count || 0,
+      flow_nodes: undefined,
+    }))
+
+    res.json(ok(flows))
   } catch (err) { next(err) }
 })
 
@@ -127,8 +134,6 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
   try {
     const { nodes, edges } = req.body
 
-    console.log('[FLOW GRAPH] saving', { flowId: req.params.id, nodeCount: nodes.length, edgeCount: edges.length })
-
     const { data: flow, error: flowError } = await db
       .from('flows')
       .select('id')
@@ -137,11 +142,9 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
       .single()
 
     if (flowError || !flow) {
-      console.error('[FLOW GRAPH] flow not found', flowError)
       throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
     }
 
-    // Deleta edges primeiro, depois nodes
     const { error: delEdgesError } = await db.from('flow_edges').delete().eq('flow_id', req.params.id)
     if (delEdgesError) console.error('[FLOW GRAPH] delete edges error', delEdgesError)
 
@@ -158,12 +161,8 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
         position_y: n.position_y,
         data: n.data || {},
       }))
-      console.log('[FLOW GRAPH] inserting nodes', nodeRows.map((n: any) => n.id))
       const { error: nodesError } = await db.from('flow_nodes').insert(nodeRows)
-      if (nodesError) {
-        console.error('[FLOW GRAPH] nodes insert error', nodesError)
-        throw new AppError('DB_ERROR', nodesError.message, 500)
-      }
+      if (nodesError) throw new AppError('DB_ERROR', nodesError.message, 500)
     }
 
     if (edges.length > 0) {
@@ -174,20 +173,14 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
         target_node: e.target_node,
         source_handle: e.source_handle || null,
       }))
-      console.log('[FLOW GRAPH] inserting edges', edgeRows.map((e: any) => e.id))
       const { error: edgesError } = await db.from('flow_edges').insert(edgeRows)
-      if (edgesError) {
-        console.error('[FLOW GRAPH] edges insert error', edgesError)
-        throw new AppError('DB_ERROR', edgesError.message, 500)
-      }
+      if (edgesError) throw new AppError('DB_ERROR', edgesError.message, 500)
     }
 
     await db.from('flows').update({ updated_at: new Date() }).eq('id', req.params.id)
 
-    console.log('[FLOW GRAPH] saved successfully')
     res.json(ok({ message: 'Grafo salvo com sucesso' }))
   } catch (err) {
-    console.error('[FLOW GRAPH] unexpected error', err)
     next(err)
   }
 })
