@@ -167,15 +167,22 @@ export class ChannelService {
   // ── Get channel by apikey (for Gupshup webhook routing) ──────────────────
 
   async getChannelByApiKey(apiKey: string): Promise<Channel | null> {
+    // Busca todos os canais ativos e compara após decriptar
+    // Necessário porque credentials estão criptografadas no banco
     const { data } = await db
       .from('channels')
       .select('*')
       .eq('type', 'gupshup')
       .eq('status', 'active')
-      .filter('credentials->>apiKey', 'eq', apiKey)
-      .maybeSingle()
 
-    return data ? this.mapRow(data) : null
+    if (!data) return null
+
+    const channel = data.find(row => {
+      const creds = this.mapRow(row).credentials
+      return creds.apiKey === apiKey
+    })
+
+    return channel ? this.mapRow(channel) : null
   }
 
   // ── Delete channel ───────────────────────────────────────────────────────
