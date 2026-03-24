@@ -3,6 +3,7 @@ import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { AppError, generateId } from '@autozap/utils'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
+import { automationService } from './automation.service'
 
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
 const PUSHER_KEY     = process.env.PUSHER_KEY
@@ -30,29 +31,18 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }
 
-// ─── Salva erro na tabela message_errors ──────────────────────────────────────
 async function saveMessageError(params: {
-  tenantId: string
-  channelId?: string
-  phone?: string
-  errorCode?: string
-  errorMessage?: string
-  messageId?: string
-  rawPayload?: object
+  tenantId: string; channelId?: string; phone?: string; errorCode?: string
+  errorMessage?: string; messageId?: string; rawPayload?: object
 }): Promise<void> {
   try {
     await db.from('message_errors').insert({
-      tenant_id:     params.tenantId,
-      channel_id:    params.channelId || null,
-      phone:         params.phone || null,
-      error_code:    params.errorCode || null,
-      error_message: params.errorMessage || null,
-      message_id:    params.messageId || null,
-      raw_payload:   params.rawPayload || null,
+      tenant_id: params.tenantId, channel_id: params.channelId || null,
+      phone: params.phone || null, error_code: params.errorCode || null,
+      error_message: params.errorMessage || null, message_id: params.messageId || null,
+      raw_payload: params.rawPayload || null,
     })
-  } catch (err) {
-    logger.error('Failed to save message error', { err })
-  }
+  } catch (err) { logger.error('Failed to save message error', { err }) }
 }
 
 export class MessageService {
@@ -89,110 +79,93 @@ export class MessageService {
       external_id: msg.externalId, status: 'delivered',
       sent_at: msg.timestamp, delivered_at: msg.timestamp,
     })
-    await db.from('conversations').update({ last_message: msg.body || `[${msg.contentType}]`, last_message_at: msg.timestamp, status: 'open' }).eq('id', conversation.id)
+    await db.from('conversations').update({
+      last_message: msg.body || `[${msg.contentType}]`,
+      last_message_at: msg.timestamp, status: 'open'
+    }).eq('id', conversation.id)
     try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {
       await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
     }
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
     emitPusher(tenantId, 'inbound.message', { conversationId: conversation.id, contactId: contact.id, body: msg.body, contentType: msg.contentType, timestamp: msg.timestamp })
+
+    // Verifica se é primeira mensagem do contato nesse canal
+    const { count: msgCount } = await db
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('contact_id', contact.id)
+      .eq('direction', 'inbound')
+
+    const isFirstMessage = (msgCount || 0) <= 1
+
+    // Executa automações (non-blocking — não bloqueia o fluxo principal)
+    automationService.processAutomations({
+      tenantId,
+      channelId,
+      contactId: contact.id,
+      conversationId: conversation.id,
+      phone: msg.from,
+      messageBody: msg.body || '',
+      isFirstMessage,
+      hour: new Date().getHours(),
+    }).catch(err => logger.error('Automation error', { err }))
+
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 
   async updateStatus(tenantId: string, channelId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage, errorCode, phone } = update as any
-
     logger.info('Webhook status received', { externalId, status, tenantId })
-
-    // ✅ Salva erro automaticamente se status for failed
     if (status === 'failed' && errorCode) {
-      await saveMessageError({
-        tenantId,
-        channelId,
-        phone,
-        errorCode:    String(errorCode),
-        errorMessage: errorMessage || 'Unknown error',
-        messageId:    externalId,
-        rawPayload:   update as any,
-      })
+      await saveMessageError({ tenantId, channelId, phone, errorCode: String(errorCode), errorMessage: errorMessage || 'Unknown error', messageId: externalId, rawPayload: update as any })
       logger.info('Message error saved', { externalId, errorCode, errorMessage })
     }
-
     const { data: rows, error: rpcError } = await db.rpc('update_message_status', {
-      p_external_id:  externalId,
-      p_tenant_id:    tenantId,
-      p_status:       status,
+      p_external_id: externalId, p_tenant_id: tenantId, p_status: status,
       p_delivered_at: status === 'delivered' ? timestamp : null,
-      p_read_at:      status === 'read'      ? timestamp : null,
-      p_failed_at:    status === 'failed'    ? timestamp : null,
-      p_error_msg:    errorMessage ?? null,
+      p_read_at: status === 'read' ? timestamp : null,
+      p_failed_at: status === 'failed' ? timestamp : null,
+      p_error_msg: errorMessage ?? null,
     })
-
     if (rpcError) {
       logger.error('update_message_status RPC failed', { externalId, error: rpcError.message })
       await this.savePending(externalId, tenantId, status, timestamp, errorMessage)
       return
     }
-
     const row = Array.isArray(rows) ? rows[0] : rows
-
     logger.info('update_message_status result', { externalId, status, updated: row?.updated, campaignId: row?.campaign_id })
-
     if (!row?.updated) {
-      const { data: exists } = await db.from('messages').select('id, status')
-        .eq('external_id', externalId).eq('tenant_id', tenantId).maybeSingle()
-
+      const { data: exists } = await db.from('messages').select('id, status').eq('external_id', externalId).eq('tenant_id', tenantId).maybeSingle()
       if (!exists) {
         logger.warn('Message not found — saving to pending', { externalId, status })
         await this.savePending(externalId, tenantId, status, timestamp, errorMessage)
       } else {
-        logger.debug('Status update ignored — no progression needed', { externalId, currentStatus: exists.status, newStatus: status })
+        logger.debug('Status update ignored', { externalId, currentStatus: exists.status, newStatus: status })
       }
       return
     }
-
     logger.info('Message status updated', { externalId, newStatus: status, campaignId: row.campaign_id })
-
     if (row.campaign_id && (status === 'delivered' || status === 'read' || status === 'failed')) {
       const field = status === 'delivered' ? 'delivered_count' : status === 'read' ? 'read_count' : 'failed_count'
-      logger.info('Incrementing campaign counter', { status, field, campaignId: row.campaign_id, externalId })
       try {
         const { data: incremented } = await db.rpc('increment_campaign_counter_safe', {
-          p_external_id: externalId,
-          p_campaign_id: row.campaign_id,
-          p_field:       field,
-          p_status:      status,
+          p_external_id: externalId, p_campaign_id: row.campaign_id, p_field: field, p_status: status,
         })
-        if (incremented) {
-          logger.info('Campaign counter incremented', { campaignId: row.campaign_id, field })
-        } else {
-          logger.debug('Campaign counter skipped — already counted', { campaignId: row.campaign_id, field, externalId })
-        }
-      } catch (err) {
-        logger.warn('increment_campaign_counter_safe failed', { err })
-      }
+        if (incremented) logger.info('Campaign counter incremented', { campaignId: row.campaign_id, field })
+        else logger.debug('Campaign counter skipped', { campaignId: row.campaign_id, field, externalId })
+      } catch (err) { logger.warn('increment_campaign_counter_safe failed', { err }) }
     }
-
     if (row.conversation_id) {
       emitPusher(tenantId, 'message.status', { externalId, status, conversationId: row.conversation_id })
     }
   }
 
-  private async savePending(
-    externalId: string,
-    tenantId: string,
-    status: string,
-    timestamp: Date,
-    errorMessage?: string,
-  ): Promise<void> {
+  private async savePending(externalId: string, tenantId: string, status: string, timestamp: Date, errorMessage?: string): Promise<void> {
     const { error } = await db.from('pending_status_updates').upsert({
-      external_id:   externalId,
-      tenant_id:     tenantId,
-      status,
-      timestamp,
-      error_message: errorMessage,
-      payload:       { externalId, status, timestamp, errorMessage },
+      external_id: externalId, tenant_id: tenantId, status, timestamp,
+      error_message: errorMessage, payload: { externalId, status, timestamp, errorMessage },
     }, { onConflict: 'external_id,status', ignoreDuplicates: true })
-
     if (error) logger.error('Failed to save pending', { externalId, status, error: error.message })
     else logger.info('Pending status saved', { externalId, status })
   }
