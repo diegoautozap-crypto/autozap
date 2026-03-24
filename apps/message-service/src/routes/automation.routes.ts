@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole, validate } from '../middleware/message.middleware'
+import { requireAuth, validate } from '../middleware/message.middleware'
 import { ok, AppError } from '@autozap/utils'
 import { db } from '../lib/db'
 
@@ -31,7 +31,7 @@ router.get('/automations', async (req, res, next) => {
 })
 
 // POST /automations
-router.post('/automations', requireRole('admin', 'owner'), validate(automationSchema), async (req, res, next) => {
+router.post('/automations', validate(automationSchema), async (req, res, next) => {
   try {
     const { name, channelId, trigger_type, trigger_value, action_type, action_value, is_active } = req.body
     const { data, error } = await db
@@ -49,7 +49,7 @@ router.post('/automations', requireRole('admin', 'owner'), validate(automationSc
 })
 
 // PATCH /automations/:id
-router.patch('/automations/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+router.patch('/automations/:id', async (req, res, next) => {
   try {
     const update: any = {}
     const allowed = ['name', 'channel_id', 'trigger_type', 'trigger_value', 'action_type', 'action_value', 'is_active']
@@ -73,7 +73,7 @@ router.patch('/automations/:id', requireRole('admin', 'owner'), async (req, res,
 })
 
 // DELETE /automations/:id
-router.delete('/automations/:id', requireRole('admin', 'owner'), async (req, res, next) => {
+router.delete('/automations/:id', async (req, res, next) => {
   try {
     const { error } = await db
       .from('automations')
