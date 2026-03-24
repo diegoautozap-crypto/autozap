@@ -4,6 +4,7 @@ import { conversationService } from '../services/conversation.service'
 import { requireAuth, validate } from '../middleware/conversation.middleware'
 import { ok, paginationSchema } from '@autozap/utils'
 import { db } from '../lib/db'
+import { decryptCredentials } from '../lib/crypto'
 
 const router = Router()
 
@@ -31,8 +32,10 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
       return
     }
 
-    const apiKey = channel.credentials?.apiKey
-    const metaToken = channel.credentials?.metaToken
+    // Decripta credenciais antes de usar
+    const credentials = decryptCredentials(channel.credentials)
+    const apiKey = credentials?.apiKey
+    const metaToken = credentials?.metaToken
 
     // Detecta se é ID numérico (Meta v3) ou URL/ID do Gupshup
     const isMetaId = /^\d+$/.test(mediaId)
