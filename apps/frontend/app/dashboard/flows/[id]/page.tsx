@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -288,6 +288,7 @@ export default function FlowEditorPage() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
   const [flowName, setFlowName] = useState('')
   const [isDirty, setIsDirty] = useState(false)
+  const [initialized, setInitialized] = useState(false)
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -297,32 +298,40 @@ export default function FlowEditorPage() {
     },
   })
 
-  const { isLoading } = useQuery({
+  const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
     queryFn: async () => {
       const { data } = await messageApi.get(`/flows/${id}`)
       return data.data
     },
-    onSuccess: (flow: any) => {
-      setFlowName(flow.name)
-      const loadedNodes: Node[] = (flow.nodes || []).map((n: any) => ({
-        id: n.id,
-        type: 'flowNode',
-        position: { x: n.position_x, y: n.position_y },
-        data: { type: n.type, ...n.data },
-      }))
-      const loadedEdges: Edge[] = (flow.edges || []).map((e: any) => ({
-        id: e.id,
-        source: e.source_node,
-        target: e.target_node,
-        sourceHandle: e.source_handle || 'success',
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
-        style: { stroke: '#d1d5db', strokeWidth: 2 },
-      }))
-      setNodes(loadedNodes)
-      setEdges(loadedEdges)
-    },
-  } as any)
+  })
+
+  // Carrega nós e edges quando o flow é carregado pela primeira vez
+  useEffect(() => {
+    if (!flowData || initialized) return
+
+    setFlowName(flowData.name || '')
+
+    const loadedNodes: Node[] = (flowData.nodes || []).map((n: any) => ({
+      id: n.id,
+      type: 'flowNode',
+      position: { x: n.position_x, y: n.position_y },
+      data: { type: n.type, ...n.data },
+    }))
+
+    const loadedEdges: Edge[] = (flowData.edges || []).map((e: any) => ({
+      id: e.id,
+      source: e.source_node,
+      target: e.target_node,
+      sourceHandle: e.source_handle || 'success',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
+      style: { stroke: '#d1d5db', strokeWidth: 2 },
+    }))
+
+    setNodes(loadedNodes)
+    setEdges(loadedEdges)
+    setInitialized(true)
+  }, [flowData, initialized, setNodes, setEdges])
 
   const saveMutation = useMutation({
     mutationFn: async () => {
