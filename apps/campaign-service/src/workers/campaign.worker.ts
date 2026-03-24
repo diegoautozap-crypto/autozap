@@ -70,9 +70,9 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
 
   let bodyTemplate = ''
 
-  // Caso 1: -d 'body' aspas simples
+  // Caso 1: -d 'body' aspas simples — body inteiro já montado
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
-  // Caso 2: -d "body" aspas duplas
+  // Caso 2: -d "body" aspas duplas — body inteiro já montado
   const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
 
   if (singleQ) {
@@ -81,20 +81,29 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
   } else if (curlStr.includes('--data-urlencode')) {
     // Caso 3: --data-urlencode "campo=valor"
-    // Percorre a string campo a campo para suportar valores com aspas internas (ex: JSON no campo template)
+    // Extrai cada campo pelo nome explicitamente — evita problema de aspas internas no JSON
+    const extract = (fieldName: string): string => {
+      // Tenta formato: --data-urlencode "campo=valor com possíveis aspas"
+      // Usa o próximo --data-urlencode ou fim de string como delimitador
+      const pattern = new RegExp(`--data-urlencode\\s+"${fieldName}=([\\s\\S]*?)(?="\\s+--|"\\s*$)`)
+      const m = curlStr.match(pattern)
+      if (m) return m[1]
+      // Fallback: até o próximo --data-urlencode ou fim
+      const idx = curlStr.indexOf(`--data-urlencode "${fieldName}=`)
+      if (idx === -1) return ''
+      const startVal = idx + `--data-urlencode "${fieldName}=`.length
+      const nextFlag = curlStr.indexOf('--data-urlencode', startVal)
+      const raw = nextFlag === -1 ? curlStr.slice(startVal) : curlStr.slice(startVal, nextFlag)
+      // Remove aspas finais
+      return raw.replace(/"?\s*$/, '').trim()
+    }
+
     const fields: string[] = []
-    let remaining = curlStr
-    const fieldRegex = /--data-urlencode\s+"((?:[^"\\]|\\.)*)"/g
-    let m: RegExpExecArray | null
-    while ((m = fieldRegex.exec(curlStr)) !== null) {
-      const raw = m[1].replace(/\\"/g, '"')
-      const eqIdx = raw.indexOf('=')
-      if (eqIdx === -1) {
-        fields.push(encodeURIComponent(raw))
-      } else {
-        const key = raw.slice(0, eqIdx)
-        const val = raw.slice(eqIdx + 1)
-        fields.push(encodeURIComponent(key) + '=' + encodeURIComponent(val))
+    const fieldNames = ['channel', 'source', 'destination', 'src.name', 'template', 'message', 'postbackTexts']
+    for (const name of fieldNames) {
+      const val = extract(name)
+      if (val !== '') {
+        fields.push(`${encodeURIComponent(name)}=${encodeURIComponent(val)}`)
       }
     }
     if (fields.length > 0) bodyTemplate = fields.join('&')
