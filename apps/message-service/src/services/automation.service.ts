@@ -52,7 +52,12 @@ export class AutomationService {
         return keywords.some(kw => body.includes(kw.toLowerCase().trim()))
       }
       case 'first_message': {
-        return ctx.isFirstMessage
+        if (!ctx.isFirstMessage) return false
+        // Se tiver palavras-chave configuradas, filtra por elas também
+        const keywords: string[] = trigger_value?.keywords || []
+        if (keywords.length === 0) return true
+        const body = (ctx.messageBody || '').toLowerCase()
+        return keywords.some(kw => body.includes(kw.toLowerCase().trim()))
       }
       case 'outside_hours': {
         const start = trigger_value?.start ?? 9

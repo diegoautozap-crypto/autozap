@@ -79,6 +79,8 @@ export default function AutomationsPage() {
         trigger_type: form.trigger_type,
         trigger_value: form.trigger_type === 'keyword'
           ? { keywords: form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) }
+          : form.trigger_type === 'first_message'
+          ? { keywords: form.trigger_value.keywords ? form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [] }
           : form.trigger_type === 'outside_hours'
           ? { start: form.trigger_value.start, end: form.trigger_value.end, days: form.trigger_value.days }
           : {},
@@ -223,6 +225,16 @@ export default function AutomationsPage() {
                 <input style={inputStyle} placeholder="preço, valor, quanto custa, info" value={form.trigger_value.keywords}
                   onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, keywords: e.target.value } })} />
                 <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>A automação dispara se a mensagem contiver qualquer uma das palavras</p>
+              </div>
+            )}
+
+            {form.trigger_type === 'first_message' && (
+              <div>
+                <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
+                <input style={inputStyle} placeholder="campanha1, promo, desconto — deixe vazio para qualquer mensagem"
+                  value={form.trigger_value.keywords}
+                  onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, keywords: e.target.value } })} />
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Se preenchido, dispara apenas se a primeira mensagem contiver uma dessas palavras. Útil para separar fluxos de diferentes campanhas de tráfego.</p>
               </div>
             )}
 
