@@ -17,9 +17,9 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { messageApi, channelApi } from '@/lib/api'
+import { messageApi, channelApi, contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Zap, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react'
+import { Zap, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, GripVertical, Tag } from 'lucide-react'
 
 const TRIGGER_TYPES = [
   { value: 'keyword', label: 'Palavra-chave recebida', desc: 'Dispara quando a mensagem contém uma palavra específica' },
@@ -31,6 +31,7 @@ const ACTION_TYPES = [
   { value: 'send_message', label: 'Enviar mensagem automática' },
   { value: 'assign_agent', label: 'Atribuir a um agente' },
   { value: 'move_pipeline', label: 'Mover no funil' },
+  { value: 'add_tag', label: 'Adicionar tag ao contato' },
 ]
 
 const PIPELINE_STAGES = [
@@ -60,7 +61,7 @@ function emptyForm() {
     trigger_type: 'keyword',
     trigger_value: { keywords: '', start: 9, end: 18, days: [1,2,3,4,5] },
     action_type: 'send_message',
-    action_value: { message: '', delay: 0, stage: 'lead' },
+    action_value: { message: '', delay: 0, stage: 'lead', tagId: '' },
     cooldown_minutes: null as number | null,
   }
 }
@@ -72,6 +73,7 @@ function SortableAutomationCard({
   onEdit,
   onDelete,
   isDimmed,
+  tags,
 }: {
   automation: any
   index: number
@@ -79,6 +81,7 @@ function SortableAutomationCard({
   onEdit: () => void
   onDelete: () => void
   isDimmed: boolean
+  tags: any[]
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: automation.id })
 
@@ -109,6 +112,10 @@ function SortableAutomationCard({
     if (a.action_type === 'send_message') return `Responder: "${(a.action_value?.message || '').slice(0, 40)}${a.action_value?.message?.length > 40 ? '...' : ''}"`
     if (a.action_type === 'move_pipeline') return `Mover para: ${a.action_value?.stage}`
     if (a.action_type === 'assign_agent') return 'Atribuir agente'
+    if (a.action_type === 'add_tag') {
+      const tag = tags.find(t => t.id === a.action_value?.tagId)
+      return tag ? `Adicionar tag: ${tag.name}` : 'Adicionar tag'
+    }
     return a.action_type
   }
 
@@ -208,6 +215,14 @@ export default function AutomationsPage() {
     },
   })
 
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data } = await contactApi.get('/tags')
+      return data.data || []
+    },
+  })
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -228,6 +243,8 @@ export default function AutomationsPage() {
           ? { message: form.action_value.message, delay: form.action_value.delay }
           : form.action_type === 'move_pipeline'
           ? { stage: form.action_value.stage }
+          : form.action_type === 'add_tag'
+          ? { tagId: form.action_value.tagId }
           : {},
         cooldown_minutes: form.cooldown_minutes,
       }
@@ -284,11 +301,9 @@ export default function AutomationsPage() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
-
     const oldIndex = displayList.findIndex((a) => a.id === active.id)
     const newIndex = displayList.findIndex((a) => a.id === over.id)
     const reordered = arrayMove(displayList, oldIndex, newIndex)
-
     setLocalList(reordered)
     reorderMutation.mutate(reordered.map((a, index) => ({ id: a.id, sort_order: index })))
   }
@@ -310,6 +325,7 @@ export default function AutomationsPage() {
         message: a.action_value?.message || '',
         delay: a.action_value?.delay || 0,
         stage: a.action_value?.stage || 'lead',
+        tagId: a.action_value?.tagId || '',
       },
       cooldown_minutes: a.cooldown_minutes ?? null,
     })
@@ -356,6 +372,7 @@ export default function AutomationsPage() {
             </div>
           </div>
 
+          {/* Trigger */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '14px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>🎯 Gatilho — quando disparar</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
@@ -403,6 +420,7 @@ export default function AutomationsPage() {
             )}
           </div>
 
+          {/* Action */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⚡ Ação — o que fazer</p>
             <div style={{ marginBottom: '14px' }}>
@@ -456,8 +474,50 @@ export default function AutomationsPage() {
                 </select>
               </div>
             )}
+
+            {form.action_type === 'add_tag' && (
+              <div>
+                <label style={labelStyle}>Tag a adicionar</label>
+                {tags.length === 0 ? (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#92400e' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <Tag size={14} />
+                      <span style={{ fontWeight: 600 }}>Nenhuma tag cadastrada</span>
+                    </div>
+                    <p>Acesse a página de Contatos e crie suas tags antes de usar esta ação.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {tags.map((tag: any) => (
+                        <div
+                          key={tag.id}
+                          onClick={() => setForm({ ...form, action_value: { ...form.action_value, tagId: tag.id } })}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '6px 12px', borderRadius: '99px', cursor: 'pointer',
+                            border: `2px solid ${form.action_value.tagId === tag.id ? (tag.color || '#16a34a') : '#e5e7eb'}`,
+                            background: form.action_value.tagId === tag.id ? `${tag.color || '#16a34a'}18` : '#fff',
+                            fontSize: '13px', fontWeight: 500,
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
+                          <span style={{ color: form.action_value.tagId === tag.id ? (tag.color || '#15803d') : '#374151' }}>{tag.name}</span>
+                          {form.action_value.tagId === tag.id && <Check size={12} color={tag.color || '#15803d'} />}
+                        </div>
+                      ))}
+                    </div>
+                    {!form.action_value.tagId && (
+                      <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px' }}>Selecione uma tag acima</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
+          {/* Cooldown */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⏱ Frequência — quantas vezes disparar</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -479,8 +539,10 @@ export default function AutomationsPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => saveMutation.mutate()} disabled={!form.name || saveMutation.isPending}
-              style={{ padding: '10px 24px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.name ? 0.5 : 1 }}>
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={!form.name || saveMutation.isPending || (form.action_type === 'add_tag' && !form.action_value.tagId)}
+              style={{ padding: '10px 24px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (!form.name || (form.action_type === 'add_tag' && !form.action_value.tagId)) ? 0.5 : 1 }}>
               {saveMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
               {editingId ? 'Salvar alterações' : 'Criar automação'}
             </button>
@@ -519,6 +581,7 @@ export default function AutomationsPage() {
                     automation={a}
                     index={index}
                     isDimmed={reorderMutation.isPending}
+                    tags={tags}
                     onToggle={() => toggleMutation.mutate({ id: a.id, isActive: a.is_active })}
                     onEdit={() => startEdit(a)}
                     onDelete={() => { if (confirm(`Excluir "${a.name}"?`)) deleteMutation.mutate(a.id) }}
