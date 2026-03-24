@@ -29,15 +29,32 @@ function getInitials(name: string | undefined | null) {
 
 function getAvatarColor(name: string | undefined | null) {
   const colors = [
-    { bg: '#dbeafe', color: '#1d4ed8' },
-    { bg: '#dcfce7', color: '#15803d' },
-    { bg: '#fce7f3', color: '#be185d' },
-    { bg: '#ede9fe', color: '#6d28d9' },
-    { bg: '#ffedd5', color: '#c2410c' },
-    { bg: '#e0f2fe', color: '#0369a1' },
+    { bg: '#dbeafe', color: '#1d4ed8' }, { bg: '#dcfce7', color: '#15803d' },
+    { bg: '#fce7f3', color: '#be185d' }, { bg: '#ede9fe', color: '#6d28d9' },
+    { bg: '#ffedd5', color: '#c2410c' }, { bg: '#e0f2fe', color: '#0369a1' },
   ]
-  const idx = ((name || '').charCodeAt(0) || 0) % colors.length
-  return colors[idx]
+  return colors[((name || '').charCodeAt(0) || 0) % colors.length]
+}
+
+function ContactTags({ contact }: { contact: any }) {
+  const tags = (contact.contact_tags || [])
+    .map((ct: any) => ct.tags)
+    .filter(Boolean)
+  if (!tags.length) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+      {tags.map((tag: any) => (
+        <span key={tag.id} style={{
+          fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
+          background: `${tag.color || '#6b7280'}18`,
+          color: tag.color || '#6b7280',
+          border: `1px solid ${tag.color || '#6b7280'}40`,
+        }}>
+          {tag.name}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export default function ContactsPage() {
@@ -164,6 +181,7 @@ export default function ContactsPage() {
       const rows = allContacts.map((c: any) => ({
         telefone: c.phone || '', nome: c.name || '', email: c.email || '',
         empresa: c.company || '',
+        tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '),
         ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
@@ -242,27 +260,19 @@ export default function ContactsPage() {
             </button>
           )}
           <button onClick={handleExport}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={13} /> Exportar CSV
           </button>
           <button onClick={handleExportExcel}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <FileSpreadsheet size={13} /> Exportar Excel
           </button>
           <button onClick={() => setShowTags(!showTags)}
-            style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = showTags ? '#f0fdf4' : '#fff' }}>
+            style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Tag size={13} /> Tags {tags.length > 0 && `(${tags.length})`}
           </button>
           <button onClick={() => setShowCreate(!showCreate)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
+            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={13} /> Novo contato
           </button>
         </div>
@@ -277,8 +287,6 @@ export default function ContactsPage() {
               <X size={16} />
             </button>
           </div>
-
-          {/* Criar nova tag */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '180px' }}>
               <label style={labelStyle}>Nome da tag</label>
@@ -301,8 +309,6 @@ export default function ContactsPage() {
               Criar tag
             </button>
           </div>
-
-          {/* Lista de tags existentes */}
           {tags.length === 0 ? (
             <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag criada ainda.</p>
           ) : (
@@ -387,7 +393,7 @@ export default function ContactsPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center' }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
               {['Nome', 'Telefone', 'Email', 'Última interação', ''].map(h => (
                 <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
@@ -399,17 +405,22 @@ export default function ContactsPage() {
               const av = getAvatarColor(c.name)
               return (
                 <div key={c.id}
-                  style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '13px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
+                  style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>
                       {getInitials(c.name)}
                     </div>
-                    {isEditing ? (
-                      <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                    ) : (
-                      <span style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</span>
-                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {isEditing ? (
+                        <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
+                      ) : (
+                        <>
+                          <div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div>
+                          <ContactTags contact={c} />
+                        </>
+                      )}
+                    </div>
                   </div>
                   <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
                   {isEditing ? (

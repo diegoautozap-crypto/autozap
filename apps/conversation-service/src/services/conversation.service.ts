@@ -127,7 +127,7 @@ export class ConversationService {
     return (data || []).reverse()
   }
 
-  // ─── Pipeline board com filtros ───────────────────────────────────────────
+  // ─── Pipeline board com filtros e tags ────────────────────────────────────
   async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string) {
     const stages: PipelineStage[] = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
@@ -135,7 +135,7 @@ export class ConversationService {
       .from('conversations')
       .select(`
         id, pipeline_stage, last_message, last_message_at, unread_count, channel_id, campaign_id,
-        contacts(id, name, phone, avatar_url),
+        contacts(id, name, phone, avatar_url, contact_tags(tag_id, tags(id, name, color))),
         channels(id, name)
       `)
       .eq('tenant_id', tenantId)

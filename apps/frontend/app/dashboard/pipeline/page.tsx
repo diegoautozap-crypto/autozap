@@ -31,6 +31,25 @@ function getAvatarColor(n: string | undefined | null) {
   return colors[((n || '').charCodeAt(0) || 0) % colors.length]
 }
 
+function ContactTagBadges({ contact }: { contact: any }) {
+  const tags = (contact?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
+  if (!tags.length) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+      {tags.map((tag: any) => (
+        <span key={tag.id} style={{
+          fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '99px',
+          background: `${tag.color || '#6b7280'}18`,
+          color: tag.color || '#6b7280',
+          border: `1px solid ${tag.color || '#6b7280'}30`,
+        }}>
+          {tag.name}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -69,32 +88,24 @@ export default function PipelinePage() {
       localBoardRef.current = null
       return data.data as Record<string, any[]>
     },
-    staleTime: Infinity, // nunca refetch automático — só via Pusher ou botão manual
+    staleTime: Infinity,
     placeholderData: (prev) => prev,
   })
 
-  // Pusher — atualiza pipeline silenciosamente quando chega mensagem nova
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
     if (!key || !user) return
-
     const pusher = new Pusher(key, { cluster })
     const tenantId = (user as any)?.tenantId || (user as any)?.tid
     if (!tenantId) return
-
     const channel = pusher.subscribe(`tenant-${tenantId}`)
-
-    // Quando chega mensagem nova, invalida o cache silenciosamente
-    // placeholderData garante que o board atual continua visível durante o refetch
     channel.bind('inbound.message', () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
     })
-
     channel.bind('conversation.updated', () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
     })
-
     return () => {
       channel.unbind_all()
       pusher.unsubscribe(`tenant-${tenantId}`)
@@ -103,7 +114,6 @@ export default function PipelinePage() {
   }, [user, queryClient])
 
   const displayBoard = localBoardRef.current ?? board
-
   const totalConvs = displayBoard
     ? Object.values(displayBoard).reduce((acc, arr) => acc + arr.length, 0)
     : 0
@@ -266,7 +276,7 @@ export default function PipelinePage() {
                           onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.1)' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.06)' }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
                               {getInitials(name)}
                             </div>
@@ -274,12 +284,16 @@ export default function PipelinePage() {
                               {name}
                             </span>
                           </div>
+
+                          {/* Tags do contato */}
+                          <ContactTagBadges contact={conv.contacts} />
+
                           {conv.last_message && (
-                            <p style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '7px' }}>
+                            <p style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>
                               {conv.last_message}
                             </p>
                           )}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
                             {conv.channels?.name && (
                               <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px' }}>
                                 {conv.channels.name}
