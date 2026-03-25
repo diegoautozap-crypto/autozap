@@ -4,6 +4,10 @@ import { generateId } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
+const PUSHER_KEY     = process.env.PUSHER_KEY
+const PUSHER_SECRET  = process.env.PUSHER_SECRET
+const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
 
 interface FlowContext {
   tenantId: string
@@ -15,11 +19,22 @@ interface FlowContext {
   isFirstMessage: boolean
 }
 
+async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
+  if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
+  try {
+    const body = JSON.stringify({ name: event, channel: `tenant-${tenantId}`, data: JSON.stringify(data) })
+    const crypto = await import('crypto')
+    const ts  = Math.floor(Date.now() / 1000)
+    const md5 = crypto.createHash('md5').update(body).digest('hex')
+    const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
+    await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+  } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
+}
+
 export class FlowEngine {
 
   async processFlows(ctx: FlowContext): Promise<void> {
     try {
-      // Busca todos os flows ativos do tenant para esse canal
       const { data: flows } = await db
         .from('flows')
         .select('*')
@@ -36,7 +51,7 @@ export class FlowEngine {
         if (triggered) {
           logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
           await this.executeFlow(flow, ctx)
-          break // primeira flow que bater executa e para
+          break
         }
       }
     } catch (err) {
@@ -45,7 +60,6 @@ export class FlowEngine {
   }
 
   private async checkFlowTrigger(flow: any, ctx: FlowContext): Promise<boolean> {
-    // Busca o nó gatilho do flow (tipo começa com trigger_)
     const { data: nodes } = await db
       .from('flow_nodes')
       .select('*')
@@ -91,7 +105,6 @@ export class FlowEngine {
   }
 
   private async executeFlow(flow: any, ctx: FlowContext): Promise<void> {
-    // Carrega todos os nós e edges do flow
     const { data: nodes } = await db
       .from('flow_nodes')
       .select('*')
@@ -104,7 +117,6 @@ export class FlowEngine {
 
     if (!nodes || nodes.length === 0) return
 
-    // Monta mapa de nós e edges para navegação rápida
     const nodeMap = new Map(nodes.map((n: any) => [n.id, n]))
     const edgeMap = new Map<string, any[]>()
     for (const edge of (edges || [])) {
@@ -113,14 +125,12 @@ export class FlowEngine {
       edgeMap.get(key)!.push(edge)
     }
 
-    // Começa pelo nó gatilho
     const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
     if (!triggerNode) return
 
-    // Percorre o grafo a partir do gatilho
     let currentNode = this.getNextNode(triggerNode.id, 'success', edgeMap, nodeMap)
     let stepCount = 0
-    const MAX_STEPS = 50 // proteção contra loop infinito
+    const MAX_STEPS = 50
 
     while (currentNode && stepCount < MAX_STEPS) {
       stepCount++
@@ -168,7 +178,7 @@ export class FlowEngine {
           const minutes = data?.minutes || 0
           const hours = data?.hours || 0
           const totalMs = (seconds + minutes * 60 + hours * 3600) * 1000
-          if (totalMs > 0 && totalMs <= 300000) { // máx 5 minutos de wait síncrono
+          if (totalMs > 0 && totalMs <= 300000) {
             await new Promise(r => setTimeout(r, totalMs))
           }
           break
@@ -190,6 +200,11 @@ export class FlowEngine {
           await db.from('conversations')
             .update({ pipeline_stage: stage })
             .eq('id', ctx.conversationId)
+          // Emite Pusher para atualizar pipeline em tempo real
+          emitPusher(ctx.tenantId, 'conversation.updated', {
+            conversationId: ctx.conversationId,
+            pipelineStage: stage,
+          })
           break
         }
 
