@@ -5,7 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check } from 'lucide-react'
+import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock } from 'lucide-react'
+
+const COOLDOWN_OPTIONS = [
+  { value: '24h',    label: '24 horas',    desc: 'Dispara no máximo 1x por dia por conversa' },
+  { value: 'once',   label: 'Uma vez só',  desc: 'Dispara apenas 1 vez por conversa, nunca mais' },
+  { value: 'always', label: 'Sempre',      desc: 'Dispara toda vez que o gatilho for acionado' },
+]
 
 export default function FlowsPage() {
   const router = useRouter()
@@ -13,11 +19,12 @@ export default function FlowsPage() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
+  const [newCooldown, setNewCooldown] = useState('24h')
 
-  // Estado do modal de edição
   const [editingFlow, setEditingFlow] = useState<any | null>(null)
   const [editName, setEditName] = useState('')
   const [editChannelId, setEditChannelId] = useState('')
+  const [editCooldown, setEditCooldown] = useState('24h')
 
   const { data: flows = [], isLoading } = useQuery({
     queryKey: ['flows'],
@@ -40,6 +47,7 @@ export default function FlowsPage() {
       const { data } = await messageApi.post('/flows', {
         name: newName,
         channelId: newChannelId || null,
+        cooldown_type: newCooldown,
       })
       return data.data
     },
@@ -49,6 +57,7 @@ export default function FlowsPage() {
       setShowNew(false)
       setNewName('')
       setNewChannelId('')
+      setNewCooldown('24h')
       router.push(`/dashboard/flows/${flow.id}`)
     },
     onError: () => toast.error('Erro ao criar flow'),
@@ -59,6 +68,7 @@ export default function FlowsPage() {
       await messageApi.patch(`/flows/${editingFlow.id}`, {
         name: editName,
         channelId: editChannelId || null,
+        cooldown_type: editCooldown,
       })
     },
     onSuccess: () => {
@@ -93,6 +103,7 @@ export default function FlowsPage() {
     setEditingFlow(f)
     setEditName(f.name)
     setEditChannelId(f.channel_id || '')
+    setEditCooldown(f.cooldown_type || '24h')
   }
 
   const inputStyle: React.CSSProperties = {
@@ -106,6 +117,40 @@ export default function FlowsPage() {
     return ch?.name || 'Todos os canais'
   }
 
+  const cooldownLabel = (type: string) => {
+    return COOLDOWN_OPTIONS.find(o => o.value === type)?.label || '24 horas'
+  }
+
+  function CooldownSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {COOLDOWN_OPTIONS.map(opt => (
+          <div key={opt.value} onClick={() => onChange(opt.value)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+              borderRadius: '8px', cursor: 'pointer',
+              border: `2px solid ${value === opt.value ? '#16a34a' : '#e5e7eb'}`,
+              background: value === opt.value ? '#f0fdf4' : '#f9fafb',
+              transition: 'all 0.1s',
+            }}>
+            <div style={{
+              width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+              border: `2px solid ${value === opt.value ? '#16a34a' : '#d1d5db'}`,
+              background: value === opt.value ? '#16a34a' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {value === opt.value && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: value === opt.value ? '#15803d' : '#111827' }}>{opt.label}</div>
+              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{opt.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '32px', maxWidth: '900px' }}>
 
@@ -115,8 +160,7 @@ export default function FlowsPage() {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Flows</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
+        <button onClick={() => setShowNew(true)}
           style={{ padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={14} /> Novo flow
         </button>
@@ -140,6 +184,13 @@ export default function FlowsPage() {
               </select>
             </div>
           </div>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+              <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
+              Cooldown — com que frequência esse flow pode disparar?
+            </label>
+            <CooldownSelector value={newCooldown} onChange={setNewCooldown} />
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}
               style={{ padding: '9px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newName ? 0.5 : 1 }}>
@@ -158,7 +209,7 @@ export default function FlowsPage() {
       {editingFlow && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setEditingFlow(null)}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px', width: '460px', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px', width: '480px', boxShadow: '0 20px 60px rgba(0,0,0,.2)', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>Editar flow</h3>
@@ -179,6 +230,13 @@ export default function FlowsPage() {
                   <option value="">Todos os canais</option>
                   {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                  <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                  Cooldown — com que frequência esse flow pode disparar?
+                </label>
+                <CooldownSelector value={editCooldown} onChange={setEditCooldown} />
               </div>
             </div>
 
@@ -229,7 +287,7 @@ export default function FlowsPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : 'Todos os canais'}
+                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : 'Todos os canais'} · {cooldownLabel(f.cooldown_type || '24h')}
                 </p>
               </div>
 

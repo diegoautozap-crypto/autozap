@@ -11,6 +11,7 @@ const flowSchema = z.object({
   name: z.string().min(1).max(255),
   channelId: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional().default(true),
+  cooldown_type: z.enum(['24h', 'once', 'always']).optional().default('24h'),
 })
 
 const graphSchema = z.object({
@@ -53,7 +54,7 @@ router.get('/flows', async (req, res, next) => {
 // POST /flows
 router.post('/flows', validate(flowSchema), async (req, res, next) => {
   try {
-    const { name, channelId, is_active } = req.body
+    const { name, channelId, is_active, cooldown_type } = req.body
 
     const { data: last } = await db
       .from('flows')
@@ -73,6 +74,7 @@ router.post('/flows', validate(flowSchema), async (req, res, next) => {
         name,
         is_active: is_active ?? true,
         sort_order: nextOrder,
+        cooldown_type: cooldown_type || '24h',
       })
       .select()
       .single()
@@ -110,7 +112,7 @@ router.get('/flows/:id', async (req, res, next) => {
 router.patch('/flows/:id', async (req, res, next) => {
   try {
     const update: any = {}
-    const allowed = ['name', 'is_active', 'channel_id']
+    const allowed = ['name', 'is_active', 'channel_id', 'cooldown_type']
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key]
     }
