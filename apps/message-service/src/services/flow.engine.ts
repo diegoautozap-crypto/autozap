@@ -1,3 +1,4 @@
+
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { generateId } from '@autozap/utils'
@@ -287,7 +288,11 @@ export class FlowEngine {
           }
 
           const { default: OpenAI } = await import('openai')
-          const openai = new OpenAI({ apiKey: openaiKey })
+          const openai = new OpenAI({ 
+            apiKey: openaiKey,
+            timeout: 30000, // 30 segundos
+            maxRetries: 1,
+          })
           const aiMode = data?.mode || 'respond'
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
