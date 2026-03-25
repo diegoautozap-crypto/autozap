@@ -503,6 +503,15 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
                 </p>
               )}
             </div>
+            {d.mode === 'respond' && (
+              <div>
+                <label style={labelStyle}>Mensagens do histórico (contexto)</label>
+                <input type="number" min="5" max="200" style={{ ...inputStyle, maxWidth: '100px' }}
+                  value={d.historyMessages ?? 50}
+                  onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} />
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Quantas mensagens anteriores a IA vai ler para entender o contexto. Recomendado: 50</p>
+              </div>
+            )}
           </>
         )}
 

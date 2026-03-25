@@ -292,39 +292,73 @@ export class FlowEngine {
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
 
-          let prompt = ''
+          // Busca histórico da conversa para manter contexto
+          const maxHistory = data?.historyMessages || 50
+          const { data: history } = await db
+            .from('messages')
+            .select('direction, body, content_type, created_at')
+            .eq('conversation_id', ctx.conversationId)
+            .eq('tenant_id', ctx.tenantId)
+            .in('content_type', ['text'])
+            .not('body', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(maxHistory)
+
+          // Monta array de mensagens com histórico (ordem cronológica)
+          const historyMessages: { role: 'user' | 'assistant'; content: string }[] = (history || [])
+            .reverse()
+            .filter((m: any) => m.body && m.body.trim())
+            .map((m: any) => ({
+              role: m.direction === 'inbound' ? 'user' : 'assistant',
+              content: m.body,
+            }))
+
+          let messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
 
           if (aiMode === 'respond') {
-            prompt = userMessage
+            // Usa histórico completo + system prompt
+            messages = [
+              { role: 'system', content: systemPrompt },
+              ...historyMessages,
+            ]
+            // Se a última mensagem do histórico não for a mensagem atual, adiciona
+            const lastHistoryMsg = historyMessages[historyMessages.length - 1]
+            if (!lastHistoryMsg || lastHistoryMsg.content !== userMessage) {
+              messages.push({ role: 'user', content: userMessage })
+            }
           } else if (aiMode === 'classify') {
             const options = (data?.classifyOptions || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-            prompt = `Classifique a mensagem a seguir em UMA das categorias: ${options.join(', ')}.\nResponda APENAS com a categoria, sem explicações.\n\nMensagem: "${userMessage}"`
+            messages = [
+              { role: 'system', content: `Classifique a mensagem em UMA das categorias: ${options.join(', ')}. Responda APENAS com a categoria, sem explicações.` },
+              { role: 'user', content: userMessage },
+            ]
           } else if (aiMode === 'extract') {
             const field = data?.extractField || 'informação'
-            prompt = `Extraia apenas ${field} da mensagem a seguir. Responda apenas com o valor extraído, sem explicações.\n\nMensagem: "${userMessage}"`
+            messages = [
+              { role: 'system', content: `Extraia apenas ${field} da mensagem. Responda apenas com o valor extraído, sem explicações.` },
+              { role: 'user', content: userMessage },
+            ]
           } else if (aiMode === 'summarize') {
-            prompt = `Resuma a seguinte mensagem em uma frase curta:\n\n"${userMessage}"`
+            messages = [
+              { role: 'system', content: 'Resuma a mensagem em uma frase curta.' },
+              { role: 'user', content: userMessage },
+            ]
           }
 
           const completion = await openai.chat.completions.create({
             model: data?.model || 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: prompt },
-            ],
-            max_tokens: data?.maxTokens || 500,
+            messages,
+            max_tokens: data?.maxTokens || 1000,
             temperature: data?.temperature ?? 0.7,
           })
 
           const aiResponse = completion.choices[0]?.message?.content?.trim() || ''
-          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100) })
+          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100), historySize: historyMessages.length })
 
-          // Salva resposta em variável
           if (data?.saveAs) {
             variables[data.saveAs] = aiResponse
           }
 
-          // Se modo responder, envia a mensagem para o cliente
           if (aiMode === 'respond' && aiResponse) {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: aiResponse })
           }
