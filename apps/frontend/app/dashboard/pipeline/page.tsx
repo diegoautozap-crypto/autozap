@@ -101,10 +101,12 @@ export default function PipelinePage() {
     if (!tenantId) return
     const channel = pusher.subscribe(`tenant-${tenantId}`)
     channel.bind('inbound.message', () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+      localBoardRef.current = null
+      queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
     })
     channel.bind('conversation.updated', () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+      localBoardRef.current = null
+      queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
     })
     return () => {
       channel.unbind_all()
@@ -124,7 +126,8 @@ export default function PipelinePage() {
     },
     onSuccess: () => {
       localBoardRef.current = null
-      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+      localBoardRef.current = null
+      queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
     },
     onError: () => {
       localBoardRef.current = null
