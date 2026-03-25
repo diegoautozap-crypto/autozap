@@ -88,7 +88,9 @@ export default function PipelinePage() {
       localBoardRef.current = null
       return data.data as Record<string, any[]>
     },
-    staleTime: Infinity,
+    staleTime: 8000,
+    refetchInterval: 10000,
+    refetchIntervalInBackground: false,
     placeholderData: (prev) => prev,
   })
 
