@@ -48,15 +48,52 @@ export class FlowEngine {
 
       for (const flow of flows) {
         const triggered = await this.checkFlowTrigger(flow, ctx)
-        if (triggered) {
-          logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
-          await this.executeFlow(flow, ctx)
-          break
+        if (!triggered) continue
+
+        // Verifica cooldown antes de executar
+        const onCooldown = await this.isOnCooldown(flow, ctx)
+        if (onCooldown) {
+          logger.info('Flow skipped — cooldown active', { flowId: flow.id, cooldownType: flow.cooldown_type })
+          continue
         }
+
+        logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
+        await this.executeFlow(flow, ctx)
+        break
       }
     } catch (err) {
       logger.error('Flow engine error', { err, tenantId: ctx.tenantId })
     }
+  }
+
+  private async isOnCooldown(flow: any, ctx: FlowContext): Promise<boolean> {
+    const cooldownType = flow.cooldown_type || '24h'
+
+    // 'always' = sem cooldown, sempre dispara
+    if (cooldownType === 'always') return false
+
+    // Busca última execução completa desse flow nessa conversa
+    const { data } = await db
+      .from('flow_logs')
+      .select('created_at')
+      .eq('flow_id', flow.id)
+      .eq('conversation_id', ctx.conversationId)
+      .eq('status', 'flow_executed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (!data || data.length === 0) return false // nunca executou
+
+    const lastExecution = new Date(data[0].created_at)
+
+    if (cooldownType === 'once') return true // já executou, nunca mais
+
+    if (cooldownType === '24h') {
+      const diff = Date.now() - lastExecution.getTime()
+      return diff < 24 * 60 * 60 * 1000
+    }
+
+    return false
   }
 
   private async checkFlowTrigger(flow: any, ctx: FlowContext): Promise<boolean> {
@@ -139,6 +176,9 @@ export class FlowEngine {
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
+    // Salva log de execução completa para controle de cooldown
+    await this.logNode(flow.id, 'flow_completed', ctx, 'flow_executed', `Flow executado com ${stepCount} passos`)
+
     logger.info('Flow executed', { flowId: flow.id, steps: stepCount, tenantId: ctx.tenantId })
   }
 
@@ -200,7 +240,6 @@ export class FlowEngine {
           await db.from('conversations')
             .update({ pipeline_stage: stage })
             .eq('id', ctx.conversationId)
-          // Emite Pusher para atualizar pipeline em tempo real
           emitPusher(ctx.tenantId, 'conversation.updated', {
             conversationId: ctx.conversationId,
             pipelineStage: stage,
@@ -274,7 +313,7 @@ export class FlowEngine {
 
   private async logNode(
     flowId: string, nodeId: string, ctx: FlowContext,
-    status: 'success' | 'error', detail: string
+    status: string, detail: string
   ): Promise<void> {
     try {
       await db.from('flow_logs').insert({
