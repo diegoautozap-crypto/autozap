@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import {
   Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
   MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
-  Upload, X, Reply, GitBranch, AlignLeft,
+  Upload, X, Reply, GitBranch, AlignLeft, Webhook,
 } from 'lucide-react'
 
 const supabase = createClient(
@@ -39,6 +39,7 @@ const NODE_COLORS: Record<string, string> = {
   add_tag:               '#0891b2',
   move_pipeline:         '#d97706',
   assign_agent:          '#db2777',
+  webhook:               '#0f172a',
 }
 
 const NODE_ICONS: Record<string, any> = {
@@ -57,6 +58,7 @@ const NODE_ICONS: Record<string, any> = {
   add_tag:               Tag,
   move_pipeline:         MoveRight,
   assign_agent:          UserCheck,
+  webhook:               Webhook,
 }
 
 const NODE_LABELS: Record<string, string> = {
@@ -75,6 +77,7 @@ const NODE_LABELS: Record<string, string> = {
   add_tag:               'Adicionar tag',
   move_pipeline:         'Mover no funil',
   assign_agent:          'Atribuir agente',
+  webhook:               'Webhook',
 }
 
 function FlowNode({ data, selected }: { data: any; selected: boolean }) {
@@ -103,6 +106,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'add_tag') return data.tagName || 'Tag não selecionada'
     if (data.type === 'move_pipeline') return data.stage || 'Etapa não definida'
     if (data.type === 'assign_agent') return 'Atribuir ao próximo agente'
+    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
     return ''
   }
 
@@ -381,6 +385,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
                 <option value="message">Mensagem recebida</option>
                 <option value="variable">Variável capturada</option>
                 <option value="phone">Telefone do contato</option>
+                <option value="webhook_status">Status do Webhook</option>
               </select>
             </div>
             {d.conditionType === 'variable' && (
@@ -481,6 +486,65 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
               value={d.message || ''}
               onChange={e => onUpdate(node.id, { message: e.target.value })} />
           </div>
+        )}
+
+        {d.type === 'webhook' && (
+          <>
+            <div>
+              <label style={labelStyle}>URL</label>
+              <input style={inputStyle} placeholder="https://api.seusite.com/webhook"
+                value={d.url || ''}
+                onChange={e => onUpdate(node.id, { url: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Método HTTP</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.method || 'POST'}
+                onChange={e => onUpdate(node.id, { method: e.target.value })}>
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+                <option value="PUT">PUT</option>
+              </select>
+            </div>
+            {(d.method || 'POST') !== 'GET' && (
+              <div>
+                <label style={labelStyle}>Body (JSON)</label>
+                <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
+                  placeholder={'{\n  "phone": "{{phone}}",\n  "nome": "{{nome}}"\n}'}
+                  value={d.body || ''}
+                  onChange={e => onUpdate(node.id, { body: e.target.value })} />
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para inserir dados dinâmicos</p>
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Headers customizados (JSON, opcional)</label>
+              <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
+                placeholder={'{"Authorization": "Bearer token"}'}
+                value={d.headers || ''}
+                onChange={e => onUpdate(node.id, { headers: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Salvar resposta como variável (opcional)</label>
+              <input style={inputStyle} placeholder="resposta_webhook"
+                value={d.saveResponseAs || ''}
+                onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
+            </div>
+            {d.saveResponseAs && (
+              <div>
+                <label style={labelStyle}>Campo da resposta (opcional)</label>
+                <input style={inputStyle} placeholder="data.status (deixe vazio para resposta completa)"
+                  value={d.responseField || ''}
+                  onChange={e => onUpdate(node.id, { responseField: e.target.value })} />
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                  Use {'{{' + (d.saveResponseAs || 'resposta') + '}}'} nos próximos nós
+                </p>
+              </div>
+            )}
+            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
+              <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>Variáveis automáticas:</p>
+              <p style={{ fontSize: '11px', color: '#9ca3af' }}>{'{{webhook_status}}'} — código HTTP (200, 404...)</p>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{'{{webhook_ok}}'} — "true" se sucesso</p>
+            </div>
+          </>
         )}
       </div>
 
@@ -610,6 +674,7 @@ export default function FlowEditorPage() {
     { type: 'add_tag',       label: 'Adicionar tag' },
     { type: 'move_pipeline', label: 'Mover no funil' },
     { type: 'assign_agent',  label: 'Atribuir agente' },
+    { type: 'webhook',       label: 'Webhook' },
   ]
 
   if (isLoading) return (

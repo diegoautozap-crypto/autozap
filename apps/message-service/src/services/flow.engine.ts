@@ -35,7 +35,7 @@ export class FlowEngine {
 
   async processFlows(ctx: FlowContext): Promise<void> {
     try {
-      // 1. Verifica se há um flow pausado aguardando resposta do usuário
+      // 1. Verifica se há um flow pausado aguardando resposta
       const resumed = await this.resumeWaitingFlow(ctx)
       if (resumed) return
 
@@ -70,7 +70,6 @@ export class FlowEngine {
     }
   }
 
-  // Retoma um flow pausado aguardando resposta do usuário
   private async resumeWaitingFlow(ctx: FlowContext): Promise<boolean> {
     const { data: state } = await db
       .from('flow_states')
@@ -86,16 +85,13 @@ export class FlowEngine {
 
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
 
-    // Salva a resposta do usuário na variável configurada
     const variables = state.variables || {}
     if (state.waiting_variable) {
       variables[state.waiting_variable] = ctx.messageBody
     }
 
-    // Marca o estado como em execução
     await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
 
-    // Carrega o flow e continua a partir do próximo nó
     const { data: flow } = await db.from('flows').select('*').eq('id', state.flow_id).single()
     if (!flow) return false
 
@@ -110,7 +106,6 @@ export class FlowEngine {
       edgeMap.get(key)!.push(edge)
     }
 
-    // Continua a partir do próximo nó após o input
     let currentNode = this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
     let stepCount = 0
 
@@ -122,10 +117,8 @@ export class FlowEngine {
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
-    // Flow completado
     await db.from('flow_states').update({ status: 'completed', updated_at: new Date() }).eq('id', state.id)
     await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow retomado e executado`)
-
     return true
   }
 
@@ -161,7 +154,6 @@ export class FlowEngine {
 
   private evaluateTrigger(node: any, ctx: FlowContext): boolean {
     const { type, data } = node
-
     switch (type) {
       case 'trigger_keyword': {
         const keywords: string[] = data?.keywords || []
@@ -276,12 +268,10 @@ export class FlowEngine {
         }
 
         case 'input': {
-          // Envia a pergunta se configurada
           if (data?.question) {
             const question = this.interpolate(data.question, ctx, variables)
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: question })
           }
-          // Pausa o flow aguardando resposta
           const saveVar = data?.saveAs || 'resposta'
           await db.from('flow_states').upsert({
             id: stateId || generateId(),
@@ -295,15 +285,88 @@ export class FlowEngine {
             status: 'waiting',
             updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
-          logger.info('Flow paused — waiting for user input', { nodeId: node.id, saveAs: saveVar })
+          logger.info('Flow paused — waiting for input', { nodeId: node.id, saveAs: saveVar })
           return { success: true, paused: true }
         }
 
+        case 'webhook': {
+          const url = this.interpolate(data?.url || '', ctx, variables)
+          if (!url) break
+
+          const method = (data?.method || 'POST').toUpperCase()
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+          // Headers customizados do usuário
+          if (data?.headers) {
+            try {
+              const customHeaders = typeof data.headers === 'string' ? JSON.parse(data.headers) : data.headers
+              Object.assign(headers, customHeaders)
+            } catch { }
+          }
+
+          // Body com variáveis interpoladas
+          let body: string | undefined
+          if (method !== 'GET') {
+            const rawBody = data?.body || '{}'
+            const interpolatedBody = this.interpolate(rawBody, ctx, variables)
+            try {
+              // Garante que é JSON válido
+              JSON.parse(interpolatedBody)
+              body = interpolatedBody
+            } catch {
+              // Se não for JSON, envia os dados padrão
+              body = JSON.stringify({
+                phone: ctx.phone,
+                message: ctx.messageBody,
+                contactId: ctx.contactId,
+                conversationId: ctx.conversationId,
+                ...variables,
+              })
+            }
+          }
+
+          logger.info('Webhook node executing', { url, method })
+
+          const response = await fetch(url, {
+            method,
+            headers,
+            body: method !== 'GET' ? body : undefined,
+            signal: AbortSignal.timeout(10000), // timeout 10s
+          })
+
+          const responseText = await response.text()
+          logger.info('Webhook response', { url, status: response.status, body: responseText.slice(0, 200) })
+
+          // Salva a resposta em variável se configurado
+          if (data?.saveResponseAs) {
+            try {
+              const json = JSON.parse(responseText)
+              // Se tem um campo específico configurado, pega ele
+              if (data?.responseField) {
+                const fieldValue = data.responseField.split('.').reduce((obj: any, key: string) => obj?.[key], json)
+                variables[data.saveResponseAs] = String(fieldValue ?? responseText)
+              } else {
+                variables[data.saveResponseAs] = responseText
+              }
+            } catch {
+              variables[data.saveResponseAs] = responseText
+            }
+          }
+
+          // Salva o status HTTP como variável
+          variables['webhook_status'] = String(response.status)
+          variables['webhook_ok'] = response.ok ? 'true' : 'false'
+
+          if (!response.ok && data?.failOnError) {
+            throw new Error(`Webhook failed with status ${response.status}`)
+          }
+
+          break
+        }
+
         case 'condition': {
-          // Avalia a condição e escolhe o caminho
           const conditionMet = this.evaluateCondition(data, ctx, variables)
           const handle = conditionMet ? 'true' : 'false'
-          // Executa o caminho correto diretamente
           let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
           let steps = 0
           while (nextNode && steps < 50) {
@@ -366,21 +429,14 @@ export class FlowEngine {
     }
   }
 
-  // Avalia condição do condition node
   private evaluateCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
     const { conditionType, field, operator, value } = data || {}
-
     let fieldValue = ''
-
-    if (conditionType === 'message') {
-      fieldValue = ctx.messageBody || ''
-    } else if (conditionType === 'variable') {
-      fieldValue = variables[field] || ''
-    } else if (conditionType === 'phone') {
-      fieldValue = ctx.phone || ''
-    } else {
-      fieldValue = ctx.messageBody || ''
-    }
+    if (conditionType === 'message') fieldValue = ctx.messageBody || ''
+    else if (conditionType === 'variable') fieldValue = variables[field] || ''
+    else if (conditionType === 'phone') fieldValue = ctx.phone || ''
+    else if (conditionType === 'webhook_status') fieldValue = variables['webhook_status'] || ''
+    else fieldValue = ctx.messageBody || ''
 
     const val = (value || '').toLowerCase()
     const fv = fieldValue.toLowerCase()
@@ -402,7 +458,9 @@ export class FlowEngine {
     let result = template
       .replace(/\{\{phone\}\}/gi, ctx.phone)
       .replace(/\{\{telefone\}\}/gi, ctx.phone)
-    // Substitui variáveis capturadas pelo input node
+      .replace(/\{\{message\}\}/gi, ctx.messageBody)
+      .replace(/\{\{contactId\}\}/gi, ctx.contactId)
+      .replace(/\{\{conversationId\}\}/gi, ctx.conversationId)
     for (const [key, value] of Object.entries(variables)) {
       result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'gi'), String(value))
     }
@@ -426,7 +484,7 @@ export class FlowEngine {
     })
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
-      throw new Error(`Failed to send flow message: ${JSON.stringify(err)}`)
+      throw new Error(`Failed to send message: ${JSON.stringify(err)}`)
     }
   }
 
