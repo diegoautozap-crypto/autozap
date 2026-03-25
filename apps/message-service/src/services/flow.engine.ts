@@ -1,7 +1,6 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { generateId } from '@autozap/utils'
-import OpenAI from 'openai'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
@@ -287,6 +286,7 @@ export class FlowEngine {
             break
           }
 
+          const { default: OpenAI } = await import('openai')
           const openai = new OpenAI({ apiKey: openaiKey })
           const aiMode = data?.mode || 'respond'
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
