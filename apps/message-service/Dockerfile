@@ -5,6 +5,7 @@ COPY tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/message-service/package*.json ./apps/message-service/
 RUN npm install --workspaces --include-workspace-root
+RUN npm install openai
 COPY apps/message-service/ ./apps/message-service/
 RUN npm run build --workspace=@autozap/types
 RUN npm run build --workspace=@autozap/utils
