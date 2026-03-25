@@ -138,12 +138,10 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           {subtitle()}
         </div>
       )}
-      {/* Saída padrão */}
       {!isCondition && (
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       )}
-      {/* Condition: duas saídas */}
       {isCondition && (
         <>
           <Handle type="source" position={Position.Right} id="true"
@@ -247,17 +245,20 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
         {d.type === 'trigger_keyword' && (
           <div>
             <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
+            {/* CORREÇÃO: usa defaultValue + onBlur para permitir digitar vírgulas livremente */}
             <input style={inputStyle} placeholder="preço, valor, info"
-              value={(d.keywords || []).join(', ')}
-              onChange={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
+              defaultValue={(d.keywords || []).join(', ')}
+              onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Digite as palavras separadas por vírgula. Clique fora para salvar.</p>
           </div>
         )}
         {d.type === 'trigger_first_message' && (
           <div>
             <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
+            {/* CORREÇÃO: usa defaultValue + onBlur para permitir digitar vírgulas livremente */}
             <input style={inputStyle} placeholder="Deixe vazio para qualquer mensagem"
-              value={(d.keywords || []).join(', ')}
-              onChange={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
+              defaultValue={(d.keywords || []).join(', ')}
+              onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
           </div>
         )}
         {d.type === 'trigger_any_reply' && (
@@ -414,12 +415,9 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             )}
             <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
               <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: 600 }}>Saídas:</p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>✗ Não → caminho vermelho</span>
-              </div>
+              <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span>
+              <br />
+              <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>✗ Não → caminho vermelho</span>
             </div>
           </>
         )}
