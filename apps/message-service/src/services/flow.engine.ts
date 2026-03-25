@@ -1,6 +1,7 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { generateId } from '@autozap/utils'
+import OpenAI from 'openai'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
@@ -35,11 +36,9 @@ export class FlowEngine {
 
   async processFlows(ctx: FlowContext): Promise<void> {
     try {
-      // 1. Verifica se há um flow pausado aguardando resposta
       const resumed = await this.resumeWaitingFlow(ctx)
       if (resumed) return
 
-      // 2. Tenta disparar um novo flow
       const { data: flows } = await db
         .from('flows')
         .select('*')
@@ -86,9 +85,7 @@ export class FlowEngine {
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
 
     const variables = state.variables || {}
-    if (state.waiting_variable) {
-      variables[state.waiting_variable] = ctx.messageBody
-    }
+    if (state.waiting_variable) variables[state.waiting_variable] = ctx.messageBody
 
     await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
 
@@ -112,7 +109,7 @@ export class FlowEngine {
     while (currentNode && stepCount < 50) {
       stepCount++
       const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, state.id)
-      if (result.paused) return true
+      if (result.paused || result.ended) break
       const nextHandle = result.success ? 'success' : 'error'
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
@@ -138,9 +135,7 @@ export class FlowEngine {
     if (!data || data.length === 0) return false
     const lastExecution = new Date(data[0].created_at)
     if (cooldownType === 'once') return true
-    if (cooldownType === '24h') {
-      return Date.now() - lastExecution.getTime() < 24 * 60 * 60 * 1000
-    }
+    if (cooldownType === '24h') return Date.now() - lastExecution.getTime() < 24 * 60 * 60 * 1000
     return false
   }
 
@@ -168,8 +163,7 @@ export class FlowEngine {
         const body = (ctx.messageBody || '').toLowerCase()
         return keywords.some((kw: string) => body.includes(kw.toLowerCase().trim()))
       }
-      case 'trigger_any_reply':
-        return true
+      case 'trigger_any_reply': return true
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
@@ -177,15 +171,13 @@ export class FlowEngine {
         const now = new Date()
         return !days.includes(now.getDay()) || now.getHours() < start || now.getHours() >= end
       }
-      default:
-        return false
+      default: return false
     }
   }
 
   private async executeFlow(flow: any, ctx: FlowContext, variables: Record<string, any>): Promise<void> {
     const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
-
     if (!nodes || nodes.length === 0) return
 
     const nodeMap = new Map(nodes.map((n: any) => [n.id, n]))
@@ -205,7 +197,7 @@ export class FlowEngine {
     while (currentNode && stepCount < 50) {
       stepCount++
       const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, null)
-      if (result.paused) return
+      if (result.paused || result.ended) break
       const nextHandle = result.success ? 'success' : 'error'
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
@@ -226,7 +218,7 @@ export class FlowEngine {
     variables: Record<string, any>,
     edgeMap: Map<string, any[]>, nodeMap: Map<string, any>,
     stateId: string | null
-  ): Promise<{ success: boolean; paused?: boolean }> {
+  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean }> {
     const { type, data } = node
 
     try {
@@ -285,8 +277,59 @@ export class FlowEngine {
             status: 'waiting',
             updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
-          logger.info('Flow paused — waiting for input', { nodeId: node.id, saveAs: saveVar })
           return { success: true, paused: true }
+        }
+
+        case 'ai': {
+          const openaiKey = data?.apiKey || process.env.OPENAI_API_KEY
+          if (!openaiKey) {
+            logger.warn('AI node: no OpenAI API key configured')
+            break
+          }
+
+          const openai = new OpenAI({ apiKey: openaiKey })
+          const aiMode = data?.mode || 'respond'
+          const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
+          const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
+
+          let prompt = ''
+
+          if (aiMode === 'respond') {
+            prompt = userMessage
+          } else if (aiMode === 'classify') {
+            const options = (data?.classifyOptions || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+            prompt = `Classifique a mensagem a seguir em UMA das categorias: ${options.join(', ')}.\nResponda APENAS com a categoria, sem explicações.\n\nMensagem: "${userMessage}"`
+          } else if (aiMode === 'extract') {
+            const field = data?.extractField || 'informação'
+            prompt = `Extraia apenas ${field} da mensagem a seguir. Responda apenas com o valor extraído, sem explicações.\n\nMensagem: "${userMessage}"`
+          } else if (aiMode === 'summarize') {
+            prompt = `Resuma a seguinte mensagem em uma frase curta:\n\n"${userMessage}"`
+          }
+
+          const completion = await openai.chat.completions.create({
+            model: data?.model || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt },
+            ],
+            max_tokens: data?.maxTokens || 500,
+            temperature: data?.temperature ?? 0.7,
+          })
+
+          const aiResponse = completion.choices[0]?.message?.content?.trim() || ''
+          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100) })
+
+          // Salva resposta em variável
+          if (data?.saveAs) {
+            variables[data.saveAs] = aiResponse
+          }
+
+          // Se modo responder, envia a mensagem para o cliente
+          if (aiMode === 'respond' && aiResponse) {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: aiResponse })
+          }
+
+          break
         }
 
         case 'webhook': {
@@ -296,7 +339,6 @@ export class FlowEngine {
           const method = (data?.method || 'POST').toUpperCase()
           const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
-          // Headers customizados do usuário
           if (data?.headers) {
             try {
               const customHeaders = typeof data.headers === 'string' ? JSON.parse(data.headers) : data.headers
@@ -304,44 +346,30 @@ export class FlowEngine {
             } catch { }
           }
 
-          // Body com variáveis interpoladas
           let body: string | undefined
           if (method !== 'GET') {
             const rawBody = data?.body || '{}'
             const interpolatedBody = this.interpolate(rawBody, ctx, variables)
             try {
-              // Garante que é JSON válido
               JSON.parse(interpolatedBody)
               body = interpolatedBody
             } catch {
-              // Se não for JSON, envia os dados padrão
-              body = JSON.stringify({
-                phone: ctx.phone,
-                message: ctx.messageBody,
-                contactId: ctx.contactId,
-                conversationId: ctx.conversationId,
-                ...variables,
-              })
+              body = JSON.stringify({ phone: ctx.phone, message: ctx.messageBody, contactId: ctx.contactId, conversationId: ctx.conversationId, ...variables })
             }
           }
-
-          logger.info('Webhook node executing', { url, method })
 
           const response = await fetch(url, {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: AbortSignal.timeout(10000), // timeout 10s
+            signal: AbortSignal.timeout(10000),
           })
 
           const responseText = await response.text()
-          logger.info('Webhook response', { url, status: response.status, body: responseText.slice(0, 200) })
 
-          // Salva a resposta em variável se configurado
           if (data?.saveResponseAs) {
             try {
               const json = JSON.parse(responseText)
-              // Se tem um campo específico configurado, pega ele
               if (data?.responseField) {
                 const fieldValue = data.responseField.split('.').reduce((obj: any, key: string) => obj?.[key], json)
                 variables[data.saveResponseAs] = String(fieldValue ?? responseText)
@@ -353,14 +381,8 @@ export class FlowEngine {
             }
           }
 
-          // Salva o status HTTP como variável
           variables['webhook_status'] = String(response.status)
           variables['webhook_ok'] = response.ok ? 'true' : 'false'
-
-          if (!response.ok && data?.failOnError) {
-            throw new Error(`Webhook failed with status ${response.status}`)
-          }
-
           break
         }
 
@@ -372,7 +394,7 @@ export class FlowEngine {
           while (nextNode && steps < 50) {
             steps++
             const result = await this.executeNode(nextNode, ctx, flowId, variables, edgeMap, nodeMap, stateId)
-            if (result.paused) return { success: true, paused: true }
+            if (result.paused || result.ended) return result
             nextNode = this.getNextNode(nextNode.id, result.success ? 'success' : 'error', edgeMap, nodeMap)
           }
           return { success: true }
@@ -383,19 +405,44 @@ export class FlowEngine {
           const minutes = data?.minutes || 0
           const hours = data?.hours || 0
           const totalMs = (seconds + minutes * 60 + hours * 3600) * 1000
-          if (totalMs > 0 && totalMs <= 300000) {
-            await new Promise(r => setTimeout(r, totalMs))
-          }
+          if (totalMs > 0 && totalMs <= 300000) await new Promise(r => setTimeout(r, totalMs))
           break
         }
 
         case 'add_tag': {
-          const tagId = data?.tagId
-          if (!tagId) break
+          if (!data?.tagId) break
           await db.from('contact_tags').upsert(
-            { contact_id: ctx.contactId, tag_id: tagId },
+            { contact_id: ctx.contactId, tag_id: data.tagId },
             { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
           )
+          break
+        }
+
+        case 'remove_tag': {
+          if (!data?.tagId) break
+          await db.from('contact_tags')
+            .delete()
+            .eq('contact_id', ctx.contactId)
+            .eq('tag_id', data.tagId)
+          break
+        }
+
+        case 'update_contact': {
+          const updateData: any = {}
+          if (data?.field === 'name' && data?.value) {
+            updateData.name = this.interpolate(data.value, ctx, variables)
+          } else if (data?.field === 'phone' && data?.value) {
+            updateData.phone = this.interpolate(data.value, ctx, variables)
+          } else if (data?.field === 'custom' && data?.customField && data?.value) {
+            // Salva em metadata do contato
+            const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
+            const metadata = contact?.metadata || {}
+            metadata[data.customField] = this.interpolate(data.value, ctx, variables)
+            updateData.metadata = metadata
+          }
+          if (Object.keys(updateData).length > 0) {
+            await db.from('contacts').update(updateData).eq('id', ctx.contactId)
+          }
           break
         }
 
@@ -412,11 +459,34 @@ export class FlowEngine {
             const message = this.interpolate(data.message, ctx, variables)
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           }
+          // Pausa o bot para atendimento humano
+          await db.from('conversations').update({ bot_active: false }).eq('id', ctx.conversationId)
           break
         }
 
+        case 'go_to': {
+          // Redireciona para outro flow
+          const targetFlowId = data?.targetFlowId
+          if (!targetFlowId) break
+          const { data: targetFlow } = await db.from('flows').select('*').eq('id', targetFlowId).eq('tenant_id', ctx.tenantId).single()
+          if (!targetFlow || !targetFlow.is_active) break
+          logger.info('Go to flow', { from: flowId, to: targetFlowId })
+          await this.executeFlow(targetFlow, ctx, variables)
+          return { success: true, ended: true }
+        }
+
+        case 'end': {
+          // Finaliza o flow explicitamente
+          logger.info('Flow ended by end node', { flowId, nodeId: node.id })
+          if (data?.message) {
+            const message = this.interpolate(data.message, ctx, variables)
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
+          }
+          return { success: true, ended: true }
+        }
+
         default:
-          logger.warn('Unknown node type in flow engine', { type, nodeId: node.id })
+          logger.warn('Unknown node type', { type, nodeId: node.id })
       }
 
       await this.logNode(flowId, node.id, ctx, 'success', `Nó ${type} executado`)

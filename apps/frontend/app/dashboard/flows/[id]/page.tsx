@@ -15,7 +15,8 @@ import { toast } from 'sonner'
 import {
   Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
   MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
-  Upload, X, Reply, GitBranch, AlignLeft, Webhook,
+  Upload, X, Reply, GitBranch, AlignLeft, Webhook, Brain,
+  TagsIcon, UserCog, CornerDownRight, Square,
 } from 'lucide-react'
 
 const supabase = createClient(
@@ -35,11 +36,16 @@ const NODE_COLORS: Record<string, string> = {
   send_document:         '#d97706',
   input:                 '#0284c7',
   condition:             '#ea580c',
+  ai:                    '#6d28d9',
+  webhook:               '#0f172a',
   wait:                  '#6b7280',
   add_tag:               '#0891b2',
+  remove_tag:            '#dc2626',
+  update_contact:        '#0369a1',
   move_pipeline:         '#d97706',
   assign_agent:          '#db2777',
-  webhook:               '#0f172a',
+  go_to:                 '#16a34a',
+  end:                   '#dc2626',
 }
 
 const NODE_ICONS: Record<string, any> = {
@@ -54,11 +60,16 @@ const NODE_ICONS: Record<string, any> = {
   send_document:         FileText,
   input:                 AlignLeft,
   condition:             GitBranch,
+  ai:                    Brain,
+  webhook:               Webhook,
   wait:                  Clock,
   add_tag:               Tag,
+  remove_tag:            TagsIcon,
+  update_contact:        UserCog,
   move_pipeline:         MoveRight,
   assign_agent:          UserCheck,
-  webhook:               Webhook,
+  go_to:                 CornerDownRight,
+  end:                   Square,
 }
 
 const NODE_LABELS: Record<string, string> = {
@@ -73,11 +84,16 @@ const NODE_LABELS: Record<string, string> = {
   send_document:         'Enviar documento',
   input:                 'Aguardar resposta',
   condition:             'Condição (se/senão)',
+  ai:                    'Inteligência Artificial',
+  webhook:               'Webhook',
   wait:                  'Espera',
   add_tag:               'Adicionar tag',
+  remove_tag:            'Remover tag',
+  update_contact:        'Atualizar contato',
   move_pipeline:         'Mover no funil',
   assign_agent:          'Atribuir agente',
-  webhook:               'Webhook',
+  go_to:                 'Ir para outro flow',
+  end:                   'Finalizar flow',
 }
 
 function FlowNode({ data, selected }: { data: any; selected: boolean }) {
@@ -98,15 +114,20 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'send_document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
     if (data.type === 'input') return data.question ? data.question.slice(0, 40) : 'Aguardando resposta...'
     if (data.type === 'condition') return data.value ? `${data.operator || 'contém'} "${data.value}"` : 'Configurar condição'
+    if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
+    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
     if (data.type === 'wait') {
       if (data.hours) return `Aguardar ${data.hours}h`
       if (data.minutes) return `Aguardar ${data.minutes} min`
       return `Aguardar ${data.seconds ?? 0}s`
     }
     if (data.type === 'add_tag') return data.tagName || 'Tag não selecionada'
+    if (data.type === 'remove_tag') return data.tagName || 'Tag não selecionada'
+    if (data.type === 'update_contact') return data.field ? `Atualizar ${data.field}` : 'Campo não definido'
     if (data.type === 'move_pipeline') return data.stage || 'Etapa não definida'
-    if (data.type === 'assign_agent') return 'Atribuir ao próximo agente'
-    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
+    if (data.type === 'assign_agent') return 'Transferir para atendente'
+    if (data.type === 'go_to') return 'Ir para outro flow'
+    if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
     return ''
   }
 
@@ -127,7 +148,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </div>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {isTrigger ? 'Gatilho' : 'Ação'}
+            {isTrigger ? 'Gatilho' : data.type === 'end' ? 'Fim' : 'Ação'}
           </div>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
             {NODE_LABELS[data.type] || data.type}
@@ -142,7 +163,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           {subtitle()}
         </div>
       )}
-      {!isCondition && (
+      {!isCondition && data.type !== 'end' && (
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       )}
@@ -213,8 +234,8 @@ function MediaUpload({ accept, label, currentUrl, onUploaded }: {
   )
 }
 
-function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
-  node: Node; tags: any[]
+function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
+  node: Node; tags: any[]; flows: any[]
   onUpdate: (id: string, data: any) => void
   onClose: () => void
   onDelete: (id: string) => void
@@ -235,7 +256,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-            {d.type?.startsWith('trigger_') ? 'Gatilho' : 'Ação'}
+            {d.type?.startsWith('trigger_') ? 'Gatilho' : d.type === 'end' ? 'Fim' : 'Ação'}
           </div>
           <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{NODE_LABELS[d.type] || d.type}</div>
         </div>
@@ -246,20 +267,19 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
+        {/* GATILHOS */}
         {d.type === 'trigger_keyword' && (
           <div>
             <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
-            {/* CORREÇÃO: usa defaultValue + onBlur para permitir digitar vírgulas livremente */}
             <input style={inputStyle} placeholder="preço, valor, info"
               defaultValue={(d.keywords || []).join(', ')}
               onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Digite as palavras separadas por vírgula. Clique fora para salvar.</p>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Clique fora do campo para salvar</p>
           </div>
         )}
         {d.type === 'trigger_first_message' && (
           <div>
             <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
-            {/* CORREÇÃO: usa defaultValue + onBlur para permitir digitar vírgulas livremente */}
             <input style={inputStyle} placeholder="Deixe vazio para qualquer mensagem"
               defaultValue={(d.keywords || []).join(', ')}
               onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
@@ -268,7 +288,6 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
         {d.type === 'trigger_any_reply' && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px' }}>
             <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500 }}>Dispara quando o contato enviar qualquer mensagem.</p>
-            <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Use este gatilho para criar sequências de resposta.</p>
           </div>
         )}
         {d.type === 'trigger_outside_hours' && (
@@ -286,15 +305,15 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </>
         )}
 
+        {/* MENSAGENS */}
         {d.type === 'send_message' && (
           <>
             <div>
               <label style={labelStyle}>Mensagem</label>
               <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' as any }}
-                placeholder="Olá! Use {{phone}} ou {{resposta}} para variáveis."
+                placeholder="Olá! Use {{phone}} ou {{nome}} para variáveis."
                 value={d.message || ''}
                 onChange={e => onUpdate(node.id, { message: e.target.value })} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para inserir respostas capturadas</p>
             </div>
             <div>
               <label style={labelStyle}>Delay antes de enviar (segundos)</label>
@@ -304,18 +323,15 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </div>
           </>
         )}
-
         {d.type === 'send_image' && (
           <>
             <div>
               <label style={labelStyle}>Imagem</label>
-              <MediaUpload accept="image/*" label="Clique para fazer upload da imagem"
-                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+              <MediaUpload accept="image/*" label="Upload de imagem" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} placeholder="Legenda da imagem..."
-                value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+              <input style={inputStyle} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
@@ -323,38 +339,34 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           <>
             <div>
               <label style={labelStyle}>Vídeo</label>
-              <MediaUpload accept="video/*" label="Clique para fazer upload do vídeo"
-                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+              <MediaUpload accept="video/*" label="Upload de vídeo" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} placeholder="Legenda do vídeo..."
-                value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+              <input style={inputStyle} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
         {d.type === 'send_audio' && (
           <div>
             <label style={labelStyle}>Áudio</label>
-            <MediaUpload accept="audio/*" label="Clique para fazer upload do áudio"
-              currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+            <MediaUpload accept="audio/*" label="Upload de áudio" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
           </div>
         )}
         {d.type === 'send_document' && (
           <>
             <div>
-              <label style={labelStyle}>Documento (PDF)</label>
-              <MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Clique para fazer upload do documento"
-                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+              <label style={labelStyle}>Documento</label>
+              <MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Upload de documento" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Nome do arquivo</label>
-              <input style={inputStyle} placeholder="catalogo.pdf"
-                value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} />
+              <input style={inputStyle} placeholder="catalogo.pdf" value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} />
             </div>
           </>
         )}
 
+        {/* INPUT */}
         {d.type === 'input' && (
           <>
             <div>
@@ -366,7 +378,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </div>
             <div>
               <label style={labelStyle}>Salvar resposta como variável</label>
-              <input style={inputStyle} placeholder="nome, email, interesse..."
+              <input style={inputStyle} placeholder="nome"
                 value={d.saveAs || ''}
                 onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
               <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
@@ -376,6 +388,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </>
         )}
 
+        {/* CONDITION */}
         {d.type === 'condition' && (
           <>
             <div>
@@ -391,7 +404,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             {d.conditionType === 'variable' && (
               <div>
                 <label style={labelStyle}>Nome da variável</label>
-                <input style={inputStyle} placeholder="nome, interesse..."
+                <input style={inputStyle} placeholder="nome, intencao..."
                   value={d.field || ''}
                   onChange={e => onUpdate(node.id, { field: e.target.value })} />
               </div>
@@ -413,81 +426,87 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             {!['is_empty', 'is_not_empty'].includes(d.operator) && (
               <div>
                 <label style={labelStyle}>Valor</label>
-                <input style={inputStyle} placeholder="sim, não, interessado..."
+                <input style={inputStyle} placeholder="sim, comprar, 200..."
                   value={d.value || ''}
                   onChange={e => onUpdate(node.id, { value: e.target.value })} />
               </div>
             )}
             <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: 600 }}>Saídas:</p>
-              <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span>
-              <br />
+              <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span><br />
               <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>✗ Não → caminho vermelho</span>
             </div>
           </>
         )}
 
-        {d.type === 'wait' && (
+        {/* AI NODE */}
+        {d.type === 'ai' && (
           <>
             <div>
-              <label style={labelStyle}>Segundos</label>
-              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0}
-                onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
+              <label style={labelStyle}>Modo</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.mode || 'respond'}
+                onChange={e => onUpdate(node.id, { mode: e.target.value })}>
+                <option value="respond">Responder automaticamente</option>
+                <option value="classify">Classificar intenção</option>
+                <option value="extract">Extrair dado da mensagem</option>
+                <option value="summarize">Resumir mensagem</option>
+              </select>
             </div>
             <div>
-              <label style={labelStyle}>Minutos</label>
-              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0}
-                onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
+              <label style={labelStyle}>Chave da API OpenAI</label>
+              <input style={inputStyle} placeholder="sk-..." type="password"
+                value={d.apiKey || ''}
+                onChange={e => onUpdate(node.id, { apiKey: e.target.value })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Ou configure OPENAI_API_KEY no Railway</p>
             </div>
             <div>
-              <label style={labelStyle}>Horas</label>
-              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0}
-                onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
+              <label style={labelStyle}>Modelo</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.model || 'gpt-4o-mini'}
+                onChange={e => onUpdate(node.id, { model: e.target.value })}>
+                <option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option>
+                <option value="gpt-4o">GPT-4o (mais inteligente)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+              </select>
+            </div>
+            {d.mode === 'respond' && (
+              <div>
+                <label style={labelStyle}>Instrução para a IA (system prompt)</label>
+                <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
+                  placeholder="Você é um atendente da empresa X. Responda de forma simpática e objetiva."
+                  value={d.systemPrompt || ''}
+                  onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} />
+              </div>
+            )}
+            {d.mode === 'classify' && (
+              <div>
+                <label style={labelStyle}>Categorias (separadas por vírgula)</label>
+                <input style={inputStyle} placeholder="comprar, suporte, cancelar, outro"
+                  defaultValue={d.classifyOptions || ''}
+                  onBlur={e => onUpdate(node.id, { classifyOptions: e.target.value })} />
+              </div>
+            )}
+            {d.mode === 'extract' && (
+              <div>
+                <label style={labelStyle}>O que extrair</label>
+                <input style={inputStyle} placeholder="o nome completo, o CPF, o endereço..."
+                  value={d.extractField || ''}
+                  onChange={e => onUpdate(node.id, { extractField: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Salvar resposta da IA como variável</label>
+              <input style={inputStyle} placeholder="intencao, nome_extraido..."
+                value={d.saveAs || ''}
+                onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
+              {d.saveAs && (
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                  Use {'{{' + d.saveAs + '}}'} nos próximos nós
+                </p>
+              )}
             </div>
           </>
         )}
 
-        {d.type === 'add_tag' && (
-          <div>
-            <label style={labelStyle}>Tag</label>
-            {tags.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhuma tag cadastrada.</p>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {tags.map((tag: any) => (
-                  <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `2px solid ${d.tagId === tag.id ? (tag.color || '#0891b2') : '#e5e7eb'}`, background: d.tagId === tag.id ? `${tag.color || '#0891b2'}15` : '#fff', fontSize: '12px', fontWeight: 500 }}>
-                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                    <span style={{ color: d.tagId === tag.id ? (tag.color || '#0891b2') : '#374151' }}>{tag.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {d.type === 'move_pipeline' && (
-          <div>
-            <label style={labelStyle}>Etapa do funil</label>
-            <select style={{ ...inputStyle, background: '#fff' }} value={d.stage || 'lead'}
-              onChange={e => onUpdate(node.id, { stage: e.target.value })}>
-              {['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido'].map(s => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {d.type === 'assign_agent' && (
-          <div>
-            <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
-            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-              placeholder="Ex: Aguarde, um atendente irá te responder."
-              value={d.message || ''}
-              onChange={e => onUpdate(node.id, { message: e.target.value })} />
-          </div>
-        )}
-
+        {/* WEBHOOK */}
         {d.type === 'webhook' && (
           <>
             <div>
@@ -508,43 +527,144 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             {(d.method || 'POST') !== 'GET' && (
               <div>
                 <label style={labelStyle}>Body (JSON)</label>
-                <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
-                  placeholder={'{\n  "phone": "{{phone}}",\n  "nome": "{{nome}}"\n}'}
+                <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
+                  placeholder={'{\n  "phone": "{{phone}}"\n}'}
                   value={d.body || ''}
                   onChange={e => onUpdate(node.id, { body: e.target.value })} />
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para inserir dados dinâmicos</p>
               </div>
             )}
             <div>
-              <label style={labelStyle}>Headers customizados (JSON, opcional)</label>
-              <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
-                placeholder={'{"Authorization": "Bearer token"}'}
-                value={d.headers || ''}
-                onChange={e => onUpdate(node.id, { headers: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Salvar resposta como variável (opcional)</label>
+              <label style={labelStyle}>Salvar resposta como variável</label>
               <input style={inputStyle} placeholder="resposta_webhook"
                 value={d.saveResponseAs || ''}
                 onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
             </div>
-            {d.saveResponseAs && (
-              <div>
-                <label style={labelStyle}>Campo da resposta (opcional)</label>
-                <input style={inputStyle} placeholder="data.status (deixe vazio para resposta completa)"
-                  value={d.responseField || ''}
-                  onChange={e => onUpdate(node.id, { responseField: e.target.value })} />
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-                  Use {'{{' + (d.saveResponseAs || 'resposta') + '}}'} nos próximos nós
-                </p>
-              </div>
-            )}
-            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
-              <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>Variáveis automáticas:</p>
-              <p style={{ fontSize: '11px', color: '#9ca3af' }}>{'{{webhook_status}}'} — código HTTP (200, 404...)</p>
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{'{{webhook_ok}}'} — "true" se sucesso</p>
+          </>
+        )}
+
+        {/* WAIT */}
+        {d.type === 'wait' && (
+          <>
+            <div>
+              <label style={labelStyle}>Segundos</label>
+              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0}
+                onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Minutos</label>
+              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0}
+                onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Horas</label>
+              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0}
+                onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
             </div>
           </>
+        )}
+
+        {/* TAGS */}
+        {(d.type === 'add_tag' || d.type === 'remove_tag') && (
+          <div>
+            <label style={labelStyle}>{d.type === 'add_tag' ? 'Tag para adicionar' : 'Tag para remover'}</label>
+            {tags.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhuma tag cadastrada.</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {tags.map((tag: any) => (
+                  <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `2px solid ${d.tagId === tag.id ? (tag.color || '#0891b2') : '#e5e7eb'}`, background: d.tagId === tag.id ? `${tag.color || '#0891b2'}15` : '#fff', fontSize: '12px', fontWeight: 500 }}>
+                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                    <span style={{ color: d.tagId === tag.id ? (tag.color || '#0891b2') : '#374151' }}>{tag.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* UPDATE CONTACT */}
+        {d.type === 'update_contact' && (
+          <>
+            <div>
+              <label style={labelStyle}>Campo para atualizar</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.field || 'name'}
+                onChange={e => onUpdate(node.id, { field: e.target.value })}>
+                <option value="name">Nome</option>
+                <option value="phone">Telefone</option>
+                <option value="custom">Campo personalizado</option>
+              </select>
+            </div>
+            {d.field === 'custom' && (
+              <div>
+                <label style={labelStyle}>Nome do campo</label>
+                <input style={inputStyle} placeholder="cargo, empresa, cidade..."
+                  value={d.customField || ''}
+                  onChange={e => onUpdate(node.id, { customField: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Novo valor</label>
+              <input style={inputStyle} placeholder="{{nome}} ou texto fixo"
+                value={d.value || ''}
+                onChange={e => onUpdate(node.id, { value: e.target.value })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use variáveis como {'{{nome}}'}</p>
+            </div>
+          </>
+        )}
+
+        {/* PIPELINE */}
+        {d.type === 'move_pipeline' && (
+          <div>
+            <label style={labelStyle}>Etapa do funil</label>
+            <select style={{ ...inputStyle, background: '#fff' }} value={d.stage || 'lead'}
+              onChange={e => onUpdate(node.id, { stage: e.target.value })}>
+              {['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido'].map(s => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* ASSIGN AGENT */}
+        {d.type === 'assign_agent' && (
+          <div>
+            <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
+            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
+              placeholder="Ex: Aguarde, um atendente irá te responder."
+              value={d.message || ''}
+              onChange={e => onUpdate(node.id, { message: e.target.value })} />
+          </div>
+        )}
+
+        {/* GO TO */}
+        {d.type === 'go_to' && (
+          <div>
+            <label style={labelStyle}>Flow de destino</label>
+            {flows.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhum outro flow disponível.</p>
+            ) : (
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.targetFlowId || ''}
+                onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })}>
+                <option value="">Selecione um flow</option>
+                {flows.map((f: any) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            )}
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>O flow atual para e o flow selecionado começa</p>
+          </div>
+        )}
+
+        {/* END */}
+        {d.type === 'end' && (
+          <div>
+            <label style={labelStyle}>Mensagem de encerramento (opcional)</label>
+            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
+              placeholder="Ex: Obrigado pelo contato! Até mais 👋"
+              value={d.message || ''}
+              onChange={e => onUpdate(node.id, { message: e.target.value })} />
+          </div>
         )}
       </div>
 
@@ -575,6 +695,14 @@ export default function FlowEditorPage() {
     queryFn: async () => {
       const { data } = await contactApi.get('/tags')
       return data.data || []
+    },
+  })
+
+  const { data: allFlows = [] } = useQuery({
+    queryKey: ['flows-list'],
+    queryFn: async () => {
+      const { data } = await messageApi.get('/flows')
+      return (data.data || []).filter((f: any) => f.id !== id)
     },
   })
 
@@ -663,18 +791,23 @@ export default function FlowEditorPage() {
   ]
 
   const ACTION_NODES = [
-    { type: 'send_message',  label: 'Enviar texto' },
-    { type: 'send_image',    label: 'Enviar imagem' },
-    { type: 'send_video',    label: 'Enviar vídeo' },
-    { type: 'send_audio',    label: 'Enviar áudio' },
-    { type: 'send_document', label: 'Enviar documento' },
-    { type: 'input',         label: 'Aguardar resposta' },
-    { type: 'condition',     label: 'Condição (se/senão)' },
-    { type: 'wait',          label: 'Espera' },
-    { type: 'add_tag',       label: 'Adicionar tag' },
-    { type: 'move_pipeline', label: 'Mover no funil' },
-    { type: 'assign_agent',  label: 'Atribuir agente' },
-    { type: 'webhook',       label: 'Webhook' },
+    { type: 'send_message',   label: 'Enviar texto' },
+    { type: 'send_image',     label: 'Enviar imagem' },
+    { type: 'send_video',     label: 'Enviar vídeo' },
+    { type: 'send_audio',     label: 'Enviar áudio' },
+    { type: 'send_document',  label: 'Enviar documento' },
+    { type: 'input',          label: 'Aguardar resposta' },
+    { type: 'condition',      label: 'Condição (se/senão)' },
+    { type: 'ai',             label: 'Inteligência Artificial' },
+    { type: 'webhook',        label: 'Webhook' },
+    { type: 'wait',           label: 'Espera' },
+    { type: 'add_tag',        label: 'Adicionar tag' },
+    { type: 'remove_tag',     label: 'Remover tag' },
+    { type: 'update_contact', label: 'Atualizar contato' },
+    { type: 'move_pipeline',  label: 'Mover no funil' },
+    { type: 'assign_agent',   label: 'Atribuir agente' },
+    { type: 'go_to',          label: 'Ir para outro flow' },
+    { type: 'end',            label: 'Finalizar flow' },
   ]
 
   if (isLoading) return (
@@ -762,7 +895,7 @@ export default function FlowEditorPage() {
         </div>
 
         {selectedNode && (
-          <NodeConfigPanel node={selectedNode} tags={tags}
+          <NodeConfigPanel node={selectedNode} tags={tags} flows={allFlows}
             onUpdate={updateNodeData} onClose={() => setSelectedNode(null)} onDelete={deleteNode} />
         )}
       </div>
