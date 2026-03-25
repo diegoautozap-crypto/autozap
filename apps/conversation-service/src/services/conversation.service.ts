@@ -14,6 +14,23 @@ export interface ConversationFilter {
   limit?: number
 }
 
+const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
+const PUSHER_KEY     = process.env.PUSHER_KEY
+const PUSHER_SECRET  = process.env.PUSHER_SECRET
+const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
+
+async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
+  if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
+  try {
+    const body = JSON.stringify({ name: event, channel: `tenant-${tenantId}`, data: JSON.stringify(data) })
+    const crypto = await import('crypto')
+    const ts  = Math.floor(Date.now() / 1000)
+    const md5 = crypto.createHash('md5').update(body).digest('hex')
+    const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
+    await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+  } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
+}
+
 export class ConversationService {
 
   async listConversations(tenantId: string, filter: ConversationFilter = {}) {
@@ -73,6 +90,10 @@ export class ConversationService {
 
     if (error || !data) throw new NotFoundError('Conversation')
     logger.info('Conversation status updated', { conversationId, status })
+
+    // Notifica pipeline e inbox em tempo real
+    emitPusher(tenantId, 'conversation.updated', { conversationId, status })
+
     return data
   }
 
@@ -86,6 +107,9 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
+
+    emitPusher(tenantId, 'conversation.updated', { conversationId, assignedTo: userId })
+
     return data
   }
 
@@ -99,6 +123,10 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
+
+    // Notifica o pipeline em tempo real — sem refresh manual
+    emitPusher(tenantId, 'conversation.updated', { conversationId, pipelineStage: stage })
+
     return data
   }
 
@@ -127,7 +155,6 @@ export class ConversationService {
     return (data || []).reverse()
   }
 
-  // ─── Pipeline board com filtros e tags ────────────────────────────────────
   async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string) {
     const stages: PipelineStage[] = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
