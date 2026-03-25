@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import {
   Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
   MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
-  Upload, X, Reply,
+  Upload, X, Reply, GitBranch, AlignLeft,
 } from 'lucide-react'
 
 const supabase = createClient(
@@ -33,6 +33,8 @@ const NODE_COLORS: Record<string, string> = {
   send_video:            '#7c3aed',
   send_audio:            '#db2777',
   send_document:         '#d97706',
+  input:                 '#0284c7',
+  condition:             '#ea580c',
   wait:                  '#6b7280',
   add_tag:               '#0891b2',
   move_pipeline:         '#d97706',
@@ -49,6 +51,8 @@ const NODE_ICONS: Record<string, any> = {
   send_video:            Video,
   send_audio:            Music,
   send_document:         FileText,
+  input:                 AlignLeft,
+  condition:             GitBranch,
   wait:                  Clock,
   add_tag:               Tag,
   move_pipeline:         MoveRight,
@@ -65,6 +69,8 @@ const NODE_LABELS: Record<string, string> = {
   send_video:            'Enviar vídeo',
   send_audio:            'Enviar áudio',
   send_document:         'Enviar documento',
+  input:                 'Aguardar resposta',
+  condition:             'Condição (se/senão)',
   wait:                  'Espera',
   add_tag:               'Adicionar tag',
   move_pipeline:         'Mover no funil',
@@ -75,6 +81,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const color = NODE_COLORS[data.type] || '#6b7280'
   const Icon = NODE_ICONS[data.type] || Zap
   const isTrigger = data.type?.startsWith('trigger_')
+  const isCondition = data.type === 'condition'
 
   const subtitle = () => {
     if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || 'Nenhuma palavra'
@@ -86,6 +93,8 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'send_video') return data.mediaUrl ? '✓ Vídeo carregado' : 'Nenhum vídeo'
     if (data.type === 'send_audio') return data.mediaUrl ? '✓ Áudio carregado' : 'Nenhum áudio'
     if (data.type === 'send_document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
+    if (data.type === 'input') return data.question ? data.question.slice(0, 40) : 'Aguardando resposta...'
+    if (data.type === 'condition') return data.value ? `${data.operator || 'contém'} "${data.value}"` : 'Configurar condição'
     if (data.type === 'wait') {
       if (data.hours) return `Aguardar ${data.hours}h`
       if (data.minutes) return `Aguardar ${data.minutes} min`
@@ -121,7 +130,6 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           </div>
         </div>
       </div>
-      {/* Preview de imagem no card */}
       {data.type === 'send_image' && data.mediaUrl && (
         <img src={data.mediaUrl} alt="preview" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '6px', marginBottom: '6px' }} />
       )}
@@ -130,8 +138,25 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           {subtitle()}
         </div>
       )}
-      <Handle type="source" position={Position.Right} id="success"
-        style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
+      {/* Saída padrão */}
+      {!isCondition && (
+        <Handle type="source" position={Position.Right} id="success"
+          style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
+      )}
+      {/* Condition: duas saídas */}
+      {isCondition && (
+        <>
+          <Handle type="source" position={Position.Right} id="true"
+            style={{ background: '#16a34a', width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
+          <Handle type="source" position={Position.Right} id="false"
+            style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
+            <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Sim</span>
+            <span style={{ fontSize: '10px', color: '#6b7280' }}>·</span>
+            <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>✗ Não</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -219,7 +244,6 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-        {/* GATILHOS */}
         {d.type === 'trigger_keyword' && (
           <div>
             <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
@@ -257,15 +281,15 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* AÇÕES DE TEXTO */}
         {d.type === 'send_message' && (
           <>
             <div>
               <label style={labelStyle}>Mensagem</label>
               <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' as any }}
-                placeholder="Olá! Use {{phone}} para o número do contato."
+                placeholder="Olá! Use {{phone}} ou {{resposta}} para variáveis."
                 value={d.message || ''}
                 onChange={e => onUpdate(node.id, { message: e.target.value })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para inserir respostas capturadas</p>
             </div>
             <div>
               <label style={labelStyle}>Delay antes de enviar (segundos)</label>
@@ -276,20 +300,17 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* AÇÕES DE MÍDIA */}
         {d.type === 'send_image' && (
           <>
             <div>
               <label style={labelStyle}>Imagem</label>
               <MediaUpload accept="image/*" label="Clique para fazer upload da imagem"
-                currentUrl={d.mediaUrl}
-                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
               <input style={inputStyle} placeholder="Legenda da imagem..."
-                value={d.caption || ''}
-                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+                value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
@@ -298,14 +319,12 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             <div>
               <label style={labelStyle}>Vídeo</label>
               <MediaUpload accept="video/*" label="Clique para fazer upload do vídeo"
-                currentUrl={d.mediaUrl}
-                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
               <input style={inputStyle} placeholder="Legenda do vídeo..."
-                value={d.caption || ''}
-                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+                value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
@@ -313,8 +332,7 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           <div>
             <label style={labelStyle}>Áudio</label>
             <MediaUpload accept="audio/*" label="Clique para fazer upload do áudio"
-              currentUrl={d.mediaUrl}
-              onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+              currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
           </div>
         )}
         {d.type === 'send_document' && (
@@ -322,19 +340,90 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             <div>
               <label style={labelStyle}>Documento (PDF)</label>
               <MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Clique para fazer upload do documento"
-                currentUrl={d.mediaUrl}
-                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+                currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
             </div>
             <div>
               <label style={labelStyle}>Nome do arquivo</label>
               <input style={inputStyle} placeholder="catalogo.pdf"
-                value={d.filename || ''}
-                onChange={e => onUpdate(node.id, { filename: e.target.value })} />
+                value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} />
             </div>
           </>
         )}
 
-        {/* ESPERA */}
+        {d.type === 'input' && (
+          <>
+            <div>
+              <label style={labelStyle}>Pergunta para o usuário</label>
+              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
+                placeholder="Ex: Qual é o seu nome?"
+                value={d.question || ''}
+                onChange={e => onUpdate(node.id, { question: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Salvar resposta como variável</label>
+              <input style={inputStyle} placeholder="nome, email, interesse..."
+                value={d.saveAs || ''}
+                onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                Use {'{{' + (d.saveAs || 'variavel') + '}}'} nos próximos nós
+              </p>
+            </div>
+          </>
+        )}
+
+        {d.type === 'condition' && (
+          <>
+            <div>
+              <label style={labelStyle}>O que verificar</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.conditionType || 'message'}
+                onChange={e => onUpdate(node.id, { conditionType: e.target.value })}>
+                <option value="message">Mensagem recebida</option>
+                <option value="variable">Variável capturada</option>
+                <option value="phone">Telefone do contato</option>
+              </select>
+            </div>
+            {d.conditionType === 'variable' && (
+              <div>
+                <label style={labelStyle}>Nome da variável</label>
+                <input style={inputStyle} placeholder="nome, interesse..."
+                  value={d.field || ''}
+                  onChange={e => onUpdate(node.id, { field: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Operador</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.operator || 'contains'}
+                onChange={e => onUpdate(node.id, { operator: e.target.value })}>
+                <option value="contains">Contém</option>
+                <option value="not_contains">Não contém</option>
+                <option value="equals">É igual a</option>
+                <option value="not_equals">É diferente de</option>
+                <option value="starts_with">Começa com</option>
+                <option value="ends_with">Termina com</option>
+                <option value="is_empty">Está vazio</option>
+                <option value="is_not_empty">Não está vazio</option>
+              </select>
+            </div>
+            {!['is_empty', 'is_not_empty'].includes(d.operator) && (
+              <div>
+                <label style={labelStyle}>Valor</label>
+                <input style={inputStyle} placeholder="sim, não, interessado..."
+                  value={d.value || ''}
+                  onChange={e => onUpdate(node.id, { value: e.target.value })} />
+              </div>
+            )}
+            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: 600 }}>Saídas:</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>✗ Não → caminho vermelho</span>
+              </div>
+            </div>
+          </>
+        )}
+
         {d.type === 'wait' && (
           <>
             <div>
@@ -355,12 +444,11 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* TAG */}
         {d.type === 'add_tag' && (
           <div>
             <label style={labelStyle}>Tag</label>
             {tags.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhuma tag cadastrada. Acesse Contatos para criar tags.</p>
+              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhuma tag cadastrada.</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {tags.map((tag: any) => (
@@ -375,7 +463,6 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </div>
         )}
 
-        {/* PIPELINE */}
         {d.type === 'move_pipeline' && (
           <div>
             <label style={labelStyle}>Etapa do funil</label>
@@ -388,7 +475,6 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </div>
         )}
 
-        {/* AGENTE */}
         {d.type === 'assign_agent' && (
           <div>
             <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
@@ -484,12 +570,11 @@ export default function FlowEditorPage() {
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
-    const newNode: Node = {
+    setNodes((nds: Node[]) => [...nds, {
       id: nodeId, type: 'flowNode',
       position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
       data: { type },
-    }
-    setNodes((nds: Node[]) => [...nds, newNode])
+    }])
     setIsDirty(true)
   }
 
@@ -521,6 +606,8 @@ export default function FlowEditorPage() {
     { type: 'send_video',    label: 'Enviar vídeo' },
     { type: 'send_audio',    label: 'Enviar áudio' },
     { type: 'send_document', label: 'Enviar documento' },
+    { type: 'input',         label: 'Aguardar resposta' },
+    { type: 'condition',     label: 'Condição (se/senão)' },
     { type: 'wait',          label: 'Espera' },
     { type: 'add_tag',       label: 'Adicionar tag' },
     { type: 'move_pipeline', label: 'Mover no funil' },

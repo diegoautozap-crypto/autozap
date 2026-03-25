@@ -35,6 +35,11 @@ export class FlowEngine {
 
   async processFlows(ctx: FlowContext): Promise<void> {
     try {
+      // 1. Verifica se há um flow pausado aguardando resposta do usuário
+      const resumed = await this.resumeWaitingFlow(ctx)
+      if (resumed) return
+
+      // 2. Tenta disparar um novo flow
       const { data: flows } = await db
         .from('flows')
         .select('*')
@@ -57,12 +62,71 @@ export class FlowEngine {
         }
 
         logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
-        await this.executeFlow(flow, ctx)
+        await this.executeFlow(flow, ctx, {})
         break
       }
     } catch (err) {
       logger.error('Flow engine error', { err, tenantId: ctx.tenantId })
     }
+  }
+
+  // Retoma um flow pausado aguardando resposta do usuário
+  private async resumeWaitingFlow(ctx: FlowContext): Promise<boolean> {
+    const { data: state } = await db
+      .from('flow_states')
+      .select('*')
+      .eq('conversation_id', ctx.conversationId)
+      .eq('tenant_id', ctx.tenantId)
+      .eq('status', 'waiting')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!state) return false
+
+    logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
+
+    // Salva a resposta do usuário na variável configurada
+    const variables = state.variables || {}
+    if (state.waiting_variable) {
+      variables[state.waiting_variable] = ctx.messageBody
+    }
+
+    // Marca o estado como em execução
+    await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
+
+    // Carrega o flow e continua a partir do próximo nó
+    const { data: flow } = await db.from('flows').select('*').eq('id', state.flow_id).single()
+    if (!flow) return false
+
+    const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
+    const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
+
+    const nodeMap = new Map((nodes || []).map((n: any) => [n.id, n]))
+    const edgeMap = new Map<string, any[]>()
+    for (const edge of (edges || [])) {
+      const key = `${edge.source_node}:${edge.source_handle || 'success'}`
+      if (!edgeMap.has(key)) edgeMap.set(key, [])
+      edgeMap.get(key)!.push(edge)
+    }
+
+    // Continua a partir do próximo nó após o input
+    let currentNode = this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
+    let stepCount = 0
+
+    while (currentNode && stepCount < 50) {
+      stepCount++
+      const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, state.id)
+      if (result.paused) return true
+      const nextHandle = result.success ? 'success' : 'error'
+      currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
+    }
+
+    // Flow completado
+    await db.from('flow_states').update({ status: 'completed', updated_at: new Date() }).eq('id', state.id)
+    await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow retomado e executado`)
+
+    return true
   }
 
   private async isOnCooldown(flow: any, ctx: FlowContext): Promise<boolean> {
@@ -88,11 +152,7 @@ export class FlowEngine {
   }
 
   private async checkFlowTrigger(flow: any, ctx: FlowContext): Promise<boolean> {
-    const { data: nodes } = await db
-      .from('flow_nodes')
-      .select('*')
-      .eq('flow_id', flow.id)
-
+    const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     if (!nodes || nodes.length === 0) return false
     const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
     if (!triggerNode) return false
@@ -116,25 +176,21 @@ export class FlowEngine {
         const body = (ctx.messageBody || '').toLowerCase()
         return keywords.some((kw: string) => body.includes(kw.toLowerCase().trim()))
       }
-      case 'trigger_any_reply': {
-        // Dispara para qualquer mensagem recebida
+      case 'trigger_any_reply':
         return true
-      }
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
         const days = data?.days ?? [1, 2, 3, 4, 5]
         const now = new Date()
-        const day = now.getDay()
-        const hour = now.getHours()
-        return !days.includes(day) || hour < start || hour >= end
+        return !days.includes(now.getDay()) || now.getHours() < start || now.getHours() >= end
       }
       default:
         return false
     }
   }
 
-  private async executeFlow(flow: any, ctx: FlowContext): Promise<void> {
+  private async executeFlow(flow: any, ctx: FlowContext, variables: Record<string, any>): Promise<void> {
     const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
 
@@ -153,18 +209,17 @@ export class FlowEngine {
 
     let currentNode = this.getNextNode(triggerNode.id, 'success', edgeMap, nodeMap)
     let stepCount = 0
-    const MAX_STEPS = 50
 
-    while (currentNode && stepCount < MAX_STEPS) {
+    while (currentNode && stepCount < 50) {
       stepCount++
-      const result = await this.executeNode(currentNode, ctx, flow.id)
+      const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, null)
+      if (result.paused) return
       const nextHandle = result.success ? 'success' : 'error'
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
-    // Log de execução completa para controle de cooldown
     await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow executado com ${stepCount} passos`)
-    logger.info('Flow executed', { flowId: flow.id, steps: stepCount, tenantId: ctx.tenantId })
+    logger.info('Flow executed', { flowId: flow.id, steps: stepCount })
   }
 
   private getNextNode(nodeId: string, handle: string, edgeMap: Map<string, any[]>, nodeMap: Map<string, any>): any | null {
@@ -174,7 +229,12 @@ export class FlowEngine {
     return nodeMap.get(edges[0].target_node) || null
   }
 
-  private async executeNode(node: any, ctx: FlowContext, flowId: string): Promise<{ success: boolean }> {
+  private async executeNode(
+    node: any, ctx: FlowContext, flowId: string,
+    variables: Record<string, any>,
+    edgeMap: Map<string, any[]>, nodeMap: Map<string, any>,
+    stateId: string | null
+  ): Promise<{ success: boolean; paused?: boolean }> {
     const { type, data } = node
 
     try {
@@ -183,7 +243,7 @@ export class FlowEngine {
       switch (type) {
 
         case 'send_message': {
-          const message = this.interpolate(data?.message || '', ctx)
+          const message = this.interpolate(data?.message || '', ctx, variables)
           if (!message) break
           const delay = data?.delay || 0
           if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
@@ -213,6 +273,46 @@ export class FlowEngine {
           if (!data?.mediaUrl) break
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'document', mediaUrl: data.mediaUrl, body: data.filename || 'documento' })
           break
+        }
+
+        case 'input': {
+          // Envia a pergunta se configurada
+          if (data?.question) {
+            const question = this.interpolate(data.question, ctx, variables)
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: question })
+          }
+          // Pausa o flow aguardando resposta
+          const saveVar = data?.saveAs || 'resposta'
+          await db.from('flow_states').upsert({
+            id: stateId || generateId(),
+            flow_id: flowId,
+            tenant_id: ctx.tenantId,
+            contact_id: ctx.contactId,
+            conversation_id: ctx.conversationId,
+            current_node_id: node.id,
+            variables,
+            waiting_variable: saveVar,
+            status: 'waiting',
+            updated_at: new Date(),
+          }, { onConflict: 'flow_id,conversation_id' })
+          logger.info('Flow paused — waiting for user input', { nodeId: node.id, saveAs: saveVar })
+          return { success: true, paused: true }
+        }
+
+        case 'condition': {
+          // Avalia a condição e escolhe o caminho
+          const conditionMet = this.evaluateCondition(data, ctx, variables)
+          const handle = conditionMet ? 'true' : 'false'
+          // Executa o caminho correto diretamente
+          let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
+          let steps = 0
+          while (nextNode && steps < 50) {
+            steps++
+            const result = await this.executeNode(nextNode, ctx, flowId, variables, edgeMap, nodeMap, stateId)
+            if (result.paused) return { success: true, paused: true }
+            nextNode = this.getNextNode(nextNode.id, result.success ? 'success' : 'error', edgeMap, nodeMap)
+          }
+          return { success: true }
         }
 
         case 'wait': {
@@ -246,7 +346,7 @@ export class FlowEngine {
 
         case 'assign_agent': {
           if (data?.message) {
-            const message = this.interpolate(data.message, ctx)
+            const message = this.interpolate(data.message, ctx, variables)
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           }
           break
@@ -266,10 +366,47 @@ export class FlowEngine {
     }
   }
 
-  private interpolate(template: string, ctx: FlowContext): string {
-    return template
+  // Avalia condição do condition node
+  private evaluateCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
+    const { conditionType, field, operator, value } = data || {}
+
+    let fieldValue = ''
+
+    if (conditionType === 'message') {
+      fieldValue = ctx.messageBody || ''
+    } else if (conditionType === 'variable') {
+      fieldValue = variables[field] || ''
+    } else if (conditionType === 'phone') {
+      fieldValue = ctx.phone || ''
+    } else {
+      fieldValue = ctx.messageBody || ''
+    }
+
+    const val = (value || '').toLowerCase()
+    const fv = fieldValue.toLowerCase()
+
+    switch (operator) {
+      case 'contains':     return fv.includes(val)
+      case 'not_contains': return !fv.includes(val)
+      case 'equals':       return fv === val
+      case 'not_equals':   return fv !== val
+      case 'starts_with':  return fv.startsWith(val)
+      case 'ends_with':    return fv.endsWith(val)
+      case 'is_empty':     return fv === ''
+      case 'is_not_empty': return fv !== ''
+      default:             return fv.includes(val)
+    }
+  }
+
+  private interpolate(template: string, ctx: FlowContext, variables: Record<string, any> = {}): string {
+    let result = template
       .replace(/\{\{phone\}\}/gi, ctx.phone)
       .replace(/\{\{telefone\}\}/gi, ctx.phone)
+    // Substitui variáveis capturadas pelo input node
+    for (const [key, value] of Object.entries(variables)) {
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'gi'), String(value))
+    }
+    return result
   }
 
   private async sendMessage(opts: {
