@@ -292,8 +292,11 @@ export class FlowEngine {
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
 
-          // Busca histórico da conversa para manter contexto
+          // Busca histórico da conversa apenas do dia atual para evitar confusão com pedidos anteriores
           const maxHistory = data?.historyMessages || 50
+          const startOfDay = new Date()
+          startOfDay.setHours(0, 0, 0, 0)
+
           const { data: history } = await db
             .from('messages')
             .select('direction, body, content_type, created_at')
@@ -301,6 +304,7 @@ export class FlowEngine {
             .eq('tenant_id', ctx.tenantId)
             .in('content_type', ['text'])
             .not('body', 'is', null)
+            .gte('created_at', startOfDay.toISOString())
             .order('created_at', { ascending: false })
             .limit(maxHistory)
 
