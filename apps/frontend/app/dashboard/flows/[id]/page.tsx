@@ -1,67 +1,74 @@
 'use client'
 
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  Connection,
-  Edge,
-  Node,
-  Panel,
-  BackgroundVariant,
-  MarkerType,
-  Handle,
-  Position,
+  ReactFlow, Background, Controls, MiniMap, addEdge,
+  useNodesState, useEdgesState, Connection, Edge, Node,
+  Panel, BackgroundVariant, MarkerType, Handle, Position,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { createClient } from '@supabase/supabase-js'
 import { messageApi, contactApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
-  Save, ArrowLeft, Loader2, Zap, MessageSquare,
-  Clock, Tag, GitBranch, MoveRight, UserCheck, Workflow,
+  Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
+  MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
+  Upload, X, Reply,
 } from 'lucide-react'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 const NODE_COLORS: Record<string, string> = {
   trigger_keyword:       '#16a34a',
   trigger_first_message: '#16a34a',
+  trigger_any_reply:     '#16a34a',
   trigger_outside_hours: '#16a34a',
   send_message:          '#2563eb',
-  wait:                  '#7c3aed',
+  send_image:            '#0891b2',
+  send_video:            '#7c3aed',
+  send_audio:            '#db2777',
+  send_document:         '#d97706',
+  wait:                  '#6b7280',
   add_tag:               '#0891b2',
   move_pipeline:         '#d97706',
   assign_agent:          '#db2777',
-  condition:             '#ea580c',
 }
 
 const NODE_ICONS: Record<string, any> = {
   trigger_keyword:       Zap,
   trigger_first_message: Zap,
+  trigger_any_reply:     Reply,
   trigger_outside_hours: Clock,
   send_message:          MessageSquare,
+  send_image:            Image,
+  send_video:            Video,
+  send_audio:            Music,
+  send_document:         FileText,
   wait:                  Clock,
   add_tag:               Tag,
   move_pipeline:         MoveRight,
   assign_agent:          UserCheck,
-  condition:             GitBranch,
 }
 
 const NODE_LABELS: Record<string, string> = {
   trigger_keyword:       'Palavra-chave',
   trigger_first_message: 'Primeira mensagem',
+  trigger_any_reply:     'Qualquer resposta',
   trigger_outside_hours: 'Fora do horário',
-  send_message:          'Enviar mensagem',
+  send_message:          'Enviar texto',
+  send_image:            'Enviar imagem',
+  send_video:            'Enviar vídeo',
+  send_audio:            'Enviar áudio',
+  send_document:         'Enviar documento',
   wait:                  'Espera',
   add_tag:               'Adicionar tag',
   move_pipeline:         'Mover no funil',
   assign_agent:          'Atribuir agente',
-  condition:             'Condição',
 }
 
 function FlowNode({ data, selected }: { data: any; selected: boolean }) {
@@ -72,8 +79,13 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const subtitle = () => {
     if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || 'Nenhuma palavra'
     if (data.type === 'trigger_first_message') return 'Primeira mensagem do contato'
+    if (data.type === 'trigger_any_reply') return 'Qualquer mensagem recebida'
     if (data.type === 'trigger_outside_hours') return `${data.start ?? 9}h – ${data.end ?? 18}h`
     if (data.type === 'send_message') return (data.message || '').slice(0, 50) || 'Sem mensagem'
+    if (data.type === 'send_image') return data.mediaUrl ? '✓ Imagem carregada' : 'Nenhuma imagem'
+    if (data.type === 'send_video') return data.mediaUrl ? '✓ Vídeo carregado' : 'Nenhum vídeo'
+    if (data.type === 'send_audio') return data.mediaUrl ? '✓ Áudio carregado' : 'Nenhum áudio'
+    if (data.type === 'send_document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
     if (data.type === 'wait') {
       if (data.hours) return `Aguardar ${data.hours}h`
       if (data.minutes) return `Aguardar ${data.minutes} min`
@@ -82,18 +94,13 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'add_tag') return data.tagName || 'Tag não selecionada'
     if (data.type === 'move_pipeline') return data.stage || 'Etapa não definida'
     if (data.type === 'assign_agent') return 'Atribuir ao próximo agente'
-    if (data.type === 'condition') return data.label || 'Condição'
     return ''
   }
 
   return (
     <div style={{
-      background: '#fff',
-      border: `2px solid ${selected ? color : '#e5e7eb'}`,
-      borderRadius: '12px',
-      padding: '14px 16px',
-      minWidth: '220px',
-      maxWidth: '260px',
+      background: '#fff', border: `2px solid ${selected ? color : '#e5e7eb'}`,
+      borderRadius: '12px', padding: '14px 16px', minWidth: '220px', maxWidth: '260px',
       boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
       transition: 'all 0.15s',
     }}>
@@ -114,6 +121,10 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           </div>
         </div>
       </div>
+      {/* Preview de imagem no card */}
+      {data.type === 'send_image' && data.mediaUrl && (
+        <img src={data.mediaUrl} alt="preview" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '6px', marginBottom: '6px' }} />
+      )}
       {subtitle() && (
         <div style={{ fontSize: '11px', color: '#9ca3af', background: '#f9fafb', borderRadius: '6px', padding: '5px 8px', wordBreak: 'break-word' }}>
           {subtitle()}
@@ -121,15 +132,59 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       )}
       <Handle type="source" position={Position.Right} id="success"
         style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
-      {data.type === 'condition' && (
-        <Handle type="source" position={Position.Bottom} id="false"
-          style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff' }} />
-      )}
     </div>
   )
 }
 
 const nodeTypes = { flowNode: FlowNode }
+
+function MediaUpload({ accept, label, currentUrl, onUploaded }: {
+  accept: string; label: string; currentUrl?: string; onUploaded: (url: string) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 20 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 20MB'); return }
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'bin'
+      const path = `flows/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
+      if (error) throw error
+      const { data } = supabase.storage.from('media').getPublicUrl(path)
+      onUploaded(data.publicUrl)
+      toast.success('Arquivo carregado!')
+    } catch (err: any) {
+      toast.error('Erro ao fazer upload: ' + err.message)
+    } finally { setUploading(false) }
+  }
+
+  return (
+    <div>
+      <input ref={inputRef} type="file" accept={accept} style={{ display: 'none' }} onChange={handleFile} />
+      {currentUrl ? (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ flex: 1, fontSize: '12px', color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            ✓ {currentUrl.split('/').pop()}
+          </div>
+          <button onClick={() => inputRef.current?.click()} disabled={uploading}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
+            Trocar
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => inputRef.current?.click()} disabled={uploading}
+          style={{ width: '100%', padding: '12px', background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: '7px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: '#6b7280' }}>
+          {uploading ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={18} />}
+          <span style={{ fontSize: '12px', fontWeight: 500 }}>{uploading ? 'Enviando...' : label}</span>
+        </button>
+      )}
+    </div>
+  )
+}
 
 function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
   node: Node; tags: any[]
@@ -140,13 +195,12 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
   const d = node.data as any
   const color = NODE_COLORS[d.type] || '#6b7280'
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 10px',
-    background: '#f9fafb', border: '1px solid #e5e7eb',
+    width: '100%', padding: '8px 10px', background: '#f9fafb', border: '1px solid #e5e7eb',
     borderRadius: '7px', fontSize: '13px', outline: 'none', color: '#111827',
   }
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '11px', fontWeight: 600,
-    color: '#6b7280', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em',
+    display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280',
+    marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em',
   }
 
   return (
@@ -158,10 +212,14 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
           </div>
           <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{NODE_LABELS[d.type] || d.type}</div>
         </div>
-        <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', fontSize: '16px', lineHeight: 1 }}>✕</button>
+        <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+          <X size={15} color="#6b7280" />
+        </button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+        {/* GATILHOS */}
         {d.type === 'trigger_keyword' && (
           <div>
             <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
@@ -178,6 +236,12 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
               onChange={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
           </div>
         )}
+        {d.type === 'trigger_any_reply' && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px' }}>
+            <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500 }}>Dispara quando o contato enviar qualquer mensagem.</p>
+            <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Use este gatilho para criar sequências de resposta.</p>
+          </div>
+        )}
         {d.type === 'trigger_outside_hours' && (
           <>
             <div>
@@ -192,6 +256,8 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </div>
           </>
         )}
+
+        {/* AÇÕES DE TEXTO */}
         {d.type === 'send_message' && (
           <>
             <div>
@@ -209,6 +275,66 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </div>
           </>
         )}
+
+        {/* AÇÕES DE MÍDIA */}
+        {d.type === 'send_image' && (
+          <>
+            <div>
+              <label style={labelStyle}>Imagem</label>
+              <MediaUpload accept="image/*" label="Clique para fazer upload da imagem"
+                currentUrl={d.mediaUrl}
+                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Legenda (opcional)</label>
+              <input style={inputStyle} placeholder="Legenda da imagem..."
+                value={d.caption || ''}
+                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+            </div>
+          </>
+        )}
+        {d.type === 'send_video' && (
+          <>
+            <div>
+              <label style={labelStyle}>Vídeo</label>
+              <MediaUpload accept="video/*" label="Clique para fazer upload do vídeo"
+                currentUrl={d.mediaUrl}
+                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Legenda (opcional)</label>
+              <input style={inputStyle} placeholder="Legenda do vídeo..."
+                value={d.caption || ''}
+                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+            </div>
+          </>
+        )}
+        {d.type === 'send_audio' && (
+          <div>
+            <label style={labelStyle}>Áudio</label>
+            <MediaUpload accept="audio/*" label="Clique para fazer upload do áudio"
+              currentUrl={d.mediaUrl}
+              onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+          </div>
+        )}
+        {d.type === 'send_document' && (
+          <>
+            <div>
+              <label style={labelStyle}>Documento (PDF)</label>
+              <MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Clique para fazer upload do documento"
+                currentUrl={d.mediaUrl}
+                onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Nome do arquivo</label>
+              <input style={inputStyle} placeholder="catalogo.pdf"
+                value={d.filename || ''}
+                onChange={e => onUpdate(node.id, { filename: e.target.value })} />
+            </div>
+          </>
+        )}
+
+        {/* ESPERA */}
         {d.type === 'wait' && (
           <>
             <div>
@@ -228,6 +354,8 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </div>
           </>
         )}
+
+        {/* TAG */}
         {d.type === 'add_tag' && (
           <div>
             <label style={labelStyle}>Tag</label>
@@ -246,6 +374,8 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             )}
           </div>
         )}
+
+        {/* PIPELINE */}
         {d.type === 'move_pipeline' && (
           <div>
             <label style={labelStyle}>Etapa do funil</label>
@@ -257,6 +387,8 @@ function NodeConfigPanel({ node, tags, onUpdate, onClose, onDelete }: {
             </select>
           </div>
         )}
+
+        {/* AGENTE */}
         {d.type === 'assign_agent' && (
           <div>
             <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
@@ -306,28 +438,20 @@ export default function FlowEditorPage() {
     },
   })
 
-  // Carrega nós e edges quando o flow é carregado pela primeira vez
   useEffect(() => {
     if (!flowData || initialized) return
-
     setFlowName(flowData.name || '')
-
     const loadedNodes: Node[] = (flowData.nodes || []).map((n: any) => ({
-      id: n.id,
-      type: 'flowNode',
+      id: n.id, type: 'flowNode',
       position: { x: n.position_x, y: n.position_y },
       data: { type: n.type, ...n.data },
     }))
-
     const loadedEdges: Edge[] = (flowData.edges || []).map((e: any) => ({
-      id: e.id,
-      source: e.source_node,
-      target: e.target_node,
+      id: e.id, source: e.source_node, target: e.target_node,
       sourceHandle: e.source_handle || 'success',
       markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
       style: { stroke: '#d1d5db', strokeWidth: 2 },
     }))
-
     setNodes(loadedNodes)
     setEdges(loadedEdges)
     setInitialized(true)
@@ -337,44 +461,31 @@ export default function FlowEditorPage() {
     mutationFn: async () => {
       const payload = {
         nodes: nodes.map(n => ({
-          id: n.id,
-          type: (n.data as any).type,
-          position_x: n.position.x,
-          position_y: n.position.y,
+          id: n.id, type: (n.data as any).type,
+          position_x: n.position.x, position_y: n.position.y,
           data: { ...(n.data as any) },
         })),
         edges: edges.map(e => ({
-          id: e.id,
-          source_node: e.source,
-          target_node: e.target,
+          id: e.id, source_node: e.source, target_node: e.target,
           source_handle: e.sourceHandle || 'success',
         })),
       }
       await messageApi.put(`/flows/${id}/graph`, payload)
       if (flowName) await messageApi.patch(`/flows/${id}`, { name: flowName })
     },
-    onSuccess: () => {
-      toast.success('Flow salvo!')
-      setIsDirty(false)
-      queryClient.invalidateQueries({ queryKey: ['flows'] })
-    },
+    onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
     onError: () => toast.error('Erro ao salvar'),
   })
 
   const onConnect = useCallback((params: Connection) => {
-    setEdges(eds => addEdge({
-      ...params,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
-      style: { stroke: '#d1d5db', strokeWidth: 2 },
-    }, eds))
+    setEdges(eds => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }, eds))
     setIsDirty(true)
   }, [setEdges])
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
     const newNode: Node = {
-      id: nodeId,
-      type: 'flowNode',
+      id: nodeId, type: 'flowNode',
       position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
       data: { type },
     }
@@ -383,9 +494,7 @@ export default function FlowEditorPage() {
   }
 
   const updateNodeData = (nodeId: string, newData: any) => {
-    setNodes((nds: Node[]) => nds.map(n =>
-      n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n
-    ))
+    setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n))
     if (selectedNode?.id === nodeId) {
       setSelectedNode(prev => prev ? { ...prev, data: { ...prev.data, ...newData } } : prev)
     }
@@ -400,27 +509,30 @@ export default function FlowEditorPage() {
   }
 
   const TRIGGER_NODES = [
-    { type: 'trigger_keyword', label: 'Palavra-chave' },
+    { type: 'trigger_keyword',       label: 'Palavra-chave' },
     { type: 'trigger_first_message', label: 'Primeira mensagem' },
+    { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
     { type: 'trigger_outside_hours', label: 'Fora do horário' },
   ]
 
   const ACTION_NODES = [
-    { type: 'send_message', label: 'Enviar mensagem' },
-    { type: 'wait', label: 'Espera' },
-    { type: 'add_tag', label: 'Adicionar tag' },
+    { type: 'send_message',  label: 'Enviar texto' },
+    { type: 'send_image',    label: 'Enviar imagem' },
+    { type: 'send_video',    label: 'Enviar vídeo' },
+    { type: 'send_audio',    label: 'Enviar áudio' },
+    { type: 'send_document', label: 'Enviar documento' },
+    { type: 'wait',          label: 'Espera' },
+    { type: 'add_tag',       label: 'Adicionar tag' },
     { type: 'move_pipeline', label: 'Mover no funil' },
-    { type: 'assign_agent', label: 'Atribuir agente' },
+    { type: 'assign_agent',  label: 'Atribuir agente' },
   ]
 
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      </div>
-    )
-  }
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
@@ -476,21 +588,14 @@ export default function FlowEditorPage() {
 
         <div style={{ flex: 1, position: 'relative' }}>
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={nodes} edges={edges}
             onNodesChange={(changes) => { onNodesChange(changes); setIsDirty(true) }}
             onEdgesChange={(changes) => { onEdgesChange(changes); setIsDirty(true) }}
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.3 }}
-            defaultEdgeOptions={{
-              markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
-              style: { stroke: '#d1d5db', strokeWidth: 2 },
-            }}
-          >
+            nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }}
+            defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
@@ -508,9 +613,7 @@ export default function FlowEditorPage() {
 
         {selectedNode && (
           <NodeConfigPanel node={selectedNode} tags={tags}
-            onUpdate={updateNodeData}
-            onClose={() => setSelectedNode(null)}
-            onDelete={deleteNode} />
+            onUpdate={updateNodeData} onClose={() => setSelectedNode(null)} onDelete={deleteNode} />
         )}
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

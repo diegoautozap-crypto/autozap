@@ -50,7 +50,6 @@ export class FlowEngine {
         const triggered = await this.checkFlowTrigger(flow, ctx)
         if (!triggered) continue
 
-        // Verifica cooldown antes de executar
         const onCooldown = await this.isOnCooldown(flow, ctx)
         if (onCooldown) {
           logger.info('Flow skipped — cooldown active', { flowId: flow.id, cooldownType: flow.cooldown_type })
@@ -68,11 +67,8 @@ export class FlowEngine {
 
   private async isOnCooldown(flow: any, ctx: FlowContext): Promise<boolean> {
     const cooldownType = flow.cooldown_type || '24h'
-
-    // 'always' = sem cooldown, sempre dispara
     if (cooldownType === 'always') return false
 
-    // Busca última execução completa desse flow nessa conversa
     const { data } = await db
       .from('flow_logs')
       .select('created_at')
@@ -82,17 +78,12 @@ export class FlowEngine {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    if (!data || data.length === 0) return false // nunca executou
-
+    if (!data || data.length === 0) return false
     const lastExecution = new Date(data[0].created_at)
-
-    if (cooldownType === 'once') return true // já executou, nunca mais
-
+    if (cooldownType === 'once') return true
     if (cooldownType === '24h') {
-      const diff = Date.now() - lastExecution.getTime()
-      return diff < 24 * 60 * 60 * 1000
+      return Date.now() - lastExecution.getTime() < 24 * 60 * 60 * 1000
     }
-
     return false
   }
 
@@ -103,10 +94,8 @@ export class FlowEngine {
       .eq('flow_id', flow.id)
 
     if (!nodes || nodes.length === 0) return false
-
     const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
     if (!triggerNode) return false
-
     return this.evaluateTrigger(triggerNode, ctx)
   }
 
@@ -127,6 +116,10 @@ export class FlowEngine {
         const body = (ctx.messageBody || '').toLowerCase()
         return keywords.some((kw: string) => body.includes(kw.toLowerCase().trim()))
       }
+      case 'trigger_any_reply': {
+        // Dispara para qualquer mensagem recebida
+        return true
+      }
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
@@ -142,15 +135,8 @@ export class FlowEngine {
   }
 
   private async executeFlow(flow: any, ctx: FlowContext): Promise<void> {
-    const { data: nodes } = await db
-      .from('flow_nodes')
-      .select('*')
-      .eq('flow_id', flow.id)
-
-    const { data: edges } = await db
-      .from('flow_edges')
-      .select('*')
-      .eq('flow_id', flow.id)
+    const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
+    const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
 
     if (!nodes || nodes.length === 0) return
 
@@ -176,9 +162,8 @@ export class FlowEngine {
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
-    // Salva log de execução completa para controle de cooldown
+    // Log de execução completa para controle de cooldown
     await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow executado com ${stepCount} passos`)
-
     logger.info('Flow executed', { flowId: flow.id, steps: stepCount, tenantId: ctx.tenantId })
   }
 
@@ -186,8 +171,7 @@ export class FlowEngine {
     const key = `${nodeId}:${handle}`
     const edges = edgeMap.get(key)
     if (!edges || edges.length === 0) return null
-    const targetId = edges[0].target_node
-    return nodeMap.get(targetId) || null
+    return nodeMap.get(edges[0].target_node) || null
   }
 
   private async executeNode(node: any, ctx: FlowContext, flowId: string): Promise<{ success: boolean }> {
@@ -197,19 +181,37 @@ export class FlowEngine {
       logger.info('Executing flow node', { nodeId: node.id, type, flowId })
 
       switch (type) {
+
         case 'send_message': {
           const message = this.interpolate(data?.message || '', ctx)
           if (!message) break
           const delay = data?.delay || 0
           if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
-          await this.sendMessage({
-            tenantId: ctx.tenantId,
-            channelId: ctx.channelId,
-            contactId: ctx.contactId,
-            conversationId: ctx.conversationId,
-            to: ctx.phone,
-            body: message,
-          })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
+          break
+        }
+
+        case 'send_image': {
+          if (!data?.mediaUrl) break
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'image', mediaUrl: data.mediaUrl, body: data.caption || '' })
+          break
+        }
+
+        case 'send_video': {
+          if (!data?.mediaUrl) break
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'video', mediaUrl: data.mediaUrl, body: data.caption || '' })
+          break
+        }
+
+        case 'send_audio': {
+          if (!data?.mediaUrl) break
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'audio', mediaUrl: data.mediaUrl })
+          break
+        }
+
+        case 'send_document': {
+          if (!data?.mediaUrl) break
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'document', mediaUrl: data.mediaUrl, body: data.filename || 'documento' })
           break
         }
 
@@ -237,30 +239,15 @@ export class FlowEngine {
         case 'move_pipeline': {
           const stage = data?.stage
           if (!stage) break
-          await db.from('conversations')
-            .update({ pipeline_stage: stage })
-            .eq('id', ctx.conversationId)
-          emitPusher(ctx.tenantId, 'conversation.updated', {
-            conversationId: ctx.conversationId,
-            pipelineStage: stage,
-          })
+          await db.from('conversations').update({ pipeline_stage: stage }).eq('id', ctx.conversationId)
+          emitPusher(ctx.tenantId, 'conversation.updated', { conversationId: ctx.conversationId, pipelineStage: stage })
           break
         }
 
         case 'assign_agent': {
-          const notifyMessage = data?.message
-          if (notifyMessage) {
-            const message = this.interpolate(notifyMessage, ctx)
-            const delay = data?.delay || 0
-            if (delay > 0) await new Promise(r => setTimeout(r, delay * 1000))
-            await this.sendMessage({
-              tenantId: ctx.tenantId,
-              channelId: ctx.channelId,
-              contactId: ctx.contactId,
-              conversationId: ctx.conversationId,
-              to: ctx.phone,
-              body: message,
-            })
+          if (data?.message) {
+            const message = this.interpolate(data.message, ctx)
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           }
           break
         }
@@ -287,22 +274,17 @@ export class FlowEngine {
 
   private async sendMessage(opts: {
     tenantId: string; channelId: string; contactId: string
-    conversationId: string; to: string; body: string
+    conversationId: string; to: string; contentType: string
+    body?: string; mediaUrl?: string
   }): Promise<void> {
     const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': INTERNAL_SECRET,
-      },
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
       body: JSON.stringify({
-        tenantId: opts.tenantId,
-        channelId: opts.channelId,
-        contactId: opts.contactId,
-        conversationId: opts.conversationId,
-        to: opts.to,
-        contentType: 'text',
-        body: opts.body,
+        tenantId: opts.tenantId, channelId: opts.channelId,
+        contactId: opts.contactId, conversationId: opts.conversationId,
+        to: opts.to, contentType: opts.contentType,
+        body: opts.body, mediaUrl: opts.mediaUrl,
       }),
     })
     if (!response.ok) {
@@ -311,20 +293,12 @@ export class FlowEngine {
     }
   }
 
-  private async logNode(
-    flowId: string, nodeId: string, ctx: FlowContext,
-    status: string, detail: string
-  ): Promise<void> {
+  private async logNode(flowId: string, nodeId: string, ctx: FlowContext, status: string, detail: string): Promise<void> {
     try {
       await db.from('flow_logs').insert({
-        id: generateId(),
-        flow_id: flowId,
-        node_id: nodeId,
-        tenant_id: ctx.tenantId,
-        contact_id: ctx.contactId,
-        conversation_id: ctx.conversationId,
-        status,
-        detail,
+        id: generateId(), flow_id: flowId, node_id: nodeId,
+        tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+        conversation_id: ctx.conversationId, status, detail,
       })
     } catch { }
   }
