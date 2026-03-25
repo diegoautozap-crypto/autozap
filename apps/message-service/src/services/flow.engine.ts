@@ -177,7 +177,7 @@ export class FlowEngine {
     }
 
     // Salva log de execução completa para controle de cooldown
-    await this.logNode(flow.id, 'flow_completed', ctx, 'flow_executed', `Flow executado com ${stepCount} passos`)
+    await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow executado com ${stepCount} passos`)
 
     logger.info('Flow executed', { flowId: flow.id, steps: stepCount, tenantId: ctx.tenantId })
   }
