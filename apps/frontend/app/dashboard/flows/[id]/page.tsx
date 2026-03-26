@@ -7,6 +7,7 @@ import {
   ReactFlow, Background, Controls, MiniMap, addEdge,
   useNodesState, useEdgesState, Connection, Edge, Node,
   Panel, BackgroundVariant, MarkerType, Handle, Position,
+  getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { createClient } from '@supabase/supabase-js'
@@ -253,6 +254,43 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
 
 const nodeTypes = { flowNode: FlowNode }
 
+// ─── Custom Edge com lixeira no hover ────────────────────────────────────────
+function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+      <path
+        d={edgePath}
+        style={{ stroke: 'transparent', strokeWidth: 20, fill: 'none', cursor: 'pointer' }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      />
+      {hovered && (
+        <foreignObject
+          width={28} height={28}
+          x={labelX - 14} y={labelY - 14}
+          style={{ overflow: 'visible', pointerEvents: 'all' }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          <div
+            onClick={() => data?.onDelete(id)}
+            style={{ width: '28px', height: '28px', background: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,.2)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+          </div>
+        </foreignObject>
+      )}
+    </>
+  )
+}
+
+const edgeTypes = { custom: CustomEdge }
+
 function MediaUpload({ accept, label, currentUrl, onUploaded }: {
   accept: string; label: string; currentUrl?: string; onUploaded: (url: string) => void
 }) {
@@ -483,7 +521,10 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
   }
 
   return (
-    <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}>
+    <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
+      onMouseDown={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
+    >
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
@@ -935,10 +976,33 @@ export default function FlowEditorPage() {
     onError: () => toast.error('Erro ao salvar'),
   })
 
+  const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
+
   const onConnect = useCallback((params: Connection) => {
-    setEdges(eds => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }, eds))
+    // Determina cor da edge baseado no sourceHandle
+    let edgeColor = '#d1d5db'
+    if (params.sourceHandle === 'fallback') {
+      edgeColor = '#9ca3af'
+    } else if (params.sourceHandle?.startsWith('branch_')) {
+      // Busca o índice do branch no nó fonte para aplicar a cor correta
+      const sourceNode = nodes.find(n => n.id === params.source)
+      const branches = (sourceNode?.data as any)?.branches || []
+      const branchId = params.sourceHandle.replace('branch_', '')
+      const branchIndex = branches.findIndex((b: any) => b.id === branchId)
+      if (branchIndex >= 0) edgeColor = BRANCH_COLORS_MAP[branchIndex % BRANCH_COLORS_MAP.length]
+    } else if (params.sourceHandle === 'true') {
+      edgeColor = '#16a34a'
+    } else if (params.sourceHandle === 'false') {
+      edgeColor = '#ef4444'
+    }
+
+    setEdges(eds => addEdge({
+      ...params,
+      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
+      style: { stroke: edgeColor, strokeWidth: 2 },
+    }, eds))
     setIsDirty(true)
-  }, [setEdges])
+  }, [setEdges, nodes])
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
@@ -1055,21 +1119,18 @@ export default function FlowEditorPage() {
 
         <div style={{ flex: 1, position: 'relative' }}>
           <ReactFlow
-            nodes={nodes} edges={edges}
+            nodes={nodes}
+            edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (edgeId: string) => { setEdges(eds => eds.filter(ed => ed.id !== edgeId)); setIsDirty(true) } } }))}
             onNodesChange={(changes) => { onNodesChange(changes); setIsDirty(true) }}
             onEdgesChange={(changes) => { onEdgesChange(changes); setIsDirty(true) }}
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
-            onEdgeClick={(e, edge) => {
-              if (confirm('Remover essa conexão?')) {
-                setEdges(eds => eds.filter(ed => ed.id !== edge.id))
-                setIsDirty(true)
-              }
-            }}
-            nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView fitViewOptions={{ padding: 0.3 }}
             deleteKeyCode={['Backspace', 'Delete']}
-            defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
+            defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
