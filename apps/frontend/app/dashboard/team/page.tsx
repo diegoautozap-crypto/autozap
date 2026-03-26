@@ -127,7 +127,7 @@ export default function TeamPage() {
 
   const togglePermission = (role: string, href: string) => {
     const current = permissions[role] || []
-    const next = current.includes(href) ? current.filter(h => h !== href) : [...current, href]
+    const next = current.includes(href) ? current.filter((h: string) => h !== href) : [...current, href]
     setLocalPermissions({ ...permissions, [role]: next })
   }
 
