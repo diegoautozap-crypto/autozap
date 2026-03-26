@@ -36,6 +36,11 @@ const subscribeSchema = z.object({
   cpfCnpj: z.string().optional(),
 })
 
+// Schema de permissões por role
+const permissionsSchema = z.object({
+  permissions: z.record(z.array(z.string())),
+})
+
 // ─── Webhook do Asaas (público — sem auth) ────────────────────────────────────
 const asaasWebhookRouter = Router()
 
@@ -97,7 +102,47 @@ router.get('/usage', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ✅ GET /tenant/analytics — dados para o dashboard
+// ─── Permissões por role ───────────────────────────────────────────────────────
+
+// GET /tenant/permissions — busca permissões configuradas
+router.get('/permissions', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { data } = await db
+      .from('tenants')
+      .select('role_permissions')
+      .eq('id', req.auth.tid)
+      .single()
+
+    // Permissões padrão se não estiver configurado
+    const defaults = {
+      supervisor: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
+      agent: ['/dashboard/inbox'],
+    }
+
+    res.json(ok(data?.role_permissions && Object.keys(data.role_permissions).length > 0
+      ? data.role_permissions
+      : defaults
+    ))
+  } catch (err) { next(err) }
+})
+
+// PATCH /tenant/permissions — salva permissões
+router.patch('/permissions', requireRole('admin', 'owner'), validate(permissionsSchema), async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { error } = await db
+      .from('tenants')
+      .update({ role_permissions: req.body.permissions })
+      .eq('id', req.auth.tid)
+
+    if (error) throw new Error(error.message)
+    res.json(ok({ message: 'Permissões salvas com sucesso' }))
+  } catch (err) { next(err) }
+})
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ✅ GET /tenant/analytics
 router.get('/analytics', async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
@@ -118,7 +163,6 @@ router.get('/analytics', async (req, res, next) => {
 
     const msgs = messages || []
 
-    // Agrupa por dia
     const byDay: Record<string, { sent: number; delivered: number; read: number }> = {}
     for (let i = 29; i >= 0; i--) {
       const d = new Date()
@@ -140,9 +184,7 @@ router.get('/analytics', async (req, res, next) => {
     const totalRead = msgs.filter((m: any) => m.status === 'read').length
 
     res.json(ok({
-      totalSent,
-      totalDelivered,
-      totalRead,
+      totalSent, totalDelivered, totalRead,
       deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
       readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
       byDay,
@@ -156,20 +198,9 @@ router.post('/billing/subscribe', validate(subscribeSchema), async (req, res, ne
   try {
     const { planSlug, cpfCnpj } = req.body
     const { db } = await import('../lib/db')
-    const { data: user } = await db
-      .from('users')
-      .select('name, email')
-      .eq('id', req.auth.sub)
-      .single()
-
-    if (!user) {
-      res.status(404).json({ success: false, error: { message: 'User not found' } })
-      return
-    }
-
-    const result = await tenantService.createSubscription(
-      req.auth.tid, planSlug, user.email, user.name, cpfCnpj,
-    )
+    const { data: user } = await db.from('users').select('name, email').eq('id', req.auth.sub).single()
+    if (!user) { res.status(404).json({ success: false, error: { message: 'User not found' } }); return }
+    const result = await tenantService.createSubscription(req.auth.tid, planSlug, user.email, user.name, cpfCnpj)
     res.json(ok(result))
   } catch (err) { next(err) }
 })
@@ -182,7 +213,6 @@ router.get('/billing/plans', async (_req, res, next) => {
       .select('id, name, slug, price_monthly, message_limit, features')
       .neq('slug', 'trial')
       .order('price_monthly', { ascending: true })
-
     res.json(ok(plans || []))
   } catch (err) { next(err) }
 })

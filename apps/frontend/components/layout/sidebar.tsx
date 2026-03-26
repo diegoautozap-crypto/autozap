@@ -6,9 +6,13 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { LayoutDashboard, Megaphone, Users, MessageSquare, Settings, LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog } from 'lucide-react'
+import {
+  LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog,
+} from 'lucide-react'
 
-const nav = [
+// Todas as páginas disponíveis
+const ALL_NAV = [
   { href: '/dashboard',           label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
@@ -21,6 +25,21 @@ const nav = [
   { href: '/dashboard/settings',  label: 'Plano',     icon: Settings },
 ]
 
+// Permissões padrão (fallback se banco não tiver)
+const DEFAULT_PERMISSIONS: Record<string, string[]> = {
+  owner: ALL_NAV.map(n => n.href), // owner vê tudo sempre
+  admin: ALL_NAV.map(n => n.href), // admin vê tudo sempre
+  supervisor: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
+  agent: ['/dashboard/inbox'],
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'WhatsApp CRM',
+  admin: 'WhatsApp CRM',
+  supervisor: 'Supervisor',
+  agent: 'Atendente',
+}
+
 function UsageBar() {
   const [sent, setSent] = useState(0)
   const [limit, setLimit] = useState<number | null>(null)
@@ -29,9 +48,7 @@ function UsageBar() {
   useEffect(() => {
     tenantApi.get('/tenant/usage').then(({ data }) => {
       const { sent, limit, percentUsed } = data.data
-      setSent(sent)
-      setLimit(limit)
-      setPct(percentUsed || 0)
+      setSent(sent); setLimit(limit); setPct(percentUsed || 0)
     }).catch(() => {})
   }, [])
 
@@ -58,7 +75,30 @@ function UsageBar() {
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { logout } = useAuthStore()
+  const { logout, user } = useAuthStore()
+  const role = (user as any)?.role || 'agent'
+  const [permissions, setPermissions] = useState<Record<string, string[]>>(DEFAULT_PERMISSIONS)
+
+  // Busca permissões do banco
+  useEffect(() => {
+    if (!user) return
+    tenantApi.get('/tenant/permissions')
+      .then(({ data }) => {
+        if (data?.data && Object.keys(data.data).length > 0) {
+          // Sempre garante que owner e admin veem tudo
+          setPermissions({
+            ...data.data,
+            owner: ALL_NAV.map(n => n.href),
+            admin: ALL_NAV.map(n => n.href),
+          })
+        }
+      })
+      .catch(() => {}) // usa default se falhar
+  }, [user])
+
+  // Filtra nav baseado nas permissões do role
+  const allowedHrefs = permissions[role] || DEFAULT_PERMISSIONS[role] || ['/dashboard/inbox']
+  const nav = ALL_NAV.filter(item => allowedHrefs.includes(item.href))
 
   const handleLogout = async () => {
     await logout()
@@ -68,14 +108,11 @@ export function Sidebar() {
 
   return (
     <aside style={{
-      width: '220px',
-      background: '#ffffff',
-      borderRight: '1px solid #e5e7eb',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      flexShrink: 0,
+      width: '220px', background: '#ffffff',
+      borderRight: '1px solid #e5e7eb', display: 'flex',
+      flexDirection: 'column', height: '100%', flexShrink: 0,
     }}>
+      {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '32px', height: '32px', background: '#16a34a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -83,11 +120,12 @@ export function Sidebar() {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#111827', letterSpacing: '-0.01em' }}>AutoZap</div>
-            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>WhatsApp CRM</div>
+            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{ROLE_LABEL[role] || 'WhatsApp CRM'}</div>
           </div>
         </div>
       </div>
 
+      {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
@@ -107,8 +145,9 @@ export function Sidebar() {
         })}
       </nav>
 
-      <UsageBar />
+      {['owner', 'admin'].includes(role) && <UsageBar />}
 
+      {/* Logout */}
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={handleLogout}
