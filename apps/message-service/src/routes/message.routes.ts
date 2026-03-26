@@ -114,4 +114,20 @@ router.get('/messages/:conversationId', requireAuth, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// POST /messages/conversations/:conversationId/take-over — pausa o bot
+router.post('/messages/conversations/:conversationId/take-over', requireAuth, async (req, res, next) => {
+  try {
+    await messageService.takeOver(req.params.conversationId, req.auth.tid)
+    res.json(ok({ message: 'Bot pausado' }))
+  } catch (err) { next(err) }
+})
+
+// POST /messages/conversations/:conversationId/release-bot — reativa o bot
+router.post('/messages/conversations/:conversationId/release-bot', requireAuth, async (req, res, next) => {
+  try {
+    await messageService.releaseBot(req.params.conversationId, req.auth.tid)
+    res.json(ok({ message: 'Bot reativado' }))
+  } catch (err) { next(err) }
+})
+
 export default router

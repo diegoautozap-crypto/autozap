@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square } from 'lucide-react'
+import { Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText, User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot, UserCheck } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -146,7 +146,13 @@ export default function InboxPage() {
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       playNotificationSound()
     })
-    channel.bind('conversation.updated', () => { queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) })
+    channel.bind('conversation.updated', (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+      // Atualiza a conversa selecionada se bot_active mudou
+      if (data?.conversationId === selectedConvId) {
+        queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
+      }
+    })
     channel.bind('message.status', (data: any) => {
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
     })
@@ -200,10 +206,37 @@ export default function InboxPage() {
     enabled: !!contactId,
   })
 
-  // Tags do contato
-  const contactTags = (contactDetail?.contact_tags || [])
-    .map((ct: any) => ct.tags)
-    .filter(Boolean)
+  const contactTags = (contactDetail?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
+
+  // ─── bot_active da conversa selecionada ──────────────────────────────────────
+  const botActive = selectedConv?.bot_active !== false // default true se não definido
+
+  // Mutation: Assumir conversa (pausa bot)
+  const takeOverMutation = useMutation({
+    mutationFn: async () => {
+      await messageApi.post(`/messages/conversations/${selectedConvId}/take-over`, {})
+    },
+    onSuccess: () => {
+      toast.success('Você assumiu a conversa — bot pausado')
+      queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+    },
+    onError: () => toast.error('Erro ao assumir conversa'),
+  })
+
+  // Mutation: Liberar bot (reativa bot)
+  const releaseBotMutation = useMutation({
+    mutationFn: async () => {
+      await messageApi.post(`/messages/conversations/${selectedConvId}/release-bot`, {})
+    },
+    onSuccess: () => {
+      toast.success('Bot reativado com sucesso')
+      queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+    },
+    onError: () => toast.error('Erro ao liberar bot'),
+  })
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const sendMutation = useMutation({
     mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
@@ -327,12 +360,21 @@ export default function InboxPage() {
               const av = getAvatarColor(name)
               const preview = (conv.last_message || 'Sem mensagens').startsWith('[') ? conv.last_message : cleanText(conv.last_message || '').split('\n')[0]
               const convChannelName = channels?.find((ch: any) => ch.id === conv.channel_id)?.name
+              const convBotActive = conv.bot_active !== false
               return (
                 <div key={conv.id} onClick={() => handleSelectConv(conv.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSel ? '#f0fdf4' : 'transparent', borderLeft: isSel ? '3px solid #16a34a' : '3px solid transparent' }}
                   onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                   onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
-                  <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 }}>{getInitials(name)}</div>
+                    {/* Indicador de bot pausado */}
+                    {!convBotActive && (
+                      <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '14px', height: '14px', borderRadius: '50%', background: '#f97316', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Bot pausado">
+                        <UserCheck size={8} color="#fff" />
+                      </div>
+                    )}
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
@@ -363,6 +405,7 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
+            {/* Header do chat */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 }}>{getInitials(contactName)}</div>
@@ -370,11 +413,45 @@ export default function InboxPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.2, margin: 0 }}>{contactName || '??'}</p>
                     {selectedChannelName && <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 7px', borderRadius: '4px' }}>{selectedChannelName}</span>}
+                    {/* Badge status do bot */}
+                    {botActive
+                      ? <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 7px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Bot size={10} /> Bot ativo
+                        </span>
+                      : <span style={{ fontSize: '10px', fontWeight: 600, color: '#ea580c', background: '#fff7ed', border: '1px solid #fed7aa', padding: '1px 7px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <UserCheck size={10} /> Humano
+                        </span>
+                    }
                   </div>
                   <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{selectedConv?.contacts?.phone}</p>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+
+                {/* ── Botões Assumir / Liberar bot ── */}
+                {selectedConv?.status !== 'closed' && (
+                  botActive ? (
+                    <button
+                      onClick={() => takeOverMutation.mutate()}
+                      disabled={takeOverMutation.isPending}
+                      title="Pausar o bot e assumir o atendimento manualmente"
+                      style={{ padding: '5px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {takeOverMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={12} />}
+                      Assumir
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => releaseBotMutation.mutate()}
+                      disabled={releaseBotMutation.isPending}
+                      title="Reativar o bot para responder automaticamente"
+                      style={{ padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {releaseBotMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={12} />}
+                      Liberar bot
+                    </button>
+                  )
+                )}
+                {/* ─────────────────────────────────── */}
+
                 {selectedConv?.status !== 'closed'
                   ? <button onClick={closeConv} style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#6b7280' }}>Fechar</button>
                   : <button onClick={openConv} style={{ padding: '5px 12px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Reabrir</button>
@@ -384,6 +461,22 @@ export default function InboxPage() {
                 </button>
               </div>
             </div>
+
+            {/* Banner quando bot está pausado */}
+            {!botActive && selectedConv?.status !== 'closed' && (
+              <div style={{ padding: '8px 16px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserCheck size={14} color="#ea580c" />
+                  <span style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>Atendimento humano ativo — o bot não está respondendo</span>
+                </div>
+                <button
+                  onClick={() => releaseBotMutation.mutate()}
+                  disabled={releaseBotMutation.isPending}
+                  style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>
+                  Reativar bot
+                </button>
+              </div>
+            )}
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
               {loadingMessages
@@ -514,7 +607,17 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Tags do contato */}
+              {/* Bot status no perfil */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bot size={13} color="#9ca3af" />
+                <div>
+                  <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Bot</p>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: botActive ? '#16a34a' : '#ea580c', background: botActive ? '#f0fdf4' : '#fff7ed', padding: '1px 8px', borderRadius: '99px', display: 'inline-block', marginTop: '2px' }}>
+                    {botActive ? 'Ativo' : 'Pausado'}
+                  </span>
+                </div>
+              </div>
+
               {contactTags.length > 0 && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -523,12 +626,7 @@ export default function InboxPage() {
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                     {contactTags.map((tag: any) => (
-                      <span key={tag.id} style={{
-                        fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
-                        background: `${tag.color || '#6b7280'}18`,
-                        color: tag.color || '#6b7280',
-                        border: `1px solid ${tag.color || '#6b7280'}40`,
-                      }}>
+                      <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>
                         {tag.name}
                       </span>
                     ))}

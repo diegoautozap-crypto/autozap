@@ -90,6 +90,23 @@ export class MessageService {
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
     emitPusher(tenantId, 'inbound.message', { conversationId: conversation.id, contactId: contact.id, body: msg.body, contentType: msg.contentType, timestamp: msg.timestamp })
 
+    // ─── Checar se bot está ativo para esta conversa ───────────────────────────
+    const { data: convData } = await db
+      .from('conversations')
+      .select('bot_active')
+      .eq('id', conversation.id)
+      .single()
+
+    // Se bot_active for false, humano assumiu — não executa flows nem automações
+    if (convData?.bot_active === false) {
+      logger.info('Bot pausado para esta conversa — pulando flows e automações', {
+        conversationId: conversation.id,
+        tenantId,
+      })
+      return
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     // Verifica se é primeira mensagem do contato nesse canal
     const { count: msgCount } = await db
       .from('messages')
@@ -121,6 +138,31 @@ export class MessageService {
 
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
+
+  // ─── Assumir conversa (pausa o bot) ─────────────────────────────────────────
+  async takeOver(conversationId: string, tenantId: string): Promise<void> {
+    const { error } = await db
+      .from('conversations')
+      .update({ bot_active: false })
+      .eq('id', conversationId)
+      .eq('tenant_id', tenantId)
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    emitPusher(tenantId, 'conversation.updated', { conversationId, botActive: false })
+    logger.info('Bot pausado — humano assumiu', { conversationId, tenantId })
+  }
+
+  // ─── Liberar bot (reativa o bot) ────────────────────────────────────────────
+  async releaseBot(conversationId: string, tenantId: string): Promise<void> {
+    const { error } = await db
+      .from('conversations')
+      .update({ bot_active: true })
+      .eq('id', conversationId)
+      .eq('tenant_id', tenantId)
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    emitPusher(tenantId, 'conversation.updated', { conversationId, botActive: true })
+    logger.info('Bot reativado', { conversationId, tenantId })
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   async updateStatus(tenantId: string, channelId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage, errorCode, phone } = update as any
@@ -221,7 +263,7 @@ export class MessageService {
   private async findOrCreateConversation(tenantId: string, channelId: string, contactId: string, channelType: string) {
     const { data: existing } = await db.from('conversations').select('id, unread_count').eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId).in('status', ['open','waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (existing) return existing
-    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'open', pipeline_stage: 'lead', unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
+    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'open', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
