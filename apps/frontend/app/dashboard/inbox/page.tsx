@@ -243,7 +243,21 @@ export default function InboxPage() {
       if (!selectedConv) return
       await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
-    onSuccess: () => { setMessageText(''); setPendingFile(null); queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) },
+    onSuccess: () => {
+      setMessageText('')
+      setPendingFile(null)
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+      // Pausa o bot automaticamente quando atendente envia mensagem manualmente
+      if (botActive && selectedConvId) {
+        messageApi.post(`/messages/conversations/${selectedConvId}/take-over`, {})
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
+            queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+          })
+          .catch(() => {}) // silencioso — não interrompe o fluxo
+      }
+    },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao enviar'),
   })
 
