@@ -205,6 +205,33 @@ router.patch('/team/:id', requireAuth, requireRole('admin', 'owner'), validate(u
       .select('id, name, email, role, is_active').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
+    // Se o role mudou, reseta permissões para o padrão do novo role
+    if (req.body.role !== undefined && req.body.role !== member.role) {
+      const newRole = req.body.role
+      const defaultPages = newRole === 'agent'
+        ? ['/dashboard/inbox']
+        : newRole === 'supervisor'
+        ? ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline']
+        : []
+
+      if (defaultPages.length > 0) {
+        await db.from('user_permissions').upsert({
+          user_id: req.params.id,
+          tenant_id: req.auth.tid,
+          allowed_pages: defaultPages,
+          allowed_channels: [],
+          campaign_access: newRole === 'supervisor' ? 'view' : 'none',
+          conversation_access: newRole === 'supervisor' ? 'all' : 'assigned',
+          updated_at: new Date(),
+        }, { onConflict: 'user_id,tenant_id' })
+      } else {
+        // admin — remove permissões individuais (admin tem acesso total)
+        await db.from('user_permissions').delete()
+          .eq('user_id', req.params.id)
+          .eq('tenant_id', req.auth.tid)
+      }
+    }
+
     if (req.body.is_active === false) {
       await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('user_id', req.params.id).is('revoked_at', null)
     }
