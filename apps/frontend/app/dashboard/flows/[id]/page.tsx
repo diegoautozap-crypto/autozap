@@ -1154,6 +1154,17 @@ export default function FlowEditorPage() {
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
+            {/* Watermark AutoZap */}
+            <Panel position="top-left" style={{ pointerEvents: 'none', userSelect: 'none', position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.07 }}>
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#16a34a" />
+                </svg>
+                <span style={{ fontSize: '80px', fontWeight: 800, letterSpacing: '-0.04em', color: '#16a34a', fontFamily: 'system-ui, sans-serif', lineHeight: 1 }}>
+                  AutoZap
+                </span>
+              </div>
+            </Panel>
             {nodes.length === 0 && (
               <Panel position="top-center">
                 <div style={{ background: '#fff', border: '1px dashed #d1d5db', borderRadius: '12px', padding: '24px 40px', textAlign: 'center', marginTop: '60px' }}>
