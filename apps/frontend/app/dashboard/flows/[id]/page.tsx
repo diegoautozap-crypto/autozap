@@ -379,7 +379,7 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                 <option value="AND">E (AND)</option>
                 <option value="OR">OU (OR)</option>
               </select>
-              <button onClick={() => removeBranch(branch.id)}
+              <button onClick={(e) => { e.stopPropagation(); removeBranch(branch.id) }}
                 title="Remover caminho"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px', color: '#9ca3af', display: 'flex', marginLeft: 'auto' }}
                 onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
@@ -1061,6 +1061,12 @@ export default function FlowEditorPage() {
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
+            onEdgeClick={(e, edge) => {
+              if (confirm('Remover essa conexão?')) {
+                setEdges(eds => eds.filter(ed => ed.id !== edge.id))
+                setIsDirty(true)
+              }
+            }}
             nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }}
             deleteKeyCode={['Backspace', 'Delete']}
             defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
