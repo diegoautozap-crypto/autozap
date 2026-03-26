@@ -1137,7 +1137,7 @@ export default function FlowEditorPage() {
           })}
         </div>
 
-        <div style={{ flex: 1, position: 'relative', background: '#f0fdf4' }}>
+        <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>
           <ReactFlow
             nodes={nodesWithDelete}
             edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (edgeId: string) => { setEdges(eds => eds.filter(ed => ed.id !== edgeId)); setIsDirty(true) } } }))}
@@ -1151,16 +1151,16 @@ export default function FlowEditorPage() {
             fitView fitViewOptions={{ padding: 0.3 }}
             deleteKeyCode={['Backspace', 'Delete']}
             defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#d1fae5" />
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
             {/* Watermark AutoZap */}
             <Panel position="top-left" style={{ pointerEvents: 'none', userSelect: 'none', position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.12 }}>
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.15 }}>
+                <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#16a34a" />
                 </svg>
-                <span style={{ fontSize: '96px', fontWeight: 800, letterSpacing: '-0.05em', color: '#16a34a', fontFamily: 'system-ui, sans-serif', lineHeight: 1 }}>
+                <span style={{ fontSize: '88px', fontWeight: 800, letterSpacing: '-0.05em', color: '#16a34a', fontFamily: 'system-ui, sans-serif', lineHeight: 1 }}>
                   AutoZap
                 </span>
               </div>
