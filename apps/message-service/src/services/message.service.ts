@@ -6,10 +6,12 @@ import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
 import { flowEngine } from './flow.engine'
 
-const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
-const PUSHER_KEY     = process.env.PUSHER_KEY
-const PUSHER_SECRET  = process.env.PUSHER_SECRET
-const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
+const PUSHER_APP_ID        = process.env.PUSHER_APP_ID
+const PUSHER_KEY           = process.env.PUSHER_KEY
+const PUSHER_SECRET        = process.env.PUSHER_SECRET
+const PUSHER_CLUSTER       = process.env.PUSHER_CLUSTER || 'sa1'
+const CAMPAIGN_SERVICE_URL = process.env.CAMPAIGN_SERVICE_URL || 'http://localhost:3007'
+const INTERNAL_SECRET      = process.env.INTERNAL_SECRET || 'autozap_internal'
 
 export interface QueueMessageInput {
   tenantId: string; channelId: string; contactId: string; conversationId: string
@@ -90,24 +92,24 @@ export class MessageService {
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
     emitPusher(tenantId, 'inbound.message', { conversationId: conversation.id, contactId: contact.id, body: msg.body, contentType: msg.contentType, timestamp: msg.timestamp })
 
-    // ─── Checar se bot está ativo para esta conversa ───────────────────────────
+    // ─── Cancela follow-up pendente (cliente respondeu) ──────────────────────
+    this.callFollowUpService('cancel', { conversationId: conversation.id })
+      .catch(err => logger.warn('Failed to cancel follow-up', { err }))
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Checar se bot está ativo ────────────────────────────────────────────
     const { data: convData } = await db
       .from('conversations')
       .select('bot_active')
       .eq('id', conversation.id)
       .single()
 
-    // Se bot_active for false, humano assumiu — não executa flows nem automações
     if (convData?.bot_active === false) {
-      logger.info('Bot pausado para esta conversa — pulando flows e automações', {
-        conversationId: conversation.id,
-        tenantId,
-      })
+      logger.info('Bot pausado — pulando flows e automações', { conversationId: conversation.id, tenantId })
       return
     }
-    // ──────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // Verifica se é primeira mensagem do contato nesse canal
     const { count: msgCount } = await db
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -118,8 +120,7 @@ export class MessageService {
     const isFirstMessage = (msgCount || 0) <= 1
 
     const automationCtx = {
-      tenantId,
-      channelId,
+      tenantId, channelId,
       contactId: contact.id,
       conversationId: conversation.id,
       phone: msg.from,
@@ -128,16 +129,34 @@ export class MessageService {
       hour: new Date().getHours(),
     }
 
-    // Executa automações antigas (non-blocking)
     automationService.processAutomations(automationCtx)
       .catch(err => logger.error('Automation error', { err }))
 
-    // Executa flows (non-blocking)
     flowEngine.processFlows(automationCtx)
       .catch(err => logger.error('Flow engine error', { err }))
 
+    // ─── Agenda follow-up caso cliente pare de responder ─────────────────────
+    this.callFollowUpService('schedule', {
+      tenantId,
+      conversationId: conversation.id,
+      contactId: contact.id,
+      channelId,
+      phone: msg.from,
+    }).catch(err => logger.warn('Failed to schedule follow-up', { err }))
+    // ─────────────────────────────────────────────────────────────────────────
+
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
+
+  // ─── Chama campaign-service para agendar/cancelar follow-ups ────────────────
+  private async callFollowUpService(action: 'schedule' | 'cancel', payload: object): Promise<void> {
+    await fetch(`${CAMPAIGN_SERVICE_URL}/internal/followup/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
+      body: JSON.stringify(payload),
+    })
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Assumir conversa (pausa o bot) ─────────────────────────────────────────
   async takeOver(conversationId: string, tenantId: string): Promise<void> {
@@ -148,6 +167,7 @@ export class MessageService {
       .eq('tenant_id', tenantId)
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     emitPusher(tenantId, 'conversation.updated', { conversationId, botActive: false })
+    this.callFollowUpService('cancel', { conversationId }).catch(() => {})
     logger.info('Bot pausado — humano assumiu', { conversationId, tenantId })
   }
 
@@ -169,7 +189,6 @@ export class MessageService {
     logger.info('Webhook status received', { externalId, status, tenantId })
     if (status === 'failed' && errorCode) {
       await saveMessageError({ tenantId, channelId, phone, errorCode: String(errorCode), errorMessage: errorMessage || 'Unknown error', messageId: externalId, rawPayload: update as any })
-      logger.info('Message error saved', { externalId, errorCode, errorMessage })
     }
     const { data: rows, error: rpcError } = await db.rpc('update_message_status', {
       p_external_id: externalId, p_tenant_id: tenantId, p_status: status,
@@ -184,15 +203,9 @@ export class MessageService {
       return
     }
     const row = Array.isArray(rows) ? rows[0] : rows
-    logger.info('update_message_status result', { externalId, status, updated: row?.updated, campaignId: row?.campaign_id })
     if (!row?.updated) {
       const { data: exists } = await db.from('messages').select('id, status').eq('external_id', externalId).eq('tenant_id', tenantId).maybeSingle()
-      if (!exists) {
-        logger.warn('Message not found — saving to pending', { externalId, status })
-        await this.savePending(externalId, tenantId, status, timestamp, errorMessage)
-      } else {
-        logger.debug('Status update ignored', { externalId, currentStatus: exists.status, newStatus: status })
-      }
+      if (!exists) await this.savePending(externalId, tenantId, status, timestamp, errorMessage)
       return
     }
     logger.info('Message status updated', { externalId, newStatus: status, campaignId: row.campaign_id })
@@ -203,7 +216,6 @@ export class MessageService {
           p_external_id: externalId, p_campaign_id: row.campaign_id, p_field: field, p_status: status,
         })
         if (incremented) logger.info('Campaign counter incremented', { campaignId: row.campaign_id, field })
-        else logger.debug('Campaign counter skipped', { campaignId: row.campaign_id, field, externalId })
       } catch (err) { logger.warn('increment_campaign_counter_safe failed', { err }) }
     }
     if (row.conversation_id) {
@@ -217,7 +229,6 @@ export class MessageService {
       error_message: errorMessage, payload: { externalId, status, timestamp, errorMessage },
     }, { onConflict: 'external_id,status', ignoreDuplicates: true })
     if (error) logger.error('Failed to save pending', { externalId, status, error: error.message })
-    else logger.info('Pending status saved', { externalId, status })
   }
 
   async markSent(messageUuid: string, externalId: string): Promise<void> {
