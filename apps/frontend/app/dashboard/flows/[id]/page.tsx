@@ -206,17 +206,18 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       {isCondition && branches.length > 0 && (
         <>
           {branches.map((branch, i) => {
-            const topPct = handleSpacing * (i + 1)
             const branchColor = BRANCH_COLORS[i % BRANCH_COLORS.length]
+            // Espaça os handles verticalmente com offset fixo de 20px entre eles
+            const topOffset = 20 + i * 22
             return (
               <Handle key={branch.id} type="source" position={Position.Right}
                 id={`branch_${branch.id}`}
-                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', top: `${topPct}%` }} />
+                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', top: 'auto', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: topOffset }} />
             )
           })}
           {/* Fallback handle */}
           <Handle type="source" position={Position.Right} id="fallback"
-            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', top: `${handleSpacing * (branches.length + 1)}%` }} />
+            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', top: 'auto', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: 20 + branches.length * 22 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
             {branches.map((branch, i) => (
               <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
