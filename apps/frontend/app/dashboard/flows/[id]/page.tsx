@@ -182,21 +182,16 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
         transition: 'all 0.15s', position: 'relative',
       }}>
-      {/* Toolbar de delete no hover */}
-      {(hovered || selected) && (
-        <div style={{ position: 'absolute', top: -36, right: 0, display: 'flex', gap: '4px', zIndex: 20 }}>
-          <button
-            onMouseDown={e => { e.stopPropagation() }}
-            onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
-            title="Deletar nó"
-            style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#fff', fontSize: '11px', fontWeight: 600, boxShadow: '0 2px 6px rgba(0,0,0,.2)' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-            Deletar
-          </button>
-        </div>
-      )}
+      {/* Lixeira sempre visível no canto superior direito */}
+      <div
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
+        title="Deletar nó"
+        style={{ position: 'absolute', top: -10, right: -10, width: '22px', height: '22px', background: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,.2)', zIndex: 20 }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+        </svg>
+      </div>
       {!isTrigger && (
         <Handle type="target" position={Position.Left}
           style={{ background: '#d1d5db', width: 10, height: 10, border: '2px solid #fff' }} />
