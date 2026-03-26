@@ -437,6 +437,14 @@ export default function InboxPage() {
   const sendMutation = useMutation({
     mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
       if (!selectedConv) return
+
+      // Verifica permissão no canal antes de enviar
+      if (role !== 'admin' && role !== 'owner' && allowedChannels.length > 0) {
+        if (!allowedChannels.includes(selectedConv.channel_id)) {
+          throw new Error('Sem permissão para enviar neste canal')
+        }
+      }
+
       await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
     onSuccess: () => {
