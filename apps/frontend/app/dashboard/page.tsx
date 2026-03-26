@@ -1,11 +1,12 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { campaignApi, conversationApi, contactApi, tenantApi, channelApi } from '@/lib/api'
+import { useState } from 'react'
+import { campaignApi, conversationApi, contactApi, tenantApi, channelApi, authApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import {
   Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp,
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
-  Clock, UserCheck, Workflow,
+  Clock, UserCheck, Workflow, X,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -92,7 +93,22 @@ export default function DashboardPage() {
   const { data: conversations } = useQuery({ queryKey: ['conversations', 'open'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data }, refetchInterval: 15000 })
   const { data: contactsMeta } = useQuery({ queryKey: ['contacts-count'], queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta }, refetchInterval: 15000 })
   const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data }, refetchInterval: 15000 })
-  const { data: analytics } = useQuery({ queryKey: ['analytics'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/analytics'); return data.data }, refetchInterval: 30000 })
+  const { data: teamMembers } = useQuery({
+    queryKey: ['team-members'],
+    queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
+  })
+
+  const [selectedAgent, setSelectedAgent] = useState<string>('')
+
+  const { data: analytics } = useQuery({
+    queryKey: ['analytics', selectedAgent],
+    queryFn: async () => {
+      const url = selectedAgent ? `/tenant/analytics?userId=${selectedAgent}` : '/tenant/analytics'
+      const { data } = await tenantApi.get(url)
+      return data.data
+    },
+    refetchInterval: 30000,
+  })
 
   const totalSent = analytics?.totalSent ?? 0
   const deliveryRate = analytics?.deliveryRate ?? 0
@@ -102,7 +118,8 @@ export default function DashboardPage() {
   const avgResponseMinutes: number | null = analytics?.avgResponseMinutes ?? null
   const activeFlowsToday: number = analytics?.activeFlowsToday ?? 0
   const flowExecutionsToday: number = analytics?.flowExecutionsToday ?? 0
-  const days = Object.keys(byDay).sort()
+  const agentConversations: number | null = analytics?.agentConversations ?? null
+  const agentClosedLast7d: number | null = analytics?.agentClosedLast7d ?? null
   const maxVal = Math.max(...days.map(d => byDay[d]?.sent || 0), 1)
 
   const metricCards = [
@@ -159,6 +176,62 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Seletor de atendente */}
+      {role === 'owner' || role === 'admin' ? (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <UserCheck size={16} color="#6b7280" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Ver desempenho de:</span>
+          <select
+            value={selectedAgent}
+            onChange={e => setSelectedAgent(e.target.value)}
+            style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', color: '#111827', outline: 'none', cursor: 'pointer', minWidth: '200px' }}>
+            <option value="">Toda a equipe</option>
+            {(teamMembers || []).map((m: any) => (
+              <option key={m.id} value={m.id}>{m.name || m.email}</option>
+            ))}
+          </select>
+          {selectedAgent && (
+            <button onClick={() => setSelectedAgent('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <X size={13} /> Limpar filtro
+            </button>
+          )}
+        </div>
+      ) : null}
+
+      {/* Métricas do atendente selecionado */}
+      {selectedAgent && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '24px' }}>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <MessageSquare size={18} color="#16a34a" />
+            </div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827' }}>{agentConversations ?? '—'}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Conversas abertas atribuídas</div>
+            </div>
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CheckCheck size={18} color="#2563eb" />
+            </div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827' }}>{agentClosedLast7d ?? '—'}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Conversas fechadas (7 dias)</div>
+            </div>
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Clock size={18} color="#ea580c" />
+            </div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#111827' }}>{formatResponseTime(avgResponseMinutes)}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>Tempo médio de resposta (7d)</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Linha de métricas operacionais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '24px' }}>
