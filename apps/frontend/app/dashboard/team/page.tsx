@@ -76,14 +76,14 @@ export default function TeamPage() {
   const { data: members = [], isLoading } = useQuery({
     queryKey: ['team'],
     queryFn: async () => {
-      const { data } = await authApi.get('/team')
+      const { data } = await authApi.get('/auth/team')
       return data.data || []
     },
   })
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await authApi.post('/team/invite', form)
+      const { data } = await authApi.post('/auth/team/invite', form)
       return data
     },
     onSuccess: () => {
@@ -97,7 +97,7 @@ export default function TeamPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await authApi.patch(`/team/${id}`, data)
+      await authApi.patch(`/auth/team/${id}`, data)
     },
     onSuccess: () => {
       toast.success('Atualizado!')
@@ -108,13 +108,13 @@ export default function TeamPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => { await authApi.delete(`/team/${id}`) },
+    mutationFn: async (id: string) => { await authApi.delete(`/auth/team/${id}`) },
     onSuccess: () => { toast.success('Membro removido'); queryClient.invalidateQueries({ queryKey: ['team'] }) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao remover'),
   })
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async (id: string) => { await authApi.post(`/team/${id}/reset-password`, {}) },
+    mutationFn: async (id: string) => { await authApi.post(`/auth/team/${id}/reset-password`, {}) },
     onSuccess: () => toast.success('Nova senha enviada por email'),
     onError: () => toast.error('Erro ao redefinir senha'),
   })
