@@ -207,17 +207,15 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         <>
           {branches.map((branch, i) => {
             const branchColor = BRANCH_COLORS[i % BRANCH_COLORS.length]
-            // Espaça os handles verticalmente com offset fixo de 20px entre eles
-            const topOffset = 20 + i * 22
+            const topOffset = 24 + i * 28
             return (
               <Handle key={branch.id} type="source" position={Position.Right}
                 id={`branch_${branch.id}`}
-                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: topOffset }} />
+                style={{ background: branchColor, width: 12, height: 12, border: '2px solid #fff', position: 'absolute', right: -7, top: topOffset, transform: 'none' }} />
             )
           })}
-          {/* Fallback handle */}
           <Handle type="source" position={Position.Right} id="fallback"
-            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: 20 + branches.length * 22 }} />
+            style={{ background: '#9ca3af', width: 12, height: 12, border: '2px solid #fff', position: 'absolute', right: -7, top: 24 + branches.length * 28, transform: 'none' }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
             {branches.map((branch, i) => (
               <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
@@ -406,12 +404,21 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                         <option value="phone">Telefone</option>
                         <option value="webhook_status">Status webhook</option>
                       </select>
-                      {branch.rules.length > 1 && (
-                        <button onClick={() => removeRule(branch.id, rule.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}>
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          if (branch.rules.length === 1) {
+                            // Se for a última regra, limpa os campos em vez de remover
+                            updateRule(branch.id, rule.id, { field: 'message', fieldName: '', operator: 'contains', value: '' })
+                          } else {
+                            removeRule(branch.id, rule.id)
+                          }
+                        }}
+                        title={branch.rules.length === 1 ? 'Limpar regra' : 'Remover regra'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                     {rule.field === 'variable' && (
                       <input value={rule.fieldName || ''} onChange={e => updateRule(branch.id, rule.id, { fieldName: e.target.value })}
@@ -1053,6 +1060,7 @@ export default function FlowEditorPage() {
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
             nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.3 }}
+            deleteKeyCode={['Backspace', 'Delete']}
             defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
             <Controls />
