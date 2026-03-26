@@ -8,7 +8,7 @@ import { Loader2, MessageSquareMore, ArrowRight, Mail } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading } = useAuthStore()
+  const { login, isLoading, user } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
@@ -27,9 +27,8 @@ export default function LoginPage() {
         return
       }
 
-      // Pega o role do store após login
-      const { user: loggedUser } = useAuthStore.getState()
-      const role = (loggedUser as any)?.role || 'agent'
+      // Pega o role do store após login (getState é seguro dentro de handlers)
+      const role = (useAuthStore.getState().user as any)?.role || 'agent'
       if (role === 'agent' || role === 'supervisor') {
         router.push('/dashboard/inbox')
       } else {
