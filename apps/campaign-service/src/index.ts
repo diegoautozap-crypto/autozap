@@ -3,6 +3,7 @@ import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import campaignRoutes from './routes/campaign.routes'
+import followupRoutes from './routes/followup.routes'
 import { errorHandler } from './middleware/campaign.middleware'
 import { logger } from './lib/logger'
 import { startCampaignWorker }    from './workers/campaign.worker'
@@ -19,6 +20,7 @@ app.use(express.json({ limit: '10mb' }))
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'campaign-service' }))
 app.use('/', campaignRoutes)
+app.use('/', followupRoutes)
 app.use(errorHandler)
 
 app.listen(PORT, () => {

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth, validate } from '../middleware/message.middleware'
+import { requireAuth, validate } from '../middleware/campaign.middleware'
 import { ok, AppError } from '@autozap/utils'
 import { db } from '../lib/db'
 
