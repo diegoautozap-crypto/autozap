@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, ChevronDown } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', label: 'Enviando' },
@@ -12,6 +12,7 @@ const S: Record<string, { color: string; bg: string; label: string }> = {
   draft:     { color: '#6b7280', bg: '#f9fafb', label: 'Rascunho' },
   paused:    { color: '#d97706', bg: '#fffbeb', label: 'Pausada' },
   failed:    { color: '#dc2626', bg: '#fef2f2', label: 'Falhou' },
+  scheduled: { color: '#7c3aed', bg: '#f5f3ff', label: 'Agendada' },
 }
 
 const inputStyle: React.CSSProperties = {
@@ -36,6 +37,8 @@ export default function CampaignsPage() {
   const [useTemplate, setUseTemplate] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [templateVars, setTemplateVars] = useState<string[]>([])
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now')
+  const [scheduledAt, setScheduledAt] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -89,7 +92,7 @@ export default function CampaignsPage() {
   const resetModal = () => {
     setCampaignName(''); setContactsText(''); setCurlText('')
     setSelectedChannel(''); setSelectedTemplate(''); setTemplateVars([])
-    setUseTemplate(true)
+    setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
   }
 
   const createMutation = useMutation({
@@ -105,6 +108,9 @@ export default function CampaignsPage() {
       } else {
         payload.curlTemplate = curlText.trim().replace(/ \\\n/g, ' ').replace(/ \\\r\n/g, ' ').replace(/'/g, '"')
       }
+      if (scheduleMode === 'scheduled' && scheduledAt) {
+        payload.scheduledAt = new Date(scheduledAt).toISOString()
+      }
       const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
       const rows = contactsText.split('\n').filter(Boolean).map(line => {
@@ -114,10 +120,19 @@ export default function CampaignsPage() {
         return { phone, name: message || phone, message: message || '' }
       }).filter(r => r.phone && r.phone.length >= 8)
       if (rows.length > 0) await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
+
+      // Se agendado, não dispara agora
+      if (scheduleMode === 'now') {
+        await campaignApi.post(`/campaigns/${campId}/start`)
+      }
+
       return campData.data
     },
     onSuccess: (camp) => {
-      toast.success('Campanha criada!')
+      const msg = scheduleMode === 'scheduled'
+        ? `Campanha agendada para ${new Date(scheduledAt).toLocaleString('pt-BR')}!`
+        : 'Campanha criada e iniciada!'
+      toast.success(msg)
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false)
       setSelectedCamp(camp)
@@ -157,11 +172,16 @@ export default function CampaignsPage() {
   const deliveryRate = sent > 0 ? Math.round((delivered / sent) * 100) : 0
   const readRate = sent > 0 ? Math.round((read / sent) * 100) : 0
 
-  const isValid = campaignName && selectedChannel && (useTemplate ? !!selectedTemplate : !!curlText)
+  const isValid = campaignName && selectedChannel &&
+    (useTemplate ? !!selectedTemplate : !!curlText) &&
+    (scheduleMode === 'now' || (scheduleMode === 'scheduled' && !!scheduledAt))
 
   const label = (text: string) => (
     <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>{text}</label>
   )
+
+  // Data mínima para agendamento (agora + 5 minutos)
+  const minDateTime = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)
 
   return (
     <div style={{ padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -188,8 +208,7 @@ export default function CampaignsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
-
-        {/* Lista de campanhas */}
+        {/* Lista */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', flex: 1 }}>
             {isLoading ? (
@@ -205,7 +224,7 @@ export default function CampaignsPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 100px 100px', gap: '8px', padding: '11px 16px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 120px 100px', gap: '8px', padding: '11px 16px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
                   {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
                     <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
@@ -216,12 +235,18 @@ export default function CampaignsPage() {
                   const isSelected = selectedCamp?.id === camp.id
                   return (
                     <div key={camp.id} onClick={() => setSelectedCamp(camp)}
-                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 100px 100px', gap: '8px', padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent' }}
+                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 100px 120px 100px', gap: '8px', padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: isSelected ? '3px solid #16a34a' : '3px solid transparent' }}
                       onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                       onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
                       <div>
-                        <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px', marginBottom: '4px' }}>{camp.name}</div>
-                        <div style={{ height: '2px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px', marginBottom: '2px' }}>{camp.name}</div>
+                        {camp.scheduled_at && camp.status === 'scheduled' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#7c3aed' }}>
+                            <Clock size={10} />
+                            {new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                        <div style={{ height: '2px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden', marginTop: '4px' }}>
                           <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '99px' }} />
                         </div>
                       </div>
@@ -270,7 +295,7 @@ export default function CampaignsPage() {
           </div>
         </div>
 
-        {/* Painel de progresso */}
+        {/* Painel progresso */}
         <div style={{ width: '280px', flexShrink: 0 }}>
           {selectedCamp ? (
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', position: 'sticky', top: 0 }}>
@@ -285,6 +310,20 @@ export default function CampaignsPage() {
                   <X size={14} />
                 </button>
               </div>
+
+              {/* Agendamento info */}
+              {selectedCamp.scheduled_at && selectedCamp.status === 'scheduled' && (
+                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={14} color="#7c3aed" />
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#6d28d9', margin: 0 }}>Agendada para</p>
+                    <p style={{ fontSize: '12px', color: '#7c3aed', margin: 0 }}>
+                      {new Date(selectedCamp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>Progresso</span>
@@ -336,13 +375,13 @@ export default function CampaignsPage() {
                     <Pause size={13} /> Pausar campanha
                   </button>
                 )}
-                {['draft', 'paused'].includes(selectedCamp.status) && (
+                {['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
                   <button onClick={() => startMutation.mutate(selectedCamp.id)}
                     style={{ width: '100%', padding: '8px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                    <Play size={13} /> Disparar campanha
+                    <Play size={13} /> {selectedCamp.status === 'scheduled' ? 'Disparar agora' : 'Disparar campanha'}
                   </button>
                 )}
-                {['draft', 'paused', 'completed', 'failed'].includes(selectedCamp.status) && (
+                {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                   <button
                     onClick={() => { if (window.confirm(`Deletar "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                     disabled={deleteMutation.isPending}
@@ -362,7 +401,7 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      {/* ── Modal Nova Campanha ── */}
+      {/* Modal Nova Campanha */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
@@ -388,16 +427,14 @@ export default function CampaignsPage() {
               </select>
             </div>
 
-            {/* Toggle template vs cURL */}
+            {/* Template vs cURL */}
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '3px', gap: '2px', marginBottom: '14px' }}>
-                <button
-                  onClick={() => setUseTemplate(true)}
+                <button onClick={() => setUseTemplate(true)}
                   style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate ? '#fff' : 'transparent', color: useTemplate ? '#111827' : '#6b7280', boxShadow: useTemplate ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
                   Usar template salvo
                 </button>
-                <button
-                  onClick={() => setUseTemplate(false)}
+                <button onClick={() => setUseTemplate(false)}
                   style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: !useTemplate ? '#fff' : 'transparent', color: !useTemplate ? '#111827' : '#6b7280', boxShadow: !useTemplate ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
                   Colar cURL manual
                 </button>
@@ -408,46 +445,22 @@ export default function CampaignsPage() {
                   templates?.length === 0 ? (
                     <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '14px 16px' }}>
                       <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 500, margin: '0 0 4px' }}>Nenhum template cadastrado para este canal</p>
-                      <p style={{ fontSize: '12px', color: '#b45309', margin: 0 }}>
-                        Vá em <strong>Canais → {channels?.find((c: any) => c.id === selectedChannel)?.name} → Templates</strong> para cadastrar.
-                      </p>
                     </div>
                   ) : (
                     <div>
                       {label('Template')}
                       <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedTemplate} onChange={e => handleTemplateChange(e.target.value)}>
                         <option value="">Selecionar template...</option>
-                        {templates?.map((t: any) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
+                        {templates?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                       {selectedTemplateObj && (
                         <div style={{ marginTop: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                             <FileText size={13} color="#6b7280" />
-                            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>Preview do template</span>
-                            <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: '99px', fontWeight: 600, marginLeft: 'auto' }}>
-                              {selectedTemplateObj.category}
-                            </span>
+                            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>Preview</span>
+                            <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: '99px', fontWeight: 600, marginLeft: 'auto' }}>{selectedTemplateObj.category}</span>
                           </div>
-                          <p style={{ fontSize: '13px', color: '#111827', lineHeight: 1.6, margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{selectedTemplateObj.body}</p>
-                          {selectedTemplateObj.variables?.length > 0 && (
-                            <div>
-                              <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>
-                                Variáveis ({selectedTemplateObj.variables.length})
-                              </p>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {selectedTemplateObj.variables.map((v: string, i: number) => (
-                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '60px' }}>{`{{${i + 1}}}`} = <em>{v}</em></span>
-                                  </div>
-                                ))}
-                              </div>
-                              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', fontStyle: 'italic' }}>
-                                As variáveis são preenchidas automaticamente pela coluna correspondente do CSV.
-                              </p>
-                            </div>
-                          )}
+                          <p style={{ fontSize: '13px', color: '#111827', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{selectedTemplateObj.body}</p>
                         </div>
                       )}
                     </div>
@@ -481,9 +494,41 @@ export default function CampaignsPage() {
             </div>
 
             {/* Velocidade */}
-            <div style={{ marginBottom: '22px' }}>
+            <div style={{ marginBottom: '16px' }}>
               {label('Mensagens por minuto (anti-ban)')}
               <input type="number" min="1" max="300" style={{ ...inputStyle, width: '100px' } as any} value={messagesPerMin} onChange={e => setMessagesPerMin(Number(e.target.value))} />
+            </div>
+
+            {/* ── Agendamento ── */}
+            <div style={{ marginBottom: '22px' }}>
+              {label('Quando disparar?')}
+              <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '3px', gap: '2px', marginBottom: '12px' }}>
+                <button onClick={() => setScheduleMode('now')}
+                  style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: scheduleMode === 'now' ? '#fff' : 'transparent', color: scheduleMode === 'now' ? '#111827' : '#6b7280', boxShadow: scheduleMode === 'now' ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <Send size={12} /> Disparar agora
+                </button>
+                <button onClick={() => setScheduleMode('scheduled')}
+                  style={{ flex: 1, padding: '7px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: scheduleMode === 'scheduled' ? '#fff' : 'transparent', color: scheduleMode === 'scheduled' ? '#111827' : '#6b7280', boxShadow: scheduleMode === 'scheduled' ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <Calendar size={12} /> Agendar
+                </button>
+              </div>
+              {scheduleMode === 'scheduled' && (
+                <div>
+                  <input
+                    type="datetime-local"
+                    min={minDateTime}
+                    value={scheduledAt}
+                    onChange={e => setScheduledAt(e.target.value)}
+                    style={{ ...inputStyle }}
+                  />
+                  {scheduledAt && (
+                    <p style={{ fontSize: '12px', color: '#7c3aed', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={12} />
+                      Será disparada em {new Date(scheduledAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -492,9 +537,9 @@ export default function CampaignsPage() {
               </button>
               <button onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || !isValid}
-                style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !isValid ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !isValid ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                {createMutation.isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} />}
-                Criar campanha
+                style={{ flex: 1, padding: '10px', background: scheduleMode === 'scheduled' ? '#7c3aed' : '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending || !isValid ? 'not-allowed' : 'pointer', opacity: createMutation.isPending || !isValid ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {createMutation.isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : scheduleMode === 'scheduled' ? <Calendar size={15} /> : <Send size={15} />}
+                {scheduleMode === 'scheduled' ? 'Agendar campanha' : 'Criar e disparar'}
               </button>
             </div>
           </div>

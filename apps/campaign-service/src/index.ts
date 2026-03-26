@@ -8,6 +8,7 @@ import { logger } from './lib/logger'
 import { startCampaignWorker }    from './workers/campaign.worker'
 import { startInboxWorker }       from './workers/inbox.worker'
 import { startReconciliationJob } from './workers/reconciliation.worker'
+import { startSchedulerWorker }   from './workers/scheduler.worker'
 
 const app = express()
 const PORT = process.env.PORT || 3007
@@ -26,6 +27,7 @@ app.listen(PORT, () => {
   startCampaignWorker()
   startInboxWorker()
   startReconciliationJob()
+  startSchedulerWorker()
   logger.info('All workers started')
 })
 
