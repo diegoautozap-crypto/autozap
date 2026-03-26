@@ -128,6 +128,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const Icon = NODE_ICONS[data.type] || Zap
   const isTrigger = data.type?.startsWith('trigger_')
   const isCondition = data.type === 'condition'
+  const [hovered, setHovered] = useState(false)
 
   // Branches do nó de condição
   const branches: ConditionBranch[] = data.branches || []
@@ -171,13 +172,31 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
   return (
-    <div style={{
-      background: '#fff', border: `2px solid ${selected ? color : '#e5e7eb'}`,
-      borderRadius: '12px', padding: '14px 16px', minWidth: '220px', maxWidth: '260px',
-      minHeight: isCondition && branches.length > 0 ? `${16 + (branches.length + 1) * 36 + 20}px` : 'auto',
-      boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
-      transition: 'all 0.15s', position: 'relative',
-    }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: '#fff', border: `2px solid ${selected ? color : '#e5e7eb'}`,
+        borderRadius: '12px', padding: '14px 16px', minWidth: '220px', maxWidth: '260px',
+        minHeight: isCondition && branches.length > 0 ? `${16 + (branches.length + 1) * 36 + 20}px` : 'auto',
+        boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
+        transition: 'all 0.15s', position: 'relative',
+      }}>
+      {/* Toolbar de delete no hover */}
+      {(hovered || selected) && (
+        <div style={{ position: 'absolute', top: -36, right: 0, display: 'flex', gap: '4px', zIndex: 20 }}>
+          <button
+            onMouseDown={e => { e.stopPropagation() }}
+            onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
+            title="Deletar nó"
+            style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#fff', fontSize: '11px', fontWeight: 600, boxShadow: '0 2px 6px rgba(0,0,0,.2)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            Deletar
+          </button>
+        </div>
+      )}
       {!isTrigger && (
         <Handle type="target" position={Position.Left}
           style={{ background: '#d1d5db', width: 10, height: 10, border: '2px solid #fff' }} />
@@ -1031,6 +1050,12 @@ export default function FlowEditorPage() {
     setIsDirty(true)
   }
 
+  // Injeta onDelete e nodeId em cada nó para a toolbar funcionar
+  const nodesWithDelete = nodes.map(n => ({
+    ...n,
+    data: { ...n.data, nodeId: n.id, onDelete: deleteNode },
+  }))
+
   const TRIGGER_NODES = [
     { type: 'trigger_keyword',       label: 'Palavra-chave' },
     { type: 'trigger_first_message', label: 'Primeira mensagem' },
@@ -1119,7 +1144,7 @@ export default function FlowEditorPage() {
 
         <div style={{ flex: 1, position: 'relative' }}>
           <ReactFlow
-            nodes={nodes}
+            nodes={nodesWithDelete}
             edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (edgeId: string) => { setEdges(eds => eds.filter(ed => ed.id !== edgeId)); setIsDirty(true) } } }))}
             onNodesChange={(changes) => { onNodesChange(changes); setIsDirty(true) }}
             onEdgesChange={(changes) => { onEdgesChange(changes); setIsDirty(true) }}
