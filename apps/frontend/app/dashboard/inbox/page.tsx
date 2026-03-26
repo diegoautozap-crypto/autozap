@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, messageApi, contactApi, channelApi } from '@/lib/api'
+import { conversationApi, messageApi, contactApi, channelApi, authApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
@@ -253,11 +253,36 @@ export default function InboxPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
+  const role = (user as any)?.role || 'agent'
+
+  // Busca permissões para filtrar canais permitidos
+  const { data: userPerms } = useQuery({
+    queryKey: ['my-permissions'],
+    queryFn: async () => {
+      const { data } = await authApi.get('/auth/me')
+      return data?.data?.permissions || null
+    },
+    enabled: !!user && role !== 'admin' && role !== 'owner',
+  })
+
+  const allowedChannels: string[] = userPerms?.allowed_channels || []
+
+  // Pré-seleciona canal automaticamente se só tem um permitido
+  useEffect(() => {
+    if (allowedChannels.length === 1 && channelFilter === 'all') {
+      setChannelFilter(allowedChannels[0])
+    }
+  }, [allowedChannels.join(',')])
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
   })
+
+  // Filtra canais permitidos para atendentes
+  const visibleChannels = (channels || []).filter((ch: any) =>
+    allowedChannels.length === 0 || allowedChannels.includes(ch.id)
+  )
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
@@ -500,12 +525,12 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {channels && channels.length > 1 && (
+        {visibleChannels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
             <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
               style={{ width: '100%', padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#111827', outline: 'none', cursor: 'pointer', appearance: 'auto' }}>
               <option value="all">Todos os canais</option>
-              {channels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+              {visibleChannels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
             </select>
           </div>
         )}
