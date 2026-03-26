@@ -404,25 +404,25 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
         return (
           <div key={branch.id} style={{ border: `2px solid ${branchColor}40`, borderRadius: '10px', overflow: 'hidden' }}>
             {/* Header do caminho */}
-            <div style={{ background: `${branchColor}10`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: `1px solid ${branchColor}30` }}>
+            <div style={{ background: `${branchColor}10`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: `1px solid ${branchColor}30` }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: branchColor, flexShrink: 0 }} />
               <input
                 value={branch.label}
                 onChange={e => updateBranch(branch.id, { label: e.target.value })}
-                style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: branchColor, outline: 'none' }}
+                style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: branchColor, outline: 'none' }}
                 placeholder="Nome do caminho"
               />
               <select value={branch.logic} onChange={e => updateBranch(branch.id, { logic: e.target.value as 'AND' | 'OR' })}
-                style={{ fontSize: '11px', fontWeight: 700, border: `1px solid ${branchColor}50`, borderRadius: '4px', padding: '2px 6px', background: '#fff', color: branchColor, cursor: 'pointer', outline: 'none' }}>
+                style={{ fontSize: '11px', fontWeight: 700, border: `1px solid ${branchColor}50`, borderRadius: '4px', padding: '2px 4px', background: '#fff', color: branchColor, cursor: 'pointer', outline: 'none', flexShrink: 0 }}>
                 <option value="AND">E (AND)</option>
                 <option value="OR">OU (OR)</option>
               </select>
-              <button onClick={(e) => { e.stopPropagation(); removeBranch(branch.id) }}
+              <button
+                onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeBranch(branch.id) }}
                 title="Remover caminho"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px', color: '#9ca3af', display: 'flex', marginLeft: 'auto' }}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
-                <X size={15} />
+                style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', padding: '3px 5px', color: '#ef4444', display: 'flex', flexShrink: 0 }}>
+                <X size={13} />
               </button>
             </div>
 
