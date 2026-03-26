@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { authApi } from '@/lib/api'
+import { toast } from 'sonner'
 import { Loader2, MessageSquareMore, ArrowRight, Mail } from 'lucide-react'
 
 export default function LoginPage() {
