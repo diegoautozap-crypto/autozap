@@ -239,22 +239,21 @@ router.get('/analytics', async (req, res, next) => {
           .gte('created_at', sevenDaysAgo.toISOString())
           .order('created_at', { ascending: true })
 
-        const timings: Record<string, { firstInbound?: number; firstOutbound?: number }> = {}
+        const responsePairs: number[] = []
+        const lastInbound: Record<string, number> = {}
+
         for (const m of (agentMsgs || [])) {
-          if (!timings[m.conversation_id]) timings[m.conversation_id] = {}
           const t = new Date(m.created_at).getTime()
-          if (m.direction === 'inbound' && !timings[m.conversation_id].firstInbound) {
-            timings[m.conversation_id].firstInbound = t
-          }
-          if (m.direction === 'outbound' && timings[m.conversation_id].firstInbound && !timings[m.conversation_id].firstOutbound) {
-            timings[m.conversation_id].firstOutbound = t
+          if (m.direction === 'inbound') {
+            lastInbound[m.conversation_id] = t
+          } else if (m.direction === 'outbound' && lastInbound[m.conversation_id]) {
+            const diff = (t - lastInbound[m.conversation_id]) / 1000 / 60
+            if (diff > 0 && diff < 1440) responsePairs.push(diff) // ignora > 24h
+            delete lastInbound[m.conversation_id]
           }
         }
-        const times = Object.values(timings)
-          .filter(t => t.firstInbound && t.firstOutbound && t.firstOutbound > t.firstInbound)
-          .map(t => (t.firstOutbound! - t.firstInbound!) / 1000 / 60)
-        agentAvgResponseMinutes = times.length > 0
-          ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+        agentAvgResponseMinutes = responsePairs.length > 0
+          ? Math.round(responsePairs.reduce((a, b) => a + b, 0) / responsePairs.length)
           : null
       }
     } else {
@@ -265,22 +264,20 @@ router.get('/analytics', async (req, res, next) => {
         .gte('created_at', sevenDaysAgo.toISOString())
         .order('created_at', { ascending: true })
 
-      const convTimings: Record<string, { firstInbound?: number; firstOutbound?: number }> = {}
+      const allPairs: number[] = []
+      const lastInboundGeneral: Record<string, number> = {}
       for (const m of (inboundMsgs || [])) {
-        if (!convTimings[m.conversation_id]) convTimings[m.conversation_id] = {}
         const t = new Date(m.created_at).getTime()
-        if (m.direction === 'inbound' && !convTimings[m.conversation_id].firstInbound) {
-          convTimings[m.conversation_id].firstInbound = t
-        }
-        if (m.direction === 'outbound' && convTimings[m.conversation_id].firstInbound && !convTimings[m.conversation_id].firstOutbound) {
-          convTimings[m.conversation_id].firstOutbound = t
+        if (m.direction === 'inbound') {
+          lastInboundGeneral[m.conversation_id] = t
+        } else if (m.direction === 'outbound' && lastInboundGeneral[m.conversation_id]) {
+          const diff = (t - lastInboundGeneral[m.conversation_id]) / 1000 / 60
+          if (diff > 0 && diff < 1440) allPairs.push(diff)
+          delete lastInboundGeneral[m.conversation_id]
         }
       }
-      const responseTimes = Object.values(convTimings)
-        .filter(t => t.firstInbound && t.firstOutbound && t.firstOutbound > t.firstInbound)
-        .map(t => (t.firstOutbound! - t.firstInbound!) / 1000 / 60)
-      agentAvgResponseMinutes = responseTimes.length > 0
-        ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+      agentAvgResponseMinutes = allPairs.length > 0
+        ? Math.round(allPairs.reduce((a, b) => a + b, 0) / allPairs.length)
         : null
     }
 
