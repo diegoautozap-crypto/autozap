@@ -152,6 +152,10 @@ router.get('/analytics', async (req, res, next) => {
     since.setDate(since.getDate() - 29)
     since.setHours(0, 0, 0, 0)
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // ─── Mensagens de campanha (30 dias) ──────────────────────────────────────
     const { data: messages } = await db
       .from('messages')
       .select('created_at, status, direction')
@@ -162,15 +166,12 @@ router.get('/analytics', async (req, res, next) => {
       .order('created_at', { ascending: true })
 
     const msgs = messages || []
-
     const byDay: Record<string, { sent: number; delivered: number; read: number }> = {}
     for (let i = 29; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
+      const d = new Date(); d.setDate(d.getDate() - i)
       const key = d.toISOString().split('T')[0]
       byDay[key] = { sent: 0, delivered: 0, read: 0 }
     }
-
     for (const m of msgs) {
       const day = m.created_at?.split('T')[0]
       if (!day || !byDay[day]) continue
@@ -178,16 +179,74 @@ router.get('/analytics', async (req, res, next) => {
       if (m.status === 'delivered' || m.status === 'read') byDay[day].delivered++
       if (m.status === 'read') byDay[day].read++
     }
-
     const totalSent = msgs.length
     const totalDelivered = msgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
     const totalRead = msgs.filter((m: any) => m.status === 'read').length
+
+    // ─── Conversas por atendente ──────────────────────────────────────────────
+    const { data: convsByAgent } = await db
+      .from('conversations')
+      .select('assigned_to, users(name)')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'open')
+      .not('assigned_to', 'is', null)
+
+    const agentMap: Record<string, { name: string; count: number }> = {}
+    for (const conv of (convsByAgent || [])) {
+      const id = conv.assigned_to
+      if (!id) continue
+      if (!agentMap[id]) agentMap[id] = { name: (conv as any).users?.name || 'Atendente', count: 0 }
+      agentMap[id].count++
+    }
+    const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count).slice(0, 5)
+
+    // ─── Tempo médio de primeira resposta (últimos 7 dias) ────────────────────
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const { data: inboundMsgs } = await db
+      .from('messages')
+      .select('conversation_id, created_at, direction')
+      .eq('tenant_id', tenantId)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: true })
+
+    const convTimings: Record<string, { firstInbound?: number; firstOutbound?: number }> = {}
+    for (const m of (inboundMsgs || [])) {
+      if (!convTimings[m.conversation_id]) convTimings[m.conversation_id] = {}
+      const t = new Date(m.created_at).getTime()
+      if (m.direction === 'inbound' && !convTimings[m.conversation_id].firstInbound) {
+        convTimings[m.conversation_id].firstInbound = t
+      }
+      if (m.direction === 'outbound' && convTimings[m.conversation_id].firstInbound && !convTimings[m.conversation_id].firstOutbound) {
+        convTimings[m.conversation_id].firstOutbound = t
+      }
+    }
+    const responseTimes = Object.values(convTimings)
+      .filter(t => t.firstInbound && t.firstOutbound && t.firstOutbound > t.firstInbound)
+      .map(t => (t.firstOutbound! - t.firstInbound!) / 1000 / 60) // em minutos
+    const avgResponseMinutes = responseTimes.length > 0
+      ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+      : null
+
+    // ─── Flows ativos hoje ────────────────────────────────────────────────────
+    const { data: flowLogs } = await db
+      .from('flow_logs')
+      .select('flow_id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'flow_executed')
+      .gte('created_at', today.toISOString())
+
+    const activeFlowsToday = new Set((flowLogs || []).map((f: any) => f.flow_id)).size
+    const flowExecutionsToday = (flowLogs || []).length
 
     res.json(ok({
       totalSent, totalDelivered, totalRead,
       deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
       readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
       byDay,
+      byAgent,
+      avgResponseMinutes,
+      activeFlowsToday,
+      flowExecutionsToday,
     }))
   } catch (err) { next(err) }
 })
