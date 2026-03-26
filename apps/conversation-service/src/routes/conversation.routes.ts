@@ -8,6 +8,17 @@ import { decryptCredentials } from '../lib/crypto'
 
 const router = Router()
 
+// ─── Helper: busca permissões do usuário ──────────────────────────────────────
+async function getUserPermissions(userId: string, tenantId: string) {
+  const { data } = await db
+    .from('user_permissions')
+    .select('allowed_channels, conversation_access')
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+  return data
+}
+
 // ─── Media proxy ──────────────────────────────────────────────────────────────
 router.get('/conversations/media/:mediaId', async (req, res, next) => {
   try {
@@ -59,11 +70,43 @@ const assignSchema = z.object({ userId: z.string().uuid().nullable() })
 const pipelineSchema = z.object({ stage: z.enum(['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']) })
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+
 router.get('/conversations', async (req, res, next) => {
   try {
     const { page, limit } = paginationSchema.parse(req.query)
-    const { status, assignedTo, channelId } = req.query as any
-    const result = await conversationService.listConversations(req.auth.tid, { status, assignedTo, channelId, page, limit })
+    const { status, channelId } = req.query as any
+    const role = req.auth.role
+
+    // Admin e owner veem tudo
+    if (role === 'admin' || role === 'owner') {
+      const result = await conversationService.listConversations(req.auth.tid, {
+        status, channelId, page, limit,
+      })
+      return res.json(ok(result.conversations, result.meta))
+    }
+
+    // Busca permissões individuais
+    const perms = await getUserPermissions(req.auth.sub, req.auth.tid)
+
+    // Determina filtro de canal
+    const allowedChannels = perms?.allowed_channels || []
+    const effectiveChannelId = channelId
+      || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
+
+    // Determina filtro de conversa
+    const conversationAccess = perms?.conversation_access || 'assigned'
+    const assignedTo = conversationAccess === 'assigned' ? req.auth.sub : undefined
+
+    const result = await conversationService.listConversations(req.auth.tid, {
+      status,
+      channelId: effectiveChannelId,
+      assignedTo,
+      page,
+      limit,
+      // Se tem canais permitidos específicos, filtra por eles
+      allowedChannels: allowedChannels.length > 0 ? allowedChannels : undefined,
+    })
+
     res.json(ok(result.conversations, result.meta))
   } catch (err) { next(err) }
 })
@@ -71,7 +114,18 @@ router.get('/conversations', async (req, res, next) => {
 router.get('/conversations/pipeline', async (req, res, next) => {
   try {
     const { channelId, campaignId } = req.query as any
-    const board = await conversationService.getPipelineBoard(req.auth.tid, channelId, campaignId)
+    const role = req.auth.role
+
+    if (role === 'admin' || role === 'owner') {
+      const board = await conversationService.getPipelineBoard(req.auth.tid, channelId, campaignId)
+      return res.json(ok(board))
+    }
+
+    const perms = await getUserPermissions(req.auth.sub, req.auth.tid)
+    const allowedChannels = perms?.allowed_channels || []
+    const effectiveChannelId = channelId || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
+
+    const board = await conversationService.getPipelineBoard(req.auth.tid, effectiveChannelId, campaignId)
     res.json(ok(board))
   } catch (err) { next(err) }
 })

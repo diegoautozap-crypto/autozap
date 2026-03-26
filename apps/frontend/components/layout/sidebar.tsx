@@ -4,14 +4,13 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
-import { tenantApi } from '@/lib/api'
+import { tenantApi, authApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
   LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog,
 } from 'lucide-react'
 
-// Todas as páginas disponíveis
 const ALL_NAV = [
   { href: '/dashboard',           label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },
@@ -25,13 +24,8 @@ const ALL_NAV = [
   { href: '/dashboard/settings',  label: 'Plano',     icon: Settings },
 ]
 
-// Permissões padrão (fallback se banco não tiver)
-const DEFAULT_PERMISSIONS: Record<string, string[]> = {
-  owner: ALL_NAV.map(n => n.href), // owner vê tudo sempre
-  admin: ALL_NAV.map(n => n.href), // admin vê tudo sempre
-  supervisor: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
-  agent: ['/dashboard/inbox'],
-}
+// Páginas que admin/owner sempre veem independente de permissões
+const ADMIN_PAGES = ALL_NAV.map(n => n.href)
 
 const ROLE_LABEL: Record<string, string> = {
   owner: 'WhatsApp CRM',
@@ -77,28 +71,33 @@ export function Sidebar() {
   const router = useRouter()
   const { logout, user } = useAuthStore()
   const role = (user as any)?.role || 'agent'
-  const [permissions, setPermissions] = useState<Record<string, string[]>>(DEFAULT_PERMISSIONS)
+  const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
 
-  // Busca permissões do banco
+  // Busca permissões individuais via /auth/me
   useEffect(() => {
     if (!user) return
-    tenantApi.get('/tenant/permissions')
+    if (role === 'admin' || role === 'owner') {
+      setAllowedPages(ADMIN_PAGES)
+      return
+    }
+    authApi.get('/auth/me')
       .then(({ data }) => {
-        if (data?.data && Object.keys(data.data).length > 0) {
-          // Sempre garante que owner e admin veem tudo
-          setPermissions({
-            ...data.data,
-            owner: ALL_NAV.map(n => n.href),
-            admin: ALL_NAV.map(n => n.href),
-          })
+        const perms = data?.data?.permissions
+        if (perms?.allowed_pages?.length > 0) {
+          setAllowedPages(perms.allowed_pages)
+        } else {
+          // fallback padrão por role
+          setAllowedPages(role === 'agent' ? ['/dashboard/inbox'] : ['/dashboard/inbox', '/dashboard'])
         }
       })
-      .catch(() => {}) // usa default se falhar
-  }, [user])
+      .catch(() => {
+        setAllowedPages(role === 'agent' ? ['/dashboard/inbox'] : ['/dashboard/inbox'])
+      })
+  }, [user, role])
 
-  // Filtra nav baseado nas permissões do role
-  const allowedHrefs = permissions[role] || DEFAULT_PERMISSIONS[role] || ['/dashboard/inbox']
-  const nav = ALL_NAV.filter(item => allowedHrefs.includes(item.href))
+  const nav = ALL_NAV.filter(item =>
+    (allowedPages || ['/dashboard/inbox']).includes(item.href)
+  )
 
   const handleLogout = async () => {
     await logout()
@@ -112,7 +111,6 @@ export function Sidebar() {
       borderRight: '1px solid #e5e7eb', display: 'flex',
       flexDirection: 'column', height: '100%', flexShrink: 0,
     }}>
-      {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '32px', height: '32px', background: '#16a34a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -125,7 +123,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
@@ -147,7 +144,6 @@ export function Sidebar() {
 
       {['owner', 'admin'].includes(role) && <UsageBar />}
 
-      {/* Logout */}
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={handleLogout}
