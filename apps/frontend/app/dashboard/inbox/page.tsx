@@ -392,6 +392,28 @@ export default function InboxPage() {
   const contactTags = (contactDetail?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
   const botActive = selectedConv?.bot_active !== false
 
+  // ─── Atribuição de atendente ──────────────────────────────────────────────
+  const { data: teamMembers } = useQuery({
+    queryKey: ['team-members'],
+    queryFn: async () => {
+      const { data } = await authApi.get('/auth/team')
+      return data.data || []
+    },
+    enabled: !!selectedConvId,
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: async (userId: string | null) => {
+      await conversationApi.patch(`/conversations/${selectedConvId}/assign`, { userId })
+    },
+    onSuccess: () => {
+      toast.success('Conversa atribuída!')
+      queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+    },
+    onError: () => toast.error('Erro ao atribuir'),
+  })
+
   const takeOverMutation = useMutation({
     mutationFn: async () => { await messageApi.post(`/messages/conversations/${selectedConvId}/take-over`, {}) },
     onSuccess: () => {
@@ -825,6 +847,24 @@ export default function InboxPage() {
                     {botActive ? 'Ativo' : 'Pausado'}
                   </span>
                 </div>
+              </div>
+
+              {/* Atribuição de atendente */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <UserCheck size={13} color="#9ca3af" />
+                  <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Atendente</p>
+                </div>
+                <select
+                  value={selectedConv?.assigned_to || ''}
+                  onChange={e => assignMutation.mutate(e.target.value || null)}
+                  disabled={assignMutation.isPending}
+                  style={{ width: '100%', padding: '5px 8px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
+                  <option value="">Sem atribuição</option>
+                  {(teamMembers || []).map((m: any) => (
+                    <option key={m.id} value={m.id}>{m.name || m.email}</option>
+                  ))}
+                </select>
               </div>
               {contactTags.length > 0 && (
                 <div>
