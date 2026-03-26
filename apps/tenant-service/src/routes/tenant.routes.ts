@@ -104,7 +104,6 @@ router.get('/usage', async (req, res, next) => {
 
 // ─── Permissões por role ───────────────────────────────────────────────────────
 
-// GET /tenant/permissions — busca permissões configuradas
 router.get('/permissions', async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
@@ -114,7 +113,6 @@ router.get('/permissions', async (req, res, next) => {
       .eq('id', req.auth.tid)
       .single()
 
-    // Permissões padrão se não estiver configurado
     const defaults = {
       supervisor: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
       agent: ['/dashboard/inbox'],
@@ -127,7 +125,6 @@ router.get('/permissions', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /tenant/permissions — salva permissões
 router.patch('/permissions', requireRole('admin', 'owner'), validate(permissionsSchema), async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
@@ -140,9 +137,9 @@ router.patch('/permissions', requireRole('admin', 'owner'), validate(permissions
     res.json(ok({ message: 'Permissões salvas com sucesso' }))
   } catch (err) { next(err) }
 })
-// ─────────────────────────────────────────────────────────────────────────────
 
-// ✅ GET /tenant/analytics
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
 router.get('/analytics', async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
@@ -159,7 +156,6 @@ router.get('/analytics', async (req, res, next) => {
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    // ─── Mensagens de campanha (30 dias) ──────────────────────────────────────
     const { data: messages } = await db
       .from('messages')
       .select('created_at, status, direction')
@@ -187,15 +183,13 @@ router.get('/analytics', async (req, res, next) => {
     const totalDelivered = msgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
     const totalRead = msgs.filter((m: any) => m.status === 'read').length
 
-    // ─── Conversas por atendente ──────────────────────────────────────────────
-    const convQuery = db
+    const { data: convsByAgent } = await db
       .from('conversations')
       .select('assigned_to, users(name)')
       .eq('tenant_id', tenantId)
       .eq('status', 'open')
       .not('assigned_to', 'is', null)
 
-    const { data: convsByAgent } = await convQuery
     const agentMap: Record<string, { name: string; count: number }> = {}
     for (const conv of (convsByAgent || [])) {
       const id = conv.assigned_to
@@ -205,13 +199,11 @@ router.get('/analytics', async (req, res, next) => {
     }
     const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count).slice(0, 5)
 
-    // ─── Métricas do atendente filtrado ───────────────────────────────────────
     let agentConversations = 0
     let agentClosedLast7d = 0
     let agentAvgResponseMinutes: number | null = null
 
     if (filterUserId) {
-      // Total de conversas abertas atribuídas
       const { count: openCount } = await db
         .from('conversations')
         .select('id', { count: 'exact', head: true })
@@ -220,7 +212,6 @@ router.get('/analytics', async (req, res, next) => {
         .eq('status', 'open')
       agentConversations = openCount || 0
 
-      // Conversas fechadas nos últimos 7 dias
       const { count: closedCount } = await db
         .from('conversations')
         .select('id', { count: 'exact', head: true })
@@ -230,7 +221,6 @@ router.get('/analytics', async (req, res, next) => {
         .gte('updated_at', sevenDaysAgo.toISOString())
       agentClosedLast7d = closedCount || 0
 
-      // Tempo médio de resposta do atendente (7 dias)
       const { data: agentConvIds } = await db
         .from('conversations')
         .select('id')
@@ -268,7 +258,6 @@ router.get('/analytics', async (req, res, next) => {
           : null
       }
     } else {
-      // Tempo médio geral (7 dias)
       const { data: inboundMsgs } = await db
         .from('messages')
         .select('conversation_id, created_at, direction')
@@ -295,7 +284,6 @@ router.get('/analytics', async (req, res, next) => {
         : null
     }
 
-    // ─── Flows ativos hoje ────────────────────────────────────────────────────
     const { data: flowLogs } = await db
       .from('flow_logs')
       .select('flow_id')
@@ -315,115 +303,8 @@ router.get('/analytics', async (req, res, next) => {
       avgResponseMinutes: agentAvgResponseMinutes,
       activeFlowsToday,
       flowExecutionsToday,
-      // Métricas do atendente filtrado
       agentConversations: filterUserId ? agentConversations : null,
       agentClosedLast7d: filterUserId ? agentClosedLast7d : null,
-    }))
-  } catch (err) { next(err) }
-})
-  try {
-    const { db } = await import('../lib/db')
-    const tenantId = req.auth.tid
-
-    const since = new Date()
-    since.setDate(since.getDate() - 29)
-    since.setHours(0, 0, 0, 0)
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    // ─── Mensagens de campanha (30 dias) ──────────────────────────────────────
-    const { data: messages } = await db
-      .from('messages')
-      .select('created_at, status, direction')
-      .eq('tenant_id', tenantId)
-      .eq('direction', 'outbound')
-      .not('campaign_id', 'is', null)
-      .gte('created_at', since.toISOString())
-      .order('created_at', { ascending: true })
-
-    const msgs = messages || []
-    const byDay: Record<string, { sent: number; delivered: number; read: number }> = {}
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i)
-      const key = d.toISOString().split('T')[0]
-      byDay[key] = { sent: 0, delivered: 0, read: 0 }
-    }
-    for (const m of msgs) {
-      const day = m.created_at?.split('T')[0]
-      if (!day || !byDay[day]) continue
-      byDay[day].sent++
-      if (m.status === 'delivered' || m.status === 'read') byDay[day].delivered++
-      if (m.status === 'read') byDay[day].read++
-    }
-    const totalSent = msgs.length
-    const totalDelivered = msgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
-    const totalRead = msgs.filter((m: any) => m.status === 'read').length
-
-    // ─── Conversas por atendente ──────────────────────────────────────────────
-    const { data: convsByAgent } = await db
-      .from('conversations')
-      .select('assigned_to, users(name)')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'open')
-      .not('assigned_to', 'is', null)
-
-    const agentMap: Record<string, { name: string; count: number }> = {}
-    for (const conv of (convsByAgent || [])) {
-      const id = conv.assigned_to
-      if (!id) continue
-      if (!agentMap[id]) agentMap[id] = { name: (conv as any).users?.name || 'Atendente', count: 0 }
-      agentMap[id].count++
-    }
-    const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count).slice(0, 5)
-
-    // ─── Tempo médio de primeira resposta (últimos 7 dias) ────────────────────
-    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const { data: inboundMsgs } = await db
-      .from('messages')
-      .select('conversation_id, created_at, direction')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', sevenDaysAgo.toISOString())
-      .order('created_at', { ascending: true })
-
-    const convTimings: Record<string, { firstInbound?: number; firstOutbound?: number }> = {}
-    for (const m of (inboundMsgs || [])) {
-      if (!convTimings[m.conversation_id]) convTimings[m.conversation_id] = {}
-      const t = new Date(m.created_at).getTime()
-      if (m.direction === 'inbound' && !convTimings[m.conversation_id].firstInbound) {
-        convTimings[m.conversation_id].firstInbound = t
-      }
-      if (m.direction === 'outbound' && convTimings[m.conversation_id].firstInbound && !convTimings[m.conversation_id].firstOutbound) {
-        convTimings[m.conversation_id].firstOutbound = t
-      }
-    }
-    const responseTimes = Object.values(convTimings)
-      .filter(t => t.firstInbound && t.firstOutbound && t.firstOutbound > t.firstInbound)
-      .map(t => (t.firstOutbound! - t.firstInbound!) / 1000 / 60) // em minutos
-    const avgResponseMinutes = responseTimes.length > 0
-      ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
-      : null
-
-    // ─── Flows ativos hoje ────────────────────────────────────────────────────
-    const { data: flowLogs } = await db
-      .from('flow_logs')
-      .select('flow_id')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'flow_executed')
-      .gte('created_at', today.toISOString())
-
-    const activeFlowsToday = new Set((flowLogs || []).map((f: any) => f.flow_id)).size
-    const flowExecutionsToday = (flowLogs || []).length
-
-    res.json(ok({
-      totalSent, totalDelivered, totalRead,
-      deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
-      readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
-      byDay,
-      byAgent,
-      avgResponseMinutes,
-      activeFlowsToday,
-      flowExecutionsToday,
     }))
   } catch (err) { next(err) }
 })
