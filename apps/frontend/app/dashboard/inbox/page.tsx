@@ -829,7 +829,19 @@ export default function InboxPage() {
                   {notes.map((note: any) => (
                     <div key={note.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
                       <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 4px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
-                      <p style={{ fontSize: '10px', color: '#d97706', margin: 0, textAlign: 'right' }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <p style={{ fontSize: '10px', color: '#d97706', margin: 0 }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                        <button
+                          onClick={async () => {
+                            await supabase.from('conversation_notes').delete().eq('id', note.id)
+                            queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] })
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#fde68a', display: 'flex' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fde68a'}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
