@@ -5,7 +5,7 @@ import type { JwtPayload, UserRole } from '@autozap/types'
 
 const ACCESS_SECRET = process.env.JWT_SECRET!
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
-const ACCESS_EXPIRES = '15m'
+const ACCESS_EXPIRES = process.env.JWT_EXPIRES_IN || '365d'
 const REFRESH_EXPIRES = '30d'
 
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
@@ -23,14 +23,12 @@ export function verifyAccessToken(token: string): JwtPayload {
 }
 
 // ─── Refresh Token ────────────────────────────────────────────────────────────
-// Refresh tokens are opaque random strings stored hashed in the DB.
-// We use token families to detect reuse (theft detection).
 
 export interface RefreshTokenPayload {
   userId: string
   tenantId: string
   role: UserRole
-  family: string // UUID — all rotations of the same token share a family
+  family: string
 }
 
 export function generateRefreshToken(): string {
