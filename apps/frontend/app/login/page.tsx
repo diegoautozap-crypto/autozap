@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { authApi } from '@/lib/api'
-import { toast } from 'sonner'
 import { Loader2, MessageSquareMore, ArrowRight, Mail } from 'lucide-react'
 
 export default function LoginPage() {
@@ -28,11 +27,10 @@ export default function LoginPage() {
         return
       }
 
-      // Redireciona baseado no role
-      const role = result?.user?.role || (result as any)?.role
-      if (role === 'agent') {
-        router.push('/dashboard/inbox')
-      } else if (role === 'supervisor') {
+      // Pega o role do store após login
+      const { user: loggedUser } = useAuthStore.getState()
+      const role = (loggedUser as any)?.role || 'agent'
+      if (role === 'agent' || role === 'supervisor') {
         router.push('/dashboard/inbox')
       } else {
         router.push('/dashboard')
