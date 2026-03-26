@@ -326,15 +326,16 @@ export default function InboxPage() {
   const { data: notes = [] } = useQuery({
     queryKey: ['notes', selectedConvId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('conversation_notes')
-        .select('*, users(name)')
+        .select('*')
         .eq('conversation_id', selectedConvId)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true })
+      if (error) { console.error('Notes error:', error); return [] }
       return data || []
     },
-    enabled: !!selectedConvId && inputMode === 'note',
+    enabled: !!selectedConvId && !!tenantId,
   })
 
   const saveNoteMutation = useMutation({
@@ -639,13 +640,13 @@ export default function InboxPage() {
               }
 
               {/* Notas internas intercaladas */}
-              {inputMode === 'note' && notes.map((note: any) => (
+              {notes.map((note: any) => (
                 <div key={note.id} style={{ display: 'flex', justifyContent: 'center' }}>
                   <div style={{ maxWidth: '70%', padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
                       <StickyNote size={11} color="#d97706" />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: '#d97706' }}>Nota interna</span>
-                      <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>{note.users?.name || 'Atendente'}</span>
+                      <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>Nota interna</span>
                     </div>
                     <p style={{ fontSize: '13px', color: '#92400e', margin: 0, whiteSpace: 'pre-line' }}>{note.body}</p>
                     <p style={{ fontSize: '10px', color: '#d97706', margin: '4px 0 0', textAlign: 'right' }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
