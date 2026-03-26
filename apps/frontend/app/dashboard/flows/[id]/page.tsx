@@ -16,7 +16,7 @@ import {
   Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
   MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
   Upload, X, Reply, GitBranch, AlignLeft, Webhook, Brain,
-  TagsIcon, UserCog, CornerDownRight, Square,
+  TagsIcon, UserCog, CornerDownRight, Square, Plus, Trash2,
 } from 'lucide-react'
 
 const supabase = createClient(
@@ -96,11 +96,40 @@ const NODE_LABELS: Record<string, string> = {
   end:                   'Finalizar flow',
 }
 
+// ─── Tipos para condição múltipla ─────────────────────────────────────────────
+interface ConditionRule {
+  id: string
+  field: string        // message | variable | phone | webhook_status
+  fieldName?: string   // nome da variável se field=variable
+  operator: string
+  value: string
+}
+
+interface ConditionBranch {
+  id: string
+  label: string        // ex: "Celular", "Notebook", "TV"
+  logic: 'AND' | 'OR'  // como as regras dentro deste ramo se combinam
+  rules: ConditionRule[]
+}
+
+function defaultBranch(label: string): ConditionBranch {
+  return {
+    id: `branch_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    label,
+    logic: 'AND',
+    rules: [{ id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }],
+  }
+}
+
+// ─── FlowNode ─────────────────────────────────────────────────────────────────
 function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const color = NODE_COLORS[data.type] || '#6b7280'
   const Icon = NODE_ICONS[data.type] || Zap
   const isTrigger = data.type?.startsWith('trigger_')
   const isCondition = data.type === 'condition'
+
+  // Branches do nó de condição
+  const branches: ConditionBranch[] = data.branches || []
 
   const subtitle = () => {
     if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || 'Nenhuma palavra'
@@ -113,7 +142,10 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'send_audio') return data.mediaUrl ? '✓ Áudio carregado' : 'Nenhum áudio'
     if (data.type === 'send_document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
     if (data.type === 'input') return data.question ? data.question.slice(0, 40) : 'Aguardando resposta...'
-    if (data.type === 'condition') return data.value ? `${data.operator || 'contém'} "${data.value}"` : 'Configurar condição'
+    if (data.type === 'condition') {
+      if (branches.length > 0) return `${branches.length} condição${branches.length > 1 ? 'ões' : ''} + fallback`
+      return 'Configurar condições'
+    }
     if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
     if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
     if (data.type === 'wait') {
@@ -130,6 +162,12 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
     return ''
   }
+
+  // Calcula posições dos handles de condição
+  const totalHandles = branches.length + 1 // branches + fallback
+  const handleSpacing = 100 / (totalHandles + 1)
+
+  const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
   return (
     <div style={{
@@ -163,11 +201,35 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           {subtitle()}
         </div>
       )}
-      {!isCondition && data.type !== 'end' && (
-        <Handle type="source" position={Position.Right} id="success"
-          style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
+
+      {/* Handles de condição múltipla */}
+      {isCondition && branches.length > 0 && (
+        <>
+          {branches.map((branch, i) => {
+            const topPct = handleSpacing * (i + 1)
+            const branchColor = BRANCH_COLORS[i % BRANCH_COLORS.length]
+            return (
+              <Handle key={branch.id} type="source" position={Position.Right}
+                id={`branch_${branch.id}`}
+                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', top: `${topPct}%` }} />
+            )
+          })}
+          {/* Fallback handle */}
+          <Handle type="source" position={Position.Right} id="fallback"
+            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', top: `${handleSpacing * (branches.length + 1)}%` }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+            {branches.map((branch, i) => (
+              <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
+                {branch.label}
+              </span>
+            ))}
+            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>· Fallback</span>
+          </div>
+        </>
       )}
-      {isCondition && (
+
+      {/* Handles legado (quando não tem branches configuradas) */}
+      {isCondition && branches.length === 0 && (
         <>
           <Handle type="source" position={Position.Right} id="true"
             style={{ background: '#16a34a', width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
@@ -179,6 +241,11 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>✗ Não</span>
           </div>
         </>
+      )}
+
+      {!isCondition && data.type !== 'end' && (
+        <Handle type="source" position={Position.Right} id="success"
+          style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       )}
     </div>
   )
@@ -234,6 +301,160 @@ function MediaUpload({ accept, label, currentUrl, onUploaded }: {
   )
 }
 
+// ─── Painel de condição múltipla ──────────────────────────────────────────────
+const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
+const OPERATORS = [
+  { value: 'contains',      label: 'Contém' },
+  { value: 'not_contains',  label: 'Não contém' },
+  { value: 'equals',        label: 'É igual a' },
+  { value: 'not_equals',    label: 'É diferente de' },
+  { value: 'starts_with',   label: 'Começa com' },
+  { value: 'ends_with',     label: 'Termina com' },
+  { value: 'is_empty',      label: 'Está vazio' },
+  { value: 'is_not_empty',  label: 'Não está vazio' },
+]
+
+function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
+  d: any; nodeId: string; inputStyle: React.CSSProperties; labelStyle: React.CSSProperties
+  onUpdate: (id: string, data: any) => void
+}) {
+  const branches: ConditionBranch[] = d.branches || []
+
+  const updateBranches = (newBranches: ConditionBranch[]) => {
+    onUpdate(nodeId, { branches: newBranches })
+  }
+
+  const addBranch = () => {
+    updateBranches([...branches, defaultBranch(`Caminho ${branches.length + 1}`)])
+  }
+
+  const removeBranch = (branchId: string) => {
+    updateBranches(branches.filter(b => b.id !== branchId))
+  }
+
+  const updateBranch = (branchId: string, changes: Partial<ConditionBranch>) => {
+    updateBranches(branches.map(b => b.id === branchId ? { ...b, ...changes } : b))
+  }
+
+  const addRule = (branchId: string) => {
+    updateBranches(branches.map(b => b.id === branchId ? {
+      ...b,
+      rules: [...b.rules, { id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }]
+    } : b))
+  }
+
+  const removeRule = (branchId: string, ruleId: string) => {
+    updateBranches(branches.map(b => b.id === branchId ? {
+      ...b, rules: b.rules.filter(r => r.id !== ruleId)
+    } : b))
+  }
+
+  const updateRule = (branchId: string, ruleId: string, changes: Partial<ConditionRule>) => {
+    updateBranches(branches.map(b => b.id === branchId ? {
+      ...b, rules: b.rules.map(r => r.id === ruleId ? { ...r, ...changes } : r)
+    } : b))
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#15803d' }}>
+        Cada caminho tem suas condições. Se nenhuma bater, vai para o <strong>Fallback</strong>.
+      </div>
+
+      {branches.map((branch, bi) => {
+        const branchColor = BRANCH_COLORS[bi % BRANCH_COLORS.length]
+        return (
+          <div key={branch.id} style={{ border: `2px solid ${branchColor}40`, borderRadius: '10px', overflow: 'hidden' }}>
+            {/* Header do caminho */}
+            <div style={{ background: `${branchColor}10`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: `1px solid ${branchColor}30` }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: branchColor, flexShrink: 0 }} />
+              <input
+                value={branch.label}
+                onChange={e => updateBranch(branch.id, { label: e.target.value })}
+                style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: branchColor, outline: 'none' }}
+                placeholder="Nome do caminho"
+              />
+              <select value={branch.logic} onChange={e => updateBranch(branch.id, { logic: e.target.value as 'AND' | 'OR' })}
+                style={{ fontSize: '11px', fontWeight: 700, border: `1px solid ${branchColor}50`, borderRadius: '4px', padding: '2px 6px', background: '#fff', color: branchColor, cursor: 'pointer', outline: 'none' }}>
+                <option value="AND">E (AND)</option>
+                <option value="OR">OU (OR)</option>
+              </select>
+              {branches.length > 1 && (
+                <button onClick={() => removeBranch(branch.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#9ca3af', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Regras do caminho */}
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {branch.rules.map((rule, ri) => (
+                <div key={rule.id}>
+                  {ri > 0 && (
+                    <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: branchColor, marginBottom: '6px' }}>
+                      {branch.logic}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f9fafb', borderRadius: '8px', padding: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <select value={rule.field} onChange={e => updateRule(branch.id, rule.id, { field: e.target.value, fieldName: '' })}
+                        style={{ ...inputStyle, flex: 1, padding: '5px 8px', fontSize: '12px' }}>
+                        <option value="message">Mensagem</option>
+                        <option value="variable">Variável</option>
+                        <option value="phone">Telefone</option>
+                        <option value="webhook_status">Status webhook</option>
+                      </select>
+                      {branch.rules.length > 1 && (
+                        <button onClick={() => removeRule(branch.id, rule.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                    {rule.field === 'variable' && (
+                      <input value={rule.fieldName || ''} onChange={e => updateRule(branch.id, rule.id, { fieldName: e.target.value })}
+                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}
+                        placeholder="nome da variável (ex: intencao)" />
+                    )}
+                    <select value={rule.operator} onChange={e => updateRule(branch.id, rule.id, { operator: e.target.value })}
+                      style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
+                      {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
+                      <input value={rule.value} onChange={e => updateRule(branch.id, rule.id, { value: e.target.value })}
+                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}
+                        placeholder="valor..." />
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={() => addRule(branch.id)}
+                style={{ width: '100%', padding: '5px', background: 'transparent', border: `1px dashed ${branchColor}50`, borderRadius: '6px', color: branchColor, fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <Plus size={11} /> Adicionar regra
+              </button>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Fallback */}
+      <div style={{ border: '2px dashed #d1d5db', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
+        <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>Fallback</span>
+        <span style={{ fontSize: '11px', color: '#d1d5db' }}>— quando nenhuma condição bater</span>
+      </div>
+
+      <button onClick={addBranch}
+        style={{ width: '100%', padding: '8px', background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: '8px', color: '#6b7280', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+        <Plus size={13} /> Adicionar caminho
+      </button>
+    </div>
+  )
+}
+
+// ─── NodeConfigPanel ──────────────────────────────────────────────────────────
 function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
   node: Node; tags: any[]; flows: any[]
   onUpdate: (id: string, data: any) => void
@@ -252,7 +473,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
   }
 
   return (
-    <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}>
+    <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}>
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
@@ -305,23 +526,16 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* MENSAGENS */}
+        {/* SEND */}
         {d.type === 'send_message' && (
-          <>
-            <div>
-              <label style={labelStyle}>Mensagem</label>
-              <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' as any }}
-                placeholder="Olá! Use {{phone}} ou {{nome}} para variáveis."
-                value={d.message || ''}
-                onChange={e => onUpdate(node.id, { message: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Delay antes de enviar (segundos)</label>
-              <input type="number" min="0" max="300" style={{ ...inputStyle, maxWidth: '120px' }}
-                value={d.delay ?? 0}
-                onChange={e => onUpdate(node.id, { delay: Number(e.target.value) })} />
-            </div>
-          </>
+          <div>
+            <label style={labelStyle}>Mensagem</label>
+            <textarea style={{ ...inputStyle, minHeight: '120px', resize: 'vertical' as any }}
+              placeholder="Olá {{nome}}! Como posso ajudar?"
+              value={d.message || ''}
+              onChange={e => onUpdate(node.id, { message: e.target.value })} />
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para personalizar</p>
+          </div>
         )}
         {d.type === 'send_image' && (
           <>
@@ -331,21 +545,17 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+              <input style={inputStyle} placeholder="Confira nosso catálogo!"
+                value={d.caption || ''}
+                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
         {d.type === 'send_video' && (
-          <>
-            <div>
-              <label style={labelStyle}>Vídeo</label>
-              <MediaUpload accept="video/*" label="Upload de vídeo" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
-            </div>
-          </>
+          <div>
+            <label style={labelStyle}>Vídeo</label>
+            <MediaUpload accept="video/*" label="Upload de vídeo" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
+          </div>
         )}
         {d.type === 'send_audio' && (
           <div>
@@ -388,54 +598,13 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* CONDITION */}
+        {/* CONDITION — NOVO com múltiplos caminhos */}
         {d.type === 'condition' && (
-          <>
-            <div>
-              <label style={labelStyle}>O que verificar</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.conditionType || 'message'}
-                onChange={e => onUpdate(node.id, { conditionType: e.target.value })}>
-                <option value="message">Mensagem recebida</option>
-                <option value="variable">Variável capturada</option>
-                <option value="phone">Telefone do contato</option>
-                <option value="webhook_status">Status do Webhook</option>
-              </select>
-            </div>
-            {d.conditionType === 'variable' && (
-              <div>
-                <label style={labelStyle}>Nome da variável</label>
-                <input style={inputStyle} placeholder="nome, intencao..."
-                  value={d.field || ''}
-                  onChange={e => onUpdate(node.id, { field: e.target.value })} />
-              </div>
-            )}
-            <div>
-              <label style={labelStyle}>Operador</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.operator || 'contains'}
-                onChange={e => onUpdate(node.id, { operator: e.target.value })}>
-                <option value="contains">Contém</option>
-                <option value="not_contains">Não contém</option>
-                <option value="equals">É igual a</option>
-                <option value="not_equals">É diferente de</option>
-                <option value="starts_with">Começa com</option>
-                <option value="ends_with">Termina com</option>
-                <option value="is_empty">Está vazio</option>
-                <option value="is_not_empty">Não está vazio</option>
-              </select>
-            </div>
-            {!['is_empty', 'is_not_empty'].includes(d.operator) && (
-              <div>
-                <label style={labelStyle}>Valor</label>
-                <input style={inputStyle} placeholder="sim, comprar, 200..."
-                  value={d.value || ''}
-                  onChange={e => onUpdate(node.id, { value: e.target.value })} />
-              </div>
-            )}
-            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px' }}>
-              <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ Sim → caminho verde</span><br />
-              <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>✗ Não → caminho vermelho</span>
-            </div>
-          </>
+          <ConditionPanel
+            d={d} nodeId={node.id}
+            inputStyle={inputStyle} labelStyle={labelStyle}
+            onUpdate={onUpdate}
+          />
         )}
 
         {/* AI NODE */}
@@ -509,7 +678,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
                 <input type="number" min="5" max="200" style={{ ...inputStyle, maxWidth: '100px' }}
                   value={d.historyMessages ?? 50}
                   onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} />
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Quantas mensagens anteriores a IA vai ler para entender o contexto. Recomendado: 50</p>
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Recomendado: 50</p>
               </div>
             )}
           </>
@@ -701,10 +870,7 @@ export default function FlowEditorPage() {
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
-    queryFn: async () => {
-      const { data } = await contactApi.get('/tags')
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
   })
 
   const { data: allFlows = [] } = useQuery({
@@ -717,10 +883,7 @@ export default function FlowEditorPage() {
 
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
-    queryFn: async () => {
-      const { data } = await messageApi.get(`/flows/${id}`)
-      return data.data
-    },
+    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}`); return data.data },
   })
 
   useEffect(() => {
@@ -769,10 +932,12 @@ export default function FlowEditorPage() {
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
+    // Inicializa branches para nó de condição
+    const extraData = type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}
     setNodes((nds: Node[]) => [...nds, {
       id: nodeId, type: 'flowNode',
       position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
-      data: { type },
+      data: { type, ...extraData },
     }])
     setIsDirty(true)
   }
