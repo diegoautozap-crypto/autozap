@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const inputStyle: React.CSSProperties = {
@@ -37,31 +37,244 @@ function getAvatarColor(name: string | undefined | null) {
 }
 
 function ContactTags({ contact }: { contact: any }) {
-  const tags = (contact.contact_tags || [])
-    .map((ct: any) => ct.tags)
-    .filter(Boolean)
+  const tags = (contact.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
   if (!tags.length) return null
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
       {tags.map((tag: any) => (
         <span key={tag.id} style={{
           fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
-          background: `${tag.color || '#6b7280'}18`,
-          color: tag.color || '#6b7280',
+          background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280',
           border: `1px solid ${tag.color || '#6b7280'}40`,
-        }}>
-          {tag.name}
-        </span>
+        }}>{tag.name}</span>
       ))}
     </div>
   )
 }
+
+// ─── Modal de importação Excel ───────────────────────────────────────────────
+function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [rows, setRows] = useState<any[]>([])
+  const [error, setError] = useState('')
+  const [step, setStep] = useState<'upload' | 'preview'>('upload')
+  const [isDragging, setIsDragging] = useState(false)
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const payload = rows.map(r => ({
+        phone: String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, ''),
+        name: r.nome || r.name || r.Name || r.Nome || '',
+        email: r.email || r.Email || '',
+        company: r.empresa || r.company || r.Company || r.Empresa || '',
+      })).filter(r => r.phone.length >= 8)
+      const { data } = await contactApi.post('/contacts/import', { rows: payload })
+      return data
+    },
+    onSuccess: (data) => {
+      const result = data?.data
+      toast.success(`${result?.imported || rows.length} contatos importados com sucesso!`)
+      onSuccess()
+      onClose()
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
+  })
+
+  const parseFile = (file: File) => {
+    setError('')
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError('Formato inválido. Use .xlsx, .xls ou .csv')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        if (!json.length) { setError('Planilha vazia ou sem dados reconhecidos'); return }
+        setRows(json)
+        setStep('preview')
+      } catch {
+        setError('Erro ao ler o arquivo. Verifique se é um Excel ou CSV válido.')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) parseFile(file)
+  }
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) parseFile(file)
+    e.target.value = ''
+  }
+
+  // Detecta colunas automaticamente
+  const validRows = rows.filter(r => {
+    const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
+    return phone.length >= 8
+  })
+  const invalidCount = rows.length - validRows.length
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>Importar contatos via Excel</h3>
+            <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Suporte: .xlsx, .xls, .csv</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+
+          {step === 'upload' && (
+            <>
+              {/* Dropzone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('excel-input')?.click()}
+                style={{
+                  border: `2px dashed ${isDragging ? '#16a34a' : '#e5e7eb'}`,
+                  borderRadius: '10px', padding: '40px 20px', textAlign: 'center',
+                  background: isDragging ? '#f0fdf4' : '#fafafa',
+                  cursor: 'pointer', transition: 'all 0.15s', marginBottom: '20px',
+                }}>
+                <FileSpreadsheet size={36} color={isDragging ? '#16a34a' : '#d1d5db'} style={{ margin: '0 auto 12px' }} />
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  {isDragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para selecionar'}
+                </p>
+                <p style={{ fontSize: '12px', color: '#9ca3af' }}>.xlsx, .xls ou .csv — até 10MB</p>
+                <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
+              </div>
+
+              {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span style={{ fontSize: '13px', color: '#dc2626' }}>{error}</span>
+                </div>
+              )}
+
+              {/* Instruções */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Colunas reconhecidas automaticamente</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                  {[
+                    ['telefone / phone', 'obrigatório'],
+                    ['nome / name', 'opcional'],
+                    ['email', 'opcional'],
+                    ['empresa / company', 'opcional'],
+                  ].map(([col, req]) => (
+                    <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', fontFamily: 'monospace', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px' }}>{col}</span>
+                      <span style={{ fontSize: '11px', color: req === 'obrigatório' ? '#dc2626' : '#9ca3af' }}>{req}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>O nome das colunas não precisa ser exato — reconhecemos variações em português e inglês.</p>
+              </div>
+            </>
+          )}
+
+          {step === 'preview' && (
+            <>
+              {/* Resumo */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{validRows.length}</div>
+                  <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>contatos válidos</div>
+                </div>
+                <div style={{ background: invalidCount > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${invalidCount > 0 ? '#fecaca' : '#e5e7eb'}`, borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: invalidCount > 0 ? '#ef4444' : '#9ca3af', lineHeight: 1 }}>{invalidCount}</div>
+                  <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : '#9ca3af', marginTop: '4px' }}>sem telefone (ignorados)</div>
+                </div>
+              </div>
+
+              {invalidCount > 0 && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <AlertCircle size={14} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span style={{ fontSize: '12px', color: '#92400e' }}>Linhas sem telefone válido serão ignoradas na importação.</span>
+                </div>
+              )}
+
+              {/* Preview tabela */}
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', marginBottom: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: '8px 12px', gap: '8px' }}>
+                  {['Telefone', 'Nome', 'Email', 'Empresa'].map(h => (
+                    <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                  ))}
+                </div>
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {validRows.slice(0, 50).map((r, i) => {
+                    const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
+                    const name = r.nome || r.name || r.Name || r.Nome || '—'
+                    const email = r.email || r.Email || '—'
+                    const company = r.empresa || r.company || r.Company || r.Empresa || '—'
+                    return (
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', padding: '8px 12px', gap: '8px', borderBottom: '1px solid #f9fafb', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <span style={{ fontSize: '12px', color: '#111827', fontFamily: 'monospace' }}>{phone}</span>
+                        <span style={{ fontSize: '12px', color: '#374151' }}>{String(name).slice(0, 20)}</span>
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(email).slice(0, 25)}</span>
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(company).slice(0, 20)}</span>
+                      </div>
+                    )
+                  })}
+                  {validRows.length > 50 && (
+                    <div style={{ padding: '8px 12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center', background: '#f9fafb' }}>
+                      + {validRows.length - 50} contatos não exibidos
+                    </div>
+                  )}
+                </div>
+              </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Contatos com telefone duplicado serão atualizados, não duplicados.</p>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          {step === 'preview' && (
+            <button onClick={() => { setStep('upload'); setRows([]) }}
+              style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+              ← Trocar arquivo
+            </button>
+          )}
+          <button onClick={onClose}
+            style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+            Cancelar
+          </button>
+          {step === 'preview' && validRows.length > 0 && (
+            <button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}
+              style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {importMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
+              {importMutation.isPending ? 'Importando...' : `Importar ${validRows.length} contatos`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
   const [showTags, setShowTags] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', email: '', company: '' })
@@ -82,94 +295,55 @@ export default function ContactsPage() {
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
-    queryFn: async () => {
-      const { data } = await contactApi.get('/tags')
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
   })
 
   const createTagMutation = useMutation({
-    mutationFn: async () => {
-      await contactApi.post('/tags', { name: newTagName, color: newTagColor })
-    },
-    onSuccess: () => {
-      toast.success('Tag criada!')
-      queryClient.invalidateQueries({ queryKey: ['tags'] })
-      setNewTagName('')
-      setNewTagColor(TAG_COLORS[0])
-    },
+    mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) },
+    onSuccess: () => { toast.success('Tag criada!'); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) },
     onError: () => toast.error('Erro ao criar tag'),
   })
 
   const deleteTagMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await contactApi.delete(`/tags/${id}`)
-    },
-    onSuccess: () => {
-      toast.success('Tag excluída!')
-      queryClient.invalidateQueries({ queryKey: ['tags'] })
-    },
+    mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) },
+    onSuccess: () => { toast.success('Tag excluída!'); queryClient.invalidateQueries({ queryKey: ['tags'] }) },
     onError: () => toast.error('Erro ao excluir tag'),
   })
 
   const createMutation = useMutation({
     mutationFn: async () => { const { data } = await contactApi.post('/contacts', form); return data },
-    onSuccess: () => {
-      toast.success('Contato criado!')
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      setShowCreate(false)
-      setForm({ phone: '', name: '', email: '', company: '' })
-    },
+    onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro'),
   })
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await contactApi.patch(`/contacts/${id}`, data)
-    },
-    onSuccess: () => {
-      toast.success('Contato atualizado!')
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      setEditingId(null)
-    },
+    mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) },
+    onSuccess: () => { toast.success('Contato atualizado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar'),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`)))
-    },
-    onSuccess: () => {
-      toast.success('Contato(s) excluído(s)!')
-      setSelected(new Set())
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-    },
+    mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) },
+    onSuccess: () => { toast.success('Contato(s) excluído(s)!'); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
     onError: () => toast.error('Erro ao excluir'),
   })
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => { await contactApi.delete('/contacts/all') },
-    onSuccess: () => {
-      toast.success('Todos os contatos foram excluídos!')
-      setSelected(new Set())
-      setPage(1)
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-    },
+    onSuccess: () => { toast.success('Todos os contatos foram excluídos!'); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
     onError: () => toast.error('Erro ao excluir todos os contatos'),
   })
 
   const handleExport = async () => {
     const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' })
     const url = URL.createObjectURL(data)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'contatos.csv'; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click()
     toast.success('CSV exportado!')
   }
 
   const handleExportExcel = async () => {
     try {
-      let allContacts: any[] = []
-      let p = 1
+      let allContacts: any[] = []; let p = 1
       while (true) {
         const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`)
         const rows = data?.data || []
@@ -179,8 +353,7 @@ export default function ContactsPage() {
       }
       if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
       const rows = allContacts.map((c: any) => ({
-        telefone: c.phone || '', nome: c.name || '', email: c.email || '',
-        empresa: c.company || '',
+        telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '',
         tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '),
         ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
       }))
@@ -189,45 +362,16 @@ export default function ContactsPage() {
       XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
       XLSX.writeFile(wb, 'contatos.xlsx')
       toast.success(`${allContacts.length} contatos exportados!`)
-    } catch (err) {
-      toast.error('Erro ao exportar Excel')
-    }
+    } catch { toast.error('Erro ao exportar Excel') }
   }
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Excluir contato "${name}"?`)) deleteMutation.mutate([id])
-  }
-
-  const handleDeleteSelected = () => {
-    if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected))
-  }
-
-  const handleDeleteAll = () => {
-    if (confirm(`⚠️ Tem certeza que deseja excluir TODOS os ${meta?.total?.toLocaleString()} contatos? Essa ação não pode ser desfeita.`)) {
-      deleteAllMutation.mutate()
-    }
-  }
-
-  const startEdit = (c: any) => {
-    setEditingId(c.id)
-    setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '' })
-  }
-
-  const saveEdit = () => {
-    if (!editingId) return
-    updateMutation.mutate({ id: editingId, data: editForm })
-  }
-
-  const toggleSelect = (id: string) => {
-    const next = new Set(selected)
-    next.has(id) ? next.delete(id) : next.add(id)
-    setSelected(next)
-  }
-
-  const toggleAll = () => {
-    if (selected.size === contacts.length) setSelected(new Set())
-    else setSelected(new Set(contacts.map((c: any) => c.id)))
-  }
+  const handleDelete = (id: string, name: string) => { if (confirm(`Excluir contato "${name}"?`)) deleteMutation.mutate([id]) }
+  const handleDeleteSelected = () => { if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected)) }
+  const handleDeleteAll = () => { if (confirm(`⚠️ Excluir TODOS os ${meta?.total?.toLocaleString()} contatos? Essa ação não pode ser desfeita.`)) deleteAllMutation.mutate() }
+  const startEdit = (c: any) => { setEditingId(c.id); setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '' }) }
+  const saveEdit = () => { if (!editingId) return; updateMutation.mutate({ id: editingId, data: editForm }) }
+  const toggleSelect = (id: string) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next) }
+  const toggleAll = () => { if (selected.size === contacts.length) setSelected(new Set()); else setSelected(new Set(contacts.map((c: any) => c.id))) }
 
   const contacts = data?.data || []
   const meta = data?.meta
@@ -236,6 +380,13 @@ export default function ContactsPage() {
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px' }}>
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }}
+        />
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -267,6 +418,11 @@ export default function ContactsPage() {
             style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <FileSpreadsheet size={13} /> Exportar Excel
           </button>
+          {/* BOTÃO IMPORTAR EXCEL */}
+          <button onClick={() => setShowImport(true)}
+            style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Upload size={13} /> Importar Excel
+          </button>
           <button onClick={() => setShowTags(!showTags)}
             style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Tag size={13} /> Tags {tags.length > 0 && `(${tags.length})`}
@@ -283,24 +439,17 @@ export default function ContactsPage() {
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Gerenciar tags</h3>
-            <button onClick={() => setShowTags(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
-              <X size={16} />
-            </button>
+            <button onClick={() => setShowTags(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}><X size={16} /></button>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '180px' }}>
               <label style={labelStyle}>Nome da tag</label>
-              <input style={inputStyle} placeholder="Ex: Lead quente, Cliente VIP..."
-                value={newTagName} onChange={e => setNewTagName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }} />
+              <input style={inputStyle} placeholder="Ex: Lead quente, Cliente VIP..." value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }} />
             </div>
             <div>
               <label style={labelStyle}>Cor</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '220px' }}>
-                {TAG_COLORS.map(c => (
-                  <div key={c} onClick={() => setNewTagColor(c)}
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? '#111827' : 'transparent'}`, transition: 'border 0.1s' }} />
-                ))}
+                {TAG_COLORS.map(c => <div key={c} onClick={() => setNewTagColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? '#111827' : 'transparent'}`, transition: 'border 0.1s' }} />)}
               </div>
             </div>
             <button onClick={() => createTagMutation.mutate()} disabled={!newTagName || createTagMutation.isPending}
@@ -309,9 +458,7 @@ export default function ContactsPage() {
               Criar tag
             </button>
           </div>
-          {tags.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag criada ainda.</p>
-          ) : (
+          {tags.length === 0 ? <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag criada ainda.</p> : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {tags.map((tag: any) => (
                 <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}15`, border: `1px solid ${tag.color || '#6b7280'}40` }}>
@@ -335,27 +482,13 @@ export default function ContactsPage() {
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Novo contato</h3>
-            <button onClick={() => setShowCreate(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
-              <X size={16} />
-            </button>
+            <button onClick={() => setShowCreate(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}><X size={16} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-            <div>
-              <label style={labelStyle}>Telefone *</label>
-              <input style={inputStyle} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Nome</label>
-              <input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Email</label>
-              <input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Empresa</label>
-              <input style={inputStyle} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
-            </div>
+            <div><label style={labelStyle}>Telefone *</label><input style={inputStyle} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><label style={labelStyle}>Nome</label><input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+            <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            <div><label style={labelStyle}>Empresa</label><input style={inputStyle} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!form.phone || createMutation.isPending}
@@ -363,9 +496,7 @@ export default function ContactsPage() {
               {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               Criar contato
             </button>
-            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
-              Cancelar
-            </button>
+            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -373,19 +504,13 @@ export default function ContactsPage() {
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-        <input style={{ ...inputStyle, paddingLeft: '36px', background: '#fff' }}
-          placeholder="Buscar por nome ou número..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
-        />
+        <input style={{ ...inputStyle, paddingLeft: '36px', background: '#fff' }} placeholder="Buscar por nome ou número..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
       </div>
 
       {/* Table */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
         {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
-          </div>
+          <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
         ) : contacts.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
             <User size={28} color="#e5e7eb" style={{ margin: '0 auto 10px' }} />
@@ -399,60 +524,40 @@ export default function ContactsPage() {
                 <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
               ))}
             </div>
-
             {contacts.map((c: any) => {
               const isEditing = editingId === c.id
               const av = getAvatarColor(c.name)
               return (
-                <div key={c.id}
-                  style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
+                <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>
-                      {getInitials(c.name)}
-                    </div>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>{getInitials(c.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {isEditing ? (
-                        <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                      ) : (
-                        <>
-                          <div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div>
-                          <ContactTags contact={c} />
-                        </>
-                      )}
+                      {isEditing ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
+                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><ContactTags contact={c} /></>}
                     </div>
                   </div>
                   <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
-                  {isEditing ? (
-                    <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
-                  ) : (
-                    <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>
-                  )}
-                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>
-                    {c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}
-                  </span>
+                  {isEditing
+                    ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+                    : <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>}
+                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>{c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</span>
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                       <>
-                        <button onClick={saveEdit} disabled={updateMutation.isPending}
-                          style={{ background: '#16a34a', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}>
+                        <button onClick={saveEdit} disabled={updateMutation.isPending} style={{ background: '#16a34a', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}>
                           {updateMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
                         </button>
-                        <button onClick={() => setEditingId(null)}
-                          style={{ background: '#f3f4f6', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#6b7280', padding: '5px', display: 'flex' }}>
-                          <X size={13} />
-                        </button>
+                        <button onClick={() => setEditingId(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#6b7280', padding: '5px', display: 'flex' }}><X size={13} /></button>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => startEdit(c)}
-                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
+                        <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => handleDelete(c.id, c.name || c.phone)}
-                          style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
+                        <button onClick={() => handleDelete(c.id, c.name || c.phone)} style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
                           <Trash2 size={13} />
@@ -469,21 +574,11 @@ export default function ContactsPage() {
 
       {meta && meta.total > 20 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
-          <span style={{ color: '#6b7280', fontSize: '13px' }}>
-            {((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos
-          </span>
+          <span style={{ color: '#6b7280', fontSize: '13px' }}>{((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos</span>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-              style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
-              <ChevronLeft size={14} />
-            </button>
-            <span style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#374151' }}>
-              {page} / {totalPages}
-            </span>
-            <button disabled={!meta.hasMore} onClick={() => setPage(p => p + 1)}
-              style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', color: !meta.hasMore ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}>
-              <ChevronRight size={14} />
-            </button>
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}><ChevronLeft size={14} /></button>
+            <span style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#374151' }}>{page} / {totalPages}</span>
+            <button disabled={!meta.hasMore} onClick={() => setPage(p => p + 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', color: !meta.hasMore ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}><ChevronRight size={14} /></button>
           </div>
         </div>
       )}
