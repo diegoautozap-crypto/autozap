@@ -7,6 +7,7 @@ import {
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
   Clock, UserCheck, Workflow,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -82,6 +83,8 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { user } = useAuthStore()
+  const role = (user as any)?.role || 'agent'
 
   const { data: campaigns } = useQuery({ queryKey: ['campaigns'], queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data }, refetchInterval: 15000 })
   const { data: channels } = useQuery({ queryKey: ['channels'], queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data }, refetchInterval: 30000 })
@@ -267,11 +270,11 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Nova campanha', href: '/dashboard/campaigns', primary: true },
-            { label: 'Importar contatos', href: '/dashboard/contacts', primary: false },
-            { label: 'Abrir inbox', href: '/dashboard/inbox', primary: false },
-            { label: 'Ver plano', href: '/dashboard/settings', primary: false },
-          ].map(({ label, href, primary }) => (
+            { label: 'Nova campanha', href: '/dashboard/campaigns', primary: true, roles: ['owner', 'admin'] },
+            { label: 'Importar contatos', href: '/dashboard/contacts', primary: false, roles: ['owner', 'admin', 'supervisor'] },
+            { label: 'Abrir inbox', href: '/dashboard/inbox', primary: false, roles: ['owner', 'admin', 'supervisor', 'agent'] },
+            { label: 'Ver plano', href: '/dashboard/settings', primary: false, roles: ['owner', 'admin'] },
+          ].filter(item => item.roles.includes(role)).map(({ label, href, primary }) => (
             <button key={href} onClick={() => router.push(href)}
               style={{ padding: '8px 14px', background: primary ? '#16a34a' : '#f9fafb', border: primary ? 'none' : '1px solid #e5e7eb', borderRadius: '6px', color: primary ? '#fff' : '#374151', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#15803d' : '#f3f4f6' }}

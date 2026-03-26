@@ -27,7 +27,16 @@ export default function LoginPage() {
         toast.info('Digite o código do autenticador')
         return
       }
-      router.push('/dashboard')
+
+      // Redireciona baseado no role
+      const role = result?.user?.role || (result as any)?.role
+      if (role === 'agent') {
+        router.push('/dashboard/inbox')
+      } else if (role === 'supervisor') {
+        router.push('/dashboard/inbox')
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || ''
       if (msg.toLowerCase().includes('verify') || msg.toLowerCase().includes('verificad') || msg.toLowerCase().includes('email_not_verified') || err?.response?.data?.error?.code === 'EMAIL_NOT_VERIFIED') {
@@ -63,15 +72,12 @@ export default function LoginPage() {
               Você precisa verificar seu email antes de entrar.
             </p>
             <p style={{ color: '#111827', fontWeight: 600, fontSize: '14px', marginBottom: '24px' }}>{email}</p>
-            <button
-              onClick={handleResendVerification}
-              disabled={resending}
+            <button onClick={handleResendVerification} disabled={resending}
               style={{ width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: resending ? 'not-allowed' : 'pointer', opacity: resending ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
               {resending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={15} />}
               Reenviar email de verificação
             </button>
-            <button
-              onClick={() => setEmailNotVerified(false)}
+            <button onClick={() => setEmailNotVerified(false)}
               style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#6b7280' }}>
               ← Voltar ao login
             </button>
