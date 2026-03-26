@@ -212,12 +212,12 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             return (
               <Handle key={branch.id} type="source" position={Position.Right}
                 id={`branch_${branch.id}`}
-                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', top: 'auto', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: topOffset }} />
+                style={{ background: branchColor, width: 10, height: 10, border: '2px solid #fff', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: topOffset }} />
             )
           })}
           {/* Fallback handle */}
           <Handle type="source" position={Position.Right} id="fallback"
-            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', top: 'auto', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: 20 + branches.length * 22 }} />
+            style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', bottom: 'auto', transform: 'none', position: 'absolute', right: -6, top: 20 + branches.length * 22 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
             {branches.map((branch, i) => (
               <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
