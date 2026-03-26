@@ -8,7 +8,7 @@ import { tenantApi, authApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle,
 } from 'lucide-react'
 
 const ALL_NAV = [
@@ -21,10 +21,11 @@ const ALL_NAV = [
   { href: '/dashboard/flows',     label: 'Flows',     icon: Workflow },
   { href: '/dashboard/channels',  label: 'Canais',    icon: Radio },
   { href: '/dashboard/team',      label: 'Equipe',    icon: UserCog },
+  { href: '/dashboard/errors',    label: 'Erros',     icon: AlertCircle },
   { href: '/dashboard/settings',  label: 'Plano',     icon: Settings },
 ]
 
-// Páginas que admin/owner sempre veem independente de permissões
+// Páginas que admin/owner sempre veem
 const ADMIN_PAGES = ALL_NAV.map(n => n.href)
 
 const ROLE_LABEL: Record<string, string> = {
@@ -73,7 +74,6 @@ export function Sidebar() {
   const role = (user as any)?.role || 'agent'
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
 
-  // Busca permissões individuais via /auth/me
   useEffect(() => {
     if (!user) return
     if (role === 'admin' || role === 'owner') {
@@ -86,7 +86,6 @@ export function Sidebar() {
         if (perms?.allowed_pages?.length > 0) {
           setAllowedPages(perms.allowed_pages)
         } else {
-          // fallback padrão por role
           setAllowedPages(role === 'agent' ? ['/dashboard/inbox'] : ['/dashboard/inbox', '/dashboard'])
         }
       })
@@ -126,16 +125,17 @@ export function Sidebar() {
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+          const isErrors = href === '/dashboard/errors'
           return (
             <Link key={href} href={href} style={{ textDecoration: 'none', display: 'block', marginBottom: '1px' }}>
               <div
-                style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? '#f0fdf4' : 'transparent', color: isActive ? '#16a34a' : '#6b7280', fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
-                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#f9fafb' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = isErrors ? '#fef2f2' : '#f9fafb' }}
                 onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
               >
                 <Icon size={15} strokeWidth={isActive ? 2.5 : 1.8} />
                 <span>{label}</span>
-                {isActive && <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />}
+                {isActive && <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: isErrors ? '#ef4444' : '#16a34a' }} />}
               </div>
             </Link>
           )
