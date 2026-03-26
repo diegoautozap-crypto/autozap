@@ -24,6 +24,17 @@ interface AuthState {
   setTokens: (accessToken: string, refreshToken: string) => void
 }
 
+function setAuthCookie(token: string) {
+  // Cookie acessível pelo middleware — 365 dias
+  const expires = new Date()
+  expires.setFullYear(expires.getFullYear() + 1)
+  document.cookie = `accessToken=${token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+}
+
+function clearAuthCookie() {
+  document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -46,8 +57,8 @@ export const useAuthStore = create<AuthState>()(
           const { accessToken, refreshToken } = data.data
           localStorage.setItem('accessToken', accessToken)
           localStorage.setItem('refreshToken', refreshToken)
+          setAuthCookie(accessToken)
 
-          // Get user info
           const meRes = await authApi.get('/auth/me', {
             headers: { Authorization: `Bearer ${accessToken}` },
           })
@@ -75,6 +86,7 @@ export const useAuthStore = create<AuthState>()(
           } catch {}
         }
         localStorage.clear()
+        clearAuthCookie()
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
       },
 
@@ -92,6 +104,7 @@ export const useAuthStore = create<AuthState>()(
       setTokens: (accessToken, refreshToken) => {
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)
+        setAuthCookie(accessToken)
         set({ accessToken, refreshToken })
       },
     }),
