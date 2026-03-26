@@ -20,7 +20,7 @@ const OWNER_ONLY = [
   '/dashboard/plan',
 ]
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Deixa passar rotas públicas e assets
