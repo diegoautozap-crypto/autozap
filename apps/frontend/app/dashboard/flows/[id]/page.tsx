@@ -173,8 +173,9 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     <div style={{
       background: '#fff', border: `2px solid ${selected ? color : '#e5e7eb'}`,
       borderRadius: '12px', padding: '14px 16px', minWidth: '220px', maxWidth: '260px',
+      minHeight: isCondition && branches.length > 0 ? `${16 + (branches.length + 1) * 36 + 20}px` : 'auto',
       boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
-      transition: 'all 0.15s',
+      transition: 'all 0.15s', position: 'relative',
     }}>
       {!isTrigger && (
         <Handle type="target" position={Position.Left}
@@ -207,15 +208,15 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         <>
           {branches.map((branch, i) => {
             const branchColor = BRANCH_COLORS[i % BRANCH_COLORS.length]
-            const topOffset = 24 + i * 28
+            const topOffset = 16 + i * 36
             return (
               <Handle key={branch.id} type="source" position={Position.Right}
                 id={`branch_${branch.id}`}
-                style={{ background: branchColor, width: 12, height: 12, border: '2px solid #fff', position: 'absolute', right: -7, top: topOffset, transform: 'none' }} />
+                style={{ background: branchColor, width: 14, height: 14, border: '3px solid #fff', position: 'absolute', right: -8, top: topOffset, transform: 'none', zIndex: 10 }} />
             )
           })}
           <Handle type="source" position={Position.Right} id="fallback"
-            style={{ background: '#9ca3af', width: 12, height: 12, border: '2px solid #fff', position: 'absolute', right: -7, top: 24 + branches.length * 28, transform: 'none' }} />
+            style={{ background: '#9ca3af', width: 14, height: 14, border: '3px solid #fff', position: 'absolute', right: -8, top: 16 + branches.length * 36, transform: 'none', zIndex: 10 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
             {branches.map((branch, i) => (
               <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
@@ -378,12 +379,13 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                 <option value="AND">E (AND)</option>
                 <option value="OR">OU (OR)</option>
               </select>
-              {branches.length > 1 && (
-                <button onClick={() => removeBranch(branch.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#9ca3af', display: 'flex' }}>
-                  <X size={14} />
-                </button>
-              )}
+              <button onClick={() => removeBranch(branch.id)}
+                title="Remover caminho"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px', color: '#9ca3af', display: 'flex', marginLeft: 'auto' }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
+                <X size={15} />
+              </button>
             </div>
 
             {/* Regras do caminho */}
