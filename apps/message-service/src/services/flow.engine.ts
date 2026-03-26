@@ -1,4 +1,3 @@
-
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { generateId } from '@autozap/utils'
@@ -18,6 +17,22 @@ interface FlowContext {
   phone: string
   messageBody: string
   isFirstMessage: boolean
+}
+
+// ─── Tipos para condição múltipla ─────────────────────────────────────────────
+interface ConditionRule {
+  id: string
+  field: string
+  fieldName?: string
+  operator: string
+  value: string
+}
+
+interface ConditionBranch {
+  id: string
+  label: string
+  logic: 'AND' | 'OR'
+  rules: ConditionRule[]
 }
 
 async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
@@ -110,7 +125,7 @@ export class FlowEngine {
       stepCount++
       const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, state.id)
       if (result.paused || result.ended) break
-      const nextHandle = result.success ? 'success' : 'error'
+      const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
@@ -198,7 +213,7 @@ export class FlowEngine {
       stepCount++
       const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, null)
       if (result.paused || result.ended) break
-      const nextHandle = result.success ? 'success' : 'error'
+      const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
@@ -218,7 +233,7 @@ export class FlowEngine {
     variables: Record<string, any>,
     edgeMap: Map<string, any[]>, nodeMap: Map<string, any>,
     stateId: string | null
-  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean }> {
+  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean; nextHandle?: string }> {
     const { type, data } = node
 
     try {
@@ -282,25 +297,16 @@ export class FlowEngine {
 
         case 'ai': {
           const openaiKey = data?.apiKey || process.env.OPENAI_API_KEY
-          if (!openaiKey) {
-            logger.warn('AI node: no OpenAI API key configured')
-            break
-          }
+          if (!openaiKey) { logger.warn('AI node: no OpenAI API key configured'); break }
 
           const { default: OpenAI } = await import('openai')
-          const openai = new OpenAI({ 
-            apiKey: openaiKey,
-            timeout: 30000, // 30 segundos
-            maxRetries: 1,
-          })
+          const openai = new OpenAI({ apiKey: openaiKey, timeout: 30000, maxRetries: 1 })
           const aiMode = data?.mode || 'respond'
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
 
-          // Busca histórico da conversa apenas do dia atual para evitar confusão com pedidos anteriores
           const maxHistory = data?.historyMessages || 50
-          const startOfDay = new Date()
-          startOfDay.setHours(0, 0, 0, 0)
+          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
 
           const { data: history } = await db
             .from('messages')
@@ -313,123 +319,96 @@ export class FlowEngine {
             .order('created_at', { ascending: false })
             .limit(maxHistory)
 
-          // Monta array de mensagens com histórico (ordem cronológica)
           const historyMessages: { role: 'user' | 'assistant'; content: string }[] = (history || [])
             .reverse()
             .filter((m: any) => m.body && m.body.trim())
-            .map((m: any) => ({
-              role: m.direction === 'inbound' ? 'user' : 'assistant',
-              content: m.body,
-            }))
+            .map((m: any) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: m.body }))
 
           let messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
 
           if (aiMode === 'respond') {
-            // Usa histórico completo + system prompt
-            messages = [
-              { role: 'system', content: systemPrompt },
-              ...historyMessages,
-            ]
-            // Se a última mensagem do histórico não for a mensagem atual, adiciona
+            messages = [{ role: 'system', content: systemPrompt }, ...historyMessages]
             const lastHistoryMsg = historyMessages[historyMessages.length - 1]
-            if (!lastHistoryMsg || lastHistoryMsg.content !== userMessage) {
-              messages.push({ role: 'user', content: userMessage })
-            }
+            if (!lastHistoryMsg || lastHistoryMsg.content !== userMessage) messages.push({ role: 'user', content: userMessage })
           } else if (aiMode === 'classify') {
             const options = (data?.classifyOptions || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-            messages = [
-              { role: 'system', content: `Classifique a mensagem em UMA das categorias: ${options.join(', ')}. Responda APENAS com a categoria, sem explicações.` },
-              { role: 'user', content: userMessage },
-            ]
+            messages = [{ role: 'system', content: `Classifique a mensagem em UMA das categorias: ${options.join(', ')}. Responda APENAS com a categoria, sem explicações.` }, { role: 'user', content: userMessage }]
           } else if (aiMode === 'extract') {
             const field = data?.extractField || 'informação'
-            messages = [
-              { role: 'system', content: `Extraia apenas ${field} da mensagem. Responda apenas com o valor extraído, sem explicações.` },
-              { role: 'user', content: userMessage },
-            ]
+            messages = [{ role: 'system', content: `Extraia apenas ${field} da mensagem. Responda apenas com o valor extraído, sem explicações.` }, { role: 'user', content: userMessage }]
           } else if (aiMode === 'summarize') {
-            messages = [
-              { role: 'system', content: 'Resuma a mensagem em uma frase curta.' },
-              { role: 'user', content: userMessage },
-            ]
+            messages = [{ role: 'system', content: 'Resuma a mensagem em uma frase curta.' }, { role: 'user', content: userMessage }]
           }
 
-          const completion = await openai.chat.completions.create({
-            model: data?.model || 'gpt-4o-mini',
-            messages,
-            max_tokens: data?.maxTokens || 1000,
-            temperature: data?.temperature ?? 0.7,
-          })
-
+          const completion = await openai.chat.completions.create({ model: data?.model || 'gpt-4o-mini', messages, max_tokens: data?.maxTokens || 1000, temperature: data?.temperature ?? 0.7 })
           const aiResponse = completion.choices[0]?.message?.content?.trim() || ''
-          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100), historySize: historyMessages.length })
+          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100) })
 
-          if (data?.saveAs) {
-            variables[data.saveAs] = aiResponse
-          }
-
+          if (data?.saveAs) variables[data.saveAs] = aiResponse
           if (aiMode === 'respond' && aiResponse) {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: aiResponse })
           }
-
           break
         }
 
         case 'webhook': {
           const url = this.interpolate(data?.url || '', ctx, variables)
           if (!url) break
-
           const method = (data?.method || 'POST').toUpperCase()
           const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-
-          if (data?.headers) {
-            try {
-              const customHeaders = typeof data.headers === 'string' ? JSON.parse(data.headers) : data.headers
-              Object.assign(headers, customHeaders)
-            } catch { }
-          }
-
+          if (data?.headers) { try { Object.assign(headers, typeof data.headers === 'string' ? JSON.parse(data.headers) : data.headers) } catch { } }
           let body: string | undefined
           if (method !== 'GET') {
             const rawBody = data?.body || '{}'
             const interpolatedBody = this.interpolate(rawBody, ctx, variables)
-            try {
-              JSON.parse(interpolatedBody)
-              body = interpolatedBody
-            } catch {
-              body = JSON.stringify({ phone: ctx.phone, message: ctx.messageBody, contactId: ctx.contactId, conversationId: ctx.conversationId, ...variables })
-            }
+            try { JSON.parse(interpolatedBody); body = interpolatedBody } catch { body = JSON.stringify({ phone: ctx.phone, message: ctx.messageBody, contactId: ctx.contactId, conversationId: ctx.conversationId, ...variables }) }
           }
-
-          const response = await fetch(url, {
-            method,
-            headers,
-            body: method !== 'GET' ? body : undefined,
-            signal: AbortSignal.timeout(10000),
-          })
-
+          const response = await fetch(url, { method, headers, body: method !== 'GET' ? body : undefined, signal: AbortSignal.timeout(10000) })
           const responseText = await response.text()
-
           if (data?.saveResponseAs) {
             try {
               const json = JSON.parse(responseText)
-              if (data?.responseField) {
-                const fieldValue = data.responseField.split('.').reduce((obj: any, key: string) => obj?.[key], json)
-                variables[data.saveResponseAs] = String(fieldValue ?? responseText)
-              } else {
-                variables[data.saveResponseAs] = responseText
-              }
-            } catch {
-              variables[data.saveResponseAs] = responseText
-            }
+              if (data?.responseField) { const fieldValue = data.responseField.split('.').reduce((obj: any, key: string) => obj?.[key], json); variables[data.saveResponseAs] = String(fieldValue ?? responseText) }
+              else { variables[data.saveResponseAs] = responseText }
+            } catch { variables[data.saveResponseAs] = responseText }
           }
-
           variables['webhook_status'] = String(response.status)
           variables['webhook_ok'] = response.ok ? 'true' : 'false'
           break
         }
 
+        // ─── CONDITION — suporte a múltiplas branches ──────────────────────────
         case 'condition': {
+          const branches: ConditionBranch[] = data?.branches || []
+
+          // ── Novo formato: múltiplas branches ──────────────────────────────────
+          if (branches.length > 0) {
+            let matchedHandle: string | null = null
+
+            for (const branch of branches) {
+              const matched = this.evaluateBranch(branch, ctx, variables)
+              if (matched) {
+                matchedHandle = `branch_${branch.id}`
+                logger.info('Condition branch matched', { branchLabel: branch.label, handle: matchedHandle })
+                break
+              }
+            }
+
+            // Se nenhuma branch bateu → fallback
+            const handle = matchedHandle || 'fallback'
+            let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
+            let steps = 0
+            while (nextNode && steps < 50) {
+              steps++
+              const result = await this.executeNode(nextNode, ctx, flowId, variables, edgeMap, nodeMap, stateId)
+              if (result.paused || result.ended) return result
+              const nh = result.nextHandle || (result.success ? 'success' : 'error')
+              nextNode = this.getNextNode(nextNode.id, nh, edgeMap, nodeMap)
+            }
+            return { success: true }
+          }
+
+          // ── Formato legado: true/false ─────────────────────────────────────────
           const conditionMet = this.evaluateCondition(data, ctx, variables)
           const handle = conditionMet ? 'true' : 'false'
           let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
@@ -454,38 +433,27 @@ export class FlowEngine {
 
         case 'add_tag': {
           if (!data?.tagId) break
-          await db.from('contact_tags').upsert(
-            { contact_id: ctx.contactId, tag_id: data.tagId },
-            { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
-          )
+          await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: data.tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
           break
         }
 
         case 'remove_tag': {
           if (!data?.tagId) break
-          await db.from('contact_tags')
-            .delete()
-            .eq('contact_id', ctx.contactId)
-            .eq('tag_id', data.tagId)
+          await db.from('contact_tags').delete().eq('contact_id', ctx.contactId).eq('tag_id', data.tagId)
           break
         }
 
         case 'update_contact': {
           const updateData: any = {}
-          if (data?.field === 'name' && data?.value) {
-            updateData.name = this.interpolate(data.value, ctx, variables)
-          } else if (data?.field === 'phone' && data?.value) {
-            updateData.phone = this.interpolate(data.value, ctx, variables)
-          } else if (data?.field === 'custom' && data?.customField && data?.value) {
-            // Salva em metadata do contato
+          if (data?.field === 'name' && data?.value) { updateData.name = this.interpolate(data.value, ctx, variables) }
+          else if (data?.field === 'phone' && data?.value) { updateData.phone = this.interpolate(data.value, ctx, variables) }
+          else if (data?.field === 'custom' && data?.customField && data?.value) {
             const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
             const metadata = contact?.metadata || {}
             metadata[data.customField] = this.interpolate(data.value, ctx, variables)
             updateData.metadata = metadata
           }
-          if (Object.keys(updateData).length > 0) {
-            await db.from('contacts').update(updateData).eq('id', ctx.contactId)
-          }
+          if (Object.keys(updateData).length > 0) await db.from('contacts').update(updateData).eq('id', ctx.contactId)
           break
         }
 
@@ -502,13 +470,11 @@ export class FlowEngine {
             const message = this.interpolate(data.message, ctx, variables)
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           }
-          // Pausa o bot para atendimento humano
           await db.from('conversations').update({ bot_active: false }).eq('id', ctx.conversationId)
           break
         }
 
         case 'go_to': {
-          // Redireciona para outro flow
           const targetFlowId = data?.targetFlowId
           if (!targetFlowId) break
           const { data: targetFlow } = await db.from('flows').select('*').eq('id', targetFlowId).eq('tenant_id', ctx.tenantId).single()
@@ -519,7 +485,6 @@ export class FlowEngine {
         }
 
         case 'end': {
-          // Finaliza o flow explicitamente
           logger.info('Flow ended by end node', { flowId, nodeId: node.id })
           if (data?.message) {
             const message = this.interpolate(data.message, ctx, variables)
@@ -542,6 +507,44 @@ export class FlowEngine {
     }
   }
 
+  // ─── Avalia uma branch (conjunto de regras com AND/OR) ─────────────────────
+  private evaluateBranch(branch: ConditionBranch, ctx: FlowContext, variables: Record<string, any>): boolean {
+    const { logic, rules } = branch
+    if (!rules || rules.length === 0) return false
+
+    if (logic === 'OR') {
+      return rules.some(rule => this.evaluateRule(rule, ctx, variables))
+    }
+    // AND (padrão)
+    return rules.every(rule => this.evaluateRule(rule, ctx, variables))
+  }
+
+  // ─── Avalia uma regra individual ──────────────────────────────────────────
+  private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, any>): boolean {
+    let fieldValue = ''
+    if (rule.field === 'message') fieldValue = ctx.messageBody || ''
+    else if (rule.field === 'variable') fieldValue = variables[rule.fieldName || rule.field] || ''
+    else if (rule.field === 'phone') fieldValue = ctx.phone || ''
+    else if (rule.field === 'webhook_status') fieldValue = variables['webhook_status'] || ''
+    else fieldValue = ctx.messageBody || ''
+
+    const val = (rule.value || '').toLowerCase()
+    const fv = fieldValue.toLowerCase()
+
+    switch (rule.operator) {
+      case 'contains':     return fv.includes(val)
+      case 'not_contains': return !fv.includes(val)
+      case 'equals':       return fv === val
+      case 'not_equals':   return fv !== val
+      case 'starts_with':  return fv.startsWith(val)
+      case 'ends_with':    return fv.endsWith(val)
+      case 'is_empty':     return fv === ''
+      case 'is_not_empty': return fv !== ''
+      default:             return fv.includes(val)
+    }
+  }
+
+  // ─── Formato legado (true/false) ──────────────────────────────────────────
   private evaluateCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
     const { conditionType, field, operator, value } = data || {}
     let fieldValue = ''
@@ -588,12 +591,7 @@ export class FlowEngine {
     const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
-      body: JSON.stringify({
-        tenantId: opts.tenantId, channelId: opts.channelId,
-        contactId: opts.contactId, conversationId: opts.conversationId,
-        to: opts.to, contentType: opts.contentType,
-        body: opts.body, mediaUrl: opts.mediaUrl,
-      }),
+      body: JSON.stringify({ tenantId: opts.tenantId, channelId: opts.channelId, contactId: opts.contactId, conversationId: opts.conversationId, to: opts.to, contentType: opts.contentType, body: opts.body, mediaUrl: opts.mediaUrl }),
     })
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
@@ -603,11 +601,7 @@ export class FlowEngine {
 
   private async logNode(flowId: string, nodeId: string, ctx: FlowContext, status: string, detail: string): Promise<void> {
     try {
-      await db.from('flow_logs').insert({
-        id: generateId(), flow_id: flowId, node_id: nodeId,
-        tenant_id: ctx.tenantId, contact_id: ctx.contactId,
-        conversation_id: ctx.conversationId, status, detail,
-      })
+      await db.from('flow_logs').insert({ id: generateId(), flow_id: flowId, node_id: nodeId, tenant_id: ctx.tenantId, contact_id: ctx.contactId, conversation_id: ctx.conversationId, status, detail })
     } catch { }
   }
 }
