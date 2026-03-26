@@ -639,20 +639,8 @@ export default function InboxPage() {
                 })
               }
 
-              {/* Notas internas intercaladas */}
-              {notes.map((note: any) => (
-                <div key={note.id} style={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ maxWidth: '70%', padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
-                      <StickyNote size={11} color="#d97706" />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#d97706' }}>Nota interna</span>
-                      <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>Nota interna</span>
-                    </div>
-                    <p style={{ fontSize: '13px', color: '#92400e', margin: 0, whiteSpace: 'pre-line' }}>{note.body}</p>
-                    <p style={{ fontSize: '10px', color: '#d97706', margin: '4px 0 0', textAlign: 'right' }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                </div>
-              ))}
+              {/* Notas internas removidas do chat — ficam no painel direito */}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -830,6 +818,25 @@ export default function InboxPage() {
               )}
             </div>
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <StickyNote size={13} color="#d97706" />
+                <p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Notas internas</p>
+              </div>
+              {notes.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#d1d5db', textAlign: 'center', padding: '8px 0' }}>Nenhuma nota ainda</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {notes.map((note: any) => (
+                    <div key={note.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
+                      <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 4px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
+                      <p style={{ fontSize: '10px', color: '#d97706', margin: 0, textAlign: 'right' }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f3f4f6' }}>
               <a href="/dashboard/contacts" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#f9fafb', borderRadius: '6px', textDecoration: 'none', color: '#374151', fontSize: '13px', fontWeight: 500 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f3f4f6' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f9fafb' }}>
