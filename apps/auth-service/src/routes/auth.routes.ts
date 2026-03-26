@@ -152,9 +152,10 @@ router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate
   try {
     const { name, email, role } = req.body
 
+    // Verifica se email já existe em qualquer tenant da plataforma
     const { data: existing } = await db
-      .from('users').select('id').eq('tenant_id', req.auth.tid).eq('email', email.toLowerCase()).maybeSingle()
-    if (existing) throw new AppError('CONFLICT', 'Este email já está cadastrado na equipe', 409)
+      .from('users').select('id').eq('email', email.toLowerCase()).maybeSingle()
+    if (existing) throw new AppError('CONFLICT', 'Este email já possui uma conta na plataforma. Peça para a pessoa acessar com suas credenciais existentes.', 409)
 
     const tempPassword = randomBytes(4).toString('hex').toUpperCase()
     const passwordHash = await hashPassword(tempPassword)
