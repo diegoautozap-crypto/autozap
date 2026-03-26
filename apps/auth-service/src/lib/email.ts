@@ -109,3 +109,44 @@ export async function sendWelcomeEmail(opts: {
   if (error) throw new Error(error.message)
   logger.info('Welcome email sent', { to: opts.to })
 }
+
+// ─── Team Invite ──────────────────────────────────────────────────────────────
+
+export async function sendTeamInviteEmail(opts: {
+  to: string
+  name: string
+  tenantName: string
+  tempPassword: string
+  isReset?: boolean
+}): Promise<void> {
+  const subject = opts.isReset
+    ? `Nova senha gerada — ${opts.tenantName}`
+    : `Você foi adicionado à equipe — ${opts.tenantName}`
+
+  const html = baseLayout(`
+    <p>Olá, <strong>${opts.name}</strong>!</p>
+    ${opts.isReset
+      ? `<p>Sua senha foi redefinida por um administrador da <strong>${opts.tenantName}</strong>.</p>`
+      : `<p>Você foi adicionado como atendente da <strong>${opts.tenantName}</strong> no AutoZap.</p>`
+    }
+    <p>Use as credenciais abaixo para acessar o sistema:</p>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:16px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Email</p>
+      <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#111827;">${opts.to}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Senha temporária</p>
+      <p style="margin:0;font-size:24px;font-weight:800;color:#16a34a;letter-spacing:0.15em;font-family:monospace;">${opts.tempPassword}</p>
+    </div>
+    <a href="${APP_URL}/login" class="btn">Acessar o sistema</a>
+    <p style="font-size:13px;color:#9ca3af;margin-top:16px;">Recomendamos que você troque sua senha após o primeiro acesso.</p>
+  `)
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject,
+    html,
+  })
+
+  if (error) throw new Error(error.message)
+  logger.info('Team invite email sent', { to: opts.to, isReset: opts.isReset })
+}

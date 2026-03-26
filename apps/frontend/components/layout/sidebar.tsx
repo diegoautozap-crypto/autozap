@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { LayoutDashboard, Megaphone, Users, MessageSquare, Settings, LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban } from 'lucide-react'
+import { LayoutDashboard, Megaphone, Users, MessageSquare, Settings, LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog } from 'lucide-react'
 
 const nav = [
   { href: '/dashboard',           label: 'Dashboard', icon: LayoutDashboard },
@@ -17,6 +17,7 @@ const nav = [
   { href: '/dashboard/pipeline',  label: 'Pipeline',  icon: Kanban },
   { href: '/dashboard/flows',     label: 'Flows',     icon: Workflow },
   { href: '/dashboard/channels',  label: 'Canais',    icon: Radio },
+  { href: '/dashboard/team',      label: 'Equipe',    icon: UserCog },
   { href: '/dashboard/settings',  label: 'Plano',     icon: Settings },
 ]
 
@@ -75,7 +76,6 @@ export function Sidebar() {
       height: '100%',
       flexShrink: 0,
     }}>
-      {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '32px', height: '32px', background: '#16a34a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -88,7 +88,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
@@ -110,7 +109,6 @@ export function Sidebar() {
 
       <UsageBar />
 
-      {/* Logout */}
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={handleLogout}
