@@ -107,7 +107,7 @@ export default function DashboardPage() {
       const { data } = await tenantApi.get(url)
       return data.data
     },
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   })
 
   const totalSent = analytics?.totalSent ?? 0
