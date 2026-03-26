@@ -1,4 +1,4 @@
-import { Worker, Queue, QueueScheduler } from 'bullmq'
+import { Worker, Queue } from 'bullmq'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
 
@@ -28,10 +28,9 @@ export interface FollowUpJob {
   phone: string
   message: string
   followUpConfigId: string
-  scheduledAt: string // ISO string de quando foi agendado
+  scheduledAt: string
 }
 
-// Queue pública para agendamento de follow-ups
 export const followUpQueue = new Queue<FollowUpJob>('followup_queue', {
   connection: getRedisConnection(),
   defaultJobOptions: {
@@ -42,7 +41,6 @@ export const followUpQueue = new Queue<FollowUpJob>('followup_queue', {
   },
 })
 
-// ─── Agenda follow-up para uma conversa ─────────────────────────────────────
 export async function scheduleFollowUp(params: {
   tenantId: string
   conversationId: string
@@ -51,13 +49,10 @@ export async function scheduleFollowUp(params: {
   phone: string
   message: string
   followUpConfigId: string
-  delayMs: number // delay em milissegundos
+  delayMs: number
 }): Promise<void> {
   const jobId = `followup:${params.conversationId}:${params.followUpConfigId}`
-
-  // Remove job anterior se existir (evita duplicatas)
   await cancelFollowUp(params.conversationId, params.followUpConfigId)
-
   await followUpQueue.add(
     'send_followup',
     {
@@ -70,12 +65,8 @@ export async function scheduleFollowUp(params: {
       followUpConfigId: params.followUpConfigId,
       scheduledAt: new Date().toISOString(),
     },
-    {
-      jobId,
-      delay: params.delayMs,
-    },
+    { jobId, delay: params.delayMs },
   )
-
   logger.info('Follow-up agendado', {
     conversationId: params.conversationId,
     delayHours: (params.delayMs / 1000 / 60 / 60).toFixed(1),
@@ -83,18 +74,13 @@ export async function scheduleFollowUp(params: {
   })
 }
 
-// ─── Cancela follow-up de uma conversa (quando cliente responde) ─────────────
 export async function cancelFollowUp(conversationId: string, followUpConfigId?: string): Promise<void> {
   try {
     if (followUpConfigId) {
       const jobId = `followup:${conversationId}:${followUpConfigId}`
       const job = await followUpQueue.getJob(jobId)
-      if (job) {
-        await job.remove()
-        logger.info('Follow-up cancelado', { conversationId, jobId })
-      }
+      if (job) { await job.remove(); logger.info('Follow-up cancelado', { conversationId, jobId }) }
     } else {
-      // Cancela todos os follow-ups desta conversa
       const delayed = await followUpQueue.getDelayed()
       for (const job of delayed) {
         if (job.data.conversationId === conversationId) {
@@ -108,19 +94,13 @@ export async function cancelFollowUp(conversationId: string, followUpConfigId?: 
   }
 }
 
-// ─── Worker que processa os follow-ups ──────────────────────────────────────
 export function startFollowUpWorker(): Worker<FollowUpJob> {
-  // QueueScheduler necessário para delayed jobs no BullMQ v1/v2
-  new QueueScheduler('followup_queue', { connection: getRedisConnection() })
-
   const worker = new Worker<FollowUpJob>(
     'followup_queue',
     async (job) => {
       const { tenantId, conversationId, contactId, channelId, phone, message, scheduledAt } = job.data
-
       logger.info('FollowUpWorker: processando', { conversationId, phone })
 
-      // Busca a conversa para checar estado atual
       const { data: conv } = await db
         .from('conversations')
         .select('id, status, last_message_at, bot_active')
@@ -128,49 +108,22 @@ export function startFollowUpWorker(): Worker<FollowUpJob> {
         .eq('tenant_id', tenantId)
         .single()
 
-      if (!conv) {
-        logger.warn('FollowUpWorker: conversa não encontrada, pulando', { conversationId })
-        return
-      }
+      if (!conv) { logger.warn('FollowUpWorker: conversa não encontrada, pulando', { conversationId }); return }
+      if (conv.status === 'closed') { logger.info('FollowUpWorker: conversa fechada, pulando', { conversationId }); return }
+      if (conv.bot_active === false) { logger.info('FollowUpWorker: humano ativo, pulando', { conversationId }); return }
 
-      // Não envia se conversa foi fechada
-      if (conv.status === 'closed') {
-        logger.info('FollowUpWorker: conversa fechada, pulando', { conversationId })
-        return
-      }
-
-      // Não envia se humano assumiu o atendimento
-      if (conv.bot_active === false) {
-        logger.info('FollowUpWorker: humano ativo, pulando follow-up', { conversationId })
-        return
-      }
-
-      // Verifica se houve mensagem nova depois do agendamento
       const scheduledDate = new Date(scheduledAt)
       if (conv.last_message_at && new Date(conv.last_message_at) > scheduledDate) {
         logger.info('FollowUpWorker: cliente respondeu após agendamento, pulando', { conversationId })
         return
       }
 
-      // Interpola variáveis na mensagem
       const finalMessage = message.replace(/\{\{phone\}\}/gi, phone)
 
-      // Envia a mensagem via message-service
       const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-secret': INTERNAL_SECRET,
-        },
-        body: JSON.stringify({
-          tenantId,
-          channelId,
-          contactId,
-          conversationId,
-          to: phone,
-          contentType: 'text',
-          body: finalMessage,
-        }),
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
+        body: JSON.stringify({ tenantId, channelId, contactId, conversationId, to: phone, contentType: 'text', body: finalMessage }),
       })
 
       if (!response.ok) {
@@ -178,29 +131,20 @@ export function startFollowUpWorker(): Worker<FollowUpJob> {
         throw new Error(`Falha ao enviar follow-up: ${JSON.stringify(err)}`)
       }
 
-      // Registra o follow-up enviado
       await db.from('follow_up_logs').insert({
-        tenant_id: tenantId,
-        conversation_id: conversationId,
-        contact_id: contactId,
-        message: finalMessage,
-        sent_at: new Date(),
-      }).catch(() => {}) // não falha se tabela não existir ainda
+        tenant_id: tenantId, conversation_id: conversationId,
+        contact_id: contactId, message: finalMessage, sent_at: new Date(),
+      }).catch(() => {})
 
       logger.info('FollowUpWorker: follow-up enviado', { conversationId, phone })
     },
-    {
-      connection: getRedisConnection(),
-      concurrency: 10,
-    },
+    { connection: getRedisConnection(), concurrency: 10 },
   )
 
   worker.on('failed', (job, err) =>
     logger.error('FollowUpWorker: job falhou', {
-      jobId: job?.id,
-      conversationId: job?.data?.conversationId,
-      attempt: job?.attemptsMade,
-      error: err.message,
+      jobId: job?.id, conversationId: job?.data?.conversationId,
+      attempt: job?.attemptsMade, error: err.message,
     }),
   )
 
