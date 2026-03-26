@@ -120,6 +120,7 @@ export default function DashboardPage() {
   const flowExecutionsToday: number = analytics?.flowExecutionsToday ?? 0
   const agentConversations: number | null = analytics?.agentConversations ?? null
   const agentClosedLast7d: number | null = analytics?.agentClosedLast7d ?? null
+  const days = Object.keys(byDay).sort()
   const maxVal = Math.max(...days.map(d => byDay[d]?.sent || 0), 1)
 
   const metricCards = [
