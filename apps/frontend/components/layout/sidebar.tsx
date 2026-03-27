@@ -185,7 +185,7 @@ export function Sidebar() {
             const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             const isErrors = href === '/dashboard/errors'
             return (
-              <button key={href} onClick={() => router.push(href)}
+              <button key={href} onClick={() => { console.log('CLICOU:', href); router.push(href) }}
                 style={{ textDecoration: 'none', display: 'block', marginBottom: '1px', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
