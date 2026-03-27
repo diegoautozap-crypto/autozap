@@ -67,7 +67,8 @@ router.use(requireAuth)
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const updateStatusSchema = z.object({ status: z.enum(['open', 'waiting', 'closed']) })
 const assignSchema = z.object({ userId: z.string().uuid().nullable() })
-const pipelineSchema = z.object({ stage: z.enum(['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']) })
+// Aceita qualquer string — colunas são dinâmicas e criadas pelo usuário
+const pipelineSchema = z.object({ stage: z.string().min(1).max(100) })
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,6 @@ router.get('/conversations', async (req, res, next) => {
     const { status, channelId } = req.query as any
     const role = req.auth.role
 
-    // Admin e owner veem tudo
     if (role === 'admin' || role === 'owner') {
       const result = await conversationService.listConversations(req.auth.tid, {
         status, channelId, page, limit,
@@ -85,15 +85,11 @@ router.get('/conversations', async (req, res, next) => {
       return res.json(ok(result.conversations, result.meta))
     }
 
-    // Busca permissões individuais
     const perms = await getUserPermissions(req.auth.sub, req.auth.tid)
-
-    // Determina filtro de canal
     const allowedChannels = perms?.allowed_channels || []
     const effectiveChannelId = channelId
       || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
 
-    // Determina filtro de conversa
     const conversationAccess = perms?.conversation_access || 'assigned'
     const assignedTo = conversationAccess === 'assigned' ? req.auth.sub : undefined
 
@@ -103,7 +99,6 @@ router.get('/conversations', async (req, res, next) => {
       assignedTo,
       page,
       limit,
-      // Se tem canais permitidos específicos, filtra por eles
       allowedChannels: allowedChannels.length > 0 ? allowedChannels : undefined,
     })
 

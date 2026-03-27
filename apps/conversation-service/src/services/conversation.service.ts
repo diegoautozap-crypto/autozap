@@ -3,12 +3,13 @@ import { logger } from '../lib/logger'
 import { AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
 
 export type ConversationStatus = 'open' | 'waiting' | 'closed'
-export type PipelineStage = 'lead' | 'qualificacao' | 'proposta' | 'negociacao' | 'ganho' | 'perdido'
+export type PipelineStage = string
 
 export interface ConversationFilter {
   status?: ConversationStatus
   assignedTo?: string
   channelId?: string
+  allowedChannels?: string[]
   search?: string
   page?: number
   limit?: number
@@ -31,10 +32,12 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }
 
+const DEFAULT_STAGES = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
+
 export class ConversationService {
 
   async listConversations(tenantId: string, filter: ConversationFilter = {}) {
-    const { status, assignedTo, channelId, page = 1, limit = 30 } = filter
+    const { status, assignedTo, channelId, allowedChannels, page = 1, limit = 30 } = filter
     const offset = (page - 1) * limit
 
     let query = db
@@ -52,6 +55,9 @@ export class ConversationService {
     if (status) query = query.eq('status', status)
     if (assignedTo) query = query.eq('assigned_to', assignedTo)
     if (channelId) query = query.eq('channel_id', channelId)
+    if (allowedChannels && allowedChannels.length > 0) {
+      query = query.in('channel_id', allowedChannels)
+    }
 
     const { data, count, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
@@ -90,10 +96,7 @@ export class ConversationService {
 
     if (error || !data) throw new NotFoundError('Conversation')
     logger.info('Conversation status updated', { conversationId, status })
-
-    // Notifica pipeline e inbox em tempo real
     emitPusher(tenantId, 'conversation.updated', { conversationId, status })
-
     return data
   }
 
@@ -107,13 +110,11 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-
     emitPusher(tenantId, 'conversation.updated', { conversationId, assignedTo: userId })
-
     return data
   }
 
-  async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage) {
+  async updatePipelineStage(conversationId: string, tenantId: string, stage: string) {
     const { data, error } = await db
       .from('conversations')
       .update({ pipeline_stage: stage })
@@ -123,10 +124,7 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-
-    // Notifica o pipeline em tempo real — sem refresh manual
     emitPusher(tenantId, 'conversation.updated', { conversationId, pipelineStage: stage })
-
     return data
   }
 
@@ -156,7 +154,17 @@ export class ConversationService {
   }
 
   async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string) {
-    const stages: PipelineStage[] = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
+    // Busca colunas dinâmicas do banco
+    const { data: dbColumns } = await db
+      .from('pipeline_columns')
+      .select('key, label')
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
+
+    // Usa colunas do banco ou fallback para as padrão
+    const stages = dbColumns && dbColumns.length > 0
+      ? dbColumns.map((c: any) => c.key)
+      : DEFAULT_STAGES
 
     let query = db
       .from('conversations')
@@ -175,11 +183,21 @@ export class ConversationService {
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
+    // Inicializa o board com todas as colunas
     const board: Record<string, any[]> = {}
-    stages.forEach(s => board[s] = [])
+    stages.forEach((s: string) => board[s] = [])
+
+    // Distribui as conversas nas colunas
     ;(data || []).forEach((conv: any) => {
-      const stage = conv.pipeline_stage || 'lead'
-      if (board[stage]) board[stage].push(conv)
+      const stage = conv.pipeline_stage || stages[0] || 'lead'
+      if (board[stage] !== undefined) {
+        board[stage].push(conv)
+      } else {
+        // Conversa em coluna que não existe mais — coloca na primeira coluna
+        const firstStage = stages[0] || 'lead'
+        if (!board[firstStage]) board[firstStage] = []
+        board[firstStage].push(conv)
+      }
     })
 
     return board
