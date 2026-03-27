@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
@@ -73,25 +72,19 @@ export function Sidebar() {
   const role = (user as any)?.role || 'agent'
   const isAdmin = role === 'admin' || role === 'owner'
 
-  // null = ainda carregando, string[] = já carregou
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
-  const [loadingPerms, setLoadingPerms] = useState(false)
 
   const fetchPermissions = useCallback(async () => {
     if (!user) return
     if (isAdmin) { setAllowedPages(ADMIN_PAGES); return }
 
-    setLoadingPerms(true)
     try {
-      // Usa fetch nativo para não passar pelo interceptor do axios
-      // que redireciona para /login em caso de 401
       const token = localStorage.getItem('accessToken')
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!res.ok) {
-        // Mantém permissões anteriores se já tinha carregado
         setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
         return
       }
@@ -107,14 +100,10 @@ export function Sidebar() {
         setAllowedPages(['/dashboard/inbox'])
       }
     } catch {
-      // Mantém permissões anteriores se já tinha carregado
       setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
-    } finally {
-      setLoadingPerms(false)
     }
   }, [user, isAdmin])
 
-  // Busca permissões ao montar e a cada 30s (pega atualizações em tempo real)
   useEffect(() => {
     fetchPermissions()
     if (isAdmin) return
@@ -122,30 +111,21 @@ export function Sidebar() {
     return () => clearInterval(interval)
   }, [fetchPermissions, isAdmin])
 
-  // ── Guard de rota ────────────────────────────────────────────────────────
+  // Guard — bloqueia acesso a páginas não permitidas
   useEffect(() => {
-    // Só roda depois que as permissões carregaram completamente
-    if (allowedPages === null) return
-    // Admin e owner sempre passam
-    if (isAdmin) return
-
+    if (allowedPages === null || isAdmin) return
     const currentAllowed = allowedPages.some(page => {
       if (page === '/dashboard') return pathname === '/dashboard'
       return pathname === page || pathname.startsWith(page + '/')
     })
-
     if (!currentAllowed) {
       toast.error('Você não tem permissão para acessar essa página')
       router.replace('/dashboard/inbox')
     }
-  // Só verifica quando as permissões carregam — não a cada mudança de pathname
-  // para evitar redirect antes de carregar
-  }, [allowedPages, isAdmin, router])
+  }, [allowedPages, isAdmin, router, pathname])
 
   const nav = ALL_NAV.filter(item =>
-    isAdmin
-      ? true
-      : (allowedPages || []).includes(item.href)
+    isAdmin ? true : (allowedPages || []).includes(item.href)
   )
 
   const handleLogout = async () => {
@@ -173,10 +153,9 @@ export function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
-        {/* Mostra skeleton enquanto carrega permissões */}
         {!isAdmin && allowedPages === null ? (
           <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} style={{ height: '36px', borderRadius: '6px', background: '#f3f4f6', animation: 'pulse 1.5s ease-in-out infinite' }} />
             ))}
           </div>
@@ -185,10 +164,10 @@ export function Sidebar() {
             const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             const isErrors = href === '/dashboard/errors'
             return (
-              <button key={href} onClick={() => { console.log('CLICOU:', href); router.push(href) }}
-                style={{ textDecoration: 'none', display: 'block', marginBottom: '1px', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+              <button key={href} onClick={() => router.push(href)}
+                style={{ display: 'block', marginBottom: '1px', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
                 <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
                   onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = isErrors ? '#fef2f2' : '#f9fafb' }}
                   onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                 >
