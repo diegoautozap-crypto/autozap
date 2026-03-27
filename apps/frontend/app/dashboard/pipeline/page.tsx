@@ -167,10 +167,14 @@ function ManageColumnsModal({
 
   const handleSave = async () => {
     setSaving(true)
+    // UUID v4 regex
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
     try {
       // Upsert all columns with new sort_order
+      // Only include id if it's a real UUID (not a default key like 'lead')
       const upserts = localCols.map((col, i) => ({
-        ...(col._isNew ? {} : { id: col.id }),
+        ...((!col._isNew && isUUID(col.id)) ? { id: col.id } : {}),
         tenant_id: tenantId,
         key: col.key,
         label: col.label,
@@ -178,10 +182,10 @@ function ManageColumnsModal({
         sort_order: i,
       }))
 
-      // Delete removed columns
+      // Delete removed columns — only real UUIDs
       const removedIds = columns
         .map(c => c.id)
-        .filter(id => !localCols.find(l => l.id === id))
+        .filter(id => isUUID(id) && !localCols.find(l => l.id === id))
 
       if (removedIds.length > 0) {
         await supabase.from('pipeline_columns').delete().in('id', removedIds)
