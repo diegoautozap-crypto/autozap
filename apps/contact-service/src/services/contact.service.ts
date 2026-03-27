@@ -12,6 +12,7 @@ export interface CreateContactInput {
   company?: string
   origin?: string
   notes?: string
+  metadata?: Record<string, unknown>
   customFields?: Record<string, unknown>
   tagIds?: string[]
 }
@@ -22,6 +23,7 @@ export interface UpdateContactInput {
   company?: string
   notes?: string
   status?: 'active' | 'blocked' | 'unsubscribed'
+  metadata?: Record<string, unknown>
   customFields?: Record<string, unknown>
 }
 
@@ -41,11 +43,10 @@ export class ContactService {
   // ── Create ───────────────────────────────────────────────────────────────
 
   async createContact(input: CreateContactInput) {
-    const { tenantId, phone, name, email, company, origin, notes, customFields, tagIds } = input
+    const { tenantId, phone, name, email, company, origin, notes, metadata, customFields, tagIds } = input
 
     const normalizedPhone = normalizePhone(phone)
 
-    // Check for duplicate
     const { data: existing } = await db
       .from('contacts')
       .select('id')
@@ -66,14 +67,13 @@ export class ContactService {
       company,
       origin: origin || 'manual',
       notes,
-      custom_fields: customFields || {},
+      metadata: metadata || customFields || {},
       status: 'active',
       last_interaction_at: new Date(),
     }).select().single()
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Add tags if provided
     if (tagIds?.length) {
       await this.addTags(contactId, tagIds)
     }
@@ -104,7 +104,7 @@ export class ContactService {
 
     let query = db
       .from('contacts')
-      .select('id, phone, name, email, company, status, origin, last_interaction_at, created_at, contact_tags(tag_id, tags(id, name, color))', { count: 'exact' })
+      .select('id, phone, name, email, company, status, origin, metadata, last_interaction_at, created_at, contact_tags(tag_id, tags(id, name, color))', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .order('last_interaction_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1)
@@ -117,7 +117,6 @@ export class ContactService {
     }
 
     if (tagId) {
-      // Filter by tag via subquery
       const { data: taggedContacts } = await db
         .from('contact_tags')
         .select('contact_id')
@@ -140,12 +139,20 @@ export class ContactService {
   // ── Update ────────────────────────────────────────────────────────────────
 
   async updateContact(contactId: string, tenantId: string, input: UpdateContactInput) {
+    // Aceita tanto metadata quanto customFields (compatibilidade)
+    const metadataValue = input.metadata || input.customFields
+
+    const updatePayload: any = {}
+    if (input.name !== undefined) updatePayload.name = input.name
+    if (input.email !== undefined) updatePayload.email = input.email
+    if (input.company !== undefined) updatePayload.company = input.company
+    if (input.notes !== undefined) updatePayload.notes = input.notes
+    if (input.status !== undefined) updatePayload.status = input.status
+    if (metadataValue !== undefined) updatePayload.metadata = metadataValue
+
     const { data, error } = await db
       .from('contacts')
-      .update({
-        ...input,
-        custom_fields: input.customFields,
-      })
+      .update(updatePayload)
       .eq('id', contactId)
       .eq('tenant_id', tenantId)
       .select()
@@ -212,7 +219,6 @@ export class ContactService {
   }
 
   // ── Import CSV ────────────────────────────────────────────────────────────
-  // Expects parsed rows: [{ phone, name?, email?, company? }]
 
   async importContacts(tenantId: string, rows: any[]): Promise<{ created: number; skipped: number; errors: number }> {
     let created = 0
@@ -222,7 +228,6 @@ export class ContactService {
     for (const row of rows) {
       try {
         if (!row.phone) { errors++; continue }
-
         await this.createContact({
           tenantId,
           phone: row.phone,
