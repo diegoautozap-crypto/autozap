@@ -52,27 +52,33 @@ const TRIGGER_NODES = [
   { type: 'trigger_outside_hours', label: 'Fora do horário' },
 ]
 const ACTION_NODES = [
-  { type: 'send_message',   label: 'Enviar texto' },
-  { type: 'send_image',     label: 'Enviar imagem' },
-  { type: 'send_video',     label: 'Enviar vídeo' },
-  { type: 'send_audio',     label: 'Enviar áudio' },
-  { type: 'send_document',  label: 'Enviar documento' },
+  { type: 'send_message',   label: 'Enviar mensagem' },
   { type: 'input',          label: 'Aguardar resposta' },
-  { type: 'condition',      label: 'Condição (se/senão)' },
+  { type: 'condition',      label: 'Condição' },
   { type: 'ai',             label: 'Inteligência Artificial' },
   { type: 'webhook',        label: 'Webhook' },
   { type: 'wait',           label: 'Espera' },
-  { type: 'add_tag',        label: 'Adicionar tag' },
-  { type: 'remove_tag',     label: 'Remover tag' },
+  { type: 'tag_contact',    label: 'Tags' },
   { type: 'update_contact', label: 'Atualizar contato' },
   { type: 'move_pipeline',  label: 'Mover no funil' },
   { type: 'assign_agent',   label: 'Atribuir agente' },
   { type: 'go_to',          label: 'Ir para outro flow' },
-  { type: 'loop_repeat',    label: 'Loop repetição' },
-  { type: 'loop_retry',     label: 'Loop tentativas' },
-  { type: 'loop_while',     label: 'Loop enquanto' },
+  { type: 'loop',           label: 'Loop' },
   { type: 'end',            label: 'Finalizar flow' },
 ]
+
+// Mapeamento de tipos legados para os novos tipos consolidados
+const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
+  send_image:    { type: 'send_message', subtype: 'image' },
+  send_video:    { type: 'send_message', subtype: 'video' },
+  send_audio:    { type: 'send_message', subtype: 'audio' },
+  send_document: { type: 'send_message', subtype: 'document' },
+  add_tag:       { type: 'tag_contact',  subtype: 'add' },
+  remove_tag:    { type: 'tag_contact',  subtype: 'remove' },
+  loop_repeat:   { type: 'loop',         subtype: 'repeat' },
+  loop_retry:    { type: 'loop',         subtype: 'retry' },
+  loop_while:    { type: 'loop',         subtype: 'while' },
+}
 
 export default function FlowEditorPage() {
   const { id } = useParams()
@@ -112,7 +118,17 @@ export default function FlowEditorPage() {
   useEffect(() => {
     if (!flowData || initialized) return
     setFlowName(flowData.name || '')
-    setNodes((flowData.nodes || []).map((n: any) => ({ id: n.id, type: 'flowNode', position: { x: n.position_x, y: n.position_y }, data: { type: n.type, ...n.data } })))
+    setNodes((flowData.nodes || []).map((n: any) => {
+      // Migrar tipos legados para os novos tipos consolidados
+      const legacy = LEGACY_TYPE_MAP[n.type]
+      const nodeType = legacy ? legacy.type : n.type
+      const nodeSubtype = legacy ? legacy.subtype : (n.data?.subtype || undefined)
+      return {
+        id: n.id, type: 'flowNode',
+        position: { x: n.position_x, y: n.position_y },
+        data: { type: nodeType, ...n.data, ...(nodeSubtype ? { subtype: nodeSubtype } : {}) },
+      }
+    }))
     setEdges((flowData.edges || []).map((e: any) => ({ id: e.id, source: e.source_node, target: e.target_node, sourceHandle: e.source_handle || 'success', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } })))
     setInitialized(true)
   }, [flowData, initialized, setNodes, setEdges])
