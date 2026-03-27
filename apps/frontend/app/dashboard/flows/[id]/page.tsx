@@ -12,6 +12,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { createClient } from '@supabase/supabase-js'
 import { messageApi, contactApi } from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
@@ -97,19 +98,29 @@ const NODE_LABELS: Record<string, string> = {
   end:                   'Finalizar flow',
 }
 
+// ─── Default pipeline stages fallback ────────────────────────────────────────
+const DEFAULT_STAGES = [
+  { key: 'lead',         label: 'Lead' },
+  { key: 'qualificacao', label: 'Qualificação' },
+  { key: 'proposta',     label: 'Proposta' },
+  { key: 'negociacao',   label: 'Negociação' },
+  { key: 'ganho',        label: 'Ganho' },
+  { key: 'perdido',      label: 'Perdido' },
+]
+
 // ─── Tipos para condição múltipla ─────────────────────────────────────────────
 interface ConditionRule {
   id: string
-  field: string        // message | variable | phone | webhook_status
-  fieldName?: string   // nome da variável se field=variable
+  field: string
+  fieldName?: string
   operator: string
   value: string
 }
 
 interface ConditionBranch {
   id: string
-  label: string        // ex: "Celular", "Notebook", "TV"
-  logic: 'AND' | 'OR'  // como as regras dentro deste ramo se combinam
+  label: string
+  logic: 'AND' | 'OR'
   rules: ConditionRule[]
 }
 
@@ -130,7 +141,6 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   const isCondition = data.type === 'condition'
   const [hovered, setHovered] = useState(false)
 
-  // Branches do nó de condição
   const branches: ConditionBranch[] = data.branches || []
 
   const subtitle = () => {
@@ -158,16 +168,12 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'add_tag') return data.tagName || 'Tag não selecionada'
     if (data.type === 'remove_tag') return data.tagName || 'Tag não selecionada'
     if (data.type === 'update_contact') return data.field ? `Atualizar ${data.field}` : 'Campo não definido'
-    if (data.type === 'move_pipeline') return data.stage || 'Etapa não definida'
+    if (data.type === 'move_pipeline') return data.stageLabel || data.stage || 'Etapa não definida'
     if (data.type === 'assign_agent') return 'Transferir para atendente'
     if (data.type === 'go_to') return 'Ir para outro flow'
     if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
     return ''
   }
-
-  // Calcula posições dos handles de condição
-  const totalHandles = branches.length + 1 // branches + fallback
-  const handleSpacing = 100 / (totalHandles + 1)
 
   const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
@@ -182,7 +188,6 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
         transition: 'all 0.15s', position: 'relative',
       }}>
-      {/* Lixeira centralizada acima do nó */}
       <div
         onMouseDown={e => e.stopPropagation()}
         onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
@@ -218,7 +223,6 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </div>
       )}
 
-      {/* Handles de condição múltipla */}
       {isCondition && branches.length > 0 && (
         <>
           {branches.map((branch, i) => {
@@ -243,7 +247,6 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </>
       )}
 
-      {/* Handles legado (quando não tem branches configuradas) */}
       {isCondition && branches.length === 0 && (
         <>
           <Handle type="source" position={Position.Right} id="true"
@@ -268,7 +271,7 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
 
 const nodeTypes = { flowNode: FlowNode }
 
-// ─── Custom Edge com lixeira no hover ────────────────────────────────────────
+// ─── Custom Edge ──────────────────────────────────────────────────────────────
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
   const [hovered, setHovered] = useState(false)
@@ -353,7 +356,7 @@ function MediaUpload({ accept, label, currentUrl, onUploaded }: {
   )
 }
 
-// ─── Painel de condição múltipla ──────────────────────────────────────────────
+// ─── Condition Panel ──────────────────────────────────────────────────────────
 const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 const OPERATORS = [
   { value: 'contains',      label: 'Contém' },
@@ -372,40 +375,21 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
 }) {
   const branches: ConditionBranch[] = d.branches || []
 
-  const updateBranches = (newBranches: ConditionBranch[]) => {
-    onUpdate(nodeId, { branches: newBranches })
-  }
-
-  const addBranch = () => {
-    updateBranches([...branches, defaultBranch(`Caminho ${branches.length + 1}`)])
-  }
-
-  const removeBranch = (branchId: string) => {
-    updateBranches(branches.filter(b => b.id !== branchId))
-  }
-
-  const updateBranch = (branchId: string, changes: Partial<ConditionBranch>) => {
+  const updateBranches = (newBranches: ConditionBranch[]) => onUpdate(nodeId, { branches: newBranches })
+  const addBranch = () => updateBranches([...branches, defaultBranch(`Caminho ${branches.length + 1}`)])
+  const removeBranch = (branchId: string) => updateBranches(branches.filter(b => b.id !== branchId))
+  const updateBranch = (branchId: string, changes: Partial<ConditionBranch>) =>
     updateBranches(branches.map(b => b.id === branchId ? { ...b, ...changes } : b))
-  }
-
-  const addRule = (branchId: string) => {
+  const addRule = (branchId: string) =>
     updateBranches(branches.map(b => b.id === branchId ? {
-      ...b,
-      rules: [...b.rules, { id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }]
+      ...b, rules: [...b.rules, { id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }]
     } : b))
-  }
-
-  const removeRule = (branchId: string, ruleId: string) => {
-    updateBranches(branches.map(b => b.id === branchId ? {
-      ...b, rules: b.rules.filter(r => r.id !== ruleId)
-    } : b))
-  }
-
-  const updateRule = (branchId: string, ruleId: string, changes: Partial<ConditionRule>) => {
+  const removeRule = (branchId: string, ruleId: string) =>
+    updateBranches(branches.map(b => b.id === branchId ? { ...b, rules: b.rules.filter(r => r.id !== ruleId) } : b))
+  const updateRule = (branchId: string, ruleId: string, changes: Partial<ConditionRule>) =>
     updateBranches(branches.map(b => b.id === branchId ? {
       ...b, rules: b.rules.map(r => r.id === ruleId ? { ...r, ...changes } : r)
     } : b))
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -417,38 +401,26 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
         const branchColor = BRANCH_COLORS[bi % BRANCH_COLORS.length]
         return (
           <div key={branch.id} style={{ border: `2px solid ${branchColor}40`, borderRadius: '10px', overflow: 'hidden' }}>
-            {/* Header do caminho */}
             <div style={{ background: `${branchColor}10`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: `1px solid ${branchColor}30` }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: branchColor, flexShrink: 0 }} />
-              <input
-                value={branch.label}
-                onChange={e => updateBranch(branch.id, { label: e.target.value })}
+              <input value={branch.label} onChange={e => updateBranch(branch.id, { label: e.target.value })}
                 style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: branchColor, outline: 'none' }}
-                placeholder="Nome do caminho"
-              />
+                placeholder="Nome do caminho" />
               <select value={branch.logic} onChange={e => updateBranch(branch.id, { logic: e.target.value as 'AND' | 'OR' })}
                 style={{ fontSize: '11px', fontWeight: 700, border: `1px solid ${branchColor}50`, borderRadius: '4px', padding: '2px 4px', background: '#fff', color: branchColor, cursor: 'pointer', outline: 'none', flexShrink: 0 }}>
                 <option value="AND">E (AND)</option>
                 <option value="OR">OU (OR)</option>
               </select>
-              <button
-                onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeBranch(branch.id) }}
-                title="Remover caminho"
+              <button onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
+                onClick={e => { e.stopPropagation(); e.preventDefault(); removeBranch(branch.id) }}
                 style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', padding: '3px 5px', color: '#ef4444', display: 'flex', flexShrink: 0 }}>
                 <X size={13} />
               </button>
             </div>
-
-            {/* Regras do caminho */}
             <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {branch.rules.map((rule, ri) => (
                 <div key={rule.id}>
-                  {ri > 0 && (
-                    <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: branchColor, marginBottom: '6px' }}>
-                      {branch.logic}
-                    </div>
-                  )}
+                  {ri > 0 && <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: branchColor, marginBottom: '6px' }}>{branch.logic}</div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f9fafb', borderRadius: '8px', padding: '8px' }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <select value={rule.field} onChange={e => updateRule(branch.id, rule.id, { field: e.target.value, fieldName: '' })}
@@ -458,17 +430,11 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                         <option value="phone">Telefone</option>
                         <option value="webhook_status">Status webhook</option>
                       </select>
-                      <button
-                        onClick={() => {
-                          if (branch.rules.length === 1) {
-                            // Se for a última regra, limpa os campos em vez de remover
-                            updateRule(branch.id, rule.id, { field: 'message', fieldName: '', operator: 'contains', value: '' })
-                          } else {
-                            removeRule(branch.id, rule.id)
-                          }
-                        }}
-                        title={branch.rules.length === 1 ? 'Limpar regra' : 'Remover regra'}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}
+                      <button onClick={() => {
+                        if (branch.rules.length === 1) {
+                          updateRule(branch.id, rule.id, { field: 'message', fieldName: '', operator: 'contains', value: '' })
+                        } else { removeRule(branch.id, rule.id) }
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}
                         onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
                         <Trash2 size={13} />
@@ -476,8 +442,7 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                     </div>
                     {rule.field === 'variable' && (
                       <input value={rule.fieldName || ''} onChange={e => updateRule(branch.id, rule.id, { fieldName: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}
-                        placeholder="nome da variável (ex: intencao)" />
+                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="nome da variável (ex: intencao)" />
                     )}
                     <select value={rule.operator} onChange={e => updateRule(branch.id, rule.id, { operator: e.target.value })}
                       style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
@@ -485,13 +450,11 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
                     </select>
                     {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
                       <input value={rule.value} onChange={e => updateRule(branch.id, rule.id, { value: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}
-                        placeholder="valor..." />
+                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="valor..." />
                     )}
                   </div>
                 </div>
               ))}
-
               <button onClick={() => addRule(branch.id)}
                 style={{ width: '100%', padding: '5px', background: 'transparent', border: `1px dashed ${branchColor}50`, borderRadius: '6px', color: branchColor, fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                 <Plus size={11} /> Adicionar regra
@@ -501,7 +464,6 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
         )
       })}
 
-      {/* Fallback */}
       <div style={{ border: '2px dashed #d1d5db', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
         <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>Fallback</span>
@@ -517,8 +479,8 @@ function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
 }
 
 // ─── NodeConfigPanel ──────────────────────────────────────────────────────────
-function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
-  node: Node; tags: any[]; flows: any[]
+function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose, onDelete }: {
+  node: Node; tags: any[]; flows: any[]; tenantId: string
   onUpdate: (id: string, data: any) => void
   onClose: () => void
   onDelete: (id: string) => void
@@ -533,6 +495,23 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
     display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280',
     marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em',
   }
+
+  // ── Load pipeline columns from Supabase ──
+  const { data: pipelineColumns = [] } = useQuery({
+    queryKey: ['pipeline-columns-flow', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return DEFAULT_STAGES
+      const { data, error } = await supabase
+        .from('pipeline_columns')
+        .select('key, label')
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+      if (error || !data || data.length === 0) return DEFAULT_STAGES
+      return data as { key: string; label: string }[]
+    },
+    staleTime: 30000,
+    enabled: d.type === 'move_pipeline',
+  })
 
   return (
     <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
@@ -610,9 +589,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             </div>
             <div>
               <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} placeholder="Confira nosso catálogo!"
-                value={d.caption || ''}
-                onChange={e => onUpdate(node.id, { caption: e.target.value })} />
+              <input style={inputStyle} placeholder="Confira nosso catálogo!" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
             </div>
           </>
         )}
@@ -663,16 +640,12 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           </>
         )}
 
-        {/* CONDITION — NOVO com múltiplos caminhos */}
+        {/* CONDITION */}
         {d.type === 'condition' && (
-          <ConditionPanel
-            d={d} nodeId={node.id}
-            inputStyle={inputStyle} labelStyle={labelStyle}
-            onUpdate={onUpdate}
-          />
+          <ConditionPanel d={d} nodeId={node.id} inputStyle={inputStyle} labelStyle={labelStyle} onUpdate={onUpdate} />
         )}
 
-        {/* AI NODE */}
+        {/* AI */}
         {d.type === 'ai' && (
           <>
             <div>
@@ -687,15 +660,12 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             </div>
             <div>
               <label style={labelStyle}>Chave da API OpenAI</label>
-              <input style={inputStyle} placeholder="sk-..." type="password"
-                value={d.apiKey || ''}
-                onChange={e => onUpdate(node.id, { apiKey: e.target.value })} />
+              <input style={inputStyle} placeholder="sk-..." type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} />
               <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Ou configure OPENAI_API_KEY no Railway</p>
             </div>
             <div>
               <label style={labelStyle}>Modelo</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.model || 'gpt-4o-mini'}
-                onChange={e => onUpdate(node.id, { model: e.target.value })}>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.model || 'gpt-4o-mini'} onChange={e => onUpdate(node.id, { model: e.target.value })}>
                 <option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option>
                 <option value="gpt-4o">GPT-4o (mais inteligente)</option>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
@@ -705,45 +675,33 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
               <div>
                 <label style={labelStyle}>Instrução para a IA (system prompt)</label>
                 <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-                  placeholder="Você é um atendente da empresa X. Responda de forma simpática e objetiva."
-                  value={d.systemPrompt || ''}
-                  onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} />
+                  placeholder="Você é um atendente da empresa X."
+                  value={d.systemPrompt || ''} onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} />
               </div>
             )}
             {d.mode === 'classify' && (
               <div>
                 <label style={labelStyle}>Categorias (separadas por vírgula)</label>
                 <input style={inputStyle} placeholder="comprar, suporte, cancelar, outro"
-                  defaultValue={d.classifyOptions || ''}
-                  onBlur={e => onUpdate(node.id, { classifyOptions: e.target.value })} />
+                  defaultValue={d.classifyOptions || ''} onBlur={e => onUpdate(node.id, { classifyOptions: e.target.value })} />
               </div>
             )}
             {d.mode === 'extract' && (
               <div>
                 <label style={labelStyle}>O que extrair</label>
-                <input style={inputStyle} placeholder="o nome completo, o CPF, o endereço..."
-                  value={d.extractField || ''}
-                  onChange={e => onUpdate(node.id, { extractField: e.target.value })} />
+                <input style={inputStyle} placeholder="o nome completo, o CPF..." value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} />
               </div>
             )}
             <div>
               <label style={labelStyle}>Salvar resposta da IA como variável</label>
               <input style={inputStyle} placeholder="intencao, nome_extraido..."
-                value={d.saveAs || ''}
-                onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
-              {d.saveAs && (
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-                  Use {'{{' + d.saveAs + '}}'} nos próximos nós
-                </p>
-              )}
+                value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
             </div>
             {d.mode === 'respond' && (
               <div>
                 <label style={labelStyle}>Mensagens do histórico (contexto)</label>
                 <input type="number" min="5" max="200" style={{ ...inputStyle, maxWidth: '100px' }}
-                  value={d.historyMessages ?? 50}
-                  onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} />
-                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Recomendado: 50</p>
+                  value={d.historyMessages ?? 50} onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} />
               </div>
             )}
           </>
@@ -754,14 +712,11 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           <>
             <div>
               <label style={labelStyle}>URL</label>
-              <input style={inputStyle} placeholder="https://api.seusite.com/webhook"
-                value={d.url || ''}
-                onChange={e => onUpdate(node.id, { url: e.target.value })} />
+              <input style={inputStyle} placeholder="https://api.seusite.com/webhook" value={d.url || ''} onChange={e => onUpdate(node.id, { url: e.target.value })} />
             </div>
             <div>
               <label style={labelStyle}>Método HTTP</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.method || 'POST'}
-                onChange={e => onUpdate(node.id, { method: e.target.value })}>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.method || 'POST'} onChange={e => onUpdate(node.id, { method: e.target.value })}>
                 <option value="POST">POST</option>
                 <option value="GET">GET</option>
                 <option value="PUT">PUT</option>
@@ -771,16 +726,12 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
               <div>
                 <label style={labelStyle}>Body (JSON)</label>
                 <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
-                  placeholder={'{\n  "phone": "{{phone}}"\n}'}
-                  value={d.body || ''}
-                  onChange={e => onUpdate(node.id, { body: e.target.value })} />
+                  placeholder={'{\n  "phone": "{{phone}}"\n}'} value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} />
               </div>
             )}
             <div>
               <label style={labelStyle}>Salvar resposta como variável</label>
-              <input style={inputStyle} placeholder="resposta_webhook"
-                value={d.saveResponseAs || ''}
-                onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
+              <input style={inputStyle} placeholder="resposta_webhook" value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
             </div>
           </>
         )}
@@ -790,18 +741,15 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           <>
             <div>
               <label style={labelStyle}>Segundos</label>
-              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0}
-                onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
+              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
             </div>
             <div>
               <label style={labelStyle}>Minutos</label>
-              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0}
-                onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
+              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
             </div>
             <div>
               <label style={labelStyle}>Horas</label>
-              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0}
-                onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
+              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
             </div>
           </>
         )}
@@ -831,8 +779,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
           <>
             <div>
               <label style={labelStyle}>Campo para atualizar</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.field || 'name'}
-                onChange={e => onUpdate(node.id, { field: e.target.value })}>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.field || 'name'} onChange={e => onUpdate(node.id, { field: e.target.value })}>
                 <option value="name">Nome</option>
                 <option value="phone">Telefone</option>
                 <option value="custom">Campo personalizado</option>
@@ -841,29 +788,32 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             {d.field === 'custom' && (
               <div>
                 <label style={labelStyle}>Nome do campo</label>
-                <input style={inputStyle} placeholder="cargo, empresa, cidade..."
-                  value={d.customField || ''}
-                  onChange={e => onUpdate(node.id, { customField: e.target.value })} />
+                <input style={inputStyle} placeholder="cargo, empresa, cidade..." value={d.customField || ''} onChange={e => onUpdate(node.id, { customField: e.target.value })} />
               </div>
             )}
             <div>
               <label style={labelStyle}>Novo valor</label>
-              <input style={inputStyle} placeholder="{{nome}} ou texto fixo"
-                value={d.value || ''}
-                onChange={e => onUpdate(node.id, { value: e.target.value })} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use variáveis como {'{{nome}}'}</p>
+              <input style={inputStyle} placeholder="{{nome}} ou texto fixo" value={d.value || ''} onChange={e => onUpdate(node.id, { value: e.target.value })} />
             </div>
           </>
         )}
 
-        {/* PIPELINE */}
+        {/* PIPELINE — dinâmico do Supabase */}
         {d.type === 'move_pipeline' && (
           <div>
             <label style={labelStyle}>Etapa do funil</label>
-            <select style={{ ...inputStyle, background: '#fff' }} value={d.stage || 'lead'}
-              onChange={e => onUpdate(node.id, { stage: e.target.value })}>
-              {['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido'].map(s => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            <select style={{ ...inputStyle, background: '#fff' }}
+              value={d.stage || ''}
+              onChange={e => {
+                const selected = pipelineColumns.find((c: any) => c.key === e.target.value)
+                onUpdate(node.id, {
+                  stage: e.target.value,
+                  stageLabel: selected?.label || e.target.value,
+                })
+              }}>
+              <option value="">Selecione uma etapa</option>
+              {pipelineColumns.map((col: any) => (
+                <option key={col.key} value={col.key}>{col.label}</option>
               ))}
             </select>
           </div>
@@ -875,8 +825,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
             <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
               placeholder="Ex: Aguarde, um atendente irá te responder."
-              value={d.message || ''}
-              onChange={e => onUpdate(node.id, { message: e.target.value })} />
+              value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} />
           </div>
         )}
 
@@ -887,12 +836,9 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             {flows.length === 0 ? (
               <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhum outro flow disponível.</p>
             ) : (
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.targetFlowId || ''}
-                onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })}>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.targetFlowId || ''} onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })}>
                 <option value="">Selecione um flow</option>
-                {flows.map((f: any) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
+                {flows.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             )}
             <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>O flow atual para e o flow selecionado começa</p>
@@ -905,8 +851,7 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
             <label style={labelStyle}>Mensagem de encerramento (opcional)</label>
             <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
               placeholder="Ex: Obrigado pelo contato! Até mais 👋"
-              value={d.message || ''}
-              onChange={e => onUpdate(node.id, { message: e.target.value })} />
+              value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} />
           </div>
         )}
       </div>
@@ -921,10 +866,13 @@ function NodeConfigPanel({ node, tags, flows, onUpdate, onClose, onDelete }: {
   )
 }
 
+// ─── Main Editor ──────────────────────────────────────────────────────────────
 export default function FlowEditorPage() {
   const { id } = useParams()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid || process.env.NEXT_PUBLIC_TENANT_ID || ''
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -993,12 +941,10 @@ export default function FlowEditorPage() {
   const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
   const onConnect = useCallback((params: Connection) => {
-    // Determina cor da edge baseado no sourceHandle
     let edgeColor = '#d1d5db'
     if (params.sourceHandle === 'fallback') {
       edgeColor = '#9ca3af'
     } else if (params.sourceHandle?.startsWith('branch_')) {
-      // Busca o índice do branch no nó fonte para aplicar a cor correta
       const sourceNode = nodes.find(n => n.id === params.source)
       const branches = (sourceNode?.data as any)?.branches || []
       const branchId = params.sourceHandle.replace('branch_', '')
@@ -1020,7 +966,6 @@ export default function FlowEditorPage() {
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
-    // Inicializa branches para nó de condição
     const extraData = type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}
     setNodes((nds: Node[]) => [...nds, {
       id: nodeId, type: 'flowNode',
@@ -1045,7 +990,6 @@ export default function FlowEditorPage() {
     setIsDirty(true)
   }
 
-  // Injeta onDelete e nodeId em cada nó para a toolbar funcionar
   const nodesWithDelete = nodes.map(n => ({
     ...n,
     data: { ...n.data, nodeId: n.id, onDelete: deleteNode },
@@ -1154,7 +1098,6 @@ export default function FlowEditorPage() {
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
             <MiniMap nodeColor={(n) => NODE_COLORS[(n.data as any)?.type] || '#e5e7eb'} />
-            {/* Watermark AutoZap */}
             <Panel position="top-left" style={{ pointerEvents: 'none', userSelect: 'none', position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                 <svg width="72" height="72" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.18 }}>
@@ -1178,8 +1121,15 @@ export default function FlowEditorPage() {
         </div>
 
         {selectedNode && (
-          <NodeConfigPanel node={selectedNode} tags={tags} flows={allFlows}
-            onUpdate={updateNodeData} onClose={() => setSelectedNode(null)} onDelete={deleteNode} />
+          <NodeConfigPanel
+            node={selectedNode}
+            tags={tags}
+            flows={allFlows}
+            tenantId={tenantId}
+            onUpdate={updateNodeData}
+            onClose={() => setSelectedNode(null)}
+            onDelete={deleteNode}
+          />
         )}
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
