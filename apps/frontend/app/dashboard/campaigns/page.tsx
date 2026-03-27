@@ -6,13 +6,13 @@ import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone } from 'lucide-react'
 
-const S: Record<string, { color: string; bg: string; dot: string; label: string }> = {
-  running:   { color: '#16a34a', bg: '#F0FDF4', dot: '#16a34a', label: 'Enviando' },
-  completed: { color: '#2563eb', bg: '#EFF6FF', dot: '#2563eb', label: 'Concluída' },
-  draft:     { color: '#6B7280', bg: '#F9FAFB', dot: '#9CA3AF', label: 'Rascunho' },
-  paused:    { color: '#D97706', bg: '#FFFBEB', dot: '#F59E0B', label: 'Pausada'  },
-  failed:    { color: '#DC2626', bg: '#FEF2F2', dot: '#EF4444', label: 'Falhou'   },
-  scheduled: { color: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6', label: 'Agendada' },
+const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
+  running:   { color: '#16a34a', bg: '#F0FDF4', dot: '#16a34a', label: 'Enviando',  bar: '#16a34a' },
+  completed: { color: '#5C6474', bg: '#F4F5F8', dot: '#16a34a', label: 'Concluída', bar: '#16a34a' },
+  draft:     { color: '#9CA5B3', bg: '#F9FAFB', dot: '#D1D5DB', label: 'Rascunho',  bar: '#D1D5DB' },
+  paused:    { color: '#D97706', bg: '#FFFBEB', dot: '#F59E0B', label: 'Pausada',   bar: '#F59E0B' },
+  failed:    { color: '#DC2626', bg: '#FEF2F2', dot: '#EF4444', label: 'Falhou',    bar: '#EF4444' },
+  scheduled: { color: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6', label: 'Agendada',  bar: '#8B5CF6' },
 }
 
 const inp: React.CSSProperties = {
@@ -213,9 +213,11 @@ export default function CampaignsPage() {
                             {new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
-                        <div style={{ height: '2px', background: '#F1F3F7', borderRadius: '99px', overflow: 'hidden', marginTop: '5px', width: '80%' }}>
-                          <div style={{ width: `${p}%`, height: '100%', background: s.color, borderRadius: '99px', transition: 'width 0.4s' }} />
-                        </div>
+                        {camp.status === 'running' && (
+                          <div style={{ height: '2px', background: '#F1F3F7', borderRadius: '99px', overflow: 'hidden', marginTop: '5px', width: '80%' }}>
+                            <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
+                          </div>
+                        )}
                       </div>
                       <span style={{ color: '#374151', fontSize: '13px', fontWeight: 500 }}>{camp.total_contacts.toLocaleString()}</span>
                       <span style={{ color: '#374151', fontSize: '13px', fontWeight: 500 }}>
