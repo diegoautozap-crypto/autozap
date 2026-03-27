@@ -67,7 +67,6 @@ const pipelineSchema = z.object({
 
 // ─── Pipeline CRUD ────────────────────────────────────────────────────────────
 
-// GET /pipelines — lista todas as pipelines do tenant
 router.get('/pipelines', async (req, res, next) => {
   try {
     const { data, error } = await db
@@ -80,7 +79,6 @@ router.get('/pipelines', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /pipelines — cria nova pipeline
 router.post('/pipelines', async (req, res, next) => {
   try {
     const { name } = req.body
@@ -95,7 +93,6 @@ router.post('/pipelines', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /pipelines/:id — renomeia pipeline
 router.patch('/pipelines/:id', async (req, res, next) => {
   try {
     const { name } = req.body
@@ -111,7 +108,6 @@ router.patch('/pipelines/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// DELETE /pipelines/:id — deleta pipeline e suas colunas
 router.delete('/pipelines/:id', async (req, res, next) => {
   try {
     await db.from('pipeline_columns').delete().eq('pipeline_id', req.params.id)
@@ -146,6 +142,51 @@ router.get('/conversations', async (req, res, next) => {
       allowedChannels: allowedChannels.length > 0 ? allowedChannels : undefined,
     })
     res.json(ok(result.conversations, result.meta))
+  } catch (err) { next(err) }
+})
+
+// ─── GET /conversations/counts ────────────────────────────────────────────────
+// Retorna { all, open, waiting, closed } respeitando permissões do usuário
+router.get('/conversations/counts', async (req, res, next) => {
+  try {
+    const { channelId } = req.query as any
+    const role = req.auth.role
+    const tid = req.auth.tid
+
+    const runCount = async (status?: string, assignedTo?: string, allowedChannels?: string[]) => {
+      let q = db
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tid)
+
+      if (status) q = q.eq('status', status)
+      if (channelId) q = q.eq('channel_id', channelId)
+      if (assignedTo) q = q.eq('assigned_to', assignedTo)
+      if (allowedChannels?.length) q = q.in('channel_id', allowedChannels)
+
+      const { count, error } = await q
+      if (error) throw error
+      return count || 0
+    }
+
+    let assignedTo: string | undefined
+    let allowedChannels: string[] | undefined
+
+    if (role !== 'admin' && role !== 'owner') {
+      const perms = await getUserPermissions(req.auth.sub, tid)
+      const conversationAccess = perms?.conversation_access || 'assigned'
+      if (conversationAccess === 'assigned') assignedTo = req.auth.sub
+      if (perms?.allowed_channels?.length) allowedChannels = perms.allowed_channels
+    }
+
+    const [all, open, waiting, closed] = await Promise.all([
+      runCount(undefined, assignedTo, allowedChannels),
+      runCount('open', assignedTo, allowedChannels),
+      runCount('waiting', assignedTo, allowedChannels),
+      runCount('closed', assignedTo, allowedChannels),
+    ])
+
+    res.json(ok({ all, open, waiting, closed }))
   } catch (err) { next(err) }
 })
 

@@ -210,42 +210,15 @@ export default function InboxPage() {
   const visibleChannels = (channels || []).filter((ch: any) => allowedChannels.length === 0 || allowedChannels.includes(ch.id))
 
   // ── Contadores por status ──────────────────────────────────────────────────
-  // FIX: queryKey inclui userId para reinvalidar quando usuário muda.
-  // FIX: atendente (role=agent) só conta conversas atribuídas a ele,
-  //      igual ao que a listagem de conversas já faz no backend.
-  // FIX: badge mostra contagem mesmo quando é 0 (exceto "Todas" quando zerada).
+  // FIX: usa conversationApi (token JWT) em vez de Supabase direto (anon key bloqueada por RLS)
+  // Permissões por role são aplicadas no backend, igual à listagem de conversas
   const { data: statusCounts } = useQuery({
-    queryKey: ['conversations-counts', tenantId, channelFilter, role, userId],
+    queryKey: ['conversations-counts', channelFilter],
     queryFn: async () => {
-      if (!tenantId) return { all: 0, open: 0, waiting: 0, closed: 0 }
-
-      const runCount = async (status?: string) => {
-        let q = supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-
-        if (status) q = q.eq('status', status)
-        if (channelFilter !== 'all') q = q.eq('channel_id', channelFilter)
-
-        // Atendente só enxerga as próprias conversas — igual à listagem
-        if (role === 'agent' && userId) {
-          q = q.eq('assigned_to', userId)
-        }
-
-        const { count } = await q
-        return count || 0
-      }
-
-      const [all, open, waiting, closed] = await Promise.all([
-        runCount(),
-        runCount('open'),
-        runCount('waiting'),
-        runCount('closed'),
-      ])
-      return { all, open, waiting, closed }
+      const params = channelFilter !== 'all' ? `?channelId=${channelFilter}` : ''
+      const { data } = await conversationApi.get(`/conversations/counts${params}`)
+      return data.data as { all: number; open: number; waiting: number; closed: number }
     },
-    enabled: !!tenantId,
     staleTime: 10000,
     refetchInterval: 15000,
   })
