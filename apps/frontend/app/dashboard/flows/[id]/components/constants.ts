@@ -1,7 +1,7 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, AlignLeft, Send,
+  RefreshCw, AlignLeft,
 } from 'lucide-react'
 
 // ─── Tipos consolidados ────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export const NODE_ICONS: Record<string, any> = {
   trigger_first_message: Zap,
   trigger_any_reply:     Reply,
   trigger_outside_hours: Clock,
-  send_message:          Send,
+  send_message:          MessageSquare,
   input:                 AlignLeft,
   condition:             GitBranch,
   ai:                    Brain,
