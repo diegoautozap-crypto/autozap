@@ -94,15 +94,11 @@ export function Sidebar() {
       const json = await res.json()
       const freshRole = json?.data?.role || roleFromStore
 
-      // Se o role mudou, atualiza o store e o estado local — sem precisar relogar
+      // Se o role mudou, atualiza o store e recarrega para garantir que tudo funciona
       if (freshRole !== currentRoleRef.current) {
         currentRoleRef.current = freshRole
-        setCurrentRole(freshRole)
         updateUser({ role: freshRole })
-        // Se virou admin, já seta todas as páginas
-        if (freshRole === 'admin' || freshRole === 'owner') {
-          setAllowedPages(ADMIN_PAGES)
-        }
+        window.location.reload()
         return
       }
 
