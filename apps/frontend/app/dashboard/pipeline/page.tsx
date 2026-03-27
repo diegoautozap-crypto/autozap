@@ -191,9 +191,23 @@ function ManageColumnsModal({
         await supabase.from('pipeline_columns').delete().in('id', removedIds)
       }
 
-      const { error } = await supabase
-        .from('pipeline_columns')
-        .upsert(upserts, { onConflict: 'id' })
+      const toInsert = upserts.filter(u => !u.id)
+      const toUpdate = upserts.filter(u => !!u.id)
+
+      if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from('pipeline_columns').insert(toInsert)
+        if (insErr) throw insErr
+      }
+      if (toUpdate.length > 0) {
+        for (const u of toUpdate) {
+          const { error: updErr } = await supabase
+            .from('pipeline_columns').update({
+              label: u.label, key: u.key, color: u.color, sort_order: u.sort_order,
+            }).eq('id', u.id)
+          if (updErr) throw updErr
+        }
+      }
+      const error = null
 
       if (error) throw error
 
