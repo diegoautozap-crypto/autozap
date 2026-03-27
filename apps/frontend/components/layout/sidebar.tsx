@@ -86,7 +86,6 @@ export function Sidebar() {
       const { data } = await authApi.get('/auth/me')
       const perms = data?.data?.permissions
       if (perms?.allowed_pages?.length > 0) {
-        // Garante que inbox sempre está incluído
         const pages = perms.allowed_pages.includes('/dashboard/inbox')
           ? perms.allowed_pages
           : ['/dashboard/inbox', ...perms.allowed_pages]
@@ -95,7 +94,9 @@ export function Sidebar() {
         setAllowedPages(['/dashboard/inbox'])
       }
     } catch {
-      setAllowedPages(['/dashboard/inbox'])
+      // Não limpa as permissões se já tinha carregado antes — mantém o acesso atual
+      // Só define inbox se for a primeira vez (ainda null)
+      setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
     } finally {
       setLoadingPerms(false)
     }

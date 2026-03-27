@@ -81,7 +81,6 @@ router.post('/resend-verification', validate(forgotSchema), async (req, res, nex
 
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
-    // Retorna também as permissões individuais do usuário
     const { data: perms } = await db
       .from('user_permissions')
       .select('allowed_pages, allowed_channels, campaign_access, conversation_access')
@@ -121,7 +120,6 @@ router.post('/2fa/disable', requireAuth, validate(totpCodeSchema), async (req, r
 
 router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res, next) => {
   try {
-    // Busca membros com suas permissões individuais
     const { data, error } = await db
       .from('users')
       .select(`
@@ -134,7 +132,6 @@ router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res,
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Normaliza user_permissions (pode vir como array)
     const members = (data || []).map((m: any) => ({
       ...m,
       permissions: Array.isArray(m.user_permissions)
@@ -166,7 +163,6 @@ router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate
     })
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Cria permissões padrão baseadas no role
     const defaultPages = role === 'agent'
       ? ['/dashboard/inbox']
       : ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline']
@@ -205,7 +201,6 @@ router.patch('/team/:id', requireAuth, requireRole('admin', 'owner'), validate(u
       .select('id, name, email, role, is_active').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Se o role mudou, reseta permissões para o padrão do novo role
     if (req.body.role !== undefined && req.body.role !== member.role) {
       const newRole = req.body.role
       const defaultPages = newRole === 'agent'
@@ -225,13 +220,13 @@ router.patch('/team/:id', requireAuth, requireRole('admin', 'owner'), validate(u
           updated_at: new Date(),
         }, { onConflict: 'user_id,tenant_id' })
       } else {
-        // admin — remove permissões individuais (admin tem acesso total)
         await db.from('user_permissions').delete()
           .eq('user_id', req.params.id)
           .eq('tenant_id', req.auth.tid)
       }
     }
 
+    // Revoga sessão apenas se desativar o membro
     if (req.body.is_active === false) {
       await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('user_id', req.params.id).is('revoked_at', null)
     }
@@ -274,7 +269,6 @@ router.post('/team/:id/reset-password', requireAuth, requireRole('admin', 'owner
 
 // ─── Permissões individuais por usuário ───────────────────────────────────────
 
-// GET /auth/team/:id/permissions — busca permissões de um membro
 router.get('/team/:id/permissions', requireAuth, requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const { data } = await db
@@ -293,10 +287,8 @@ router.get('/team/:id/permissions', requireAuth, requireRole('admin', 'owner'), 
   } catch (err) { next(err) }
 })
 
-// PATCH /auth/team/:id/permissions — salva permissões individuais
 router.patch('/team/:id/permissions', requireAuth, requireRole('admin', 'owner'), validate(userPermissionsSchema), async (req, res, next) => {
   try {
-    // Verifica que o membro pertence ao tenant
     const { data: member } = await db
       .from('users').select('id, role').eq('id', req.params.id).eq('tenant_id', req.auth.tid).maybeSingle()
     if (!member) throw new AppError('NOT_FOUND', 'Membro não encontrado', 404)
@@ -316,10 +308,8 @@ router.patch('/team/:id/permissions', requireAuth, requireRole('admin', 'owner')
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Revoga sessões para que o usuário recarregue as permissões no próximo login
-    await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('user_id', req.params.id).is('revoked_at', null)
-
-    res.json(ok({ message: 'Permissões salvas. O membro precisará fazer login novamente.' }))
+    // Não revoga sessão — permissões são buscadas dinamicamente pelo frontend a cada 5s
+    res.json(ok({ message: 'Permissões salvas com sucesso.' }))
   } catch (err) { next(err) }
 })
 
