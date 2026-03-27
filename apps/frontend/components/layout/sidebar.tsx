@@ -124,15 +124,13 @@ export function Sidebar() {
 
   // ── Guard de rota ────────────────────────────────────────────────────────
   useEffect(() => {
-    // Enquanto ainda está carregando as permissões, não faz nada
+    // Só roda depois que as permissões carregaram completamente
     if (allowedPages === null) return
     // Admin e owner sempre passam
     if (isAdmin) return
 
     const currentAllowed = allowedPages.some(page => {
-      // Dashboard exige match exato
       if (page === '/dashboard') return pathname === '/dashboard'
-      // Outras páginas aceitam subpaths (ex: /dashboard/inbox/123)
       return pathname === page || pathname.startsWith(page + '/')
     })
 
@@ -140,7 +138,9 @@ export function Sidebar() {
       toast.error('Você não tem permissão para acessar essa página')
       router.replace('/dashboard/inbox')
     }
-  }, [pathname, allowedPages, isAdmin, router])
+  // Só verifica quando as permissões carregam — não a cada mudança de pathname
+  // para evitar redirect antes de carregar
+  }, [allowedPages, isAdmin, router])
 
   const nav = ALL_NAV.filter(item =>
     isAdmin
