@@ -118,18 +118,38 @@ export class FlowEngine {
       edgeMap.get(key)!.push(edge)
     }
 
-    let currentNode = this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
-    let stepCount = 0
+    // Se existe nó de condição pendente (fallback voltou para input), reexecuta a condição
+    let currentNode: any
+    if (state.pending_condition_node_id) {
+      currentNode = nodeMap.get(state.pending_condition_node_id) || null
+      logger.info('Resuming from pending condition node', { nodeId: state.pending_condition_node_id })
+    } else {
+      currentNode = this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
+    }
 
-    while (currentNode && stepCount < 50) {
+    let stepCount = 0
+    const visitedNodes = new Map<string, number>()
+
+    while (currentNode && stepCount < 100) {
+      const visits = visitedNodes.get(currentNode.id) || 0
+      if (visits >= 3) {
+        logger.warn('Flow loop detected, stopping', { nodeId: currentNode.id })
+        break
+      }
+      visitedNodes.set(currentNode.id, visits + 1)
       stepCount++
+
       const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, state.id)
       if (result.paused || result.ended) break
       const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
-    await db.from('flow_states').update({ status: 'completed', updated_at: new Date() }).eq('id', state.id)
+    // Só marca completed se não ficou pausado de novo
+    const { data: updatedState } = await db.from('flow_states').select('status').eq('id', state.id).single()
+    if (updatedState?.status !== 'waiting') {
+      await db.from('flow_states').update({ status: 'completed', pending_condition_node_id: null, updated_at: new Date() }).eq('id', state.id)
+    }
     await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow retomado e executado`)
     return true
   }
@@ -280,6 +300,12 @@ export class FlowEngine {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: question })
           }
           const saveVar = data?.saveAs || 'resposta'
+
+          // Detecta se o próximo nó é uma condição — se sim, salva como pending_condition_node_id
+          // para que o resumeWaitingFlow reexecute a condição quando o usuário responder
+          const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
+          const pendingConditionNodeId = (nextNode?.type === 'condition') ? nextNode.id : null
+
           await db.from('flow_states').upsert({
             id: stateId || generateId(),
             flow_id: flowId,
@@ -287,6 +313,7 @@ export class FlowEngine {
             contact_id: ctx.contactId,
             conversation_id: ctx.conversationId,
             current_node_id: node.id,
+            pending_condition_node_id: pendingConditionNodeId,
             variables,
             waiting_variable: saveVar,
             status: 'waiting',
