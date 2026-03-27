@@ -18,6 +18,7 @@ const createContactSchema = z.object({
   origin: z.string().optional(),
   notes: z.string().optional(),
   tagIds: z.array(z.string().uuid()).optional(),
+  metadata: z.record(z.any()).optional(),
 })
 
 const updateContactSchema = z.object({
@@ -26,6 +27,7 @@ const updateContactSchema = z.object({
   company: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.enum(['active', 'blocked', 'unsubscribed']).optional(),
+  metadata: z.record(z.any()).optional(),
 })
 
 const tagSchema = z.object({
@@ -67,7 +69,7 @@ router.get('/contacts/export', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ✅ DELETE /contacts/all — excluir todos os contatos do tenant
+// DELETE /contacts/all — excluir todos os contatos do tenant
 router.delete('/contacts/all', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const { error, count } = await db
