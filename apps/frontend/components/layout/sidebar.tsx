@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
-import { tenantApi, authApi } from '@/lib/api'
+import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
@@ -83,8 +83,21 @@ export function Sidebar() {
 
     setLoadingPerms(true)
     try {
-      const { data } = await authApi.get('/auth/me')
-      const perms = data?.data?.permissions
+      // Usa fetch nativo para não passar pelo interceptor do axios
+      // que redireciona para /login em caso de 401
+      const token = localStorage.getItem('accessToken')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        // Mantém permissões anteriores se já tinha carregado
+        setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
+        return
+      }
+
+      const json = await res.json()
+      const perms = json?.data?.permissions
       if (perms?.allowed_pages?.length > 0) {
         const pages = perms.allowed_pages.includes('/dashboard/inbox')
           ? perms.allowed_pages
@@ -94,8 +107,7 @@ export function Sidebar() {
         setAllowedPages(['/dashboard/inbox'])
       }
     } catch {
-      // Não limpa as permissões se já tinha carregado antes — mantém o acesso atual
-      // Só define inbox se for a primeira vez (ainda null)
+      // Mantém permissões anteriores se já tinha carregado
       setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
     } finally {
       setLoadingPerms(false)
