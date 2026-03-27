@@ -109,7 +109,6 @@ function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; c
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 
-// ─── Modal de Respostas Rápidas ────────────────────────────────────────────────
 function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
@@ -122,11 +121,7 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   const { data: replies = [], isLoading } = useQuery({
     queryKey: ['quick-replies'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('quick_replies')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false })
+      const { data } = await supabase.from('quick_replies').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })
       return data || []
     },
     enabled: !!tenantId,
@@ -165,57 +160,40 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
           <span style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>Respostas rápidas</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
+          <button onClick={() => setShowForm(!showForm)} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
             <Plus size={12} /> Nova
           </button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex' }}><X size={16} /></button>
         </div>
       </div>
-
       {showForm && (
         <div style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', background: '#fafafa', flexShrink: 0 }}>
-          <input
-            style={{ width: '100%', padding: '7px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box' }}
-            placeholder="Título (ex: Saudação)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
-          <textarea
-            style={{ width: '100%', padding: '7px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', resize: 'none', height: '60px', boxSizing: 'border-box' }}
-            placeholder="Texto da resposta..." value={newBody} onChange={e => setNewBody(e.target.value)} />
+          <input style={{ width: '100%', padding: '7px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box' }} placeholder="Título (ex: Saudação)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          <textarea style={{ width: '100%', padding: '7px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', resize: 'none', height: '60px', boxSizing: 'border-box' }} placeholder="Texto da resposta..." value={newBody} onChange={e => setNewBody(e.target.value)} />
           <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-            <button onClick={() => createMutation.mutate()} disabled={!newTitle || !newBody || createMutation.isPending}
-              style={{ padding: '5px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (!newTitle || !newBody) ? 0.5 : 1 }}>
-              Salvar
-            </button>
+            <button onClick={() => createMutation.mutate()} disabled={!newTitle || !newBody || createMutation.isPending} style={{ padding: '5px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (!newTitle || !newBody) ? 0.5 : 1 }}>Salvar</button>
             <button onClick={() => setShowForm(false)} style={{ padding: '5px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#374151' }}>Cancelar</button>
           </div>
         </div>
       )}
-
       <div style={{ padding: '8px 14px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
-        <input
-          style={{ width: '100%', padding: '6px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
-          placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={{ width: '100%', padding: '6px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {isLoading ? (
           <div style={{ padding: '20px', textAlign: 'center' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-            {replies.length === 0 ? 'Nenhuma resposta rápida criada ainda' : 'Nenhum resultado'}
-          </div>
+          <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>{replies.length === 0 ? 'Nenhuma resposta rápida criada ainda' : 'Nenhum resultado'}</div>
         ) : (
           filtered.map((r: any) => (
-            <div key={r.id}
-              style={{ padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '8px' }}
+            <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '8px' }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f9fafb'}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}>
               <div style={{ flex: 1 }} onClick={() => { onSelect(r.body); onClose() }}>
                 <p style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: '0 0 2px' }}>{r.title}</p>
                 <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.body}</p>
               </div>
-              <button onClick={e => { e.stopPropagation(); deleteMutation.mutate(r.id) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#d1d5db', flexShrink: 0, display: 'flex' }}
+              <button onClick={e => { e.stopPropagation(); deleteMutation.mutate(r.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#d1d5db', flexShrink: 0, display: 'flex' }}
                 onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                 onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d1d5db'}>
                 <Trash2 size={13} />
@@ -233,7 +211,7 @@ export default function InboxPage() {
   const [search, setSearch] = useState('')
   const [messageText, setMessageText] = useState('')
   const [noteText, setNoteText] = useState('')
-  const [inputMode, setInputMode] = useState<'message' | 'note'>('message') // ← nova aba
+  const [inputMode, setInputMode] = useState<'message' | 'note'>('message')
   const [statusFilter, setStatusFilter] = useState('open')
   const [channelFilter, setChannelFilter] = useState('all')
   const [showProfile, setShowProfile] = useState(true)
@@ -255,23 +233,16 @@ export default function InboxPage() {
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const role = (user as any)?.role || 'agent'
 
-  // Busca permissões para filtrar canais permitidos
   const { data: userPerms } = useQuery({
     queryKey: ['my-permissions'],
-    queryFn: async () => {
-      const { data } = await authApi.get('/auth/me')
-      return data?.data?.permissions || null
-    },
+    queryFn: async () => { const { data } = await authApi.get('/auth/me'); return data?.data?.permissions || null },
     enabled: !!user && role !== 'admin' && role !== 'owner',
   })
 
   const allowedChannels: string[] = userPerms?.allowed_channels || []
 
-  // Pré-seleciona canal automaticamente se só tem um permitido
   useEffect(() => {
-    if (allowedChannels.length === 1 && channelFilter === 'all') {
-      setChannelFilter(allowedChannels[0])
-    }
+    if (allowedChannels.length === 1 && channelFilter === 'all') setChannelFilter(allowedChannels[0])
   }, [allowedChannels.join(',')])
 
   const { data: channels } = useQuery({
@@ -279,10 +250,7 @@ export default function InboxPage() {
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data },
   })
 
-  // Filtra canais permitidos para atendentes
-  const visibleChannels = (channels || []).filter((ch: any) =>
-    allowedChannels.length === 0 || allowedChannels.includes(ch.id)
-  )
+  const visibleChannels = (channels || []).filter((ch: any) => allowedChannels.length === 0 || allowedChannels.includes(ch.id))
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
@@ -347,16 +315,10 @@ export default function InboxPage() {
     refetchInterval: 3000,
   })
 
-  // ─── Notas internas ───────────────────────────────────────────────────────
   const { data: notes = [] } = useQuery({
     queryKey: ['notes', selectedConvId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('conversation_notes')
-        .select('*')
-        .eq('conversation_id', selectedConvId)
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: true })
+      const { data, error } = await supabase.from('conversation_notes').select('*').eq('conversation_id', selectedConvId).eq('tenant_id', tenantId).order('created_at', { ascending: true })
       if (error) { console.error('Notes error:', error); return [] }
       return data || []
     },
@@ -365,22 +327,12 @@ export default function InboxPage() {
 
   const saveNoteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('conversation_notes').insert({
-        conversation_id: selectedConvId,
-        tenant_id: tenantId,
-        user_id: (user as any)?.userId,
-        body: noteText,
-      })
+      const { error } = await supabase.from('conversation_notes').insert({ conversation_id: selectedConvId, tenant_id: tenantId, user_id: (user as any)?.userId, body: noteText })
       if (error) throw error
     },
-    onSuccess: () => {
-      toast.success('Nota salva!')
-      setNoteText('')
-      queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] })
-    },
+    onSuccess: () => { toast.success('Nota salva!'); setNoteText(''); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) },
     onError: () => toast.error('Erro ao salvar nota'),
   })
-  // ─────────────────────────────────────────────────────────────────────────
 
   const contactId = selectedConv?.contact_id
   const { data: contactDetail } = useQuery({
@@ -392,20 +344,26 @@ export default function InboxPage() {
   const contactTags = (contactDetail?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
   const botActive = selectedConv?.bot_active !== false
 
-  // ─── Atribuição de atendente ──────────────────────────────────────────────
+  // ── Campos personalizados ──────────────────────────────────────────────────
+  const { data: customFields = [] } = useQuery({
+    queryKey: ['custom-fields-inbox', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return []
+      const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true })
+      return data || []
+    },
+    staleTime: 60000,
+    enabled: !!tenantId && !!contactId,
+  })
+
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
-    queryFn: async () => {
-      const { data } = await authApi.get('/auth/team')
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
     enabled: !!selectedConvId,
   })
 
   const assignMutation = useMutation({
-    mutationFn: async (userId: string | null) => {
-      await conversationApi.patch(`/conversations/${selectedConvId}/assign`, { userId })
-    },
+    mutationFn: async (userId: string | null) => { await conversationApi.patch(`/conversations/${selectedConvId}/assign`, { userId }) },
     onSuccess: () => {
       toast.success('Conversa atribuída!')
       queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
@@ -437,19 +395,13 @@ export default function InboxPage() {
   const sendMutation = useMutation({
     mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
       if (!selectedConv) return
-
-      // Verifica permissão no canal antes de enviar
       if (role !== 'admin' && role !== 'owner' && allowedChannels.length > 0) {
-        if (!allowedChannels.includes(selectedConv.channel_id)) {
-          throw new Error('Sem permissão para enviar neste canal')
-        }
+        if (!allowedChannels.includes(selectedConv.channel_id)) throw new Error('Sem permissão para enviar neste canal')
       }
-
       await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
     onSuccess: () => {
-      setMessageText('')
-      setPendingFile(null)
+      setMessageText(''); setPendingFile(null)
       queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       if (botActive && selectedConvId) {
@@ -624,7 +576,6 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 }}>{getInitials(contactName)}</div>
@@ -660,7 +611,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Banner bot pausado */}
             {!botActive && selectedConv?.status !== 'closed' && (
               <div style={{ padding: '8px 16px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -671,7 +621,6 @@ export default function InboxPage() {
               </div>
             )}
 
-            {/* Mensagens + Notas */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f6f8fa' }}>
               {loadingMessages
                 ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
@@ -693,13 +642,9 @@ export default function InboxPage() {
                   )
                 })
               }
-
-              {/* Notas internas removidas do chat — ficam no painel direito */}
-
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Preview arquivo */}
             {pendingFile && !isRecording && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {pendingFile.contentType === 'image'
@@ -718,29 +663,20 @@ export default function InboxPage() {
               </div>
             )}
 
-            {/* Modal respostas rápidas */}
             {showQuickReplies && (
-              <QuickRepliesModal
-                onSelect={text => { setMessageText(text); setInputMode('message') }}
-                onClose={() => setShowQuickReplies(false)}
-              />
+              <QuickRepliesModal onSelect={text => { setMessageText(text); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />
             )}
 
-            {/* Input */}
             {selectedConv?.status !== 'closed' ? (
               <div style={{ borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0, position: 'relative' }}>
-                {/* Abas mensagem / nota */}
                 <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6' }}>
-                  <button onClick={() => setInputMode('message')}
-                    style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'message' ? '#16a34a' : '#9ca3af', borderBottom: inputMode === 'message' ? '2px solid #16a34a' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <button onClick={() => setInputMode('message')} style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'message' ? '#16a34a' : '#9ca3af', borderBottom: inputMode === 'message' ? '2px solid #16a34a' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <MessageSquare size={12} /> Mensagem
                   </button>
-                  <button onClick={() => setInputMode('note')}
-                    style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'note' ? '#d97706' : '#9ca3af', borderBottom: inputMode === 'note' ? '2px solid #d97706' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <button onClick={() => setInputMode('note')} style={{ padding: '7px 14px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'note' ? '#d97706' : '#9ca3af', borderBottom: inputMode === 'note' ? '2px solid #d97706' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <StickyNote size={12} /> Nota interna
                   </button>
                 </div>
-
                 <div style={{ padding: '10px 14px' }}>
                   {isRecording ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -758,39 +694,30 @@ export default function InboxPage() {
                       <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
                       <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"><Paperclip size={16} /></button>
                       <button onClick={startRecording} style={btnStyle} title="Gravar áudio"><Mic size={16} /></button>
-                      <button onClick={() => setShowQuickReplies(p => !p)}
-                        style={{ ...btnStyle, background: showQuickReplies ? '#f0fdf4' : '#f9fafb', color: showQuickReplies ? '#16a34a' : '#6b7280', border: `1px solid ${showQuickReplies ? '#16a34a' : '#e5e7eb'}` }}
-                        title="Respostas rápidas">
+                      <button onClick={() => setShowQuickReplies(p => !p)} style={{ ...btnStyle, background: showQuickReplies ? '#f0fdf4' : '#f9fafb', color: showQuickReplies ? '#16a34a' : '#6b7280', border: `1px solid ${showQuickReplies ? '#16a34a' : '#e5e7eb'}` }} title="Respostas rápidas">
                         <Zap size={16} />
                       </button>
                       <textarea
                         style={{ flex: 1, padding: '10px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                         placeholder="Digite uma mensagem... (Enter envia)"
-                        value={messageText}
-                        onChange={e => setMessageText(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                        value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={handleKeyDown}
                         onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#fff' }}
                         onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb' }}
                       />
-                      <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()}
-                        style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()} style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#16a34a' : '#e5e7eb', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {sendMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color={messageText.trim() ? '#fff' : '#9ca3af'} />}
                       </button>
                     </div>
                   ) : (
-                    /* Input de nota interna */
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                       <textarea
                         style={{ flex: 1, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', resize: 'none', height: '42px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
                         placeholder="Escreva uma nota interna... (visível só para a equipe)"
-                        value={noteText}
-                        onChange={e => setNoteText(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                        value={noteText} onChange={e => setNoteText(e.target.value)} onKeyDown={handleKeyDown}
                         onFocus={e => { e.currentTarget.style.borderColor = '#d97706' }}
                         onBlur={e => { e.currentTarget.style.borderColor = '#fde68a' }}
                       />
-                      <button onClick={() => saveNoteMutation.mutate()} disabled={saveNoteMutation.isPending || !noteText.trim()}
-                        style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: noteText.trim() ? '#d97706' : '#e5e7eb', border: 'none', cursor: noteText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={() => saveNoteMutation.mutate()} disabled={saveNoteMutation.isPending || !noteText.trim()} style={{ width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0, background: noteText.trim() ? '#d97706' : '#e5e7eb', border: 'none', cursor: noteText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {saveNoteMutation.isPending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <StickyNote size={16} color={noteText.trim() ? '#fff' : '#9ca3af'} />}
                       </button>
                     </div>
@@ -834,6 +761,21 @@ export default function InboxPage() {
                   <div><p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Empresa</p><p style={{ fontSize: '13px', color: '#111827', margin: 0 }}>{contactDetail.company}</p></div>
                 </div>
               )}
+
+              {/* ── Campos personalizados ── */}
+              {(customFields as any[])
+                .filter((cf: any) => contactDetail?.metadata?.[cf.name] != null && contactDetail?.metadata?.[cf.name] !== '')
+                .map((cf: any) => (
+                  <div key={cf.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <User size={13} color="#9ca3af" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>{cf.label}</p>
+                      <p style={{ fontSize: '13px', color: '#111827', margin: 0 }}>{String(contactDetail.metadata[cf.name])}</p>
+                    </div>
+                  </div>
+                ))
+              }
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={13} color="#9ca3af" />
                 <div><p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Última interação</p><p style={{ fontSize: '13px', color: '#111827', margin: 0 }}>{contactDetail?.last_interaction_at ? new Date(contactDetail.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</p></div>
@@ -856,22 +798,15 @@ export default function InboxPage() {
                   </span>
                 </div>
               </div>
-
-              {/* Atribuição de atendente */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <UserCheck size={13} color="#9ca3af" />
                   <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Atendente</p>
                 </div>
-                <select
-                  value={selectedConv?.assigned_to || ''}
-                  onChange={e => assignMutation.mutate(e.target.value || null)}
-                  disabled={assignMutation.isPending}
+                <select value={selectedConv?.assigned_to || ''} onChange={e => assignMutation.mutate(e.target.value || null)} disabled={assignMutation.isPending}
                   style={{ width: '100%', padding: '5px 8px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#374151', outline: 'none', cursor: 'pointer' }}>
                   <option value="">Sem atribuição</option>
-                  {(teamMembers || []).map((m: any) => (
-                    <option key={m.id} value={m.id}>{m.name || m.email}</option>
-                  ))}
+                  {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
                 </select>
               </div>
               {contactTags.length > 0 && (
@@ -882,14 +817,13 @@ export default function InboxPage() {
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                     {contactTags.map((tag: any) => (
-                      <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>
-                        {tag.name}
-                      </span>
+                      <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>
                     ))}
                   </div>
                 </div>
               )}
             </div>
+
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                 <StickyNote size={13} color="#d97706" />
@@ -899,16 +833,12 @@ export default function InboxPage() {
                 <p style={{ fontSize: '12px', color: '#d1d5db', textAlign: 'center', padding: '8px 0' }}>Nenhuma nota ainda</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {notes.map((note: any) => (
+                  {(notes as any[]).map((note: any) => (
                     <div key={note.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
                       <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 4px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <p style={{ fontSize: '10px', color: '#d97706', margin: 0 }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                        <button
-                          onClick={async () => {
-                            await supabase.from('conversation_notes').delete().eq('id', note.id)
-                            queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] })
-                          }}
+                        <button onClick={async () => { await supabase.from('conversation_notes').delete().eq('id', note.id); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) }}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#fde68a', display: 'flex' }}
                           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fde68a'}>
