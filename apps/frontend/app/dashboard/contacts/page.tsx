@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
@@ -80,8 +80,19 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: {
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLSpanElement>(null)
 
   const activeIds = new Set(contactTags.map((t: any) => t.id))
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
+    }
+    setOpen(o => !o)
+  }
 
   const toggle = async (tag: any) => {
     setLoading(tag.id)
@@ -98,8 +109,15 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: {
     setLoading(null)
   }
 
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ display: 'inline-block' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px', alignItems: 'center' }}>
         {contactTags.map((tag: any) => (
           <span key={tag.id} style={{
@@ -111,7 +129,7 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: {
             <span onClick={e => { e.stopPropagation(); toggle(tag) }} style={{ cursor: 'pointer', lineHeight: 1, opacity: 0.6 }}>×</span>
           </span>
         ))}
-        <span onClick={e => { e.stopPropagation(); setOpen(o => !o) }} style={{
+        <span ref={btnRef} onClick={handleOpen} style={{
           fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
           background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb',
           cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px',
@@ -119,14 +137,14 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: {
           <Plus size={9} /> tag
         </span>
       </div>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, zIndex: 100,
-          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,.12)', padding: '6px', minWidth: '160px', marginTop: '4px',
-        }}
+      {open && typeof window !== 'undefined' && (
+        <div
           onClick={e => e.stopPropagation()}
-          onMouseLeave={() => setOpen(false)}
+          style={{
+            position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999,
+            background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,.12)', padding: '6px', minWidth: '160px',
+          }}
         >
           {allTags.length === 0
             ? <p style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>

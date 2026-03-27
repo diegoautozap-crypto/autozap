@@ -181,7 +181,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: {
     queryKey: ['tags-inbox', tenantId],
     queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
     enabled: !!tenantId,
-    staleTime: 60000,
+    staleTime: 5000,
   })
 
   const activeIds = new Set(contactTags.map((t: any) => t.id))
