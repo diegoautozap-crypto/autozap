@@ -22,10 +22,10 @@ interface AuthState {
   logout: () => Promise<void>
   register: (name: string, email: string, password: string, tenantName: string) => Promise<void>
   setTokens: (accessToken: string, refreshToken: string) => void
+  updateUser: (data: Partial<User>) => void
 }
 
 function setAuthCookie(token: string) {
-  // Cookie acessível pelo middleware — 365 dias
   const expires = new Date()
   expires.setFullYear(expires.getFullYear() + 1)
   document.cookie = `accessToken=${token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
@@ -106,6 +106,12 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('refreshToken', refreshToken)
         setAuthCookie(accessToken)
         set({ accessToken, refreshToken })
+      },
+
+      updateUser: (data) => {
+        const current = get().user
+        if (!current) return
+        set({ user: { ...current, ...data } })
       },
     }),
     {

@@ -68,7 +68,7 @@ function UsageBar() {
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { logout, user } = useAuthStore()
+  const { logout, user, updateUser } = useAuthStore()
   const roleFromStore = (user as any)?.role || 'agent'
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
@@ -94,11 +94,15 @@ export function Sidebar() {
       const json = await res.json()
       const freshRole = json?.data?.role || roleFromStore
 
-      // Se o role mudou, recarrega a página automaticamente
+      // Se o role mudou, atualiza o store e o estado local — sem precisar relogar
       if (freshRole !== currentRoleRef.current) {
         currentRoleRef.current = freshRole
         setCurrentRole(freshRole)
-        window.location.reload()
+        updateUser({ role: freshRole })
+        // Se virou admin, já seta todas as páginas
+        if (freshRole === 'admin' || freshRole === 'owner') {
+          setAllowedPages(ADMIN_PAGES)
+        }
         return
       }
 
