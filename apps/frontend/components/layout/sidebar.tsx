@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
@@ -25,7 +25,6 @@ const ALL_NAV = [
   { href: '/dashboard/settings',  label: 'Plano',     icon: Settings },
 ]
 
-// Páginas que admin/owner sempre veem
 const ADMIN_PAGES = ALL_NAV.map(n => n.href)
 
 const ROLE_LABEL: Record<string, string> = {
@@ -72,30 +71,68 @@ export function Sidebar() {
   const router = useRouter()
   const { logout, user } = useAuthStore()
   const role = (user as any)?.role || 'agent'
-  const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
+  const isAdmin = role === 'admin' || role === 'owner'
 
-  useEffect(() => {
+  // null = ainda carregando, string[] = já carregou
+  const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
+  const [loadingPerms, setLoadingPerms] = useState(false)
+
+  const fetchPermissions = useCallback(async () => {
     if (!user) return
-    if (role === 'admin' || role === 'owner') {
-      setAllowedPages(ADMIN_PAGES)
-      return
+    if (isAdmin) { setAllowedPages(ADMIN_PAGES); return }
+
+    setLoadingPerms(true)
+    try {
+      const { data } = await authApi.get('/auth/me')
+      const perms = data?.data?.permissions
+      if (perms?.allowed_pages?.length > 0) {
+        // Garante que inbox sempre está incluído
+        const pages = perms.allowed_pages.includes('/dashboard/inbox')
+          ? perms.allowed_pages
+          : ['/dashboard/inbox', ...perms.allowed_pages]
+        setAllowedPages(pages)
+      } else {
+        setAllowedPages(['/dashboard/inbox'])
+      }
+    } catch {
+      setAllowedPages(['/dashboard/inbox'])
+    } finally {
+      setLoadingPerms(false)
     }
-    authApi.get('/auth/me')
-      .then(({ data }) => {
-        const perms = data?.data?.permissions
-        if (perms?.allowed_pages?.length > 0) {
-          setAllowedPages(perms.allowed_pages)
-        } else {
-          setAllowedPages(role === 'agent' ? ['/dashboard/inbox'] : ['/dashboard/inbox', '/dashboard'])
-        }
-      })
-      .catch(() => {
-        setAllowedPages(role === 'agent' ? ['/dashboard/inbox'] : ['/dashboard/inbox'])
-      })
-  }, [user, role])
+  }, [user, isAdmin])
+
+  // Busca permissões ao montar e a cada 30s (pega atualizações em tempo real)
+  useEffect(() => {
+    fetchPermissions()
+    if (isAdmin) return
+    const interval = setInterval(fetchPermissions, 5_000)
+    return () => clearInterval(interval)
+  }, [fetchPermissions, isAdmin])
+
+  // ── Guard de rota ────────────────────────────────────────────────────────
+  useEffect(() => {
+    // Enquanto ainda está carregando as permissões, não faz nada
+    if (allowedPages === null) return
+    // Admin e owner sempre passam
+    if (isAdmin) return
+
+    const currentAllowed = allowedPages.some(page => {
+      // Dashboard exige match exato
+      if (page === '/dashboard') return pathname === '/dashboard'
+      // Outras páginas aceitam subpaths (ex: /dashboard/inbox/123)
+      return pathname === page || pathname.startsWith(page + '/')
+    })
+
+    if (!currentAllowed) {
+      toast.error('Você não tem permissão para acessar essa página')
+      router.replace('/dashboard/inbox')
+    }
+  }, [pathname, allowedPages, isAdmin, router])
 
   const nav = ALL_NAV.filter(item =>
-    (allowedPages || ['/dashboard/inbox']).includes(item.href)
+    isAdmin
+      ? true
+      : (allowedPages || []).includes(item.href)
   )
 
   const handleLogout = async () => {
@@ -123,26 +160,35 @@ export function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
-        {nav.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-          const isErrors = href === '/dashboard/errors'
-          return (
-            <Link key={href} href={href} style={{ textDecoration: 'none', display: 'block', marginBottom: '1px' }}>
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
-                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = isErrors ? '#fef2f2' : '#f9fafb' }}
-                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
-              >
-                <Icon size={15} strokeWidth={isActive ? 2.5 : 1.8} />
-                <span>{label}</span>
-                {isActive && <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: isErrors ? '#ef4444' : '#16a34a' }} />}
-              </div>
-            </Link>
-          )
-        })}
+        {/* Mostra skeleton enquanto carrega permissões */}
+        {!isAdmin && allowedPages === null ? (
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ height: '36px', borderRadius: '6px', background: '#f3f4f6', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            ))}
+          </div>
+        ) : (
+          nav.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+            const isErrors = href === '/dashboard/errors'
+            return (
+              <Link key={href} href={href} style={{ textDecoration: 'none', display: 'block', marginBottom: '1px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', background: isActive ? (isErrors ? '#fef2f2' : '#f0fdf4') : 'transparent', color: isActive ? (isErrors ? '#ef4444' : '#16a34a') : (isErrors ? '#ef4444' : '#6b7280'), fontSize: '13.5px', fontWeight: isActive ? 600 : 400, transition: 'all 0.1s ease' }}
+                  onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = isErrors ? '#fef2f2' : '#f9fafb' }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                >
+                  <Icon size={15} strokeWidth={isActive ? 2.5 : 1.8} />
+                  <span>{label}</span>
+                  {isActive && <div style={{ marginLeft: 'auto', width: '6px', height: '6px', borderRadius: '50%', background: isErrors ? '#ef4444' : '#16a34a' }} />}
+                </div>
+              </Link>
+            )
+          })
+        )}
       </nav>
 
-      {['owner', 'admin'].includes(role) && <UsageBar />}
+      {isAdmin && <UsageBar />}
 
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #f3f4f6' }}>
         <button
@@ -155,6 +201,10 @@ export function Sidebar() {
           <span>Sair</span>
         </button>
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
     </aside>
   )
 }
