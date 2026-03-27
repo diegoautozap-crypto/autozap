@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string }> = {
   running:   { color: '#16a34a', bg: '#F0FDF4', dot: '#16a34a', label: 'Enviando' },
