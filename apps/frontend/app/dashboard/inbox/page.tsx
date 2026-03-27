@@ -193,6 +193,7 @@ export default function InboxPage() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const role = (user as any)?.role || 'agent'
+  const userId = (user as any)?.userId || (user as any)?.id
 
   const { data: userPerms } = useQuery({
     queryKey: ['my-permissions'],
@@ -209,18 +210,39 @@ export default function InboxPage() {
   const visibleChannels = (channels || []).filter((ch: any) => allowedChannels.length === 0 || allowedChannels.includes(ch.id))
 
   // ── Contadores por status ──────────────────────────────────────────────────
+  // FIX: queryKey inclui userId para reinvalidar quando usuário muda.
+  // FIX: atendente (role=agent) só conta conversas atribuídas a ele,
+  //      igual ao que a listagem de conversas já faz no backend.
+  // FIX: badge mostra contagem mesmo quando é 0 (exceto "Todas" quando zerada).
   const { data: statusCounts } = useQuery({
-    queryKey: ['conversations-counts', tenantId, channelFilter],
+    queryKey: ['conversations-counts', tenantId, channelFilter, role, userId],
     queryFn: async () => {
       if (!tenantId) return { all: 0, open: 0, waiting: 0, closed: 0 }
+
       const runCount = async (status?: string) => {
-        let q = supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+        let q = supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+
         if (status) q = q.eq('status', status)
         if (channelFilter !== 'all') q = q.eq('channel_id', channelFilter)
+
+        // Atendente só enxerga as próprias conversas — igual à listagem
+        if (role === 'agent' && userId) {
+          q = q.eq('assigned_to', userId)
+        }
+
         const { count } = await q
         return count || 0
       }
-      const [all, open, waiting, closed] = await Promise.all([runCount(), runCount('open'), runCount('waiting'), runCount('closed')])
+
+      const [all, open, waiting, closed] = await Promise.all([
+        runCount(),
+        runCount('open'),
+        runCount('waiting'),
+        runCount('closed'),
+      ])
       return { all, open, waiting, closed }
     },
     enabled: !!tenantId,
@@ -477,15 +499,17 @@ export default function InboxPage() {
             </select>
           </div>
         )}
-        {/* Filtros com contadores */}
+        {/* Filtros com contadores — FIX: badge aparece mesmo com count=0 nas abas de status */}
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => {
             const count = statusCounts?.[f.key as keyof typeof statusCounts]
             const isActive = statusFilter === f.key
+            // Mostra badge em todas as abas (exceto "Todas" quando zerada)
+            const showBadge = count != null && (f.key !== 'all' || count > 0)
             return (
               <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 7px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: isActive ? '#16a34a' : 'transparent', color: isActive ? '#fff' : '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {f.label}
-                {count != null && count > 0 && (
+                {showBadge && (
                   <span style={{ fontSize: '10px', fontWeight: 700, background: isActive ? 'rgba(255,255,255,0.25)' : '#f3f4f6', color: isActive ? '#fff' : '#6b7280', padding: '0px 5px', borderRadius: '99px', lineHeight: '16px' }}>
                     {count > 99 ? '99+' : count}
                   </span>
