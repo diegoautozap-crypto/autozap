@@ -1,11 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID!
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -22,6 +30,18 @@ const TAG_COLORS = [
   '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706',
   '#0891b2', '#ea580c', '#65a30d', '#0284c7', '#9333ea',
 ]
+
+type CustomFieldType = 'text' | 'number' | 'date' | 'select'
+
+interface CustomField {
+  id: string
+  name: string
+  label: string
+  type: CustomFieldType
+  options: string[]
+  required: boolean
+  sort_order: number
+}
 
 function getInitials(name: string | undefined | null) {
   return ((name || '??').trim().slice(0, 2)).toUpperCase()
@@ -52,7 +72,162 @@ function ContactTags({ contact }: { contact: any }) {
   )
 }
 
-// ─── Modal de importação Excel ───────────────────────────────────────────────
+function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [fields, setFields] = useState<CustomField[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [dragging, setDragging] = useState<number | null>(null)
+  const [newField, setNewField] = useState({ label: '', type: 'text' as CustomFieldType, options: '', required: false })
+
+  useEffect(() => { loadFields() }, [])
+
+  const loadFields = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true })
+    if (!error && data) setFields(data)
+    setLoading(false)
+  }
+
+  const handleAddField = async () => {
+    if (!newField.label.trim()) return
+    setSaving(true)
+    const name = newField.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    const options = newField.type === 'select' ? newField.options.split(',').map(o => o.trim()).filter(Boolean) : []
+    const { error } = await supabase.from('custom_fields').insert({
+      tenant_id: TENANT_ID, name, label: newField.label.trim(),
+      type: newField.type, options, required: newField.required, sort_order: fields.length,
+    })
+    if (error) toast.error('Erro ao criar campo')
+    else { toast.success('Campo criado!'); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
+    setSaving(false)
+  }
+
+  const handleDeleteField = async (id: string, label: string) => {
+    if (!confirm(`Excluir o campo "${label}"? Os dados preenchidos serão perdidos.`)) return
+    setDeleting(id)
+    const { error } = await supabase.from('custom_fields').delete().eq('id', id)
+    if (error) toast.error('Erro ao excluir campo')
+    else { toast.success('Campo excluído!'); await loadFields(); onSaved() }
+    setDeleting(null)
+  }
+
+  const handleDragStart = (index: number) => setDragging(index)
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (dragging === null || dragging === index) return
+    const reordered = [...fields]
+    const [moved] = reordered.splice(dragging, 1)
+    reordered.splice(index, 0, moved)
+    setFields(reordered)
+    setDragging(index)
+  }
+  const handleDragEnd = async () => {
+    setDragging(null)
+    await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id)))
+    onSaved()
+  }
+
+  const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = { text: 'Texto', number: 'Número', date: 'Data', select: 'Seleção' }
+  const FIELD_TYPE_COLORS: Record<CustomFieldType, { bg: string; color: string }> = {
+    text: { bg: '#eff6ff', color: '#2563eb' }, number: { bg: '#f0fdf4', color: '#16a34a' },
+    date: { bg: '#fef3c7', color: '#d97706' }, select: { bg: '#faf5ff', color: '#7c3aed' },
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>Campos personalizados</h3>
+            <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Adicione campos extras aos seus contatos</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}><X size={16} /></button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Novo campo</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={labelStyle}>Nome do campo</label>
+                <input style={inputStyle} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Tipo</label>
+                <select style={{ ...inputStyle, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}>
+                  <option value="text">Texto</option>
+                  <option value="number">Número</option>
+                  <option value="date">Data</option>
+                  <option value="select">Seleção</option>
+                </select>
+              </div>
+            </div>
+            {newField.type === 'select' && (
+              <div style={{ marginBottom: '10px' }}>
+                <label style={labelStyle}>Opções (separadas por vírgula)</label>
+                <input style={inputStyle} placeholder="Ex: Ativo, Inativo, Pendente" value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} />
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
+                <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} />
+                Campo obrigatório
+              </label>
+              <button onClick={handleAddField} disabled={!newField.label.trim() || saving}
+                style={{ padding: '8px 18px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newField.label.trim() ? 0.5 : 1 }}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
+                Adicionar campo
+              </button>
+            </div>
+          </div>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '30px' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
+          ) : fields.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#9ca3af', fontSize: '14px' }}>Nenhum campo personalizado criado ainda.</div>
+          ) : (
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campos ativos ({fields.length})</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {fields.map((field, index) => {
+                  const typeStyle = FIELD_TYPE_COLORS[field.type]
+                  return (
+                    <div key={field.id} draggable onDragStart={() => handleDragStart(index)} onDragOver={e => handleDragOver(e, index)} onDragEnd={handleDragEnd}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: dragging === index ? '#f5f3ff' : '#fff', border: `1px solid ${dragging === index ? '#7c3aed' : '#e5e7eb'}`, borderRadius: '8px', transition: 'all 0.1s', cursor: 'grab' }}>
+                      <GripVertical size={14} color="#d1d5db" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>{field.label}</span>
+                          {field.required && <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 600 }}>OBRIGATÓRIO</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: typeStyle.bg, color: typeStyle.color }}>{FIELD_TYPE_LABELS[field.type]}</span>
+                          {field.type === 'select' && field.options?.length > 0 && <span style={{ fontSize: '10px', color: '#9ca3af' }}>{field.options.join(' · ')}</span>}
+                          <span style={{ fontSize: '10px', color: '#d1d5db', fontFamily: 'monospace' }}>{field.name}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteField(field.id, field.label)} disabled={deleting === field.id}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                        {deleting === field.id ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '10px' }}>Arraste para reordenar os campos.</p>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [rows, setRows] = useState<any[]>([])
   const [error, setError] = useState('')
@@ -70,21 +245,13 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       const { data } = await contactApi.post('/contacts/import', { rows: payload })
       return data
     },
-    onSuccess: (data) => {
-      const result = data?.data
-      toast.success(`${result?.imported || rows.length} contatos importados com sucesso!`)
-      onSuccess()
-      onClose()
-    },
+    onSuccess: (data) => { toast.success(`${data?.data?.imported || rows.length} contatos importados!`); onSuccess(); onClose() },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
   })
 
   const parseFile = (file: File) => {
     setError('')
-    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      setError('Formato inválido. Use .xlsx, .xls ou .csv')
-      return
-    }
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { setError('Formato inválido. Use .xlsx, .xls ou .csv'); return }
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -93,104 +260,59 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         const ws = wb.Sheets[wb.SheetNames[0]]
         const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
         if (!json.length) { setError('Planilha vazia ou sem dados reconhecidos'); return }
-        setRows(json)
-        setStep('preview')
-      } catch {
-        setError('Erro ao ler o arquivo. Verifique se é um Excel ou CSV válido.')
-      }
+        setRows(json); setStep('preview')
+      } catch { setError('Erro ao ler o arquivo. Verifique se é um Excel ou CSV válido.') }
     }
     reader.readAsArrayBuffer(file)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) parseFile(file)
-  }
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) parseFile(file)
-    e.target.value = ''
-  }
-
-  // Detecta colunas automaticamente
-  const validRows = rows.filter(r => {
-    const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
-    return phone.length >= 8
-  })
+  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) parseFile(file) }
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) parseFile(file); e.target.value = '' }
+  const validRows = rows.filter(r => String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '').length >= 8)
   const invalidCount = rows.length - validRows.length
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
       <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
-
-        {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>Importar contatos via Excel</h3>
             <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Suporte: .xlsx, .xls, .csv</p>
           </div>
-          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}>
-            <X size={16} />
-          </button>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}><X size={16} /></button>
         </div>
-
         <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-
           {step === 'upload' && (
             <>
-              {/* Dropzone */}
-              <div
-                onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
+              <div onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}
                 onClick={() => document.getElementById('excel-input')?.click()}
-                style={{
-                  border: `2px dashed ${isDragging ? '#16a34a' : '#e5e7eb'}`,
-                  borderRadius: '10px', padding: '40px 20px', textAlign: 'center',
-                  background: isDragging ? '#f0fdf4' : '#fafafa',
-                  cursor: 'pointer', transition: 'all 0.15s', marginBottom: '20px',
-                }}>
+                style={{ border: `2px dashed ${isDragging ? '#16a34a' : '#e5e7eb'}`, borderRadius: '10px', padding: '40px 20px', textAlign: 'center', background: isDragging ? '#f0fdf4' : '#fafafa', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '20px' }}>
                 <FileSpreadsheet size={36} color={isDragging ? '#16a34a' : '#d1d5db'} style={{ margin: '0 auto 12px' }} />
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                  {isDragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para selecionar'}
-                </p>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>{isDragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para selecionar'}</p>
                 <p style={{ fontSize: '12px', color: '#9ca3af' }}>.xlsx, .xls ou .csv — até 10MB</p>
                 <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
               </div>
-
               {error && (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} />
                   <span style={{ fontSize: '13px', color: '#dc2626' }}>{error}</span>
                 </div>
               )}
-
-              {/* Instruções */}
               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
                 <p style={{ fontSize: '12px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Colunas reconhecidas automaticamente</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  {[
-                    ['telefone / phone', 'obrigatório'],
-                    ['nome / name', 'opcional'],
-                    ['email', 'opcional'],
-                    ['empresa / company', 'opcional'],
-                  ].map(([col, req]) => (
+                  {[['telefone / phone', 'obrigatório'], ['nome / name', 'opcional'], ['email', 'opcional'], ['empresa / company', 'opcional']].map(([col, req]) => (
                     <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <span style={{ fontSize: '11px', fontFamily: 'monospace', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px' }}>{col}</span>
                       <span style={{ fontSize: '11px', color: req === 'obrigatório' ? '#dc2626' : '#9ca3af' }}>{req}</span>
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>O nome das colunas não precisa ser exato — reconhecemos variações em português e inglês.</p>
               </div>
             </>
           )}
-
           {step === 'preview' && (
             <>
-              {/* Resumo */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{validRows.length}</div>
@@ -201,60 +323,32 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                   <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : '#9ca3af', marginTop: '4px' }}>sem telefone (ignorados)</div>
                 </div>
               </div>
-
-              {invalidCount > 0 && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '14px' }}>
-                  <AlertCircle size={14} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <span style={{ fontSize: '12px', color: '#92400e' }}>Linhas sem telefone válido serão ignoradas na importação.</span>
-                </div>
-              )}
-
-              {/* Preview tabela */}
               <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', marginBottom: '4px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: '8px 12px', gap: '8px' }}>
-                  {['Telefone', 'Nome', 'Email', 'Empresa'].map(h => (
-                    <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                  ))}
+                  {['Telefone', 'Nome', 'Email', 'Empresa'].map(h => <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {validRows.slice(0, 50).map((r, i) => {
                     const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
-                    const name = r.nome || r.name || r.Name || r.Nome || '—'
-                    const email = r.email || r.Email || '—'
-                    const company = r.empresa || r.company || r.Company || r.Empresa || '—'
                     return (
                       <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', padding: '8px 12px', gap: '8px', borderBottom: '1px solid #f9fafb', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <span style={{ fontSize: '12px', color: '#111827', fontFamily: 'monospace' }}>{phone}</span>
-                        <span style={{ fontSize: '12px', color: '#374151' }}>{String(name).slice(0, 20)}</span>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(email).slice(0, 25)}</span>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(company).slice(0, 20)}</span>
+                        <span style={{ fontSize: '12px', color: '#374151' }}>{String(r.nome || r.name || r.Name || r.Nome || '—').slice(0, 20)}</span>
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(r.email || r.Email || '—').slice(0, 25)}</span>
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(r.empresa || r.company || r.Company || r.Empresa || '—').slice(0, 20)}</span>
                       </div>
                     )
                   })}
-                  {validRows.length > 50 && (
-                    <div style={{ padding: '8px 12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center', background: '#f9fafb' }}>
-                      + {validRows.length - 50} contatos não exibidos
-                    </div>
-                  )}
+                  {validRows.length > 50 && <div style={{ padding: '8px 12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center', background: '#f9fafb' }}>+ {validRows.length - 50} contatos não exibidos</div>}
                 </div>
               </div>
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Contatos com telefone duplicado serão atualizados, não duplicados.</p>
+              <p style={{ fontSize: '11px', color: '#9ca3af' }}>Contatos com telefone duplicado serão atualizados, não duplicados.</p>
             </>
           )}
         </div>
-
-        {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          {step === 'preview' && (
-            <button onClick={() => { setStep('upload'); setRows([]) }}
-              style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
-              ← Trocar arquivo
-            </button>
-          )}
-          <button onClick={onClose}
-            style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
-            Cancelar
-          </button>
+          {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>← Trocar arquivo</button>}
+          <button onClick={onClose} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Cancelar</button>
           {step === 'preview' && validRows.length > 0 && (
             <button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}
               style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -267,7 +361,6 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     </div>
   )
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
   const [search, setSearch] = useState('')
@@ -275,13 +368,23 @@ export default function ContactsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showCustomFields, setShowCustomFields] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', email: '', company: '' })
+  const [editForm, setEditForm] = useState<{ name: string; email: string; company: string; metadata: Record<string, any> }>({ name: '', email: '', company: '', metadata: {} })
   const [form, setForm] = useState({ phone: '', name: '', email: '', company: '' })
+  const [createMetadata, setCreateMetadata] = useState<Record<string, any>>({})
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0])
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
   const queryClient = useQueryClient()
+
+  const loadCustomFields = async () => {
+    const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true })
+    if (data) setCustomFields(data)
+  }
+
+  useEffect(() => { loadCustomFields() }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['contacts', search, page],
@@ -303,31 +406,26 @@ export default function ContactsPage() {
     onSuccess: () => { toast.success('Tag criada!'); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) },
     onError: () => toast.error('Erro ao criar tag'),
   })
-
   const deleteTagMutation = useMutation({
     mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) },
     onSuccess: () => { toast.success('Tag excluída!'); queryClient.invalidateQueries({ queryKey: ['tags'] }) },
     onError: () => toast.error('Erro ao excluir tag'),
   })
-
   const createMutation = useMutation({
-    mutationFn: async () => { const { data } = await contactApi.post('/contacts', form); return data },
-    onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }) },
+    mutationFn: async () => { const { data } = await contactApi.post('/contacts', { ...form, metadata: createMetadata }); return data },
+    onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }); setCreateMetadata({}) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro'),
   })
-
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) },
     onSuccess: () => { toast.success('Contato atualizado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar'),
   })
-
   const deleteMutation = useMutation({
     mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) },
     onSuccess: () => { toast.success('Contato(s) excluído(s)!'); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
     onError: () => toast.error('Erro ao excluir'),
   })
-
   const deleteAllMutation = useMutation({
     mutationFn: async () => { await contactApi.delete('/contacts/all') },
     onSuccess: () => { toast.success('Todos os contatos foram excluídos!'); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
@@ -352,11 +450,15 @@ export default function ContactsPage() {
         p++
       }
       if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
-      const rows = allContacts.map((c: any) => ({
-        telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '',
-        tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '),
-        ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
-      }))
+      const rows = allContacts.map((c: any) => {
+        const base: any = {
+          telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '',
+          tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '),
+          ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
+        }
+        customFields.forEach(cf => { base[cf.label] = c.metadata?.[cf.name] ?? '' })
+        return base
+      })
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
@@ -368,25 +470,42 @@ export default function ContactsPage() {
   const handleDelete = (id: string, name: string) => { if (confirm(`Excluir contato "${name}"?`)) deleteMutation.mutate([id]) }
   const handleDeleteSelected = () => { if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected)) }
   const handleDeleteAll = () => { if (confirm(`⚠️ Excluir TODOS os ${meta?.total?.toLocaleString()} contatos? Essa ação não pode ser desfeita.`)) deleteAllMutation.mutate() }
-  const startEdit = (c: any) => { setEditingId(c.id); setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '' }) }
+  const startEdit = (c: any) => { setEditingId(c.id); setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '', metadata: c.metadata || {} }) }
   const saveEdit = () => { if (!editingId) return; updateMutation.mutate({ id: editingId, data: editForm }) }
   const toggleSelect = (id: string) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next) }
   const toggleAll = () => { if (selected.size === contacts.length) setSelected(new Set()); else setSelected(new Set(contacts.map((c: any) => c.id))) }
+
+  const renderCustomFieldInput = (field: CustomField, value: any, onChange: (val: any) => void, compact = false) => {
+    const style = compact ? { ...inputStyle, padding: '6px 10px', fontSize: '13px' } : inputStyle
+    if (field.type === 'select') return (
+      <select style={{ ...style, cursor: 'pointer' }} value={value || ''} onChange={e => onChange(e.target.value)}>
+        <option value="">— selecionar —</option>
+        {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
+    )
+    if (field.type === 'date') return <input type="date" style={style} value={value || ''} onChange={e => onChange(e.target.value)} />
+    if (field.type === 'number') return <input type="number" style={style} value={value || ''} onChange={e => onChange(e.target.value)} placeholder="0" />
+    return <input type="text" style={style} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={field.label} />
+  }
 
   const contacts = data?.data || []
   const meta = data?.meta
   const allSelected = contacts.length > 0 && selected.size === contacts.length
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
 
-  return (
-    <div style={{ padding: '32px', maxWidth: '1200px' }}>
+  const tableColumns = [
+    { key: 'name', label: 'Nome', width: '2.5fr' },
+    { key: 'phone', label: 'Telefone', width: '1.5fr' },
+    { key: 'email', label: 'Email', width: '1.5fr' },
+    ...customFields.map(cf => ({ key: `meta_${cf.name}`, label: cf.label, width: '1fr', customField: cf })),
+    { key: 'last_interaction', label: 'Última interação', width: '1fr' },
+  ]
+  const gridTemplateColumns = `40px ${tableColumns.map(c => c.width).join(' ')} 80px`
 
-      {showImport && (
-        <ImportModal
-          onClose={() => setShowImport(false)}
-          onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }}
-        />
-      )}
+  return (
+    <div style={{ padding: '32px', maxWidth: '1400px' }}>
+      {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
+      {showCustomFields && <CustomFieldsModal onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -394,6 +513,7 @@ export default function ContactsPage() {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>CRM de Contatos</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>
             {meta?.total ? `${meta.total.toLocaleString()} contatos na sua base` : '0 contatos'}
+            {customFields.length > 0 && ` · ${customFields.length} campo${customFields.length > 1 ? 's' : ''} personalizado${customFields.length > 1 ? 's' : ''}`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -410,18 +530,18 @@ export default function ContactsPage() {
               Excluir todos
             </button>
           )}
-          <button onClick={handleExport}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={handleExport} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={13} /> Exportar CSV
           </button>
-          <button onClick={handleExportExcel}
-            style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={handleExportExcel} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <FileSpreadsheet size={13} /> Exportar Excel
           </button>
-          {/* BOTÃO IMPORTAR EXCEL */}
-          <button onClick={() => setShowImport(true)}
-            style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => setShowImport(true)} style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Upload size={13} /> Importar Excel
+          </button>
+          <button onClick={() => setShowCustomFields(true)}
+            style={{ padding: '8px 14px', background: customFields.length > 0 ? '#faf5ff' : '#fff', border: `1px solid ${customFields.length > 0 ? '#a855f7' : '#e5e7eb'}`, borderRadius: '6px', color: customFields.length > 0 ? '#7c3aed' : '#6b7280', fontSize: '13px', fontWeight: customFields.length > 0 ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Settings2 size={13} /> Campos {customFields.length > 0 && `(${customFields.length})`}
           </button>
           <button onClick={() => setShowTags(!showTags)}
             style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -489,6 +609,12 @@ export default function ContactsPage() {
             <div><label style={labelStyle}>Nome</label><input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
             <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div><label style={labelStyle}>Empresa</label><input style={inputStyle} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
+            {customFields.map(cf => (
+              <div key={cf.id}>
+                <label style={labelStyle}>{cf.label}{cf.required && <span style={{ color: '#dc2626', marginLeft: '2px' }}>*</span>}</label>
+                {renderCustomFieldInput(cf, createMetadata[cf.name], val => setCreateMetadata({ ...createMetadata, [cf.name]: val }))}
+              </div>
+            ))}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!form.phone || createMutation.isPending}
@@ -508,7 +634,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto' }}>
         {isLoading ? (
           <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
         ) : contacts.length === 0 ? (
@@ -518,30 +644,43 @@ export default function ContactsPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center', minWidth: '700px' }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
-              {['Nome', 'Telefone', 'Email', 'Última interação', ''].map(h => (
-                <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+              {tableColumns.map(col => (
+                <span key={col.key} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col.label}</span>
               ))}
+              <span></span>
             </div>
             {contacts.map((c: any) => {
               const isEditing = editingId === c.id
               const av = getAvatarColor(c.name)
               return (
-                <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '40px 2.5fr 1.5fr 1.5fr 1fr 80px', gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s' }}>
+                <div key={c.id} style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s', minWidth: '700px' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
+                  {/* Nome */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>{getInitials(c.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {isEditing ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
+                      {isEditing
+                        ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
                         : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><ContactTags contact={c} /></>}
                     </div>
                   </div>
+                  {/* Telefone */}
                   <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
+                  {/* Email */}
                   {isEditing
                     ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
                     : <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>}
+                  {/* Campos personalizados */}
+                  {customFields.map(cf => (
+                    isEditing
+                      ? <div key={cf.id}>{renderCustomFieldInput(cf, editForm.metadata[cf.name], val => setEditForm({ ...editForm, metadata: { ...editForm.metadata, [cf.name]: val } }), true)}</div>
+                      : <span key={cf.id} style={{ color: '#6b7280', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.metadata?.[cf.name] || '—'}</span>
+                  ))}
+                  {/* Última interação */}
                   <span style={{ color: '#9ca3af', fontSize: '12px' }}>{c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</span>
+                  {/* Ações */}
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                       <>
@@ -585,7 +724,7 @@ export default function ContactsPage() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        input:focus { border-color: #16a34a !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.1) !important; }
+        input:focus, select:focus { border-color: #16a34a !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.1) !important; }
       `}</style>
     </div>
   )
