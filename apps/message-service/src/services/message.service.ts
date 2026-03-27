@@ -60,7 +60,12 @@ export class MessageService {
     }).select('id').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     const lastMsg = input.body || `[${input.contentType}]`
-    await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date() }).eq('id', input.conversationId)
+    // Atendente respondeu — conversa vira 'open'
+    await db.from('conversations').update({
+      last_message: lastMsg,
+      last_message_at: new Date(),
+      status: 'open',
+    }).eq('id', input.conversationId)
     emitPusher(input.tenantId, 'conversation.updated', { conversationId: input.conversationId, lastMessage: lastMsg, lastMessageAt: new Date() })
     return messageUuid
   }
@@ -80,9 +85,11 @@ export class MessageService {
       external_id: msg.externalId, status: 'delivered',
       sent_at: msg.timestamp, delivered_at: msg.timestamp,
     })
+    // Cliente mandou mensagem — conversa vira 'waiting'
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
-      last_message_at: msg.timestamp, status: 'open'
+      last_message_at: msg.timestamp,
+      status: 'waiting',
     }).eq('id', conversation.id)
     try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {
       await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
@@ -90,7 +97,6 @@ export class MessageService {
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
     emitPusher(tenantId, 'inbound.message', { conversationId: conversation.id, contactId: contact.id, body: msg.body, contentType: msg.contentType, timestamp: msg.timestamp })
 
-    // ─── Checar se bot está ativo ────────────────────────────────────────────
     const { data: convData } = await db
       .from('conversations')
       .select('bot_active')
@@ -101,7 +107,6 @@ export class MessageService {
       logger.info('Bot pausado — pulando flows e automações', { conversationId: conversation.id, tenantId })
       return
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     const { count: msgCount } = await db
       .from('messages')
@@ -131,7 +136,6 @@ export class MessageService {
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 
-  // ─── Assumir conversa (pausa o bot) ─────────────────────────────────────────
   async takeOver(conversationId: string, tenantId: string): Promise<void> {
     const { error } = await db
       .from('conversations')
@@ -143,7 +147,6 @@ export class MessageService {
     logger.info('Bot pausado — humano assumiu', { conversationId, tenantId })
   }
 
-  // ─── Liberar bot (reativa o bot) ────────────────────────────────────────────
   async releaseBot(conversationId: string, tenantId: string): Promise<void> {
     const { error } = await db
       .from('conversations')
@@ -154,7 +157,6 @@ export class MessageService {
     emitPusher(tenantId, 'conversation.updated', { conversationId, botActive: true })
     logger.info('Bot reativado', { conversationId, tenantId })
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
   async updateStatus(tenantId: string, channelId: string, update: MessageStatusUpdate): Promise<void> {
     const { externalId, status, timestamp, errorMessage, errorCode, phone } = update as any
@@ -246,7 +248,8 @@ export class MessageService {
   private async findOrCreateConversation(tenantId: string, channelId: string, contactId: string, channelType: string) {
     const { data: existing } = await db.from('conversations').select('id, unread_count').eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId).in('status', ['open','waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (existing) return existing
-    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'open', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
+    // Nova conversa começa como 'waiting' — atendente ainda não abriu
+    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }
