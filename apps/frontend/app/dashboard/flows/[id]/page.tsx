@@ -1,308 +1,36 @@
 'use client'
 
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge,
   useNodesState, useEdgesState, Connection, Edge, Node,
-  Panel, BackgroundVariant, MarkerType, Handle, Position,
-  getBezierPath, BaseEdge,
+  Panel, BackgroundVariant, MarkerType, getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { createClient } from '@supabase/supabase-js'
 import { messageApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import {
-  Save, ArrowLeft, Loader2, Zap, MessageSquare, Clock, Tag,
-  MoveRight, UserCheck, Workflow, Image, Video, Music, FileText,
-  Upload, X, Reply, GitBranch, AlignLeft, Webhook, Brain,
-  TagsIcon, UserCog, CornerDownRight, Square, Plus, Trash2,
-} from 'lucide-react'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const NODE_COLORS: Record<string, string> = {
-  trigger_keyword:       '#16a34a',
-  trigger_first_message: '#16a34a',
-  trigger_any_reply:     '#16a34a',
-  trigger_outside_hours: '#16a34a',
-  send_message:          '#2563eb',
-  send_image:            '#0891b2',
-  send_video:            '#7c3aed',
-  send_audio:            '#db2777',
-  send_document:         '#d97706',
-  input:                 '#0284c7',
-  condition:             '#ea580c',
-  ai:                    '#6d28d9',
-  webhook:               '#0f172a',
-  wait:                  '#6b7280',
-  add_tag:               '#0891b2',
-  remove_tag:            '#dc2626',
-  update_contact:        '#0369a1',
-  move_pipeline:         '#d97706',
-  assign_agent:          '#db2777',
-  go_to:                 '#16a34a',
-  end:                   '#dc2626',
-}
-
-const NODE_ICONS: Record<string, any> = {
-  trigger_keyword:       Zap,
-  trigger_first_message: Zap,
-  trigger_any_reply:     Reply,
-  trigger_outside_hours: Clock,
-  send_message:          MessageSquare,
-  send_image:            Image,
-  send_video:            Video,
-  send_audio:            Music,
-  send_document:         FileText,
-  input:                 AlignLeft,
-  condition:             GitBranch,
-  ai:                    Brain,
-  webhook:               Webhook,
-  wait:                  Clock,
-  add_tag:               Tag,
-  remove_tag:            TagsIcon,
-  update_contact:        UserCog,
-  move_pipeline:         MoveRight,
-  assign_agent:          UserCheck,
-  go_to:                 CornerDownRight,
-  end:                   Square,
-}
-
-const NODE_LABELS: Record<string, string> = {
-  trigger_keyword:       'Palavra-chave',
-  trigger_first_message: 'Primeira mensagem',
-  trigger_any_reply:     'Qualquer resposta',
-  trigger_outside_hours: 'Fora do horário',
-  send_message:          'Enviar texto',
-  send_image:            'Enviar imagem',
-  send_video:            'Enviar vídeo',
-  send_audio:            'Enviar áudio',
-  send_document:         'Enviar documento',
-  input:                 'Aguardar resposta',
-  condition:             'Condição (se/senão)',
-  ai:                    'Inteligência Artificial',
-  webhook:               'Webhook',
-  wait:                  'Espera',
-  add_tag:               'Adicionar tag',
-  remove_tag:            'Remover tag',
-  update_contact:        'Atualizar contato',
-  move_pipeline:         'Mover no funil',
-  assign_agent:          'Atribuir agente',
-  go_to:                 'Ir para outro flow',
-  end:                   'Finalizar flow',
-}
-
-// ─── Default pipeline stages fallback ────────────────────────────────────────
-const DEFAULT_STAGES = [
-  { key: 'lead',         label: 'Lead' },
-  { key: 'qualificacao', label: 'Qualificação' },
-  { key: 'proposta',     label: 'Proposta' },
-  { key: 'negociacao',   label: 'Negociação' },
-  { key: 'ganho',        label: 'Ganho' },
-  { key: 'perdido',      label: 'Perdido' },
-]
-
-// ─── Tipos para condição múltipla ─────────────────────────────────────────────
-interface ConditionRule {
-  id: string
-  field: string
-  fieldName?: string
-  operator: string
-  value: string
-}
-
-interface ConditionBranch {
-  id: string
-  label: string
-  logic: 'AND' | 'OR'
-  rules: ConditionRule[]
-}
-
-function defaultBranch(label: string): ConditionBranch {
-  return {
-    id: `branch_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    label,
-    logic: 'AND',
-    rules: [{ id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }],
-  }
-}
-
-// ─── FlowNode ─────────────────────────────────────────────────────────────────
-function FlowNode({ data, selected }: { data: any; selected: boolean }) {
-  const color = NODE_COLORS[data.type] || '#6b7280'
-  const Icon = NODE_ICONS[data.type] || Zap
-  const isTrigger = data.type?.startsWith('trigger_')
-  const isCondition = data.type === 'condition'
-  const [hovered, setHovered] = useState(false)
-
-  const branches: ConditionBranch[] = data.branches || []
-
-  const subtitle = () => {
-    if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || 'Nenhuma palavra'
-    if (data.type === 'trigger_first_message') return 'Primeira mensagem do contato'
-    if (data.type === 'trigger_any_reply') return 'Qualquer mensagem recebida'
-    if (data.type === 'trigger_outside_hours') return `${data.start ?? 9}h – ${data.end ?? 18}h`
-    if (data.type === 'send_message') return (data.message || '').slice(0, 50) || 'Sem mensagem'
-    if (data.type === 'send_image') return data.mediaUrl ? '✓ Imagem carregada' : 'Nenhuma imagem'
-    if (data.type === 'send_video') return data.mediaUrl ? '✓ Vídeo carregado' : 'Nenhum vídeo'
-    if (data.type === 'send_audio') return data.mediaUrl ? '✓ Áudio carregado' : 'Nenhum áudio'
-    if (data.type === 'send_document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
-    if (data.type === 'input') return data.question ? data.question.slice(0, 40) : 'Aguardando resposta...'
-    if (data.type === 'condition') {
-      if (branches.length > 0) return `${branches.length} condição${branches.length > 1 ? 'ões' : ''} + fallback`
-      return 'Configurar condições'
-    }
-    if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
-    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
-    if (data.type === 'wait') {
-      if (data.hours) return `Aguardar ${data.hours}h`
-      if (data.minutes) return `Aguardar ${data.minutes} min`
-      return `Aguardar ${data.seconds ?? 0}s`
-    }
-    if (data.type === 'add_tag') return data.tagName || 'Tag não selecionada'
-    if (data.type === 'remove_tag') return data.tagName || 'Tag não selecionada'
-    if (data.type === 'update_contact') return data.field ? `Atualizar ${data.field}` : 'Campo não definido'
-    if (data.type === 'move_pipeline') return data.stageLabel || data.stage || 'Etapa não definida'
-    if (data.type === 'assign_agent') return 'Transferir para atendente'
-    if (data.type === 'go_to') return 'Ir para outro flow'
-    if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
-    return ''
-  }
-
-  const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: '#fff', border: `2px solid ${selected ? color : '#e5e7eb'}`,
-        borderRadius: '12px', padding: '14px 16px', minWidth: '220px', maxWidth: '260px',
-        minHeight: isCondition && branches.length > 0 ? `${16 + (branches.length + 1) * 36 + 20}px` : 'auto',
-        boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
-        transition: 'all 0.15s', position: 'relative',
-      }}>
-      <div
-        onMouseDown={e => e.stopPropagation()}
-        onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
-        title="Deletar nó"
-        style={{
-          position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-          width: '22px', height: '22px',
-          background: hovered ? '#ef4444' : 'transparent',
-          border: hovered ? 'none' : '2px solid #e5e7eb',
-          borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', boxShadow: hovered ? '0 2px 5px rgba(0,0,0,.2)' : 'none',
-          zIndex: 20, transition: 'all 0.15s',
-        }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={hovered ? '#fff' : '#d1d5db'} strokeWidth="2.5">
-          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-        </svg>
-      </div>
-      {!isTrigger && (
-        <Handle type="target" position={Position.Left}
-          style={{ background: '#d1d5db', width: 10, height: 10, border: '2px solid #fff' }} />
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon size={14} color={color} />
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {isTrigger ? 'Gatilho' : data.type === 'end' ? 'Fim' : 'Ação'}
-          </div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
-            {NODE_LABELS[data.type] || data.type}
-          </div>
-        </div>
-      </div>
-      {data.type === 'send_image' && data.mediaUrl && (
-        <img src={data.mediaUrl} alt="preview" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '6px', marginBottom: '6px' }} />
-      )}
-      {subtitle() && (
-        <div style={{ fontSize: '11px', color: '#9ca3af', background: '#f9fafb', borderRadius: '6px', padding: '5px 8px', wordBreak: 'break-word' }}>
-          {subtitle()}
-        </div>
-      )}
-
-      {isCondition && branches.length > 0 && (
-        <>
-          {branches.map((branch, i) => {
-            const branchColor = BRANCH_COLORS[i % BRANCH_COLORS.length]
-            const topOffset = 16 + i * 36
-            return (
-              <Handle key={branch.id} type="source" position={Position.Right}
-                id={`branch_${branch.id}`}
-                style={{ background: branchColor, width: 14, height: 14, border: '3px solid #fff', position: 'absolute', right: -8, top: topOffset, transform: 'none', zIndex: 10 }} />
-            )
-          })}
-          <Handle type="source" position={Position.Right} id="fallback"
-            style={{ background: '#9ca3af', width: 14, height: 14, border: '3px solid #fff', position: 'absolute', right: -8, top: 16 + branches.length * 36, transform: 'none', zIndex: 10 }} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-            {branches.map((branch, i) => (
-              <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>
-                {branch.label}
-              </span>
-            ))}
-            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>· Fallback</span>
-          </div>
-        </>
-      )}
-
-      {isCondition && branches.length === 0 && (
-        <>
-          <Handle type="source" position={Position.Right} id="true"
-            style={{ background: '#16a34a', width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
-          <Handle type="source" position={Position.Right} id="false"
-            style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
-            <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Sim</span>
-            <span style={{ fontSize: '10px', color: '#6b7280' }}>·</span>
-            <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>✗ Não</span>
-          </div>
-        </>
-      )}
-
-      {!isCondition && data.type !== 'end' && (
-        <Handle type="source" position={Position.Right} id="success"
-          style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
-      )}
-    </div>
-  )
-}
-
-const nodeTypes = { flowNode: FlowNode }
+import { Save, ArrowLeft, Loader2, Workflow } from 'lucide-react'
+import { FlowNode } from './components/FlowNode'
+import { NodeConfigPanel } from './components/NodeConfigPanel'
+import { NODE_COLORS, NODE_ICONS, defaultBranch } from './components/constants'
 
 // ─── Custom Edge ──────────────────────────────────────────────────────────────
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
   const [hovered, setHovered] = useState(false)
-
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
-      <path
-        d={edgePath}
-        style={{ stroke: 'transparent', strokeWidth: 20, fill: 'none', cursor: 'pointer' }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      />
+      <path d={edgePath} style={{ stroke: 'transparent', strokeWidth: 20, fill: 'none', cursor: 'pointer' }}
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} />
       {hovered && (
-        <foreignObject
-          width={28} height={28}
-          x={labelX - 14} y={labelY - 14}
+        <foreignObject width={28} height={28} x={labelX - 14} y={labelY - 14}
           style={{ overflow: 'visible', pointerEvents: 'all' }}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-        >
-          <div
-            onClick={() => data?.onDelete(id)}
+          onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+          <div onClick={() => data?.onDelete(id)}
             style={{ width: '28px', height: '28px', background: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,.2)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
               <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
@@ -314,566 +42,35 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   )
 }
 
+const nodeTypes = { flowNode: FlowNode }
 const edgeTypes = { custom: CustomEdge }
 
-function MediaUpload({ accept, label, currentUrl, onUploaded }: {
-  accept: string; label: string; currentUrl?: string; onUploaded: (url: string) => void
-}) {
-  const [uploading, setUploading] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 20 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 20MB'); return }
-    setUploading(true)
-    try {
-      const ext = file.name.split('.').pop() || 'bin'
-      const path = `flows/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
-      if (error) throw error
-      const { data } = supabase.storage.from('media').getPublicUrl(path)
-      onUploaded(data.publicUrl)
-      toast.success('Arquivo carregado!')
-    } catch (err: any) {
-      toast.error('Erro ao fazer upload: ' + err.message)
-    } finally { setUploading(false) }
-  }
-
-  return (
-    <div>
-      <input ref={inputRef} type="file" accept={accept} style={{ display: 'none' }} onChange={handleFile} />
-      {currentUrl ? (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ flex: 1, fontSize: '12px', color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            ✓ {currentUrl.split('/').pop()}
-          </div>
-          <button onClick={() => inputRef.current?.click()} disabled={uploading}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
-            Trocar
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => inputRef.current?.click()} disabled={uploading}
-          style={{ width: '100%', padding: '12px', background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: '7px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: '#6b7280' }}>
-          {uploading ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={18} />}
-          <span style={{ fontSize: '12px', fontWeight: 500 }}>{uploading ? 'Enviando...' : label}</span>
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Condition Panel ──────────────────────────────────────────────────────────
-const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
-const OPERATORS = [
-  { value: 'contains',      label: 'Contém' },
-  { value: 'not_contains',  label: 'Não contém' },
-  { value: 'equals',        label: 'É igual a' },
-  { value: 'not_equals',    label: 'É diferente de' },
-  { value: 'starts_with',   label: 'Começa com' },
-  { value: 'ends_with',     label: 'Termina com' },
-  { value: 'is_empty',      label: 'Está vazio' },
-  { value: 'is_not_empty',  label: 'Não está vazio' },
+const TRIGGER_NODES = [
+  { type: 'trigger_keyword',       label: 'Palavra-chave' },
+  { type: 'trigger_first_message', label: 'Primeira mensagem' },
+  { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
+  { type: 'trigger_outside_hours', label: 'Fora do horário' },
+]
+const ACTION_NODES = [
+  { type: 'send_message',   label: 'Enviar texto' },
+  { type: 'send_image',     label: 'Enviar imagem' },
+  { type: 'send_video',     label: 'Enviar vídeo' },
+  { type: 'send_audio',     label: 'Enviar áudio' },
+  { type: 'send_document',  label: 'Enviar documento' },
+  { type: 'input',          label: 'Aguardar resposta' },
+  { type: 'condition',      label: 'Condição (se/senão)' },
+  { type: 'ai',             label: 'Inteligência Artificial' },
+  { type: 'webhook',        label: 'Webhook' },
+  { type: 'wait',           label: 'Espera' },
+  { type: 'add_tag',        label: 'Adicionar tag' },
+  { type: 'remove_tag',     label: 'Remover tag' },
+  { type: 'update_contact', label: 'Atualizar contato' },
+  { type: 'move_pipeline',  label: 'Mover no funil' },
+  { type: 'assign_agent',   label: 'Atribuir agente' },
+  { type: 'go_to',          label: 'Ir para outro flow' },
+  { type: 'end',            label: 'Finalizar flow' },
 ]
 
-function ConditionPanel({ d, nodeId, inputStyle, labelStyle, onUpdate }: {
-  d: any; nodeId: string; inputStyle: React.CSSProperties; labelStyle: React.CSSProperties
-  onUpdate: (id: string, data: any) => void
-}) {
-  const branches: ConditionBranch[] = d.branches || []
-
-  const updateBranches = (newBranches: ConditionBranch[]) => onUpdate(nodeId, { branches: newBranches })
-  const addBranch = () => updateBranches([...branches, defaultBranch(`Caminho ${branches.length + 1}`)])
-  const removeBranch = (branchId: string) => updateBranches(branches.filter(b => b.id !== branchId))
-  const updateBranch = (branchId: string, changes: Partial<ConditionBranch>) =>
-    updateBranches(branches.map(b => b.id === branchId ? { ...b, ...changes } : b))
-  const addRule = (branchId: string) =>
-    updateBranches(branches.map(b => b.id === branchId ? {
-      ...b, rules: [...b.rules, { id: `rule_${Date.now()}`, field: 'message', operator: 'contains', value: '' }]
-    } : b))
-  const removeRule = (branchId: string, ruleId: string) =>
-    updateBranches(branches.map(b => b.id === branchId ? { ...b, rules: b.rules.filter(r => r.id !== ruleId) } : b))
-  const updateRule = (branchId: string, ruleId: string, changes: Partial<ConditionRule>) =>
-    updateBranches(branches.map(b => b.id === branchId ? {
-      ...b, rules: b.rules.map(r => r.id === ruleId ? { ...r, ...changes } : r)
-    } : b))
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#15803d' }}>
-        Cada caminho tem suas condições. Se nenhuma bater, vai para o <strong>Fallback</strong>.
-      </div>
-
-      {branches.map((branch, bi) => {
-        const branchColor = BRANCH_COLORS[bi % BRANCH_COLORS.length]
-        return (
-          <div key={branch.id} style={{ border: `2px solid ${branchColor}40`, borderRadius: '10px', overflow: 'hidden' }}>
-            <div style={{ background: `${branchColor}10`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: `1px solid ${branchColor}30` }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: branchColor, flexShrink: 0 }} />
-              <input value={branch.label} onChange={e => updateBranch(branch.id, { label: e.target.value })}
-                style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: branchColor, outline: 'none' }}
-                placeholder="Nome do caminho" />
-              <select value={branch.logic} onChange={e => updateBranch(branch.id, { logic: e.target.value as 'AND' | 'OR' })}
-                style={{ fontSize: '11px', fontWeight: 700, border: `1px solid ${branchColor}50`, borderRadius: '4px', padding: '2px 4px', background: '#fff', color: branchColor, cursor: 'pointer', outline: 'none', flexShrink: 0 }}>
-                <option value="AND">E (AND)</option>
-                <option value="OR">OU (OR)</option>
-              </select>
-              <button onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
-                onClick={e => { e.stopPropagation(); e.preventDefault(); removeBranch(branch.id) }}
-                style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', padding: '3px 5px', color: '#ef4444', display: 'flex', flexShrink: 0 }}>
-                <X size={13} />
-              </button>
-            </div>
-            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {branch.rules.map((rule, ri) => (
-                <div key={rule.id}>
-                  {ri > 0 && <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: branchColor, marginBottom: '6px' }}>{branch.logic}</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f9fafb', borderRadius: '8px', padding: '8px' }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <select value={rule.field} onChange={e => updateRule(branch.id, rule.id, { field: e.target.value, fieldName: '' })}
-                        style={{ ...inputStyle, flex: 1, padding: '5px 8px', fontSize: '12px' }}>
-                        <option value="message">Mensagem</option>
-                        <option value="variable">Variável</option>
-                        <option value="phone">Telefone</option>
-                        <option value="webhook_status">Status webhook</option>
-                      </select>
-                      <button onClick={() => {
-                        if (branch.rules.length === 1) {
-                          updateRule(branch.id, rule.id, { field: 'message', fieldName: '', operator: 'contains', value: '' })
-                        } else { removeRule(branch.id, rule.id) }
-                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', flexShrink: 0 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                    {rule.field === 'variable' && (
-                      <input value={rule.fieldName || ''} onChange={e => updateRule(branch.id, rule.id, { fieldName: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="nome da variável (ex: intencao)" />
-                    )}
-                    <select value={rule.operator} onChange={e => updateRule(branch.id, rule.id, { operator: e.target.value })}
-                      style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
-                      {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-                    </select>
-                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
-                      <input value={rule.value} onChange={e => updateRule(branch.id, rule.id, { value: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="valor..." />
-                    )}
-                  </div>
-                </div>
-              ))}
-              <button onClick={() => addRule(branch.id)}
-                style={{ width: '100%', padding: '5px', background: 'transparent', border: `1px dashed ${branchColor}50`, borderRadius: '6px', color: branchColor, fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                <Plus size={11} /> Adicionar regra
-              </button>
-            </div>
-          </div>
-        )
-      })}
-
-      <div style={{ border: '2px dashed #d1d5db', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
-        <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>Fallback</span>
-        <span style={{ fontSize: '11px', color: '#d1d5db' }}>— quando nenhuma condição bater</span>
-      </div>
-
-      <button onClick={addBranch}
-        style={{ width: '100%', padding: '8px', background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: '8px', color: '#6b7280', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-        <Plus size={13} /> Adicionar caminho
-      </button>
-    </div>
-  )
-}
-
-// ─── NodeConfigPanel ──────────────────────────────────────────────────────────
-function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose, onDelete }: {
-  node: Node; tags: any[]; flows: any[]; tenantId: string
-  onUpdate: (id: string, data: any) => void
-  onClose: () => void
-  onDelete: (id: string) => void
-}) {
-  const d = node.data as any
-  const color = NODE_COLORS[d.type] || '#6b7280'
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', background: '#f9fafb', border: '1px solid #e5e7eb',
-    borderRadius: '7px', fontSize: '13px', outline: 'none', color: '#111827',
-  }
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280',
-    marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em',
-  }
-
-  // ── Load pipeline columns from Supabase ──
-  const { data: pipelineColumns = [] } = useQuery({
-    queryKey: ['pipeline-columns-flow', tenantId],
-    queryFn: async () => {
-      if (!tenantId) return DEFAULT_STAGES
-      const { data, error } = await supabase
-        .from('pipeline_columns')
-        .select('key, label')
-        .eq('tenant_id', tenantId)
-        .order('sort_order', { ascending: true })
-      if (error || !data || data.length === 0) return DEFAULT_STAGES
-      return data as { key: string; label: string }[]
-    },
-    staleTime: 0,
-  })
-
-  return (
-    <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e5e7eb', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
-      onMouseDown={e => e.stopPropagation()}
-      onClick={e => e.stopPropagation()}
-    >
-      <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-            {d.type?.startsWith('trigger_') ? 'Gatilho' : d.type === 'end' ? 'Fim' : 'Ação'}
-          </div>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{NODE_LABELS[d.type] || d.type}</div>
-        </div>
-        <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
-          <X size={15} color="#6b7280" />
-        </button>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-        {/* GATILHOS */}
-        {d.type === 'trigger_keyword' && (
-          <div>
-            <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
-            <input style={inputStyle} placeholder="preço, valor, info"
-              defaultValue={(d.keywords || []).join(', ')}
-              onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Clique fora do campo para salvar</p>
-          </div>
-        )}
-        {d.type === 'trigger_first_message' && (
-          <div>
-            <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
-            <input style={inputStyle} placeholder="Deixe vazio para qualquer mensagem"
-              defaultValue={(d.keywords || []).join(', ')}
-              onBlur={e => onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })} />
-          </div>
-        )}
-        {d.type === 'trigger_any_reply' && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px' }}>
-            <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500 }}>Dispara quando o contato enviar qualquer mensagem.</p>
-          </div>
-        )}
-        {d.type === 'trigger_outside_hours' && (
-          <>
-            <div>
-              <label style={labelStyle}>Início do expediente (hora)</label>
-              <input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9}
-                onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Fim do expediente (hora)</label>
-              <input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18}
-                onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} />
-            </div>
-          </>
-        )}
-
-        {/* SEND */}
-        {d.type === 'send_message' && (
-          <div>
-            <label style={labelStyle}>Mensagem</label>
-            <textarea style={{ ...inputStyle, minHeight: '120px', resize: 'vertical' as any }}
-              placeholder="Olá {{nome}}! Como posso ajudar?"
-              value={d.message || ''}
-              onChange={e => onUpdate(node.id, { message: e.target.value })} />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{variavel}}'} para personalizar</p>
-          </div>
-        )}
-        {d.type === 'send_image' && (
-          <>
-            <div>
-              <label style={labelStyle}>Imagem</label>
-              <MediaUpload accept="image/*" label="Upload de imagem" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Legenda (opcional)</label>
-              <input style={inputStyle} placeholder="Confira nosso catálogo!" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} />
-            </div>
-          </>
-        )}
-        {d.type === 'send_video' && (
-          <div>
-            <label style={labelStyle}>Vídeo</label>
-            <MediaUpload accept="video/*" label="Upload de vídeo" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
-          </div>
-        )}
-        {d.type === 'send_audio' && (
-          <div>
-            <label style={labelStyle}>Áudio</label>
-            <MediaUpload accept="audio/*" label="Upload de áudio" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
-          </div>
-        )}
-        {d.type === 'send_document' && (
-          <>
-            <div>
-              <label style={labelStyle}>Documento</label>
-              <MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Upload de documento" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Nome do arquivo</label>
-              <input style={inputStyle} placeholder="catalogo.pdf" value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} />
-            </div>
-          </>
-        )}
-
-        {/* INPUT */}
-        {d.type === 'input' && (
-          <>
-            <div>
-              <label style={labelStyle}>Pergunta para o usuário</label>
-              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-                placeholder="Ex: Qual é o seu nome?"
-                value={d.question || ''}
-                onChange={e => onUpdate(node.id, { question: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Salvar resposta como variável</label>
-              <input style={inputStyle} placeholder="nome"
-                value={d.saveAs || ''}
-                onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-                Use {'{{' + (d.saveAs || 'variavel') + '}}'} nos próximos nós
-              </p>
-            </div>
-          </>
-        )}
-
-        {/* CONDITION */}
-        {d.type === 'condition' && (
-          <ConditionPanel d={d} nodeId={node.id} inputStyle={inputStyle} labelStyle={labelStyle} onUpdate={onUpdate} />
-        )}
-
-        {/* AI */}
-        {d.type === 'ai' && (
-          <>
-            <div>
-              <label style={labelStyle}>Modo</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.mode || 'respond'}
-                onChange={e => onUpdate(node.id, { mode: e.target.value })}>
-                <option value="respond">Responder automaticamente</option>
-                <option value="classify">Classificar intenção</option>
-                <option value="extract">Extrair dado da mensagem</option>
-                <option value="summarize">Resumir mensagem</option>
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Chave da API OpenAI</label>
-              <input style={inputStyle} placeholder="sk-..." type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Ou configure OPENAI_API_KEY no Railway</p>
-            </div>
-            <div>
-              <label style={labelStyle}>Modelo</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.model || 'gpt-4o-mini'} onChange={e => onUpdate(node.id, { model: e.target.value })}>
-                <option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option>
-                <option value="gpt-4o">GPT-4o (mais inteligente)</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              </select>
-            </div>
-            {d.mode === 'respond' && (
-              <div>
-                <label style={labelStyle}>Instrução para a IA (system prompt)</label>
-                <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-                  placeholder="Você é um atendente da empresa X."
-                  value={d.systemPrompt || ''} onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} />
-              </div>
-            )}
-            {d.mode === 'classify' && (
-              <div>
-                <label style={labelStyle}>Categorias (separadas por vírgula)</label>
-                <input style={inputStyle} placeholder="comprar, suporte, cancelar, outro"
-                  defaultValue={d.classifyOptions || ''} onBlur={e => onUpdate(node.id, { classifyOptions: e.target.value })} />
-              </div>
-            )}
-            {d.mode === 'extract' && (
-              <div>
-                <label style={labelStyle}>O que extrair</label>
-                <input style={inputStyle} placeholder="o nome completo, o CPF..." value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} />
-              </div>
-            )}
-            <div>
-              <label style={labelStyle}>Salvar resposta da IA como variável</label>
-              <input style={inputStyle} placeholder="intencao, nome_extraido..."
-                value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
-            </div>
-            {d.mode === 'respond' && (
-              <div>
-                <label style={labelStyle}>Mensagens do histórico (contexto)</label>
-                <input type="number" min="5" max="200" style={{ ...inputStyle, maxWidth: '100px' }}
-                  value={d.historyMessages ?? 50} onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* WEBHOOK */}
-        {d.type === 'webhook' && (
-          <>
-            <div>
-              <label style={labelStyle}>URL</label>
-              <input style={inputStyle} placeholder="https://api.seusite.com/webhook" value={d.url || ''} onChange={e => onUpdate(node.id, { url: e.target.value })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Método HTTP</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.method || 'POST'} onChange={e => onUpdate(node.id, { method: e.target.value })}>
-                <option value="POST">POST</option>
-                <option value="GET">GET</option>
-                <option value="PUT">PUT</option>
-              </select>
-            </div>
-            {(d.method || 'POST') !== 'GET' && (
-              <div>
-                <label style={labelStyle}>Body (JSON)</label>
-                <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any, fontFamily: 'monospace', fontSize: '12px' }}
-                  placeholder={'{\n  "phone": "{{phone}}"\n}'} value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} />
-              </div>
-            )}
-            <div>
-              <label style={labelStyle}>Salvar resposta como variável</label>
-              <input style={inputStyle} placeholder="resposta_webhook" value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} />
-            </div>
-          </>
-        )}
-
-        {/* WAIT */}
-        {d.type === 'wait' && (
-          <>
-            <div>
-              <label style={labelStyle}>Segundos</label>
-              <input type="number" min="0" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Minutos</label>
-              <input type="number" min="0" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} />
-            </div>
-            <div>
-              <label style={labelStyle}>Horas</label>
-              <input type="number" min="0" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} />
-            </div>
-          </>
-        )}
-
-        {/* TAGS */}
-        {(d.type === 'add_tag' || d.type === 'remove_tag') && (
-          <div>
-            <label style={labelStyle}>{d.type === 'add_tag' ? 'Tag para adicionar' : 'Tag para remover'}</label>
-            {tags.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhuma tag cadastrada.</p>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {tags.map((tag: any) => (
-                  <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `2px solid ${d.tagId === tag.id ? (tag.color || '#0891b2') : '#e5e7eb'}`, background: d.tagId === tag.id ? `${tag.color || '#0891b2'}15` : '#fff', fontSize: '12px', fontWeight: 500 }}>
-                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                    <span style={{ color: d.tagId === tag.id ? (tag.color || '#0891b2') : '#374151' }}>{tag.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* UPDATE CONTACT */}
-        {d.type === 'update_contact' && (
-          <>
-            <div>
-              <label style={labelStyle}>Campo para atualizar</label>
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.field || 'name'} onChange={e => onUpdate(node.id, { field: e.target.value })}>
-                <option value="name">Nome</option>
-                <option value="phone">Telefone</option>
-                <option value="custom">Campo personalizado</option>
-              </select>
-            </div>
-            {d.field === 'custom' && (
-              <div>
-                <label style={labelStyle}>Nome do campo</label>
-                <input style={inputStyle} placeholder="cargo, empresa, cidade..." value={d.customField || ''} onChange={e => onUpdate(node.id, { customField: e.target.value })} />
-              </div>
-            )}
-            <div>
-              <label style={labelStyle}>Novo valor</label>
-              <input style={inputStyle} placeholder="{{nome}} ou texto fixo" value={d.value || ''} onChange={e => onUpdate(node.id, { value: e.target.value })} />
-            </div>
-          </>
-        )}
-
-        {/* PIPELINE — dinâmico do Supabase */}
-        {d.type === 'move_pipeline' && (
-          <div>
-            <label style={labelStyle}>Etapa do funil</label>
-            <select style={{ ...inputStyle, background: '#fff' }}
-              value={d.stage || ''}
-              onChange={e => {
-                const selected = pipelineColumns.find((c: any) => c.key === e.target.value)
-                onUpdate(node.id, {
-                  stage: e.target.value,
-                  stageLabel: selected?.label || e.target.value,
-                })
-              }}>
-              <option value="">Selecione uma etapa</option>
-              {pipelineColumns.map((col: any) => (
-                <option key={col.key} value={col.key}>{col.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* ASSIGN AGENT */}
-        {d.type === 'assign_agent' && (
-          <div>
-            <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
-            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-              placeholder="Ex: Aguarde, um atendente irá te responder."
-              value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} />
-          </div>
-        )}
-
-        {/* GO TO */}
-        {d.type === 'go_to' && (
-          <div>
-            <label style={labelStyle}>Flow de destino</label>
-            {flows.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#9ca3af' }}>Nenhum outro flow disponível.</p>
-            ) : (
-              <select style={{ ...inputStyle, background: '#fff' }} value={d.targetFlowId || ''} onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })}>
-                <option value="">Selecione um flow</option>
-                {flows.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            )}
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>O flow atual para e o flow selecionado começa</p>
-          </div>
-        )}
-
-        {/* END */}
-        {d.type === 'end' && (
-          <div>
-            <label style={labelStyle}>Mensagem de encerramento (opcional)</label>
-            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as any }}
-              placeholder="Ex: Obrigado pelo contato! Até mais 👋"
-              value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} />
-          </div>
-        )}
-      </div>
-
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
-        <button onClick={() => onDelete(node.id)}
-          style={{ width: '100%', padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-          Remover nó
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main Editor ──────────────────────────────────────────────────────────────
 export default function FlowEditorPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -889,7 +86,6 @@ export default function FlowEditorPage() {
   const [initialized, setInitialized] = useState(false)
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
 
-  // Carrega clipboard do sessionStorage ao montar
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('autozap_flow_clipboard')
@@ -901,15 +97,10 @@ export default function FlowEditorPage() {
     queryKey: ['tags'],
     queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
   })
-
   const { data: allFlows = [] } = useQuery({
     queryKey: ['flows-list'],
-    queryFn: async () => {
-      const { data } = await messageApi.get('/flows')
-      return (data.data || []).filter((f: any) => f.id !== id)
-    },
+    queryFn: async () => { const { data } = await messageApi.get('/flows'); return (data.data || []).filter((f: any) => f.id !== id) },
   })
-
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
     queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}`); return data.data },
@@ -918,36 +109,17 @@ export default function FlowEditorPage() {
   useEffect(() => {
     if (!flowData || initialized) return
     setFlowName(flowData.name || '')
-    const loadedNodes: Node[] = (flowData.nodes || []).map((n: any) => ({
-      id: n.id, type: 'flowNode',
-      position: { x: n.position_x, y: n.position_y },
-      data: { type: n.type, ...n.data },
-    }))
-    const loadedEdges: Edge[] = (flowData.edges || []).map((e: any) => ({
-      id: e.id, source: e.source_node, target: e.target_node,
-      sourceHandle: e.source_handle || 'success',
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
-      style: { stroke: '#d1d5db', strokeWidth: 2 },
-    }))
-    setNodes(loadedNodes)
-    setEdges(loadedEdges)
+    setNodes((flowData.nodes || []).map((n: any) => ({ id: n.id, type: 'flowNode', position: { x: n.position_x, y: n.position_y }, data: { type: n.type, ...n.data } })))
+    setEdges((flowData.edges || []).map((e: any) => ({ id: e.id, source: e.source_node, target: e.target_node, sourceHandle: e.source_handle || 'success', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } })))
     setInitialized(true)
   }, [flowData, initialized, setNodes, setEdges])
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
-        nodes: nodes.map(n => ({
-          id: n.id, type: (n.data as any).type,
-          position_x: n.position.x, position_y: n.position.y,
-          data: { ...(n.data as any) },
-        })),
-        edges: edges.map(e => ({
-          id: e.id, source_node: e.source, target_node: e.target,
-          source_handle: e.sourceHandle || 'success',
-        })),
-      }
-      await messageApi.put(`/flows/${id}/graph`, payload)
+      await messageApi.put(`/flows/${id}/graph`, {
+        nodes: nodes.map(n => ({ id: n.id, type: (n.data as any).type, position_x: n.position.x, position_y: n.position.y, data: { ...(n.data as any) } })),
+        edges: edges.map(e => ({ id: e.id, source_node: e.source, target_node: e.target, source_handle: e.sourceHandle || 'success' })),
+      })
       if (flowName) await messageApi.patch(`/flows/${id}`, { name: flowName })
     },
     onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
@@ -958,44 +130,27 @@ export default function FlowEditorPage() {
 
   const onConnect = useCallback((params: Connection) => {
     let edgeColor = '#d1d5db'
-    if (params.sourceHandle === 'fallback') {
-      edgeColor = '#9ca3af'
-    } else if (params.sourceHandle?.startsWith('branch_')) {
-      const sourceNode = nodes.find(n => n.id === params.source)
-      const branches = (sourceNode?.data as any)?.branches || []
-      const branchId = params.sourceHandle.replace('branch_', '')
-      const branchIndex = branches.findIndex((b: any) => b.id === branchId)
-      if (branchIndex >= 0) edgeColor = BRANCH_COLORS_MAP[branchIndex % BRANCH_COLORS_MAP.length]
-    } else if (params.sourceHandle === 'true') {
-      edgeColor = '#16a34a'
-    } else if (params.sourceHandle === 'false') {
-      edgeColor = '#ef4444'
-    }
-
-    setEdges(eds => addEdge({
-      ...params,
-      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
-      style: { stroke: edgeColor, strokeWidth: 2 },
-    }, eds))
+    if (params.sourceHandle === 'fallback') edgeColor = '#9ca3af'
+    else if (params.sourceHandle?.startsWith('branch_')) {
+      const src = nodes.find(n => n.id === params.source)
+      const branches = (src?.data as any)?.branches || []
+      const idx = branches.findIndex((b: any) => b.id === params.sourceHandle!.replace('branch_', ''))
+      if (idx >= 0) edgeColor = BRANCH_COLORS_MAP[idx % BRANCH_COLORS_MAP.length]
+    } else if (params.sourceHandle === 'true') edgeColor = '#16a34a'
+    else if (params.sourceHandle === 'false') edgeColor = '#ef4444'
+    setEdges(eds => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor }, style: { stroke: edgeColor, strokeWidth: 2 } }, eds))
     setIsDirty(true)
   }, [setEdges, nodes])
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
-    const extraData = type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}
-    setNodes((nds: Node[]) => [...nds, {
-      id: nodeId, type: 'flowNode',
-      position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
-      data: { type, ...extraData },
-    }])
+    setNodes((nds: Node[]) => [...nds, { id: nodeId, type: 'flowNode', position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 }, data: { type, ...(type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}) } }])
     setIsDirty(true)
   }
 
   const updateNodeData = (nodeId: string, newData: any) => {
     setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n))
-    if (selectedNode?.id === nodeId) {
-      setSelectedNode(prev => prev ? { ...prev, data: { ...prev.data, ...newData } } : prev)
-    }
+    if (selectedNode?.id === nodeId) setSelectedNode(prev => prev ? { ...prev, data: { ...prev.data, ...newData } } : prev)
     setIsDirty(true)
   }
 
@@ -1006,84 +161,33 @@ export default function FlowEditorPage() {
     setIsDirty(true)
   }
 
-  // ── Copiar nodes selecionados ──
   const copySelected = () => {
-    const selectedNodes = nodes.filter(n => n.selected)
-    if (selectedNodes.length === 0) {
-      toast.error('Selecione pelo menos um nó (shift+click ou arraste)')
-      return
-    }
-    const selectedIds = new Set(selectedNodes.map(n => n.id))
-    const selectedEdges = edges.filter(e => selectedIds.has(e.source) && selectedIds.has(e.target))
-    const clipboard = { nodes: selectedNodes, edges: selectedEdges }
-    setCopiedNodes(clipboard)
-    try { sessionStorage.setItem('autozap_flow_clipboard', JSON.stringify(clipboard)) } catch { }
-    toast.success(`${selectedNodes.length} nó${selectedNodes.length > 1 ? 's' : ''} copiado${selectedNodes.length > 1 ? 's' : ''}! Abra outro flow e cole.`)
+    const sel = nodes.filter(n => n.selected)
+    if (sel.length === 0) { toast.error('Selecione pelo menos um nó (shift+click ou arraste)'); return }
+    const ids = new Set(sel.map(n => n.id))
+    const cb = { nodes: sel, edges: edges.filter(e => ids.has(e.source) && ids.has(e.target)) }
+    setCopiedNodes(cb)
+    try { sessionStorage.setItem('autozap_flow_clipboard', JSON.stringify(cb)) } catch { }
+    toast.success(`${sel.length} nó${sel.length > 1 ? 's' : ''} copiado${sel.length > 1 ? 's' : ''}!`)
   }
 
-  // ── Colar nodes (com novos IDs para não colidir) ──
   const pasteNodes = () => {
-    if (!copiedNodes || copiedNodes.nodes.length === 0) return
+    if (!copiedNodes?.nodes.length) return
     const idMap = new Map<string, string>()
-    const offsetX = 60 + Math.random() * 40
-    const offsetY = 60 + Math.random() * 40
-
+    const offset = 60 + Math.random() * 40
     const newNodes: Node[] = copiedNodes.nodes.map(n => {
       const newId = `node_${Date.now()}_${Math.random().toString(36).slice(2)}`
       idMap.set(n.id, newId)
-      return {
-        ...n,
-        id: newId,
-        selected: true,
-        position: { x: n.position.x + offsetX, y: n.position.y + offsetY },
-        data: { ...n.data },
-      }
+      return { ...n, id: newId, selected: true, position: { x: n.position.x + offset, y: n.position.y + offset }, data: { ...n.data } }
     })
-
-    const newEdges: Edge[] = copiedNodes.edges.map(e => ({
-      ...e,
-      id: `edge_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      source: idMap.get(e.source) || e.source,
-      target: idMap.get(e.target) || e.target,
-    }))
-
+    const newEdges: Edge[] = copiedNodes.edges.map(e => ({ ...e, id: `edge_${Date.now()}_${Math.random().toString(36).slice(2)}`, source: idMap.get(e.source) || e.source, target: idMap.get(e.target) || e.target }))
     setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes])
     setEdges(eds => [...eds, ...newEdges])
     setIsDirty(true)
     toast.success(`${newNodes.length} nó${newNodes.length > 1 ? 's' : ''} colado${newNodes.length > 1 ? 's' : ''}!`)
   }
 
-  const nodesWithDelete = nodes.map(n => ({
-    ...n,
-    data: { ...n.data, nodeId: n.id, onDelete: deleteNode },
-  }))
-
-  const TRIGGER_NODES = [
-    { type: 'trigger_keyword',       label: 'Palavra-chave' },
-    { type: 'trigger_first_message', label: 'Primeira mensagem' },
-    { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
-    { type: 'trigger_outside_hours', label: 'Fora do horário' },
-  ]
-
-  const ACTION_NODES = [
-    { type: 'send_message',   label: 'Enviar texto' },
-    { type: 'send_image',     label: 'Enviar imagem' },
-    { type: 'send_video',     label: 'Enviar vídeo' },
-    { type: 'send_audio',     label: 'Enviar áudio' },
-    { type: 'send_document',  label: 'Enviar documento' },
-    { type: 'input',          label: 'Aguardar resposta' },
-    { type: 'condition',      label: 'Condição (se/senão)' },
-    { type: 'ai',             label: 'Inteligência Artificial' },
-    { type: 'webhook',        label: 'Webhook' },
-    { type: 'wait',           label: 'Espera' },
-    { type: 'add_tag',        label: 'Adicionar tag' },
-    { type: 'remove_tag',     label: 'Remover tag' },
-    { type: 'update_contact', label: 'Atualizar contato' },
-    { type: 'move_pipeline',  label: 'Mover no funil' },
-    { type: 'assign_agent',   label: 'Atribuir agente' },
-    { type: 'go_to',          label: 'Ir para outro flow' },
-    { type: 'end',            label: 'Finalizar flow' },
-  ]
+  const nodesWithDelete = nodes.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onDelete: deleteNode } }))
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -1094,6 +198,7 @@ export default function FlowEditorPage() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+      {/* Header */}
       <div style={{ height: '56px', background: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '12px', flexShrink: 0, zIndex: 20 }}>
         <button onClick={() => router.push('/dashboard/flows')}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '13px', padding: '6px 8px', borderRadius: '6px' }}
@@ -1108,30 +213,18 @@ export default function FlowEditorPage() {
         {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● Não salvo</span>}
         <div style={{ flex: 1 }} />
 
-        {/* Colar — só aparece se tem algo copiado */}
         {copiedNodes && copiedNodes.nodes.length > 0 && (
-          <button onClick={pasteNodes} style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-            background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px',
-            fontSize: '13px', fontWeight: 600, color: '#16a34a', cursor: 'pointer',
-          }}
+          <button onClick={pasteNodes} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '13px', fontWeight: 600, color: '#16a34a', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#dcfce7'}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'}
-            title="Colar nós copiados neste flow">
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Colar ({copiedNodes.nodes.length})
           </button>
         )}
 
-        {/* Copiar selecionados */}
-        <button onClick={copySelected} style={{
-          display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-          background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px',
-          fontSize: '13px', fontWeight: 500, color: '#6b7280', cursor: 'pointer',
-        }}
+        <button onClick={copySelected} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: '#6b7280', cursor: 'pointer' }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
-          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}
-          title="Copiar nós selecionados (shift+click para selecionar)">
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copiar selecionados
         </button>
@@ -1144,10 +237,11 @@ export default function FlowEditorPage() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        {/* Sidebar */}
         <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Gatilhos</p>
           {TRIGGER_NODES.map(n => {
-            const Icon = NODE_ICONS[n.type] || Zap
+            const Icon = NODE_ICONS[n.type]
             const color = NODE_COLORS[n.type]
             return (
               <button key={n.type} onClick={() => addNode(n.type)}
@@ -1160,7 +254,7 @@ export default function FlowEditorPage() {
           })}
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: '16px' }}>Ações</p>
           {ACTION_NODES.map(n => {
-            const Icon = NODE_ICONS[n.type] || Zap
+            const Icon = NODE_ICONS[n.type]
             const color = NODE_COLORS[n.type]
             return (
               <button key={n.type} onClick={() => addNode(n.type)}
@@ -1173,12 +267,13 @@ export default function FlowEditorPage() {
           })}
         </div>
 
+        {/* Canvas */}
         <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>
           <ReactFlow
             nodes={nodesWithDelete}
-            edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (edgeId: string) => { setEdges(eds => eds.filter(ed => ed.id !== edgeId)); setIsDirty(true) } } }))}
-            onNodesChange={(changes) => { onNodesChange(changes); setIsDirty(true) }}
-            onEdgesChange={(changes) => { onEdgesChange(changes); setIsDirty(true) }}
+            edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (eid: string) => { setEdges(eds => eds.filter(ed => ed.id !== eid)); setIsDirty(true) } } }))}
+            onNodesChange={ch => { onNodesChange(ch); setIsDirty(true) }}
+            onEdgesChange={ch => { onEdgesChange(ch); setIsDirty(true) }}
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
@@ -1197,9 +292,7 @@ export default function FlowEditorPage() {
                 <svg width="72" height="72" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.18 }}>
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#16a34a" />
                 </svg>
-                <span style={{ fontSize: '88px', fontWeight: 800, letterSpacing: '-0.05em', fontFamily: 'system-ui, sans-serif', lineHeight: 1, color: 'transparent', WebkitTextStroke: '2px #16a34a', opacity: 0.18 }}>
-                  AutoZap
-                </span>
+                <span style={{ fontSize: '88px', fontWeight: 800, letterSpacing: '-0.05em', fontFamily: 'system-ui, sans-serif', lineHeight: 1, color: 'transparent', WebkitTextStroke: '2px #16a34a', opacity: 0.18 }}>AutoZap</span>
               </div>
             </Panel>
             {nodes.length === 0 && (
@@ -1215,15 +308,8 @@ export default function FlowEditorPage() {
         </div>
 
         {selectedNode && (
-          <NodeConfigPanel
-            node={selectedNode}
-            tags={tags}
-            flows={allFlows}
-            tenantId={tenantId}
-            onUpdate={updateNodeData}
-            onClose={() => setSelectedNode(null)}
-            onDelete={deleteNode}
-          />
+          <NodeConfigPanel node={selectedNode} tags={tags} flows={allFlows} tenantId={tenantId}
+            onUpdate={updateNodeData} onClose={() => setSelectedNode(null)} onDelete={deleteNode} />
         )}
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
