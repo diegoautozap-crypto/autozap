@@ -623,7 +623,34 @@ export default function PipelinePage() {
 
   const handleColDragEnd = () => { setDraggingColKey(null); setOverColKey(null) }
 
-  const handleColumnsSaved = () => {
+  const boardScrollRef = useRef<HTMLDivElement>(null)
+  const boardDragStart = useRef<{ x: number; scrollLeft: number } | null>(null)
+  const [isDraggingBoard, setIsDraggingBoard] = useState(false)
+
+  const handleBoardMouseDown = (e: React.MouseEvent) => {
+    // Only drag on the container itself or column bodies, not on cards/headers
+    const target = e.target as HTMLElement
+    if (target.closest('[data-card]') || target.closest('[data-col-header]') || target.closest('button') || target.closest('select')) return
+    if (!boardScrollRef.current) return
+    boardDragStart.current = { x: e.clientX, scrollLeft: boardScrollRef.current.scrollLeft }
+    setIsDraggingBoard(true)
+
+    const onMove = (ev: MouseEvent) => {
+      if (!boardDragStart.current || !boardScrollRef.current) return
+      const dx = ev.clientX - boardDragStart.current.x
+      boardScrollRef.current.scrollLeft = boardDragStart.current.scrollLeft - dx
+    }
+    const onUp = () => {
+      boardDragStart.current = null
+      setIsDraggingBoard(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+
     refetchCols()
     localBoardRef.current = null
     queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
@@ -687,7 +714,15 @@ export default function PipelinePage() {
           <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
         </div>
       ) : (
-        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '20px 24px' }}>
+        <div
+          ref={boardScrollRef}
+          onMouseDown={handleBoardMouseDown}
+          style={{
+            flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '20px 24px',
+            cursor: isDraggingBoard ? 'grabbing' : 'grab',
+            userSelect: 'none',
+          }}
+        >
           <div style={{ display: 'flex', gap: '14px', height: '100%', minWidth: 'max-content' }}>
             {stages.map(stage => {
               const cards = displayBoard?.[stage.key] || []
@@ -714,6 +749,7 @@ export default function PipelinePage() {
 
                   {/* Column header — draggable */}
                   <div
+                    data-col-header
                     draggable
                     onDragStart={e => handleColDragStart(e, stage.key)}
                     onDragEnd={handleColDragEnd}
@@ -744,7 +780,7 @@ export default function PipelinePage() {
                       const av = getAvatarColor(name)
                       const isDragging = draggingId === conv.id
                       return (
-                        <div key={conv.id} draggable
+                        <div key={conv.id} draggable data-card
                           onDragStart={e => handleDragStart(e, conv.id)}
                           onDragEnd={handleDragEnd}
                           onClick={() => router.push('/dashboard/inbox')}
