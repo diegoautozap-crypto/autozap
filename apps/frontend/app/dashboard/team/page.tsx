@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Users, Plus, Pencil, Trash2, X, Check, Loader2,
-  Shield, UserCheck, Eye, RotateCcw, ToggleLeft, ToggleRight, Settings,
+  UserCheck, Eye, RotateCcw, ToggleLeft, ToggleRight, Settings,
   ChevronLeft,
 } from 'lucide-react'
 
@@ -21,10 +21,10 @@ const labelStyle: React.CSSProperties = {
   color: '#374151', marginBottom: '5px',
 }
 
+// Só supervisor e atendente — admin é exclusivo do owner
 const ROLES = [
-  { value: 'admin',      label: 'Admin',      desc: 'Acesso total',                              color: '#7c3aed', bg: '#f5f3ff', icon: Shield },
-  { value: 'supervisor', label: 'Supervisor', desc: 'Vê relatórios, não altera configurações',   color: '#0891b2', bg: '#ecfeff', icon: Eye },
-  { value: 'agent',      label: 'Atendente',  desc: 'Apenas inbox e conversas atribuídas',      color: '#16a34a', bg: '#f0fdf4', icon: UserCheck },
+  { value: 'supervisor', label: 'Supervisor', desc: 'Acesso configurável a páginas e canais', color: '#0891b2', bg: '#ecfeff', icon: Eye },
+  { value: 'agent',      label: 'Atendente',  desc: 'Acesso configurável a páginas e canais', color: '#16a34a', bg: '#f0fdf4', icon: UserCheck },
 ]
 
 const ALL_PAGES = [
@@ -50,7 +50,9 @@ const CONVERSATION_ACCESS_OPTIONS = [
   { value: 'all',      label: 'Todas',       desc: 'Todas as conversas do canal' },
 ]
 
-function getRoleInfo(role: string) { return ROLES.find(r => r.value === role) || ROLES[2] }
+function getRoleInfo(role: string) {
+  return ROLES.find(r => r.value === role) || { value: role, label: role === 'admin' ? 'Admin' : role === 'owner' ? 'Owner' : role, desc: '', color: '#6b7280', bg: '#f9fafb', icon: Eye }
+}
 function getInitials(name: string) { return (name || '??').trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() }
 function getAvatarColor(name: string) {
   const colors = [
@@ -61,7 +63,6 @@ function getAvatarColor(name: string) {
   return colors[((name || '').charCodeAt(0) || 0) % colors.length]
 }
 
-// ─── Painel de permissões individuais ────────────────────────────────────────
 function PermissionsPanel({ member, onClose }: { member: any; onClose: () => void }) {
   const queryClient = useQueryClient()
 
@@ -91,7 +92,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
       await authApi.patch(`/auth/team/${member.id}/permissions`, effectivePerms)
     },
     onSuccess: () => {
-      toast.success('Permissões salvas! O membro precisará fazer login novamente.')
+      toast.success('Permissões salvas!')
       setPerms(null)
       queryClient.invalidateQueries({ queryKey: ['member-permissions', member.id] })
       queryClient.invalidateQueries({ queryKey: ['team'] })
@@ -103,7 +104,6 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
   const togglePage = (href: string) => {
     const current = effectivePerms.allowed_pages || []
-    // Inbox sempre obrigatório
     if (href === '/dashboard/inbox') return
     const next = current.includes(href) ? current.filter((h: string) => h !== href) : [...current, href]
     update('allowed_pages', next)
@@ -121,7 +121,6 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
   return (
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
-      {/* Header */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex' }}>
           <ChevronLeft size={18} />
@@ -251,7 +250,6 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
 export default function TeamPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -298,7 +296,6 @@ export default function TeamPage() {
 
   const startEdit = (m: any) => { setEditingId(m.id); setEditForm({ name: m.name, role: m.role }) }
 
-  // Se está configurando um membro, mostra o painel de permissões
   if (configuringMember) {
     return (
       <div style={{ padding: '32px', maxWidth: '900px' }}>
@@ -326,7 +323,7 @@ export default function TeamPage() {
       </div>
 
       {/* Cards roles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
         {ROLES.map(r => {
           const Icon = r.icon
           return (
@@ -353,8 +350,8 @@ export default function TeamPage() {
             <div><label style={labelStyle}>Email *</label><input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
           </div>
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle}>Permissão inicial</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <label style={labelStyle}>Tipo de acesso</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               {ROLES.map(r => {
                 const Icon = r.icon
                 return (
@@ -399,6 +396,8 @@ export default function TeamPage() {
             const RoleIcon = roleInfo.icon
             const av = getAvatarColor(m.name)
             const isEditing = editingId === m.id
+            // Só mostra opções de editar para supervisor e atendente
+            const isEditableRole = m.role === 'agent' || m.role === 'supervisor'
 
             return (
               <div key={m.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px', opacity: m.is_active ? 1 : 0.6 }}>
@@ -429,7 +428,7 @@ export default function TeamPage() {
                     </>
                   )}
                 </div>
-                {canManage && (
+                {canManage && isEditableRole && (
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
                     {isEditing ? (
                       <>
@@ -445,15 +444,12 @@ export default function TeamPage() {
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: m.is_active ? '#16a34a' : '#d1d5db' }}>
                           {m.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                         </button>
-                        {/* Botão de permissões — só para agent e supervisor */}
-                        {(m.role === 'agent' || m.role === 'supervisor') && (
-                          <button onClick={() => setConfiguringMember(m)} title="Configurar permissões"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; (e.currentTarget as HTMLButtonElement).style.color = '#2563eb' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
-                            <Settings size={14} />
-                          </button>
-                        )}
+                        <button onClick={() => setConfiguringMember(m)} title="Configurar permissões"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; (e.currentTarget as HTMLButtonElement).style.color = '#2563eb' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                          <Settings size={14} />
+                        </button>
                         <button onClick={() => startEdit(m)} title="Editar"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#9ca3af', borderRadius: '6px' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
