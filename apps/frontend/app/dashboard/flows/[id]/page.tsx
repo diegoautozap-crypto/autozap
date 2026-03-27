@@ -68,6 +68,9 @@ const ACTION_NODES = [
   { type: 'move_pipeline',  label: 'Mover no funil' },
   { type: 'assign_agent',   label: 'Atribuir agente' },
   { type: 'go_to',          label: 'Ir para outro flow' },
+  { type: 'loop_repeat',    label: 'Loop repetição' },
+  { type: 'loop_retry',     label: 'Loop tentativas' },
+  { type: 'loop_while',     label: 'Loop enquanto' },
   { type: 'end',            label: 'Finalizar flow' },
 ]
 

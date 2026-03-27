@@ -2,6 +2,7 @@ import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   Image, Video, Music, FileText, AlignLeft, GitBranch,
   Brain, Webhook, TagsIcon, UserCog, CornerDownRight, Square, Reply,
+  RefreshCw, RotateCcw, Repeat,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -26,6 +27,9 @@ export const NODE_COLORS: Record<string, string> = {
   assign_agent:          '#db2777',
   go_to:                 '#16a34a',
   end:                   '#dc2626',
+  loop_repeat:           '#7c3aed',
+  loop_retry:            '#ea580c',
+  loop_while:            '#0891b2',
 }
 
 export const NODE_ICONS: Record<string, any> = {
@@ -50,6 +54,9 @@ export const NODE_ICONS: Record<string, any> = {
   assign_agent:          UserCheck,
   go_to:                 CornerDownRight,
   end:                   Square,
+  loop_repeat:           Repeat,
+  loop_retry:            RotateCcw,
+  loop_while:            RefreshCw,
 }
 
 export const NODE_LABELS: Record<string, string> = {
@@ -74,6 +81,9 @@ export const NODE_LABELS: Record<string, string> = {
   assign_agent:          'Atribuir agente',
   go_to:                 'Ir para outro flow',
   end:                   'Finalizar flow',
+  loop_repeat:           'Loop repetição',
+  loop_retry:            'Loop tentativas',
+  loop_while:            'Loop enquanto',
 }
 
 export const DEFAULT_STAGES = [

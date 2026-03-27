@@ -19,7 +19,6 @@ interface FlowContext {
   isFirstMessage: boolean
 }
 
-// ─── Tipos para condição múltipla ─────────────────────────────────────────────
 interface ConditionRule {
   id: string
   field: string
@@ -84,6 +83,34 @@ export class FlowEngine {
     }
   }
 
+  // ── Retoma flow após wait longo (chamado pelo flow.worker.ts) ──────────────
+  async resumeFromNode(
+    nodeId: string,
+    ctx: FlowContext,
+    flow: any,
+    variables: Record<string, any>,
+    loopCounters: Record<string, number>,
+    edgeMap: Map<string, any[]>,
+    nodeMap: Map<string, any>,
+    stateId: string
+  ): Promise<void> {
+    let currentNode = nodeMap.get(nodeId) || null
+    let stepCount = 0
+
+    while (currentNode && stepCount < 100) {
+      stepCount++
+      const result = await this.executeNode(currentNode, ctx, flow.id, variables, loopCounters, edgeMap, nodeMap, stateId)
+      if (result.paused || result.ended || result.delayed) break
+      const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
+      currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
+    }
+
+    const { data: updatedState } = await db.from('flow_states').select('status').eq('id', stateId).single()
+    if (updatedState?.status !== 'waiting' && updatedState?.status !== 'delayed') {
+      await db.from('flow_states').update({ status: 'completed', updated_at: new Date() }).eq('id', stateId)
+    }
+  }
+
   private async resumeWaitingFlow(ctx: FlowContext): Promise<boolean> {
     const { data: state } = await db
       .from('flow_states')
@@ -100,6 +127,7 @@ export class FlowEngine {
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
 
     const variables = state.variables || {}
+    const loopCounters = state.loop_counters || {}
     if (state.waiting_variable) variables[state.waiting_variable] = ctx.messageBody
 
     await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
@@ -118,11 +146,9 @@ export class FlowEngine {
       edgeMap.get(key)!.push(edge)
     }
 
-    // Se existe nó de condição pendente (fallback voltou para input), reexecuta a condição
     let currentNode: any
     if (state.pending_condition_node_id) {
       currentNode = nodeMap.get(state.pending_condition_node_id) || null
-      logger.info('Resuming from pending condition node', { nodeId: state.pending_condition_node_id })
     } else {
       currentNode = this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
     }
@@ -132,22 +158,18 @@ export class FlowEngine {
 
     while (currentNode && stepCount < 100) {
       const visits = visitedNodes.get(currentNode.id) || 0
-      if (visits >= 3) {
-        logger.warn('Flow loop detected, stopping', { nodeId: currentNode.id })
-        break
-      }
+      if (visits >= 3) { logger.warn('Flow loop detected, stopping', { nodeId: currentNode.id }); break }
       visitedNodes.set(currentNode.id, visits + 1)
       stepCount++
 
-      const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, state.id)
-      if (result.paused || result.ended) break
+      const result = await this.executeNode(currentNode, ctx, flow.id, variables, loopCounters, edgeMap, nodeMap, state.id)
+      if (result.paused || result.ended || result.delayed) break
       const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
 
-    // Só marca completed se não ficou pausado de novo
     const { data: updatedState } = await db.from('flow_states').select('status').eq('id', state.id).single()
-    if (updatedState?.status !== 'waiting') {
+    if (updatedState?.status !== 'waiting' && updatedState?.status !== 'delayed') {
       await db.from('flow_states').update({ status: 'completed', pending_condition_node_id: null, updated_at: new Date() }).eq('id', state.id)
     }
     await this.logNode(flow.id, generateId(), ctx, 'flow_executed', `Flow retomado e executado`)
@@ -157,16 +179,7 @@ export class FlowEngine {
   private async isOnCooldown(flow: any, ctx: FlowContext): Promise<boolean> {
     const cooldownType = flow.cooldown_type || '24h'
     if (cooldownType === 'always') return false
-
-    const { data } = await db
-      .from('flow_logs')
-      .select('created_at')
-      .eq('flow_id', flow.id)
-      .eq('conversation_id', ctx.conversationId)
-      .eq('status', 'flow_executed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-
+    const { data } = await db.from('flow_logs').select('created_at').eq('flow_id', flow.id).eq('conversation_id', ctx.conversationId).eq('status', 'flow_executed').order('created_at', { ascending: false }).limit(1)
     if (!data || data.length === 0) return false
     const lastExecution = new Date(data[0].created_at)
     if (cooldownType === 'once') return true
@@ -228,11 +241,12 @@ export class FlowEngine {
 
     let currentNode = this.getNextNode(triggerNode.id, 'success', edgeMap, nodeMap)
     let stepCount = 0
+    const loopCounters: Record<string, number> = {}
 
-    while (currentNode && stepCount < 50) {
+    while (currentNode && stepCount < 200) {
       stepCount++
-      const result = await this.executeNode(currentNode, ctx, flow.id, variables, edgeMap, nodeMap, null)
-      if (result.paused || result.ended) break
+      const result = await this.executeNode(currentNode, ctx, flow.id, variables, loopCounters, edgeMap, nodeMap, null)
+      if (result.paused || result.ended || result.delayed) break
       const nextHandle = result.nextHandle || (result.success ? 'success' : 'error')
       currentNode = this.getNextNode(currentNode.id, nextHandle, edgeMap, nodeMap)
     }
@@ -251,9 +265,10 @@ export class FlowEngine {
   private async executeNode(
     node: any, ctx: FlowContext, flowId: string,
     variables: Record<string, any>,
+    loopCounters: Record<string, number>,
     edgeMap: Map<string, any[]>, nodeMap: Map<string, any>,
     stateId: string | null
-  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean; nextHandle?: string }> {
+  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean; delayed?: boolean; nextHandle?: string }> {
     const { type, data } = node
 
     try {
@@ -300,9 +315,6 @@ export class FlowEngine {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: question })
           }
           const saveVar = data?.saveAs || 'resposta'
-
-          // Detecta se o próximo nó é uma condição — se sim, salva como pending_condition_node_id
-          // para que o resumeWaitingFlow reexecute a condição quando o usuário responder
           const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
           const pendingConditionNodeId = (nextNode?.type === 'condition') ? nextNode.id : null
 
@@ -315,11 +327,147 @@ export class FlowEngine {
             current_node_id: node.id,
             pending_condition_node_id: pendingConditionNodeId,
             variables,
+            loop_counters: loopCounters,
             waiting_variable: saveVar,
             status: 'waiting',
             updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
           return { success: true, paused: true }
+        }
+
+        // ─── WAIT LONGO — usa BullMQ para delays acima de 5 minutos ──────────
+        case 'wait': {
+          const seconds = data?.seconds || 0
+          const minutes = data?.minutes || 0
+          const hours = data?.hours || 0
+          const days = data?.days || 0
+          const totalMs = (seconds + minutes * 60 + hours * 3600 + days * 86400) * 1000
+
+          if (totalMs <= 0) break
+
+          // Até 5 minutos: espera síncrona (comportamento anterior)
+          if (totalMs <= 300_000) {
+            await new Promise(r => setTimeout(r, totalMs))
+            break
+          }
+
+          // Acima de 5 minutos: agenda via BullMQ e pausa o flow
+          const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
+          if (!nextNode) break // sem próximo nó, não precisa pausar
+
+          const newStateId = stateId || generateId()
+          await db.from('flow_states').upsert({
+            id: newStateId,
+            flow_id: flowId,
+            tenant_id: ctx.tenantId,
+            contact_id: ctx.contactId,
+            conversation_id: ctx.conversationId,
+            current_node_id: node.id,
+            variables,
+            loop_counters: loopCounters,
+            status: 'delayed',
+            delay_until: new Date(Date.now() + totalMs).toISOString(),
+            updated_at: new Date(),
+          }, { onConflict: 'flow_id,conversation_id' })
+
+          // Importa e enfileira o job com delay
+          const { flowResumeQueue } = await import('../workers/flow.worker')
+          await flowResumeQueue.add('resume', {
+            stateId: newStateId,
+            flowId,
+            tenantId: ctx.tenantId,
+            contactId: ctx.contactId,
+            conversationId: ctx.conversationId,
+            channelId: ctx.channelId,
+            phone: ctx.phone,
+            resumeNodeId: nextNode.id,
+          }, { delay: totalMs })
+
+          logger.info('Flow delayed via BullMQ', { flowId, delayMs: totalMs, resumeNodeId: nextNode.id })
+          return { success: true, delayed: true }
+        }
+
+        // ─── LOOP REPEAT — repete N vezes ─────────────────────────────────────
+        case 'loop_repeat': {
+          const maxTimes = data?.times || 1
+          const countKey = `loop_repeat_${node.id}`
+          const current = loopCounters[countKey] || 0
+
+          if (current < maxTimes) {
+            // Incrementa contador e entra no loop
+            loopCounters[countKey] = current + 1
+            logger.info('Loop repeat iteration', { nodeId: node.id, iteration: current + 1, max: maxTimes })
+
+            // Executa o corpo do loop (handle 'loop')
+            let loopNode = this.getNextNode(node.id, 'loop', edgeMap, nodeMap)
+            let steps = 0
+            while (loopNode && steps < 100) {
+              steps++
+              // Detecta quando voltou ao mesmo nó de loop (saída do corpo)
+              if (loopNode.id === node.id) break
+              const result = await this.executeNode(loopNode, ctx, flowId, variables, loopCounters, edgeMap, nodeMap, stateId)
+              if (result.paused || result.ended || result.delayed) return result
+              const nh = result.nextHandle || (result.success ? 'success' : 'error')
+              const next = this.getNextNode(loopNode.id, nh, edgeMap, nodeMap)
+              if (!next || next.id === node.id) break // voltou ao nó de loop
+              loopNode = next
+            }
+
+            // Verifica se ainda tem iterações
+            if (loopCounters[countKey] < maxTimes) {
+              // Volta para o início do loop — retorna nextHandle especial
+              return { success: true, nextHandle: 'loop' }
+            }
+          }
+
+          // Esgotou as iterações — zera contador e segue pelo handle 'done'
+          loopCounters[countKey] = 0
+          return { success: true, nextHandle: 'done' }
+        }
+
+        // ─── LOOP RETRY — tenta até condição ser true ou esgotar tentativas ──
+        case 'loop_retry': {
+          const maxRetries = data?.maxRetries || 3
+          const countKey = `loop_retry_${node.id}`
+          const current = loopCounters[countKey] || 0
+
+          if (current >= maxRetries) {
+            // Esgotou tentativas — sai pelo handle 'exhausted'
+            loopCounters[countKey] = 0
+            logger.info('Loop retry exhausted', { nodeId: node.id, attempts: current })
+            return { success: true, nextHandle: 'exhausted' }
+          }
+
+          loopCounters[countKey] = current + 1
+          logger.info('Loop retry attempt', { nodeId: node.id, attempt: current + 1, max: maxRetries })
+          // Executa o corpo pelo handle 'loop' — a condição dentro decide se sai
+          return { success: true, nextHandle: 'loop' }
+        }
+
+        // ─── LOOP WHILE — repete enquanto condição for true ───────────────────
+        case 'loop_while': {
+          const maxIterations = data?.maxIterations || 10
+          const countKey = `loop_while_${node.id}`
+          const current = loopCounters[countKey] || 0
+
+          if (current >= maxIterations) {
+            loopCounters[countKey] = 0
+            logger.info('Loop while max iterations reached', { nodeId: node.id })
+            return { success: true, nextHandle: 'done' }
+          }
+
+          // Avalia a condição
+          const conditionMet = this.evaluateLoopCondition(data, ctx, variables)
+
+          if (conditionMet) {
+            loopCounters[countKey] = current + 1
+            logger.info('Loop while condition met, iterating', { nodeId: node.id, iteration: current + 1 })
+            return { success: true, nextHandle: 'loop' }
+          } else {
+            loopCounters[countKey] = 0
+            logger.info('Loop while condition false, exiting', { nodeId: node.id })
+            return { success: true, nextHandle: 'done' }
+          }
         }
 
         case 'ai': {
@@ -331,25 +479,28 @@ export class FlowEngine {
           const aiMode = data?.mode || 'respond'
           const systemPrompt = data?.systemPrompt || 'Você é um assistente prestativo e responde de forma clara e objetiva.'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
+          const maxHistory = data?.historyMessages ?? 20
 
-          const maxHistory = data?.historyMessages || 50
-          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+          let historyMessages: { role: 'user' | 'assistant'; content: string }[] = []
 
-          const { data: history } = await db
-            .from('messages')
-            .select('direction, body, content_type, created_at')
-            .eq('conversation_id', ctx.conversationId)
-            .eq('tenant_id', ctx.tenantId)
-            .in('content_type', ['text'])
-            .not('body', 'is', null)
-            .gte('created_at', startOfDay.toISOString())
-            .order('created_at', { ascending: false })
-            .limit(maxHistory)
+          if (maxHistory > 0) {
+            const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+            const { data: history } = await db
+              .from('messages')
+              .select('direction, body, content_type, created_at')
+              .eq('conversation_id', ctx.conversationId)
+              .eq('tenant_id', ctx.tenantId)
+              .in('content_type', ['text'])
+              .not('body', 'is', null)
+              .gte('created_at', startOfDay.toISOString())
+              .order('created_at', { ascending: false })
+              .limit(maxHistory)
 
-          const historyMessages: { role: 'user' | 'assistant'; content: string }[] = (history || [])
-            .reverse()
-            .filter((m: any) => m.body && m.body.trim())
-            .map((m: any) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: m.body }))
+            historyMessages = (history || [])
+              .reverse()
+              .filter((m: any) => m.body && m.body.trim())
+              .map((m: any) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: m.body }))
+          }
 
           let messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
 
@@ -369,7 +520,6 @@ export class FlowEngine {
 
           const completion = await openai.chat.completions.create({ model: data?.model || 'gpt-4o-mini', messages, max_tokens: data?.maxTokens || 1000, temperature: data?.temperature ?? 0.7 })
           const aiResponse = completion.choices[0]?.message?.content?.trim() || ''
-          logger.info('AI node response', { mode: aiMode, response: aiResponse.slice(0, 100) })
 
           if (data?.saveAs) variables[data.saveAs] = aiResponse
           if (aiMode === 'respond' && aiResponse) {
@@ -383,7 +533,6 @@ export class FlowEngine {
           if (!url) break
           const method = (data?.method || 'POST').toUpperCase()
           const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-          if (data?.headers) { try { Object.assign(headers, typeof data.headers === 'string' ? JSON.parse(data.headers) : data.headers) } catch { } }
           let body: string | undefined
           if (method !== 'GET') {
             const rawBody = data?.body || '{}'
@@ -404,58 +553,39 @@ export class FlowEngine {
           break
         }
 
-        // ─── CONDITION — suporte a múltiplas branches ──────────────────────────
         case 'condition': {
           const branches: ConditionBranch[] = data?.branches || []
-
-          // ── Novo formato: múltiplas branches ──────────────────────────────────
           if (branches.length > 0) {
             let matchedHandle: string | null = null
-
             for (const branch of branches) {
-              const matched = this.evaluateBranch(branch, ctx, variables)
-              if (matched) {
+              if (this.evaluateBranch(branch, ctx, variables)) {
                 matchedHandle = `branch_${branch.id}`
-                logger.info('Condition branch matched', { branchLabel: branch.label, handle: matchedHandle })
                 break
               }
             }
-
-            // Se nenhuma branch bateu → fallback
             const handle = matchedHandle || 'fallback'
             let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
             let steps = 0
             while (nextNode && steps < 50) {
               steps++
-              const result = await this.executeNode(nextNode, ctx, flowId, variables, edgeMap, nodeMap, stateId)
-              if (result.paused || result.ended) return result
+              const result = await this.executeNode(nextNode, ctx, flowId, variables, loopCounters, edgeMap, nodeMap, stateId)
+              if (result.paused || result.ended || result.delayed) return result
               const nh = result.nextHandle || (result.success ? 'success' : 'error')
               nextNode = this.getNextNode(nextNode.id, nh, edgeMap, nodeMap)
             }
             return { success: true }
           }
-
-          // ── Formato legado: true/false ─────────────────────────────────────────
           const conditionMet = this.evaluateCondition(data, ctx, variables)
           const handle = conditionMet ? 'true' : 'false'
           let nextNode = this.getNextNode(node.id, handle, edgeMap, nodeMap)
           let steps = 0
           while (nextNode && steps < 50) {
             steps++
-            const result = await this.executeNode(nextNode, ctx, flowId, variables, edgeMap, nodeMap, stateId)
-            if (result.paused || result.ended) return result
+            const result = await this.executeNode(nextNode, ctx, flowId, variables, loopCounters, edgeMap, nodeMap, stateId)
+            if (result.paused || result.ended || result.delayed) return result
             nextNode = this.getNextNode(nextNode.id, result.success ? 'success' : 'error', edgeMap, nodeMap)
           }
           return { success: true }
-        }
-
-        case 'wait': {
-          const seconds = data?.seconds || 0
-          const minutes = data?.minutes || 0
-          const hours = data?.hours || 0
-          const totalMs = (seconds + minutes * 60 + hours * 3600) * 1000
-          if (totalMs > 0 && totalMs <= 300000) await new Promise(r => setTimeout(r, totalMs))
-          break
         }
 
         case 'add_tag': {
@@ -506,13 +636,11 @@ export class FlowEngine {
           if (!targetFlowId) break
           const { data: targetFlow } = await db.from('flows').select('*').eq('id', targetFlowId).eq('tenant_id', ctx.tenantId).single()
           if (!targetFlow || !targetFlow.is_active) break
-          logger.info('Go to flow', { from: flowId, to: targetFlowId })
           await this.executeFlow(targetFlow, ctx, variables)
           return { success: true, ended: true }
         }
 
         case 'end': {
-          logger.info('Flow ended by end node', { flowId, nodeId: node.id })
           if (data?.message) {
             const message = this.interpolate(data.message, ctx, variables)
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
@@ -534,19 +662,40 @@ export class FlowEngine {
     }
   }
 
-  // ─── Avalia uma branch (conjunto de regras com AND/OR) ─────────────────────
+  // ─── Avalia condição do loop_while ────────────────────────────────────────
+  private evaluateLoopCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
+    const field = data?.conditionField || 'variable'
+    const fieldName = data?.conditionFieldName || ''
+    const operator = data?.conditionOperator || 'is_empty'
+    const value = data?.conditionValue || ''
+
+    let fieldValue = ''
+    if (field === 'message') fieldValue = ctx.messageBody || ''
+    else if (field === 'variable') fieldValue = variables[fieldName] || ''
+    else if (field === 'phone') fieldValue = ctx.phone || ''
+    else fieldValue = ctx.messageBody || ''
+
+    const val = value.toLowerCase()
+    const fv = fieldValue.toLowerCase()
+
+    switch (operator) {
+      case 'contains': return fv.includes(val)
+      case 'not_contains': return !fv.includes(val)
+      case 'equals': return fv === val
+      case 'not_equals': return fv !== val
+      case 'is_empty': return fv === ''
+      case 'is_not_empty': return fv !== ''
+      default: return fv.includes(val)
+    }
+  }
+
   private evaluateBranch(branch: ConditionBranch, ctx: FlowContext, variables: Record<string, any>): boolean {
     const { logic, rules } = branch
     if (!rules || rules.length === 0) return false
-
-    if (logic === 'OR') {
-      return rules.some(rule => this.evaluateRule(rule, ctx, variables))
-    }
-    // AND (padrão)
+    if (logic === 'OR') return rules.some(rule => this.evaluateRule(rule, ctx, variables))
     return rules.every(rule => this.evaluateRule(rule, ctx, variables))
   }
 
-  // ─── Avalia uma regra individual ──────────────────────────────────────────
   private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, any>): boolean {
     let fieldValue = ''
     if (rule.field === 'message') fieldValue = ctx.messageBody || ''
@@ -559,41 +708,39 @@ export class FlowEngine {
     const fv = fieldValue.toLowerCase()
 
     switch (rule.operator) {
-      case 'contains':     return fv.includes(val)
+      case 'contains': return fv.includes(val)
       case 'not_contains': return !fv.includes(val)
-      case 'equals':       return fv === val
-      case 'not_equals':   return fv !== val
-      case 'starts_with':  return fv.startsWith(val)
-      case 'ends_with':    return fv.endsWith(val)
-      case 'is_empty':     return fv === ''
+      case 'equals': return fv === val
+      case 'not_equals': return fv !== val
+      case 'starts_with': return fv.startsWith(val)
+      case 'ends_with': return fv.endsWith(val)
+      case 'is_empty': return fv === ''
       case 'is_not_empty': return fv !== ''
-      default:             return fv.includes(val)
+      default: return fv.includes(val)
     }
   }
 
-  // ─── Formato legado (true/false) ──────────────────────────────────────────
   private evaluateCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
     const { conditionType, field, operator, value } = data || {}
     let fieldValue = ''
     if (conditionType === 'message') fieldValue = ctx.messageBody || ''
     else if (conditionType === 'variable') fieldValue = variables[field] || ''
     else if (conditionType === 'phone') fieldValue = ctx.phone || ''
-    else if (conditionType === 'webhook_status') fieldValue = variables['webhook_status'] || ''
     else fieldValue = ctx.messageBody || ''
 
     const val = (value || '').toLowerCase()
     const fv = fieldValue.toLowerCase()
 
     switch (operator) {
-      case 'contains':     return fv.includes(val)
+      case 'contains': return fv.includes(val)
       case 'not_contains': return !fv.includes(val)
-      case 'equals':       return fv === val
-      case 'not_equals':   return fv !== val
-      case 'starts_with':  return fv.startsWith(val)
-      case 'ends_with':    return fv.endsWith(val)
-      case 'is_empty':     return fv === ''
+      case 'equals': return fv === val
+      case 'not_equals': return fv !== val
+      case 'starts_with': return fv.startsWith(val)
+      case 'ends_with': return fv.endsWith(val)
+      case 'is_empty': return fv === ''
       case 'is_not_empty': return fv !== ''
-      default:             return fv.includes(val)
+      default: return fv.includes(val)
     }
   }
 

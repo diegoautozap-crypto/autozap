@@ -198,9 +198,92 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
 
         {d.type === 'wait' && (
           <>
-            <div><label style={labelStyle}>Segundos</label><input type="number" min="0" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0 })} /></div>
-            <div><label style={labelStyle}>Minutos</label><input type="number" min="0" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0 })} /></div>
-            <div><label style={labelStyle}>Horas</label><input type="number" min="0" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0 })} /></div>
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1', marginBottom: '4px' }}>
+              Acima de 5 minutos o flow pausa e retoma automaticamente via fila. Sem limite de tempo.
+            </div>
+            <div><label style={labelStyle}>Segundos</label><input type="number" min="0" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0, days: 0 })} /></div>
+            <div><label style={labelStyle}>Minutos</label><input type="number" min="0" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0, days: 0 })} /></div>
+            <div><label style={labelStyle}>Horas</label><input type="number" min="0" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0, days: 0 })} /></div>
+            <div><label style={labelStyle}>Dias</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value), seconds: 0, minutes: 0, hours: 0 })} /></div>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+              Total: {((d.days||0)*24*60 + (d.hours||0)*60 + (d.minutes||0) + Math.ceil((d.seconds||0)/60))} minuto(s)
+              {((d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)) > 300
+                ? ' — será agendado via fila ✓'
+                : ' — espera síncrona'}
+            </p>
+          </>
+        )}
+
+        {/* ── LOOP REPEAT ────────────────────────────────────────────────── */}
+        {d.type === 'loop_repeat' && (
+          <>
+            <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#6d28d9' }}>
+              Conecte a saída <strong>Loop</strong> aos nós que devem repetir. A saída <strong>Concluído</strong> segue após terminar todas as repetições.
+            </div>
+            <div>
+              <label style={labelStyle}>Número de repetições</label>
+              <input type="number" min="1" max="100" style={inputStyle} value={d.times ?? 1} onChange={e => onUpdate(node.id, { times: Number(e.target.value) })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Executa o loop exatamente {d.times ?? 1} vez{(d.times ?? 1) > 1 ? 'es' : ''}</p>
+            </div>
+          </>
+        )}
+
+        {/* ── LOOP RETRY ─────────────────────────────────────────────────── */}
+        {d.type === 'loop_retry' && (
+          <>
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#ea580c' }}>
+              Conecte a saída <strong>Tentativa</strong> aos nós de cada tentativa. A saída <strong>Esgotado</strong> dispara quando atingir o limite.
+            </div>
+            <div>
+              <label style={labelStyle}>Máximo de tentativas</label>
+              <input type="number" min="1" max="20" style={inputStyle} value={d.maxRetries ?? 3} onChange={e => onUpdate(node.id, { maxRetries: Number(e.target.value) })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Após {d.maxRetries ?? 3} tentativa{(d.maxRetries ?? 3) > 1 ? 's' : ''} sem sucesso, vai para "Esgotado"</p>
+            </div>
+          </>
+        )}
+
+        {/* ── LOOP WHILE ─────────────────────────────────────────────────── */}
+        {d.type === 'loop_while' && (
+          <>
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1' }}>
+              Repete enquanto a condição for verdadeira. A saída <strong>Loop</strong> executa o corpo. A saída <strong>Concluído</strong> sai quando a condição falhar.
+            </div>
+            <div>
+              <label style={labelStyle}>Campo</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.conditionField || 'variable'} onChange={e => onUpdate(node.id, { conditionField: e.target.value })}>
+                <option value="variable">Variável</option>
+                <option value="message">Mensagem</option>
+                <option value="phone">Telefone</option>
+              </select>
+            </div>
+            {(d.conditionField || 'variable') === 'variable' && (
+              <div>
+                <label style={labelStyle}>Nome da variável</label>
+                <input style={inputStyle} placeholder="ex: status_pagamento" value={d.conditionFieldName || ''} onChange={e => onUpdate(node.id, { conditionFieldName: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Operador</label>
+              <select style={{ ...inputStyle, background: '#fff' }} value={d.conditionOperator || 'is_empty'} onChange={e => onUpdate(node.id, { conditionOperator: e.target.value })}>
+                <option value="is_empty">Está vazio</option>
+                <option value="is_not_empty">Não está vazio</option>
+                <option value="equals">É igual a</option>
+                <option value="not_equals">É diferente de</option>
+                <option value="contains">Contém</option>
+                <option value="not_contains">Não contém</option>
+              </select>
+            </div>
+            {!['is_empty', 'is_not_empty'].includes(d.conditionOperator || 'is_empty') && (
+              <div>
+                <label style={labelStyle}>Valor</label>
+                <input style={inputStyle} placeholder="valor para comparar" value={d.conditionValue || ''} onChange={e => onUpdate(node.id, { conditionValue: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Máximo de iterações (segurança)</label>
+              <input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Evita loop infinito. Máximo: {d.maxIterations ?? 10} repetições</p>
+            </div>
           </>
         )}
 

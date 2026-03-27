@@ -8,6 +8,7 @@ import flowRoutes from './routes/flow.routes'
 import { errorHandler } from './middleware/message.middleware'
 import { logger } from './lib/logger'
 import { startMessageWorker, startRetryWorker, startReconciliationJob } from './workers/message.worker'
+import { startFlowResumeWorker } from './workers/flow.worker'
 
 const app = express()
 const PORT = process.env.PORT || 3004
@@ -30,6 +31,7 @@ app.listen(PORT, async () => {
   logger.info(`message-service running on port ${PORT}`)
   startMessageWorker()
   startRetryWorker()
+  startFlowResumeWorker()
   await startReconciliationJob()
   logger.info('All workers started')
 })

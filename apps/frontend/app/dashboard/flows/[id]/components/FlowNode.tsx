@@ -30,6 +30,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
     if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
     if (data.type === 'wait') {
+      if (data.days) return `Aguardar ${data.days} dia${data.days > 1 ? 's' : ''}`
       if (data.hours) return `Aguardar ${data.hours}h`
       if (data.minutes) return `Aguardar ${data.minutes} min`
       return `Aguardar ${data.seconds ?? 0}s`
@@ -40,9 +41,14 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'move_pipeline') return data.stageLabel || data.stage || 'Etapa não definida'
     if (data.type === 'assign_agent') return 'Transferir para atendente'
     if (data.type === 'go_to') return 'Ir para outro flow'
+    if (data.type === 'loop_repeat') return `Repetir ${data.times ?? 1}x`
+    if (data.type === 'loop_retry') return `Até ${data.maxRetries ?? 3} tentativas`
+    if (data.type === 'loop_while') return data.conditionFieldName ? `Enquanto ${data.conditionFieldName}` : 'Configurar condição'
     if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
     return ''
   }
+
+  const isLoop = data.type === 'loop_repeat' || data.type === 'loop_retry' || data.type === 'loop_while'
 
   return (
     <div
