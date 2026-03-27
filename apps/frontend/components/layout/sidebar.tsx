@@ -93,7 +93,12 @@ export function Sidebar() {
 
       const json = await res.json()
       const freshRole = json?.data?.role || roleFromStore
+      if (freshRole !== currentRole) {
       setCurrentRole(freshRole)
+      window.location.reload()
+      return
+     }
+     setCurrentRole(freshRole)
 
       // Admin e owner têm acesso total
       if (freshRole === 'admin' || freshRole === 'owner') {
