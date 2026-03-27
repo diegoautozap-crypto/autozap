@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
@@ -73,6 +73,7 @@ export function Sidebar() {
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
   const [currentRole, setCurrentRole] = useState<string>(roleFromStore)
+  const currentRoleRef = useRef<string>(roleFromStore)
 
   const isAdmin = currentRole === 'admin' || currentRole === 'owner'
 
@@ -86,7 +87,6 @@ export function Sidebar() {
       })
 
       if (!res.ok) {
-        if (currentRole === 'admin' || currentRole === 'owner') return
         setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
         return
       }
@@ -95,13 +95,12 @@ export function Sidebar() {
       const freshRole = json?.data?.role || roleFromStore
 
       // Se o role mudou, recarrega a página automaticamente
-      if (freshRole !== currentRole) {
+      if (freshRole !== currentRoleRef.current) {
+        currentRoleRef.current = freshRole
         setCurrentRole(freshRole)
         window.location.reload()
         return
       }
-
-      setCurrentRole(freshRole)
 
       // Admin e owner têm acesso total
       if (freshRole === 'admin' || freshRole === 'owner') {
@@ -121,7 +120,7 @@ export function Sidebar() {
     } catch {
       setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
     }
-  }, [user, roleFromStore, currentRole])
+  }, [user, roleFromStore])
 
   useEffect(() => {
     fetchPermissions()
