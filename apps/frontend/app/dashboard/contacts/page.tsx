@@ -764,7 +764,7 @@ export default function ContactsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {isEditing
                         ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => queryClient.invalidateQueries({ queryKey: ['contacts'] })} /></>}
+                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /></>}
                     </div>
                   </div>
                   {/* Telefone */}
