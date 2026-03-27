@@ -167,6 +167,97 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   )
 }
 
+function InboxTagEditor({ contactId, contactTags, onChanged }: {
+  contactId: string
+  contactTags: any[]
+  onChanged: () => void
+}) {
+  const { user } = useAuthStore()
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const { data: allTags = [] } = useQuery({
+    queryKey: ['tags-inbox', tenantId],
+    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
+    enabled: !!tenantId,
+    staleTime: 60000,
+  })
+
+  const activeIds = new Set(contactTags.map((t: any) => t.id))
+
+  const toggle = async (tag: any) => {
+    setLoading(tag.id)
+    try {
+      if (activeIds.has(tag.id)) {
+        await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
+      } else {
+        await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
+      }
+      onChanged()
+    } catch {
+      toast.error('Erro ao atualizar tag')
+    }
+    setLoading(null)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
+        {contactTags.map((tag: any) => (
+          <span key={tag.id} style={{
+            fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
+            background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280',
+            border: `1px solid ${tag.color || '#6b7280'}40`,
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+          }}>
+            {tag.name}
+            <span onClick={() => toggle(tag)} style={{ cursor: 'pointer', opacity: 0.6, lineHeight: 1, fontSize: '13px' }}>×</span>
+          </span>
+        ))}
+        <span onClick={() => setOpen(o => !o)} style={{
+          fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
+          background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb',
+          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px',
+        }}>
+          <Plus size={10} /> tag
+        </span>
+      </div>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 100,
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,.12)', padding: '6px', minWidth: '160px', marginTop: '4px',
+        }}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {(allTags as any[]).length === 0
+            ? <p style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
+            : (allTags as any[]).map((tag: any) => {
+              const active = activeIds.has(tag.id)
+              return (
+                <div key={tag.id} onClick={() => toggle(tag)} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                  borderRadius: '6px', cursor: 'pointer', background: active ? `${tag.color}12` : 'transparent',
+                }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}20` : '#f9fafb'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}12` : 'transparent'}
+                >
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', color: '#111827', flex: 1 }}>{tag.name}</span>
+                  {loading === tag.id
+                    ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
+                    : active && <Check size={11} color={tag.color || '#16a34a'} />}
+                </div>
+              )
+            })
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InboxPage() {
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -744,14 +835,11 @@ export default function InboxPage() {
                   {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
                 </select>
               </div>
-              {contactTags.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Tag size={13} color="#9ca3af" /><p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Tags</p></div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                    {contactTags.map((tag: any) => <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>)}
-                  </div>
-                </div>
-              )}
+              {/* Tags — editáveis */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Tag size={13} color="#9ca3af" /><p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Tags</p></div>
+                <InboxTagEditor contactId={contactId!} contactTags={contactTags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contact', contactId] }) }} />
+              </div>
             </div>
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><StickyNote size={13} color="#d97706" /><p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Notas internas</p></div>

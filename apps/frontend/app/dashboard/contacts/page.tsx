@@ -72,6 +72,89 @@ function ContactTags({ contact }: { contact: any }) {
   )
 }
 
+function TagEditor({ contactId, contactTags, allTags, onChanged }: {
+  contactId: string
+  contactTags: any[]
+  allTags: any[]
+  onChanged: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const activeIds = new Set(contactTags.map((t: any) => t.id))
+
+  const toggle = async (tag: any) => {
+    setLoading(tag.id)
+    try {
+      if (activeIds.has(tag.id)) {
+        await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
+      } else {
+        await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
+      }
+      onChanged()
+    } catch {
+      toast.error('Erro ao atualizar tag')
+    }
+    setLoading(null)
+  }
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px', alignItems: 'center' }}>
+        {contactTags.map((tag: any) => (
+          <span key={tag.id} style={{
+            fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
+            background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280',
+            border: `1px solid ${tag.color || '#6b7280'}40`, display: 'inline-flex', alignItems: 'center', gap: '4px',
+          }}>
+            {tag.name}
+            <span onClick={e => { e.stopPropagation(); toggle(tag) }} style={{ cursor: 'pointer', lineHeight: 1, opacity: 0.6 }}>×</span>
+          </span>
+        ))}
+        <span onClick={e => { e.stopPropagation(); setOpen(o => !o) }} style={{
+          fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
+          background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb',
+          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px',
+        }}>
+          <Plus size={9} /> tag
+        </span>
+      </div>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 100,
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,.12)', padding: '6px', minWidth: '160px', marginTop: '4px',
+        }}
+          onClick={e => e.stopPropagation()}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {allTags.length === 0
+            ? <p style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
+            : allTags.map((tag: any) => {
+              const active = activeIds.has(tag.id)
+              return (
+                <div key={tag.id} onClick={() => toggle(tag)} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                  borderRadius: '6px', cursor: 'pointer', background: active ? `${tag.color}12` : 'transparent',
+                }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}20` : '#f9fafb'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}12` : 'transparent'}
+                >
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', color: '#111827', flex: 1 }}>{tag.name}</span>
+                  {loading === tag.id
+                    ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
+                    : active && <Check size={11} color={tag.color || '#16a34a'} />}
+                </div>
+              )
+            })
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [fields, setFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState(true)
@@ -663,7 +746,7 @@ export default function ContactsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {isEditing
                         ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><ContactTags contact={c} /></>}
+                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => queryClient.invalidateQueries({ queryKey: ['contacts'] })} /></>}
                     </div>
                   </div>
                   {/* Telefone */}
