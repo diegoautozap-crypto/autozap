@@ -99,7 +99,7 @@ function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
       tenant_id: TENANT_ID, name, label: newField.label.trim(),
       type: newField.type, options, required: newField.required, sort_order: fields.length,
     })
-    if (error) toast.error('Erro ao criar campo')
+    if (error) toast.error('Erro: ' + error.message)
     else { toast.success('Campo criado!'); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
     setSaving(false)
   }
