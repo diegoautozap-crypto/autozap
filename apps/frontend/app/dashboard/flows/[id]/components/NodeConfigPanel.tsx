@@ -153,6 +153,33 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
             {d.mode === 'classify' && <div><label style={labelStyle}>Categorias (separadas por vírgula)</label><input style={inputStyle} placeholder="comprar, suporte, cancelar" defaultValue={d.classifyOptions || ''} onBlur={e => onUpdate(node.id, { classifyOptions: e.target.value })} /></div>}
             {d.mode === 'extract' && <div><label style={labelStyle}>O que extrair</label><input style={inputStyle} placeholder="o nome completo, o CPF..." value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} /></div>}
             <div><label style={labelStyle}>Salvar resposta como variável</label><input style={inputStyle} placeholder="intencao" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} /></div>
+
+            {/* Contexto do histórico */}
+            <div>
+              <label style={labelStyle}>Mensagens do histórico para contexto</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="range" min="0" max="200" step="5"
+                  value={d.historyMessages ?? 20}
+                  onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })}
+                  style={{ flex: 1, accentColor: '#6d28d9' }}
+                />
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#6d28d9', minWidth: '42px', textAlign: 'right' }}>
+                  {d.historyMessages === 0 ? 'nenhuma' : d.historyMessages === 200 ? 'todas' : `${d.historyMessages ?? 20}`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#d1d5db', marginTop: '2px' }}>
+                <span>Sem histórico</span>
+                <span>Todas</span>
+              </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                {d.historyMessages === 0
+                  ? 'A IA responde sem ver o histórico da conversa'
+                  : d.historyMessages === 200
+                  ? 'A IA vê toda a conversa (pode ser mais lento e caro)'
+                  : `A IA considera as últimas ${d.historyMessages ?? 20} mensagens como contexto`}
+              </p>
+            </div>
           </>
         )}
 
