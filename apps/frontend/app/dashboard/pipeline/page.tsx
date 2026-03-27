@@ -650,8 +650,9 @@ export default function PipelinePage() {
     window.addEventListener('mouseup', onUp)
   }
 
-
+  const handleColumnsSaved = () => {
     refetchCols()
+    setLocalStages(null)
     localBoardRef.current = null
     queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
   }
