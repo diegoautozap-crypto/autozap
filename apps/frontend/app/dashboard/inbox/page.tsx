@@ -371,8 +371,18 @@ export default function InboxPage() {
     },
     onSuccess: () => {
       setMessageText(''); setPendingFile(null)
+      // Atualiza status para 'open' imediatamente no cache — sem esperar refetch
+      queryClient.setQueryData(['conversation', selectedConvId], (old: any) => {
+        if (!old) return old
+        return { ...old, status: 'open' }
+      })
+      queryClient.setQueriesData({ queryKey: ['conversations'], exact: false }, (old: any) => {
+        if (!Array.isArray(old)) return old
+        return old.map((c: any) => c.id === selectedConvId ? { ...c, status: 'open' } : c)
+      })
       queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
       if (botActive && selectedConvId) {
         messageApi.post(`/messages/conversations/${selectedConvId}/take-over`, {})
           .then(() => { queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) })
@@ -456,7 +466,7 @@ export default function InboxPage() {
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f6f8fa' }}>
       {/* Left */}
-      <div style={{ width: '280px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Inbox</h2>
           <div style={{ position: 'relative' }}>
