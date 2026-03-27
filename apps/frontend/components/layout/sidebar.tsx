@@ -93,12 +93,15 @@ export function Sidebar() {
 
       const json = await res.json()
       const freshRole = json?.data?.role || roleFromStore
+
+      // Se o role mudou, recarrega a página automaticamente
       if (freshRole !== currentRole) {
+        setCurrentRole(freshRole)
+        window.location.reload()
+        return
+      }
+
       setCurrentRole(freshRole)
-      window.location.reload()
-      return
-     }
-     setCurrentRole(freshRole)
 
       // Admin e owner têm acesso total
       if (freshRole === 'admin' || freshRole === 'owner') {
@@ -118,14 +121,13 @@ export function Sidebar() {
     } catch {
       setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
     }
-  }, [user, roleFromStore])
+  }, [user, roleFromStore, currentRole])
 
   useEffect(() => {
     fetchPermissions()
-    if (isAdmin) return
     const interval = setInterval(fetchPermissions, 5_000)
     return () => clearInterval(interval)
-  }, [fetchPermissions, isAdmin])
+  }, [fetchPermissions])
 
   // Guard — bloqueia acesso a páginas não permitidas
   useEffect(() => {
