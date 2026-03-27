@@ -43,7 +43,7 @@ export class ConversationService {
     let query = db
       .from('conversations')
       .select(`
-        id, status, pipeline_stage, unread_count, last_message, last_message_at, created_at,
+        id, status, pipeline_stage, pipeline_id, unread_count, last_message, last_message_at, created_at,
         contacts(id, name, phone, avatar_url),
         channels(id, name, type),
         users!conversations_assigned_to_fkey(id, name, avatar_url)
@@ -95,7 +95,6 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-    logger.info('Conversation status updated', { conversationId, status })
     emitPusher(tenantId, 'conversation.updated', { conversationId, status })
     return data
   }
@@ -114,17 +113,20 @@ export class ConversationService {
     return data
   }
 
-  async updatePipelineStage(conversationId: string, tenantId: string, stage: string) {
+  async updatePipelineStage(conversationId: string, tenantId: string, stage: string, pipelineId?: string) {
+    const updateData: any = { pipeline_stage: stage }
+    if (pipelineId) updateData.pipeline_id = pipelineId
+
     const { data, error } = await db
       .from('conversations')
-      .update({ pipeline_stage: stage })
+      .update(updateData)
       .eq('id', conversationId)
       .eq('tenant_id', tenantId)
       .select()
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-    emitPusher(tenantId, 'conversation.updated', { conversationId, pipelineStage: stage })
+    emitPusher(tenantId, 'conversation.updated', { conversationId, pipelineStage: stage, pipelineId })
     return data
   }
 
@@ -153,15 +155,23 @@ export class ConversationService {
     return (data || []).reverse()
   }
 
-  async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string) {
-    // Busca colunas dinâmicas do banco
-    const { data: dbColumns } = await db
+  async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string, pipelineId?: string) {
+    // Busca colunas — filtra por pipeline se fornecido
+    let colQuery = db
       .from('pipeline_columns')
       .select('key, label')
       .eq('tenant_id', tenantId)
       .order('sort_order', { ascending: true })
 
-    // Usa colunas do banco ou fallback para as padrão
+    if (pipelineId) {
+      colQuery = colQuery.eq('pipeline_id', pipelineId)
+    } else {
+      // Sem pipeline selecionada — pega colunas sem pipeline_id (legado)
+      colQuery = colQuery.is('pipeline_id', null)
+    }
+
+    const { data: dbColumns } = await colQuery
+
     const stages = dbColumns && dbColumns.length > 0
       ? dbColumns.map((c: any) => c.key)
       : DEFAULT_STAGES
@@ -169,7 +179,7 @@ export class ConversationService {
     let query = db
       .from('conversations')
       .select(`
-        id, pipeline_stage, last_message, last_message_at, unread_count, channel_id, campaign_id,
+        id, pipeline_stage, pipeline_id, last_message, last_message_at, unread_count, channel_id, campaign_id,
         contacts(id, name, phone, avatar_url, contact_tags(tag_id, tags(id, name, color))),
         channels(id, name)
       `)
@@ -179,21 +189,23 @@ export class ConversationService {
 
     if (channelId) query = query.eq('channel_id', channelId)
     if (campaignId) query = query.eq('campaign_id', campaignId)
+    if (pipelineId) {
+      query = query.eq('pipeline_id', pipelineId)
+    } else {
+      query = query.is('pipeline_id', null)
+    }
 
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // Inicializa o board com todas as colunas
     const board: Record<string, any[]> = {}
     stages.forEach((s: string) => board[s] = [])
 
-    // Distribui as conversas nas colunas
     ;(data || []).forEach((conv: any) => {
       const stage = conv.pipeline_stage || stages[0] || 'lead'
       if (board[stage] !== undefined) {
         board[stage].push(conv)
       } else {
-        // Conversa em coluna que não existe mais — coloca na primeira coluna
         const firstStage = stages[0] || 'lead'
         if (!board[firstStage]) board[firstStage] = []
         board[firstStage].push(conv)

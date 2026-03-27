@@ -8,7 +8,6 @@ import { decryptCredentials } from '../lib/crypto'
 
 const router = Router()
 
-// ─── Helper: busca permissões do usuário ──────────────────────────────────────
 async function getUserPermissions(userId: string, tenantId: string) {
   const { data } = await db
     .from('user_permissions')
@@ -24,18 +23,14 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
   try {
     const { mediaId } = req.params
     const { channelId } = req.query as any
-
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
-
     const { data: channel } = await db.from('channels').select('credentials, type').eq('id', channelId).single()
     if (!channel) { res.status(404).json({ error: 'Channel not found' }); return }
-
     const credentials = decryptCredentials(channel.credentials)
     const apiKey = credentials?.apiKey
     const metaToken = credentials?.metaToken
     const isMetaId = /^\d+$/.test(mediaId)
     let mediaResponse: Response
-
     if (isMetaId && metaToken) {
       const metaUrlResponse = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${metaToken}` } })
       if (!metaUrlResponse.ok) { res.status(404).json({ error: 'Media not found on Meta' }); return }
@@ -47,9 +42,7 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     } else {
       res.status(400).json({ error: 'No credentials available' }); return
     }
-
     if (!mediaResponse.ok) { res.status(mediaResponse.status).json({ error: 'Failed to fetch media' }); return }
-
     const contentType = mediaResponse.headers.get('content-type')
     const contentLength = mediaResponse.headers.get('content-length')
     if (contentType) res.setHeader('Content-Type', contentType)
@@ -67,60 +60,107 @@ router.use(requireAuth)
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const updateStatusSchema = z.object({ status: z.enum(['open', 'waiting', 'closed']) })
 const assignSchema = z.object({ userId: z.string().uuid().nullable() })
-// Aceita qualquer string — colunas são dinâmicas e criadas pelo usuário
-const pipelineSchema = z.object({ stage: z.string().min(1).max(100) })
+const pipelineSchema = z.object({
+  stage: z.string().min(1).max(100),
+  pipelineId: z.string().uuid().optional(),
+})
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ─── Pipeline CRUD ────────────────────────────────────────────────────────────
+
+// GET /pipelines — lista todas as pipelines do tenant
+router.get('/pipelines', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('pipelines')
+      .select('*')
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// POST /pipelines — cria nova pipeline
+router.post('/pipelines', async (req, res, next) => {
+  try {
+    const { name } = req.body
+    if (!name) { res.status(400).json({ error: 'name is required' }); return }
+    const { data, error } = await db
+      .from('pipelines')
+      .insert({ tenant_id: req.auth.tid, name })
+      .select()
+      .single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// PATCH /pipelines/:id — renomeia pipeline
+router.patch('/pipelines/:id', async (req, res, next) => {
+  try {
+    const { name } = req.body
+    const { data, error } = await db
+      .from('pipelines')
+      .update({ name })
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select()
+      .single()
+    if (error) throw error
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// DELETE /pipelines/:id — deleta pipeline e suas colunas
+router.delete('/pipelines/:id', async (req, res, next) => {
+  try {
+    await db.from('pipeline_columns').delete().eq('pipeline_id', req.params.id)
+    const { error } = await db
+      .from('pipelines')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+    if (error) throw error
+    res.json(ok({ message: 'Pipeline deleted' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Conversation Routes ───────────────────────────────────────────────────────
 
 router.get('/conversations', async (req, res, next) => {
   try {
     const { page, limit } = paginationSchema.parse(req.query)
     const { status, channelId } = req.query as any
     const role = req.auth.role
-
     if (role === 'admin' || role === 'owner') {
-      const result = await conversationService.listConversations(req.auth.tid, {
-        status, channelId, page, limit,
-      })
+      const result = await conversationService.listConversations(req.auth.tid, { status, channelId, page, limit })
       return res.json(ok(result.conversations, result.meta))
     }
-
     const perms = await getUserPermissions(req.auth.sub, req.auth.tid)
     const allowedChannels = perms?.allowed_channels || []
-    const effectiveChannelId = channelId
-      || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
-
+    const effectiveChannelId = channelId || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
     const conversationAccess = perms?.conversation_access || 'assigned'
     const assignedTo = conversationAccess === 'assigned' ? req.auth.sub : undefined
-
     const result = await conversationService.listConversations(req.auth.tid, {
-      status,
-      channelId: effectiveChannelId,
-      assignedTo,
-      page,
-      limit,
+      status, channelId: effectiveChannelId, assignedTo, page, limit,
       allowedChannels: allowedChannels.length > 0 ? allowedChannels : undefined,
     })
-
     res.json(ok(result.conversations, result.meta))
   } catch (err) { next(err) }
 })
 
 router.get('/conversations/pipeline', async (req, res, next) => {
   try {
-    const { channelId, campaignId } = req.query as any
+    const { channelId, campaignId, pipelineId } = req.query as any
     const role = req.auth.role
-
     if (role === 'admin' || role === 'owner') {
-      const board = await conversationService.getPipelineBoard(req.auth.tid, channelId, campaignId)
+      const board = await conversationService.getPipelineBoard(req.auth.tid, channelId, campaignId, pipelineId)
       return res.json(ok(board))
     }
-
     const perms = await getUserPermissions(req.auth.sub, req.auth.tid)
     const allowedChannels = perms?.allowed_channels || []
     const effectiveChannelId = channelId || (allowedChannels.length === 1 ? allowedChannels[0] : undefined)
-
-    const board = await conversationService.getPipelineBoard(req.auth.tid, effectiveChannelId, campaignId)
+    const board = await conversationService.getPipelineBoard(req.auth.tid, effectiveChannelId, campaignId, pipelineId)
     res.json(ok(board))
   } catch (err) { next(err) }
 })
@@ -157,7 +197,7 @@ router.patch('/conversations/:id/assign', validate(assignSchema), async (req, re
 
 router.patch('/conversations/:id/pipeline', validate(pipelineSchema), async (req, res, next) => {
   try {
-    const conv = await conversationService.updatePipelineStage(req.params.id, req.auth.tid, req.body.stage)
+    const conv = await conversationService.updatePipelineStage(req.params.id, req.auth.tid, req.body.stage, req.body.pipelineId)
     res.json(ok(conv))
   } catch (err) { next(err) }
 })
