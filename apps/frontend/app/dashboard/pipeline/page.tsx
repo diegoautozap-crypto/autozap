@@ -345,6 +345,9 @@ export default function PipelinePage() {
   const [campaignFilter, setCampaignFilter] = useState('all')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
+  const [draggingColKey, setDraggingColKey] = useState<string | null>(null)
+  const [overColKey, setOverColKey] = useState<string | null>(null)
+  const [localStages, setLocalStages] = useState<any[] | null>(null)
   const [showManage, setShowManage] = useState(false)
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
@@ -369,8 +372,10 @@ export default function PipelinePage() {
     staleTime: 30000,
   })
 
-  // Resolve which columns to display
-  const stages = (dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS).map(c => ({
+  // Resolve which columns to display (localStages = optimistic reorder)
+  const baseStages = dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS
+  const stages = (localStages ?? baseStages).map((c: any) => ({
+    ...c,
     key: c.key,
     label: c.label,
     color: c.color || '#6b7280',
@@ -496,6 +501,54 @@ export default function PipelinePage() {
 
   const handleDragEnd = () => { setDraggingId(null); setOverStage(null) }
 
+  // ── Column drag-to-reorder ──
+  const handleColDragStart = (e: React.DragEvent, key: string) => {
+    e.dataTransfer.setData('dragType', 'column')
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingColKey(key)
+  }
+
+  const handleColDragOver = (e: React.DragEvent, key: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (draggingColKey && draggingColKey !== key) setOverColKey(key)
+  }
+
+  const handleColDrop = async (e: React.DragEvent, targetKey: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!draggingColKey || draggingColKey === targetKey) {
+      setDraggingColKey(null); setOverColKey(null); return
+    }
+
+    const arr = [...stages]
+    const fromIdx = arr.findIndex(s => s.key === draggingColKey)
+    const toIdx = arr.findIndex(s => s.key === targetKey)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const [moved] = arr.splice(fromIdx, 1)
+    arr.splice(toIdx, 0, moved)
+
+    // Optimistic update
+    setLocalStages(arr)
+    setDraggingColKey(null); setOverColKey(null)
+
+    // Persist to Supabase
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+    const updates = arr
+      .filter(c => isUUID(c.id))
+      .map((c, i) => ({ id: c.id, sort_order: i }))
+
+    if (updates.length > 0) {
+      for (const u of updates) {
+        await supabase.from('pipeline_columns').update({ sort_order: u.sort_order }).eq('id', u.id)
+      }
+      refetchCols()
+    }
+  }
+
+  const handleColDragEnd = () => { setDraggingColKey(null); setOverColKey(null) }
+
   const handleColumnsSaved = () => {
     refetchCols()
     localBoardRef.current = null
@@ -567,18 +620,34 @@ export default function PipelinePage() {
               const isOver = overStage === stage.key
               return (
                 <div key={stage.key}
-                  onDragOver={e => handleDragOver(e, stage.key)}
-                  onDrop={e => handleDrop(e, stage.key)}
-                  onDragLeave={() => setOverStage(null)}
+                  onDragOver={e => {
+                    if (draggingColKey) { handleColDragOver(e, stage.key) }
+                    else { handleDragOver(e, stage.key) }
+                  }}
+                  onDrop={e => {
+                    if (draggingColKey) { handleColDrop(e, stage.key) }
+                    else { handleDrop(e, stage.key) }
+                  }}
+                  onDragLeave={() => { setOverStage(null); setOverColKey(null) }}
                   style={{
                     width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column',
                     background: isOver ? stage.bg : '#f6f8fa',
-                    border: `2px solid ${isOver ? stage.color : '#e5e7eb'}`,
+                    border: `2px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : '#e5e7eb'}`,
                     borderRadius: '12px', overflow: 'hidden',
-                    transition: 'border-color 0.15s, background 0.15s',
+                    transition: 'border-color 0.15s, background 0.15s, opacity 0.15s',
+                    opacity: draggingColKey === stage.key ? 0.4 : 1,
                   }}>
 
-                  <div style={{ padding: '12px 14px', borderBottom: `1px solid ${stage.border}`, background: stage.bg, flexShrink: 0 }}>
+                  {/* Column header — draggable */}
+                  <div
+                    draggable
+                    onDragStart={e => handleColDragStart(e, stage.key)}
+                    onDragEnd={handleColDragEnd}
+                    style={{
+                      padding: '12px 14px', borderBottom: `1px solid ${stage.border}`,
+                      background: stage.bg, flexShrink: 0,
+                      cursor: 'grab', userSelect: 'none',
+                    }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                         <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: stage.color }} />
