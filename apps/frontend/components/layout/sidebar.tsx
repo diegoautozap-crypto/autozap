@@ -69,14 +69,15 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { logout, user } = useAuthStore()
-  const role = (user as any)?.role || 'agent'
-  const isAdmin = role === 'admin' || role === 'owner'
+  const roleFromStore = (user as any)?.role || 'agent'
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
+  const [currentRole, setCurrentRole] = useState<string>(roleFromStore)
+
+  const isAdmin = currentRole === 'admin' || currentRole === 'owner'
 
   const fetchPermissions = useCallback(async () => {
     if (!user) return
-    if (isAdmin) { setAllowedPages(ADMIN_PAGES); return }
 
     try {
       const token = localStorage.getItem('accessToken')
@@ -85,11 +86,21 @@ export function Sidebar() {
       })
 
       if (!res.ok) {
+        if (currentRole === 'admin' || currentRole === 'owner') return
         setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
         return
       }
 
       const json = await res.json()
+      const freshRole = json?.data?.role || roleFromStore
+      setCurrentRole(freshRole)
+
+      // Admin e owner têm acesso total
+      if (freshRole === 'admin' || freshRole === 'owner') {
+        setAllowedPages(ADMIN_PAGES)
+        return
+      }
+
       const perms = json?.data?.permissions
       if (perms?.allowed_pages?.length > 0) {
         const pages = perms.allowed_pages.includes('/dashboard/inbox')
@@ -102,7 +113,7 @@ export function Sidebar() {
     } catch {
       setAllowedPages(prev => prev ?? ['/dashboard/inbox'])
     }
-  }, [user, isAdmin])
+  }, [user, roleFromStore])
 
   useEffect(() => {
     fetchPermissions()
@@ -147,7 +158,7 @@ export function Sidebar() {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#111827', letterSpacing: '-0.01em' }}>AutoZap</div>
-            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{ROLE_LABEL[role] || 'WhatsApp CRM'}</div>
+            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{ROLE_LABEL[currentRole] || 'WhatsApp CRM'}</div>
           </div>
         </div>
       </div>
