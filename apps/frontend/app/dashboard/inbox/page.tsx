@@ -473,17 +473,16 @@ export default function InboxPage() {
           </div>
         )}
         {/* Filtros com contadores — FIX: badge aparece mesmo com count=0 nas abas de status */}
-        <div style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '3px', flexShrink: 0 }}>
+        <div style={{ padding: '6px 8px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '2px', flexShrink: 0 }}>
           {statusFilters.map(f => {
             const count = statusCounts?.[f.key as keyof typeof statusCounts]
             const isActive = statusFilter === f.key
-            // Mostra badge em todas as abas (exceto "Todas" quando zerada)
             const showBadge = count != null && (f.key !== 'all' || count > 0)
             return (
-              <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '4px 7px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer', background: isActive ? '#16a34a' : 'transparent', color: isActive ? '#fff' : '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button key={f.key} onClick={() => setStatusFilter(f.key)} style={{ flex: 1, padding: '4px 4px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer', background: isActive ? '#16a34a' : 'transparent', color: isActive ? '#fff' : '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
                 {f.label}
                 {showBadge && (
-                  <span style={{ fontSize: '10px', fontWeight: 700, background: isActive ? 'rgba(255,255,255,0.25)' : '#f3f4f6', color: isActive ? '#fff' : '#6b7280', padding: '0px 5px', borderRadius: '99px', lineHeight: '16px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, background: isActive ? 'rgba(255,255,255,0.25)' : '#f3f4f6', color: isActive ? '#fff' : '#6b7280', padding: '0px 4px', borderRadius: '99px', lineHeight: '16px', flexShrink: 0 }}>
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
