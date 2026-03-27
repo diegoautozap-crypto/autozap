@@ -192,8 +192,16 @@ function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         onMouseDown={e => e.stopPropagation()}
         onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
         title="Deletar nó"
-        style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', width: '22px', height: '22px', background: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,.2)', zIndex: 20 }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+        style={{
+          position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+          width: '22px', height: '22px',
+          background: hovered ? '#ef4444' : 'transparent',
+          border: hovered ? 'none' : '2px solid #e5e7eb',
+          borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', boxShadow: hovered ? '0 2px 5px rgba(0,0,0,.2)' : 'none',
+          zIndex: 20, transition: 'all 0.15s',
+        }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={hovered ? '#fff' : '#d1d5db'} strokeWidth="2.5">
           <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
         </svg>
       </div>
@@ -879,6 +887,15 @@ export default function FlowEditorPage() {
   const [flowName, setFlowName] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
+
+  // Carrega clipboard do sessionStorage ao montar
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('autozap_flow_clipboard')
+      if (saved) setCopiedNodes(JSON.parse(saved))
+    } catch { }
+  }, [])
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -989,6 +1006,53 @@ export default function FlowEditorPage() {
     setIsDirty(true)
   }
 
+  // ── Copiar nodes selecionados ──
+  const copySelected = () => {
+    const selectedNodes = nodes.filter(n => n.selected)
+    if (selectedNodes.length === 0) {
+      toast.error('Selecione pelo menos um nó (shift+click ou arraste)')
+      return
+    }
+    const selectedIds = new Set(selectedNodes.map(n => n.id))
+    const selectedEdges = edges.filter(e => selectedIds.has(e.source) && selectedIds.has(e.target))
+    const clipboard = { nodes: selectedNodes, edges: selectedEdges }
+    setCopiedNodes(clipboard)
+    try { sessionStorage.setItem('autozap_flow_clipboard', JSON.stringify(clipboard)) } catch { }
+    toast.success(`${selectedNodes.length} nó${selectedNodes.length > 1 ? 's' : ''} copiado${selectedNodes.length > 1 ? 's' : ''}! Abra outro flow e cole.`)
+  }
+
+  // ── Colar nodes (com novos IDs para não colidir) ──
+  const pasteNodes = () => {
+    if (!copiedNodes || copiedNodes.nodes.length === 0) return
+    const idMap = new Map<string, string>()
+    const offsetX = 60 + Math.random() * 40
+    const offsetY = 60 + Math.random() * 40
+
+    const newNodes: Node[] = copiedNodes.nodes.map(n => {
+      const newId = `node_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      idMap.set(n.id, newId)
+      return {
+        ...n,
+        id: newId,
+        selected: true,
+        position: { x: n.position.x + offsetX, y: n.position.y + offsetY },
+        data: { ...n.data },
+      }
+    })
+
+    const newEdges: Edge[] = copiedNodes.edges.map(e => ({
+      ...e,
+      id: `edge_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      source: idMap.get(e.source) || e.source,
+      target: idMap.get(e.target) || e.target,
+    }))
+
+    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes])
+    setEdges(eds => [...eds, ...newEdges])
+    setIsDirty(true)
+    toast.success(`${newNodes.length} nó${newNodes.length > 1 ? 's' : ''} colado${newNodes.length > 1 ? 's' : ''}!`)
+  }
+
   const nodesWithDelete = nodes.map(n => ({
     ...n,
     data: { ...n.data, nodeId: n.id, onDelete: deleteNode },
@@ -1043,6 +1107,35 @@ export default function FlowEditorPage() {
           style={{ border: 'none', outline: 'none', fontSize: '15px', fontWeight: 600, color: '#111827', background: 'transparent', minWidth: '200px' }} />
         {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● Não salvo</span>}
         <div style={{ flex: 1 }} />
+
+        {/* Colar — só aparece se tem algo copiado */}
+        {copiedNodes && copiedNodes.nodes.length > 0 && (
+          <button onClick={pasteNodes} style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+            background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px',
+            fontSize: '13px', fontWeight: 600, color: '#16a34a', cursor: 'pointer',
+          }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#dcfce7'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'}
+            title="Colar nós copiados neste flow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Colar ({copiedNodes.nodes.length})
+          </button>
+        )}
+
+        {/* Copiar selecionados */}
+        <button onClick={copySelected} style={{
+          display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+          background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px',
+          fontSize: '13px', fontWeight: 500, color: '#6b7280', cursor: 'pointer',
+        }}
+          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}
+          title="Copiar nós selecionados (shift+click para selecionar)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar selecionados
+        </button>
+
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
@@ -1093,6 +1186,8 @@ export default function FlowEditorPage() {
             edgeTypes={edgeTypes}
             fitView fitViewOptions={{ padding: 0.3 }}
             deleteKeyCode={['Backspace', 'Delete']}
+            multiSelectionKeyCode="Shift"
+            selectionOnDrag
             defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
