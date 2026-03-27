@@ -103,16 +103,18 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
 
 // ─── Manage Columns Modal ────────────────────────────────────────────────────
 function ManageColumnsModal({
-  columns, tenantId, onClose, onSaved,
+  columns, tenantId, onClose, onSaved, board,
 }: {
   columns: any[]
   tenantId: string
   onClose: () => void
   onSaved: () => void
+  board: Record<string, any[]> | undefined
 }) {
   const [localCols, setLocalCols] = useState(
     columns.map(c => ({ ...c }))
   )
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newColor, setNewColor] = useState('#6b7280')
@@ -144,6 +146,20 @@ function ManageColumnsModal({
       _isNew: true,
     }])
     setNewLabel(''); setNewColor('#6b7280')
+  }
+
+  const tryRemoveColumn = (col: any) => {
+    const count = board?.[col.key]?.length ?? 0
+    if (count > 0) {
+      setPendingDeleteId(col.id)
+    } else {
+      setLocalCols(c => c.filter(x => x.id !== col.id))
+    }
+  }
+
+  const confirmRemoveColumn = (id: string) => {
+    setLocalCols(c => c.filter(x => x.id !== id))
+    setPendingDeleteId(null)
   }
 
   const removeColumn = (id: string) => {
@@ -202,7 +218,8 @@ function ManageColumnsModal({
         for (const u of toUpdate) {
           const { error: updErr } = await supabase
             .from('pipeline_columns').update({
-              label: u.label, key: u.key, color: u.color, sort_order: u.sort_order,
+              label: u.label, color: u.color, sort_order: u.sort_order,
+              // NEVER update key — it's the permanent identifier linked to pipeline_stage
             }).eq('id', u.id)
           if (updErr) throw updErr
         }
@@ -243,58 +260,101 @@ function ManageColumnsModal({
 
         {/* Column list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
-          {localCols.map((col, i) => (
-            <div
-              key={col.id}
-              draggable
-              onDragStart={() => handleDragStart(i)}
-              onDragEnter={() => handleDragEnter(i)}
-              onDragEnd={handleDragEnd}
-              onDragOver={e => e.preventDefault()}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '9px 10px', marginBottom: '6px', borderRadius: '8px',
-                background: '#f9fafb', border: '1px solid #f3f4f6',
-                cursor: 'grab',
-              }}
-            >
-              <GripVertical size={14} color="#d1d5db" style={{ flexShrink: 0 }} />
-              <ColorPicker value={col.color} onChange={c => updateColor(col.id, c)} />
-
-              {editingId === col.id ? (
-                <input
-                  autoFocus
-                  value={editLabel}
-                  onChange={e => setEditLabel(e.target.value)}
-                  onBlur={() => commitEdit(col.id)}
-                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(col.id); if (e.key === 'Escape') setEditingId(null) }}
+          {localCols.map((col, i) => {
+            const cardCount = board?.[col.key]?.length ?? 0
+            const isPendingDelete = pendingDeleteId === col.id
+            return (
+              <div key={col.id} style={{ marginBottom: '6px' }}>
+                <div
+                  draggable={!isPendingDelete}
+                  onDragStart={() => handleDragStart(i)}
+                  onDragEnter={() => handleDragEnter(i)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={e => e.preventDefault()}
                   style={{
-                    flex: 1, border: 'none', borderBottom: '1.5px solid #7c3aed',
-                    background: 'transparent', fontSize: '13px', fontWeight: 600,
-                    color: '#111827', outline: 'none', padding: '1px 0',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '9px 10px', borderRadius: isPendingDelete ? '8px 8px 0 0' : '8px',
+                    background: isPendingDelete ? '#fff5f5' : '#f9fafb',
+                    border: `1px solid ${isPendingDelete ? '#fecaca' : '#f3f4f6'}`,
+                    cursor: isPendingDelete ? 'default' : 'grab',
+                    transition: 'background 0.15s, border-color 0.15s',
                   }}
-                />
-              ) : (
-                <span
-                  onDoubleClick={() => startEdit(col)}
-                  onClick={() => startEdit(col)}
-                  style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'text' }}
                 >
-                  {col.label}
-                </span>
-              )}
+                  <GripVertical size={14} color="#d1d5db" style={{ flexShrink: 0 }} />
+                  <ColorPicker value={col.color} onChange={c => updateColor(col.id, c)} />
 
-              <button onClick={() => removeColumn(col.id)} style={{
-                background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db',
-                padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center',
-              }}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d1d5db'}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+                  {editingId === col.id ? (
+                    <input
+                      autoFocus
+                      value={editLabel}
+                      onChange={e => setEditLabel(e.target.value)}
+                      onBlur={() => commitEdit(col.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') commitEdit(col.id); if (e.key === 'Escape') setEditingId(null) }}
+                      style={{
+                        flex: 1, border: 'none', borderBottom: '1.5px solid #7c3aed',
+                        background: 'transparent', fontSize: '13px', fontWeight: 600,
+                        color: '#111827', outline: 'none', padding: '1px 0',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={() => startEdit(col)}
+                      onClick={() => !isPendingDelete && startEdit(col)}
+                      style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: isPendingDelete ? '#ef4444' : '#374151', cursor: isPendingDelete ? 'default' : 'text' }}
+                    >
+                      {col.label}
+                    </span>
+                  )}
+
+                  {cardCount > 0 && !isPendingDelete && (
+                    <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 500, marginRight: '2px' }}>
+                      {cardCount} conv.
+                    </span>
+                  )}
+
+                  <button onClick={() => tryRemoveColumn(col)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: isPendingDelete ? '#ef4444' : '#d1d5db',
+                    padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center',
+                  }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = isPendingDelete ? '#ef4444' : '#d1d5db'}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Inline warning panel */}
+                {isPendingDelete && (
+                  <div style={{
+                    background: '#fff5f5', border: '1px solid #fecaca', borderTop: 'none',
+                    borderRadius: '0 0 8px 8px', padding: '10px 12px',
+                  }}>
+                    <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>
+                      ⚠️ Esta coluna tem {cardCount} conversa{cardCount !== 1 ? 's' : ''}
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', lineHeight: '1.4' }}>
+                      Ao excluir, essas conversas ficam invisíveis no pipeline. Essa ação não pode ser desfeita.
+                    </p>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => setPendingDeleteId(null)} style={{
+                        flex: 1, padding: '6px', background: '#fff', border: '1px solid #e5e7eb',
+                        borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#6b7280', cursor: 'pointer',
+                      }}>
+                        Cancelar
+                      </button>
+                      <button onClick={() => confirmRemoveColumn(col.id)} style={{
+                        flex: 1, padding: '6px', background: '#dc2626', border: 'none',
+                        borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer',
+                      }}>
+                        Excluir mesmo assim
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           {/* Add new */}
           <div style={{
@@ -761,6 +821,7 @@ export default function PipelinePage() {
           tenantId={tenantId}
           onClose={() => setShowManage(false)}
           onSaved={handleColumnsSaved}
+          board={displayBoard ?? undefined}
         />
       )}
 
