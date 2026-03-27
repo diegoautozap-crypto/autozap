@@ -509,8 +509,7 @@ function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose, onDel
       if (error || !data || data.length === 0) return DEFAULT_STAGES
       return data as { key: string; label: string }[]
     },
-    staleTime: 30000,
-    enabled: d.type === 'move_pipeline',
+    staleTime: 0,
   })
 
   return (
