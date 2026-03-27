@@ -1,9 +1,13 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
-  Image, Video, Music, FileText, AlignLeft, GitBranch,
-  Brain, Webhook, TagsIcon, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, RotateCcw, Repeat,
+  GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
+  RefreshCw, AlignLeft, Send,
 } from 'lucide-react'
+
+// ─── Tipos consolidados ────────────────────────────────────────────────────────
+// send_message   → subtipo: text | image | video | audio | document
+// tag_contact    → subtipo: add | remove
+// loop           → subtipo: repeat | retry | while
 
 export const NODE_COLORS: Record<string, string> = {
   trigger_keyword:       '#16a34a',
@@ -11,25 +15,18 @@ export const NODE_COLORS: Record<string, string> = {
   trigger_any_reply:     '#16a34a',
   trigger_outside_hours: '#16a34a',
   send_message:          '#2563eb',
-  send_image:            '#0891b2',
-  send_video:            '#7c3aed',
-  send_audio:            '#db2777',
-  send_document:         '#d97706',
   input:                 '#0284c7',
   condition:             '#ea580c',
   ai:                    '#6d28d9',
   webhook:               '#0f172a',
   wait:                  '#6b7280',
-  add_tag:               '#0891b2',
-  remove_tag:            '#dc2626',
+  tag_contact:           '#0891b2',
   update_contact:        '#0369a1',
   move_pipeline:         '#d97706',
   assign_agent:          '#db2777',
   go_to:                 '#16a34a',
   end:                   '#dc2626',
-  loop_repeat:           '#7c3aed',
-  loop_retry:            '#ea580c',
-  loop_while:            '#0891b2',
+  loop:                  '#7c3aed',
 }
 
 export const NODE_ICONS: Record<string, any> = {
@@ -37,26 +34,19 @@ export const NODE_ICONS: Record<string, any> = {
   trigger_first_message: Zap,
   trigger_any_reply:     Reply,
   trigger_outside_hours: Clock,
-  send_message:          MessageSquare,
-  send_image:            Image,
-  send_video:            Video,
-  send_audio:            Music,
-  send_document:         FileText,
+  send_message:          Send,
   input:                 AlignLeft,
   condition:             GitBranch,
   ai:                    Brain,
   webhook:               Webhook,
   wait:                  Clock,
-  add_tag:               Tag,
-  remove_tag:            TagsIcon,
+  tag_contact:           Tag,
   update_contact:        UserCog,
   move_pipeline:         MoveRight,
   assign_agent:          UserCheck,
   go_to:                 CornerDownRight,
   end:                   Square,
-  loop_repeat:           Repeat,
-  loop_retry:            RotateCcw,
-  loop_while:            RefreshCw,
+  loop:                  RefreshCw,
 }
 
 export const NODE_LABELS: Record<string, string> = {
@@ -64,26 +54,52 @@ export const NODE_LABELS: Record<string, string> = {
   trigger_first_message: 'Primeira mensagem',
   trigger_any_reply:     'Qualquer resposta',
   trigger_outside_hours: 'Fora do horário',
-  send_message:          'Enviar texto',
-  send_image:            'Enviar imagem',
-  send_video:            'Enviar vídeo',
-  send_audio:            'Enviar áudio',
-  send_document:         'Enviar documento',
+  send_message:          'Enviar mensagem',
   input:                 'Aguardar resposta',
-  condition:             'Condição (se/senão)',
+  condition:             'Condição',
   ai:                    'Inteligência Artificial',
   webhook:               'Webhook',
   wait:                  'Espera',
-  add_tag:               'Adicionar tag',
-  remove_tag:            'Remover tag',
+  tag_contact:           'Tags',
   update_contact:        'Atualizar contato',
   move_pipeline:         'Mover no funil',
   assign_agent:          'Atribuir agente',
   go_to:                 'Ir para outro flow',
   end:                   'Finalizar flow',
-  loop_repeat:           'Loop repetição',
-  loop_retry:            'Loop tentativas',
-  loop_while:            'Loop enquanto',
+  loop:                  'Loop',
+}
+
+// Subtipos para nodes consolidados
+export const SEND_SUBTYPES = [
+  { value: 'text',     label: 'Texto',      emoji: '💬' },
+  { value: 'image',    label: 'Imagem',     emoji: '🖼️' },
+  { value: 'video',    label: 'Vídeo',      emoji: '🎥' },
+  { value: 'audio',    label: 'Áudio',      emoji: '🎵' },
+  { value: 'document', label: 'Documento',  emoji: '📄' },
+]
+
+export const TAG_SUBTYPES = [
+  { value: 'add',    label: 'Adicionar tag', emoji: '➕' },
+  { value: 'remove', label: 'Remover tag',   emoji: '➖' },
+]
+
+export const LOOP_SUBTYPES = [
+  { value: 'repeat', label: 'Repetição',   emoji: '🔁', desc: 'Repete N vezes' },
+  { value: 'retry',  label: 'Tentativas',  emoji: '🔄', desc: 'Tenta até N vezes' },
+  { value: 'while',  label: 'Enquanto',    emoji: '♾️', desc: 'Repete enquanto condição' },
+]
+
+// Mapa de compatibilidade: tipos legados → novo tipo consolidado
+export const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
+  send_image:    { type: 'send_message', subtype: 'image' },
+  send_video:    { type: 'send_message', subtype: 'video' },
+  send_audio:    { type: 'send_message', subtype: 'audio' },
+  send_document: { type: 'send_message', subtype: 'document' },
+  add_tag:       { type: 'tag_contact',  subtype: 'add' },
+  remove_tag:    { type: 'tag_contact',  subtype: 'remove' },
+  loop_repeat:   { type: 'loop',         subtype: 'repeat' },
+  loop_retry:    { type: 'loop',         subtype: 'retry' },
+  loop_while:    { type: 'loop',         subtype: 'while' },
 }
 
 export const DEFAULT_STAGES = [
