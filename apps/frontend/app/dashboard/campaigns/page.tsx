@@ -6,13 +6,13 @@ import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone } from 'lucide-react'
 
-const S: Record<string, { color: string; bg: string; dot: string; label: string }> = {
-  running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando'  },
-  completed: { color: '#52525b', bg: '#f4f4f5', dot: '#a1a1aa', label: 'Concluída' },
-  draft:     { color: '#71717a', bg: '#fafafa',  dot: '#d4d4d8', label: 'Rascunho'  },
-  paused:    { color: '#d97706', bg: '#fffbeb',  dot: '#f59e0b', label: 'Pausada'   },
-  failed:    { color: '#dc2626', bg: '#fef2f2',  dot: '#ef4444', label: 'Falhou'    },
-  scheduled: { color: '#7c3aed', bg: '#f5f3ff',  dot: '#8b5cf6', label: 'Agendada'  },
+const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
+  running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
+  completed: { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Concluída', bar: '#22c55e' },
+  draft:     { color: '#71717a', bg: '#fafafa',  dot: '#d4d4d8', label: 'Rascunho',  bar: '#d4d4d8' },
+  paused:    { color: '#d97706', bg: '#fffbeb',  dot: '#f59e0b', label: 'Pausada',   bar: '#f59e0b' },
+  failed:    { color: '#dc2626', bg: '#fef2f2',  dot: '#ef4444', label: 'Falhou',    bar: '#ef4444' },
+  scheduled: { color: '#7c3aed', bg: '#f5f3ff',  dot: '#8b5cf6', label: 'Agendada',  bar: '#8b5cf6' },
 }
 
 const PAGE_SIZE = 10
@@ -206,11 +206,9 @@ export default function CampaignsPage() {
                             <Clock size={10} />{new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
-                        {camp.status === 'running' && (
-                          <div style={{ height: '2px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '70%' }}>
-                            <div style={{ width: `${p}%`, height: '100%', background: '#22c55e', borderRadius: '99px', transition: 'width 0.4s' }} />
-                          </div>
-                        )}
+                        <div style={{ height: '3px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '80%' }}>
+                          <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
+                        </div>
                       </div>
 
                       <span style={{ color: '#71717a', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{camp.total_contacts.toLocaleString()}</span>
@@ -272,60 +270,60 @@ export default function CampaignsPage() {
         {/* ── Painel lateral ─────────────────────────────────────────────── */}
         <div style={{ width: '268px', flexShrink: 0 }}>
           {selectedCamp ? (
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', position: 'sticky', top: 0, boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-              <div style={{ padding: '16px 18px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ background: '#161b27', border: 'none', borderRadius: '12px', overflow: 'hidden', position: 'sticky', top: 0, boxShadow: '0 4px 20px rgba(0,0,0,.15)' }}>
+              <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0, marginRight: '10px' }}>
-                  <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#18181b', margin: '0 0 5px', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCamp.name}</p>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', background: (S[selectedCamp.status] || S.draft).bg, borderRadius: '5px' }}>
+                  <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#fff', margin: '0 0 5px', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCamp.name}</p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', background: 'rgba(34,197,94,0.15)', borderRadius: '5px' }}>
                     <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: (S[selectedCamp.status] || S.draft).dot }} />
                     <span style={{ fontSize: '11px', fontWeight: 600, color: (S[selectedCamp.status] || S.draft).color }}>{(S[selectedCamp.status] || S.draft).label}</span>
                   </div>
                 </div>
                 <button onClick={() => setSelectedCamp(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', padding: '2px', display: 'flex' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px', display: 'flex' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)' }}>
                   <X size={14} />
                 </button>
               </div>
 
               <div style={{ padding: '16px 18px' }}>
                 {selectedCamp.scheduled_at && selectedCamp.status === 'scheduled' && (
-                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <Calendar size={13} color="#7c3aed" style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <div style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <Calendar size={13} color="#a78bfa" style={{ flexShrink: 0, marginTop: '1px' }} />
                     <div>
-                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#6d28d9', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agendada para</p>
-                      <p style={{ fontSize: '12px', color: '#7c3aed', margin: 0 }}>{new Date(selectedCamp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agendada para</p>
+                      <p style={{ fontSize: '12px', color: '#c4b5fd', margin: 0 }}>{new Date(selectedCamp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Progress */}
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progresso</span>
-                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em' }}>{pct}%</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progresso</span>
+                    <span style={{ fontSize: '18px', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.03em' }}>{pct}%</span>
                   </div>
-                  <div style={{ height: '4px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: '#22c55e', borderRadius: '99px', transition: 'width 0.5s ease' }} />
+                  <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: '#22c55e', borderRadius: '99px', transition: 'width 0.5s ease', boxShadow: '0 0 8px rgba(34,197,94,0.4)' }} />
                   </div>
                 </div>
 
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
                   {[
-                    { label: 'Total',     value: total,     color: '#71717a', icon: BarChart2 },
-                    { label: 'Enviadas',  value: sent,      color: '#2563eb', icon: Send },
-                    { label: 'Entregues', value: delivered, color: '#16a34a', icon: CheckCheck },
-                    { label: 'Lidas',     value: read,      color: '#7c3aed', icon: TrendingUp },
-                    { label: 'Falhas',    value: failed,    color: '#dc2626', icon: AlertCircle },
+                    { label: 'Total',     value: total,     color: 'rgba(255,255,255,0.5)', icon: BarChart2 },
+                    { label: 'Enviadas',  value: sent,      color: '#60a5fa',               icon: Send },
+                    { label: 'Entregues', value: delivered, color: '#22c55e',               icon: CheckCheck },
+                    { label: 'Lidas',     value: read,      color: '#a78bfa',               icon: TrendingUp },
+                    { label: 'Falhas',    value: failed,    color: '#f87171',               icon: AlertCircle },
                   ].map(({ label, value, color, icon: Icon }) => (
-                    <div key={label} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '9px 11px' }}>
+                    <div key={label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', padding: '9px 11px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
                         <Icon size={11} color={color} />
-                        <span style={{ fontSize: '10px', color: '#a1a1aa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
                       </div>
-                      <div style={{ fontSize: '19px', fontWeight: 700, color, letterSpacing: '-0.03em', lineHeight: 1 }}>{value.toLocaleString()}</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color, letterSpacing: '-0.03em', lineHeight: 1 }}>{value.toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
@@ -333,15 +331,15 @@ export default function CampaignsPage() {
                 {sent > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     {[
-                      { rate: deliveryRate, label: 'entregues', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: CheckCheck },
-                      { rate: readRate,     label: 'lidas',     color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', icon: TrendingUp },
+                      { rate: deliveryRate, label: 'entregues', color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: CheckCheck },
+                      { rate: readRate,     label: 'lidas',     color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', icon: TrendingUp },
                     ].map(({ rate, label, color, bg, border, icon: Icon }) => (
                       <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '7px', padding: '8px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Icon size={12} color={color} />
                           <span style={{ fontSize: '12px', color, fontWeight: 600 }}>{rate}% {label}</span>
                         </div>
-                        <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{sent.toLocaleString()}</span>
+                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{sent.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -351,22 +349,26 @@ export default function CampaignsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {selectedCamp.status === 'running' && (
                     <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
-                      style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#52525b', fontWeight: 500 }}>
+                      style={{ width: '100%', padding: '9px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)' }}>
                       <Pause size={13} /> Pausar campanha
                     </button>
                   )}
                   {['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => startMutation.mutate(selectedCamp.id)}
-                      style={{ width: '100%', padding: '8px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      style={{ width: '100%', padding: '9px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
                       <Play size={13} fill="#fff" /> {selectedCamp.status === 'scheduled' ? 'Disparar agora' : 'Disparar'}
                     </button>
                   )}
                   {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => { if (window.confirm(`Deletar "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}
-                      style={{ width: '100%', padding: '8px', background: '#fff', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#dc2626', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+                      style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f87171', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
                       {deleteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
                       Deletar campanha
                     </button>
@@ -375,11 +377,11 @@ export default function CampaignsPage() {
               </div>
             </div>
           ) : (
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                <BarChart2 size={20} color="#d4d4d8" />
+            <div style={{ background: '#161b27', borderRadius: '12px', padding: '40px 20px', textAlign: 'center' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <BarChart2 size={20} color="rgba(255,255,255,0.2)" />
               </div>
-              <p style={{ color: '#a1a1aa', fontSize: '13px' }}>Selecione uma campanha</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Selecione uma campanha</p>
             </div>
           )}
         </div>
