@@ -8,165 +8,82 @@ import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, Chevro
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID!
 
-const inputStyle: React.CSSProperties = {
+const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fff', border: '1px solid #e5e7eb',
-  borderRadius: '6px', fontSize: '14px', outline: 'none', color: '#111827',
+  background: '#fff', border: '1px solid #e4e4e7',
+  borderRadius: '8px', fontSize: '13.5px', outline: 'none',
+  color: '#18181b', fontFamily: 'inherit', transition: 'all 0.15s',
 }
 
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: '12px', fontWeight: 500,
-  color: '#6b7280', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em',
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: '12px', fontWeight: 600,
+  color: '#71717a', marginBottom: '5px', letterSpacing: '0.01em',
 }
 
-const TAG_COLORS = [
-  '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706',
-  '#0891b2', '#ea580c', '#65a30d', '#0284c7', '#9333ea',
-]
+const TAG_COLORS = ['#16a34a','#2563eb','#7c3aed','#db2777','#d97706','#0891b2','#ea580c','#65a30d','#0284c7','#9333ea']
 
 type CustomFieldType = 'text' | 'number' | 'date' | 'select'
+interface CustomField { id: string; name: string; label: string; type: CustomFieldType; options: string[]; required: boolean; sort_order: number }
 
-interface CustomField {
-  id: string
-  name: string
-  label: string
-  type: CustomFieldType
-  options: string[]
-  required: boolean
-  sort_order: number
-}
-
-function getInitials(name: string | undefined | null) {
-  return ((name || '??').trim().slice(0, 2)).toUpperCase()
-}
-
+function getInitials(name: string | undefined | null) { return ((name || '??').trim().slice(0, 2)).toUpperCase() }
 function getAvatarColor(name: string | undefined | null) {
-  const colors = [
-    { bg: '#dbeafe', color: '#1d4ed8' }, { bg: '#dcfce7', color: '#15803d' },
-    { bg: '#fce7f3', color: '#be185d' }, { bg: '#ede9fe', color: '#6d28d9' },
-    { bg: '#ffedd5', color: '#c2410c' }, { bg: '#e0f2fe', color: '#0369a1' },
-  ]
+  const colors = [{ bg: '#dbeafe', color: '#1d4ed8' },{ bg: '#dcfce7', color: '#15803d' },{ bg: '#fce7f3', color: '#be185d' },{ bg: '#ede9fe', color: '#6d28d9' },{ bg: '#ffedd5', color: '#c2410c' },{ bg: '#e0f2fe', color: '#0369a1' }]
   return colors[((name || '').charCodeAt(0) || 0) % colors.length]
 }
 
-function ContactTags({ contact }: { contact: any }) {
-  const tags = (contact.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
-  if (!tags.length) return null
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-      {tags.map((tag: any) => (
-        <span key={tag.id} style={{
-          fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
-          background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280',
-          border: `1px solid ${tag.color || '#6b7280'}40`,
-        }}>{tag.name}</span>
-      ))}
-    </div>
-  )
-}
-
-function TagEditor({ contactId, contactTags, allTags, onChanged }: {
-  contactId: string
-  contactTags: any[]
-  allTags: any[]
-  onChanged: () => void
-}) {
+function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: string; contactTags: any[]; allTags: any[]; onChanged: () => void }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
   const btnRef = useRef<HTMLSpanElement>(null)
-
   const activeIds = new Set(contactTags.map((t: any) => t.id))
 
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
-    }
+    if (btnRef.current) { const rect = btnRef.current.getBoundingClientRect(); setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX }) }
     setOpen(o => !o)
   }
-
   const toggle = async (tag: any) => {
     setLoading(tag.id)
     try {
-      if (activeIds.has(tag.id)) {
-        await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
-      } else {
-        await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
-      }
+      if (activeIds.has(tag.id)) await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
+      else await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
       onChanged()
-    } catch {
-      toast.error('Erro ao atualizar tag')
-    }
+    } catch { toast.error('Erro ao atualizar tag') }
     setLoading(null)
   }
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [open])
+  useEffect(() => { if (!open) return; const close = () => setOpen(false); window.addEventListener('click', close); return () => window.removeEventListener('click', close) }, [open])
 
   return (
     <div style={{ display: 'inline-block' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px', alignItems: 'center' }}>
         {contactTags.map((tag: any) => (
-          <span key={tag.id} style={{
-            fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
-            background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280',
-            border: `1px solid ${tag.color || '#6b7280'}40`, display: 'inline-flex', alignItems: 'center', gap: '4px',
-          }}>
-            {tag.name}
-            <span onClick={e => { e.stopPropagation(); toggle(tag) }} style={{ cursor: 'pointer', lineHeight: 1, opacity: 0.6 }}>×</span>
+          <span key={tag.id} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40`, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            {tag.name}<span onClick={e => { e.stopPropagation(); toggle(tag) }} style={{ cursor: 'pointer', lineHeight: 1, opacity: 0.6 }}>×</span>
           </span>
         ))}
-        <span ref={btnRef} onClick={handleOpen} style={{
-          fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
-          background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb',
-          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px',
-        }}>
+        <span ref={btnRef} onClick={handleOpen} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px', background: '#f4f4f5', color: '#71717a', border: '1px solid #e4e4e7', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
           <Plus size={9} /> tag
         </span>
       </div>
       {open && typeof window !== 'undefined' && (
-        <div
-          onClick={e => e.stopPropagation()}
-          style={{
-            position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999,
-            background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
-            boxShadow: '0 4px 16px rgba(0,0,0,.12)', padding: '6px', minWidth: '160px',
-          }}
-        >
-          {allTags.length === 0
-            ? <p style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
+        <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999, background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,.1)', padding: '6px', minWidth: '160px' }}>
+          {allTags.length === 0 ? <p style={{ fontSize: '12px', color: '#a1a1aa', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
             : allTags.map((tag: any) => {
               const active = activeIds.has(tag.id)
               return (
-                <div key={tag.id} onClick={() => toggle(tag)} style={{
-                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                  borderRadius: '6px', cursor: 'pointer', background: active ? `${tag.color}12` : 'transparent',
-                }}
-                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}20` : '#f9fafb'}
-                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}12` : 'transparent'}
-                >
+                <div key={tag.id} onClick={() => toggle(tag)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', background: active ? `${tag.color}12` : 'transparent' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}20` : '#f4f4f5'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${tag.color}12` : 'transparent'}>
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
-                  <span style={{ fontSize: '12px', color: '#111827', flex: 1 }}>{tag.name}</span>
-                  {loading === tag.id
-                    ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
-                    : active && <Check size={11} color={tag.color || '#16a34a'} />}
+                  <span style={{ fontSize: '12px', color: '#18181b', flex: 1 }}>{tag.name}</span>
+                  {loading === tag.id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', color: '#a1a1aa' }} /> : active && <Check size={11} color={tag.color || '#16a34a'} />}
                 </div>
               )
-            })
-          }
+            })}
         </div>
       )}
     </div>
@@ -182,147 +99,90 @@ function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   const [newField, setNewField] = useState({ label: '', type: 'text' as CustomFieldType, options: '', required: false })
 
   useEffect(() => { loadFields() }, [])
-
-  const loadFields = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true })
-    if (!error && data) setFields(data)
-    setLoading(false)
-  }
-
+  const loadFields = async () => { setLoading(true); const { data, error } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true }); if (!error && data) setFields(data); setLoading(false) }
   const handleAddField = async () => {
-    if (!newField.label.trim()) return
-    setSaving(true)
+    if (!newField.label.trim()) return; setSaving(true)
     const name = newField.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     const options = newField.type === 'select' ? newField.options.split(',').map(o => o.trim()).filter(Boolean) : []
-    const { error } = await supabase.from('custom_fields').insert({
-      tenant_id: TENANT_ID, name, label: newField.label.trim(),
-      type: newField.type, options, required: newField.required, sort_order: fields.length,
-    })
+    const { error } = await supabase.from('custom_fields').insert({ tenant_id: TENANT_ID, name, label: newField.label.trim(), type: newField.type, options, required: newField.required, sort_order: fields.length })
     if (error) toast.error('Erro: ' + error.message)
     else { toast.success('Campo criado!'); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
     setSaving(false)
   }
-
   const handleDeleteField = async (id: string, label: string) => {
-    if (!confirm(`Excluir o campo "${label}"? Os dados preenchidos serão perdidos.`)) return
-    setDeleting(id)
+    if (!confirm(`Excluir o campo "${label}"?`)) return; setDeleting(id)
     const { error } = await supabase.from('custom_fields').delete().eq('id', id)
-    if (error) toast.error('Erro ao excluir campo')
-    else { toast.success('Campo excluído!'); await loadFields(); onSaved() }
+    if (error) toast.error('Erro ao excluir campo'); else { toast.success('Campo excluído!'); await loadFields(); onSaved() }
     setDeleting(null)
   }
-
   const handleDragStart = (index: number) => setDragging(index)
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    if (dragging === null || dragging === index) return
-    const reordered = [...fields]
-    const [moved] = reordered.splice(dragging, 1)
-    reordered.splice(index, 0, moved)
-    setFields(reordered)
-    setDragging(index)
-  }
-  const handleDragEnd = async () => {
-    setDragging(null)
-    await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id)))
-    onSaved()
-  }
-
+  const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); if (dragging === null || dragging === index) return; const r = [...fields]; const [m] = r.splice(dragging, 1); r.splice(index, 0, m); setFields(r); setDragging(index) }
+  const handleDragEnd = async () => { setDragging(null); await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id))); onSaved() }
   const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = { text: 'Texto', number: 'Número', date: 'Data', select: 'Seleção' }
-  const FIELD_TYPE_COLORS: Record<CustomFieldType, { bg: string; color: string }> = {
-    text: { bg: '#eff6ff', color: '#2563eb' }, number: { bg: '#f0fdf4', color: '#16a34a' },
-    date: { bg: '#fef3c7', color: '#d97706' }, select: { bg: '#faf5ff', color: '#7c3aed' },
-  }
+  const FIELD_TYPE_COLORS: Record<CustomFieldType, { bg: string; color: string }> = { text: { bg: '#eff6ff', color: '#2563eb' }, number: { bg: '#f0fdf4', color: '#16a34a' }, date: { bg: '#fef3c7', color: '#d97706' }, select: { bg: '#faf5ff', color: '#7c3aed' } }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>Campos personalizados</h3>
-            <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Adicione campos extras aos seus contatos</p>
-          </div>
-          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}><X size={16} /></button>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', margin: 0 }}>Campos personalizados</h3><p style={{ fontSize: '12px', color: '#71717a', marginTop: '3px' }}>Adicione campos extras aos seus contatos</p></div>
+          <button onClick={onClose} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#71717a' }}><X size={15} /></button>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Novo campo</p>
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+          <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Novo campo</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px', marginBottom: '10px' }}>
-              <div>
-                <label style={labelStyle}>Nome do campo</label>
-                <input style={inputStyle} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Tipo</label>
-                <select style={{ ...inputStyle, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}>
-                  <option value="text">Texto</option>
-                  <option value="number">Número</option>
-                  <option value="date">Data</option>
-                  <option value="select">Seleção</option>
-                </select>
-              </div>
+              <div><label style={lbl}>Nome do campo</label><input style={inp} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} /></div>
+              <div><label style={lbl}>Tipo</label><select style={{ ...inp, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}><option value="text">Texto</option><option value="number">Número</option><option value="date">Data</option><option value="select">Seleção</option></select></div>
             </div>
-            {newField.type === 'select' && (
-              <div style={{ marginBottom: '10px' }}>
-                <label style={labelStyle}>Opções (separadas por vírgula)</label>
-                <input style={inputStyle} placeholder="Ex: Ativo, Inativo, Pendente" value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} />
-              </div>
-            )}
+            {newField.type === 'select' && <div style={{ marginBottom: '10px' }}><label style={lbl}>Opções (separadas por vírgula)</label><input style={inp} placeholder="Ex: Ativo, Inativo, Pendente" value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} /></div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
-                <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} />
-                Campo obrigatório
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#52525b' }}>
+                <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} /> Campo obrigatório
               </label>
               <button onClick={handleAddField} disabled={!newField.label.trim() || saving}
-                style={{ padding: '8px 18px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newField.label.trim() ? 0.5 : 1 }}>
-                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
-                Adicionar campo
+                style={{ padding: '8px 16px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newField.label.trim() ? 0.5 : 1 }}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Adicionar
               </button>
             </div>
           </div>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '30px' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
-          ) : fields.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: '#9ca3af', fontSize: '14px' }}>Nenhum campo personalizado criado ainda.</div>
-          ) : (
-            <div>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campos ativos ({fields.length})</p>
+          {loading ? <div style={{ textAlign: 'center', padding: '30px' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
+            : fields.length === 0 ? <div style={{ textAlign: 'center', padding: '30px', color: '#a1a1aa', fontSize: '14px' }}>Nenhum campo criado ainda.</div>
+            : <div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campos ativos ({fields.length})</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {fields.map((field, index) => {
-                  const typeStyle = FIELD_TYPE_COLORS[field.type]
+                  const ts = FIELD_TYPE_COLORS[field.type]
                   return (
                     <div key={field.id} draggable onDragStart={() => handleDragStart(index)} onDragOver={e => handleDragOver(e, index)} onDragEnd={handleDragEnd}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: dragging === index ? '#f5f3ff' : '#fff', border: `1px solid ${dragging === index ? '#7c3aed' : '#e5e7eb'}`, borderRadius: '8px', transition: 'all 0.1s', cursor: 'grab' }}>
-                      <GripVertical size={14} color="#d1d5db" style={{ flexShrink: 0 }} />
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: dragging === index ? '#f5f3ff' : '#fff', border: `1px solid ${dragging === index ? '#7c3aed' : '#e4e4e7'}`, borderRadius: '8px', cursor: 'grab' }}>
+                      <GripVertical size={14} color="#d4d4d8" style={{ flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>{field.label}</span>
-                          {field.required && <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 600 }}>OBRIGATÓRIO</span>}
+                          <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#18181b' }}>{field.label}</span>
+                          {field.required && <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 700 }}>OBRIGATÓRIO</span>}
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: typeStyle.bg, color: typeStyle.color }}>{FIELD_TYPE_LABELS[field.type]}</span>
-                          {field.type === 'select' && field.options?.length > 0 && <span style={{ fontSize: '10px', color: '#9ca3af' }}>{field.options.join(' · ')}</span>}
-                          <span style={{ fontSize: '10px', color: '#d1d5db', fontFamily: 'monospace' }}>{field.name}</span>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '3px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: ts.bg, color: ts.color }}>{FIELD_TYPE_LABELS[field.type]}</span>
+                          {field.type === 'select' && field.options?.length > 0 && <span style={{ fontSize: '10px', color: '#a1a1aa' }}>{field.options.join(' · ')}</span>}
+                          <span style={{ fontSize: '10px', color: '#d4d4d8', fontFamily: 'monospace' }}>{field.name}</span>
                         </div>
                       </div>
                       <button onClick={() => handleDeleteField(field.id, field.label)} disabled={deleting === field.id}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '4px', display: 'flex', borderRadius: '5px' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8' }}>
                         {deleting === field.id ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
                       </button>
                     </div>
                   )
                 })}
               </div>
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '10px' }}>Arraste para reordenar os campos.</p>
-            </div>
-          )}
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '10px' }}>Arraste para reordenar.</p>
+            </div>}
         </div>
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Fechar</button>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #f4f4f5', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 18px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Fechar</button>
         </div>
       </div>
     </div>
@@ -337,14 +197,8 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      const payload = rows.map(r => ({
-        phone: String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, ''),
-        name: r.nome || r.name || r.Name || r.Nome || '',
-        email: r.email || r.Email || '',
-        company: r.empresa || r.company || r.Company || r.Empresa || '',
-      })).filter(r => r.phone.length >= 8)
-      const { data } = await contactApi.post('/contacts/import', { rows: payload })
-      return data
+      const payload = rows.map(r => ({ phone: String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, ''), name: r.nome || r.name || r.Name || r.Nome || '', email: r.email || r.Email || '', company: r.empresa || r.company || r.Company || r.Empresa || '' })).filter(r => r.phone.length >= 8)
+      const { data } = await contactApi.post('/contacts/import', { rows: payload }); return data
     },
     onSuccess: (data) => { toast.success(`${data?.data?.imported || rows.length} contatos importados!`); onSuccess(); onClose() },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
@@ -357,104 +211,89 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
+        const wb = XLSX.read(data, { type: 'array' }); const ws = wb.Sheets[wb.SheetNames[0]]
         const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
-        if (!json.length) { setError('Planilha vazia ou sem dados reconhecidos'); return }
+        if (!json.length) { setError('Planilha vazia'); return }
         setRows(json); setStep('preview')
-      } catch { setError('Erro ao ler o arquivo. Verifique se é um Excel ou CSV válido.') }
+      } catch { setError('Erro ao ler o arquivo.') }
     }
     reader.readAsArrayBuffer(file)
   }
-
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) parseFile(file) }
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) parseFile(file); e.target.value = '' }
   const validRows = rows.filter(r => String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '').length >= 8)
   const invalidCount = rows.length - validRows.length
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>Importar contatos via Excel</h3>
-            <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Suporte: .xlsx, .xls, .csv</p>
-          </div>
-          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#6b7280' }}><X size={16} /></button>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', margin: 0 }}>Importar contatos</h3><p style={{ fontSize: '12px', color: '#71717a', marginTop: '3px' }}>Suporte: .xlsx, .xls, .csv</p></div>
+          <button onClick={onClose} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: '#71717a' }}><X size={15} /></button>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-          {step === 'upload' && (
-            <>
-              <div onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}
-                onClick={() => document.getElementById('excel-input')?.click()}
-                style={{ border: `2px dashed ${isDragging ? '#16a34a' : '#e5e7eb'}`, borderRadius: '10px', padding: '40px 20px', textAlign: 'center', background: isDragging ? '#f0fdf4' : '#fafafa', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '20px' }}>
-                <FileSpreadsheet size={36} color={isDragging ? '#16a34a' : '#d1d5db'} style={{ margin: '0 auto 12px' }} />
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>{isDragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para selecionar'}</p>
-                <p style={{ fontSize: '12px', color: '#9ca3af' }}>.xlsx, .xls ou .csv — até 10MB</p>
-                <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+          {step === 'upload' && (<>
+            <div onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}
+              onClick={() => document.getElementById('excel-input')?.click()}
+              style={{ border: `2px dashed ${isDragging ? '#22c55e' : '#e4e4e7'}`, borderRadius: '10px', padding: '40px 20px', textAlign: 'center', background: isDragging ? '#f0fdf4' : '#fafafa', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '16px' }}>
+              <FileSpreadsheet size={36} color={isDragging ? '#22c55e' : '#d4d4d8'} style={{ margin: '0 auto 12px' }} />
+              <p style={{ fontSize: '14px', fontWeight: 600, color: '#18181b', marginBottom: '4px' }}>{isDragging ? 'Solte aqui' : 'Arraste ou clique para selecionar'}</p>
+              <p style={{ fontSize: '12px', color: '#a1a1aa' }}>.xlsx, .xls ou .csv — até 10MB</p>
+              <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
+            </div>
+            {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '14px' }}><AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} /><span style={{ fontSize: '13px', color: '#dc2626' }}>{error}</span></div>}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Colunas reconhecidas</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                {[['telefone / phone', 'obrigatório'],['nome / name','opcional'],['email','opcional'],['empresa / company','opcional']].map(([col, req]) => (
+                  <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontFamily: 'monospace', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px' }}>{col}</span>
+                    <span style={{ fontSize: '11px', color: req === 'obrigatório' ? '#dc2626' : '#a1a1aa' }}>{req}</span>
+                  </div>
+                ))}
               </div>
-              {error && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <span style={{ fontSize: '13px', color: '#dc2626' }}>{error}</span>
-                </div>
-              )}
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Colunas reconhecidas automaticamente</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  {[['telefone / phone', 'obrigatório'], ['nome / name', 'opcional'], ['email', 'opcional'], ['empresa / company', 'opcional']].map(([col, req]) => (
-                    <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontFamily: 'monospace', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px' }}>{col}</span>
-                      <span style={{ fontSize: '11px', color: req === 'obrigatório' ? '#dc2626' : '#9ca3af' }}>{req}</span>
+            </div>
+          </>)}
+          {step === 'preview' && (<>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{validRows.length}</div>
+                <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>contatos válidos</div>
+              </div>
+              <div style={{ background: invalidCount > 0 ? '#fef2f2' : '#fafafa', border: `1px solid ${invalidCount > 0 ? '#fecaca' : '#e4e4e7'}`, borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: invalidCount > 0 ? '#ef4444' : '#a1a1aa', lineHeight: 1 }}>{invalidCount}</div>
+                <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : '#a1a1aa', marginTop: '4px' }}>sem telefone</div>
+              </div>
+            </div>
+            <div style={{ border: '1px solid #e4e4e7', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', background: '#fafafa', borderBottom: '1px solid #f4f4f5', padding: '8px 12px', gap: '8px' }}>
+                {['Telefone','Nome','Email','Empresa'].map(h => <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
+              </div>
+              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {validRows.slice(0, 50).map((r, i) => {
+                  const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
+                  return (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', padding: '8px 12px', gap: '8px', borderBottom: '1px solid #f4f4f5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                      <span style={{ fontSize: '12px', color: '#18181b', fontFamily: 'monospace' }}>{phone}</span>
+                      <span style={{ fontSize: '12px', color: '#52525b' }}>{String(r.nome || r.name || r.Name || r.Nome || '—').slice(0,20)}</span>
+                      <span style={{ fontSize: '12px', color: '#71717a' }}>{String(r.email || r.Email || '—').slice(0,25)}</span>
+                      <span style={{ fontSize: '12px', color: '#71717a' }}>{String(r.empresa || r.company || r.Company || r.Empresa || '—').slice(0,20)}</span>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
+                {validRows.length > 50 && <div style={{ padding: '8px 12px', fontSize: '12px', color: '#a1a1aa', textAlign: 'center' }}>+ {validRows.length - 50} não exibidos</div>}
               </div>
-            </>
-          )}
-          {step === 'preview' && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{validRows.length}</div>
-                  <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>contatos válidos</div>
-                </div>
-                <div style={{ background: invalidCount > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${invalidCount > 0 ? '#fecaca' : '#e5e7eb'}`, borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: invalidCount > 0 ? '#ef4444' : '#9ca3af', lineHeight: 1 }}>{invalidCount}</div>
-                  <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : '#9ca3af', marginTop: '4px' }}>sem telefone (ignorados)</div>
-                </div>
-              </div>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', marginBottom: '4px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: '8px 12px', gap: '8px' }}>
-                  {['Telefone', 'Nome', 'Email', 'Empresa'].map(h => <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {validRows.slice(0, 50).map((r, i) => {
-                    const phone = String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, '')
-                    return (
-                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', padding: '8px 12px', gap: '8px', borderBottom: '1px solid #f9fafb', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <span style={{ fontSize: '12px', color: '#111827', fontFamily: 'monospace' }}>{phone}</span>
-                        <span style={{ fontSize: '12px', color: '#374151' }}>{String(r.nome || r.name || r.Name || r.Nome || '—').slice(0, 20)}</span>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(r.email || r.Email || '—').slice(0, 25)}</span>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{String(r.empresa || r.company || r.Company || r.Empresa || '—').slice(0, 20)}</span>
-                      </div>
-                    )
-                  })}
-                  {validRows.length > 50 && <div style={{ padding: '8px 12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center', background: '#f9fafb' }}>+ {validRows.length - 50} contatos não exibidos</div>}
-                </div>
-              </div>
-              <p style={{ fontSize: '11px', color: '#9ca3af' }}>Contatos com telefone duplicado serão atualizados, não duplicados.</p>
-            </>
-          )}
+            </div>
+          </>)}
         </div>
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>← Trocar arquivo</button>}
-          <button onClick={onClose} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Cancelar</button>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #f4f4f5', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>← Trocar arquivo</button>}
+          <button onClick={onClose} style={{ padding: '8px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
           {step === 'preview' && validRows.length > 0 && (
             <button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}
-              style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {importMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
-              {importMutation.isPending ? 'Importando...' : `Importar ${validRows.length} contatos`}
+              {importMutation.isPending ? 'Importando...' : `Importar ${validRows.length}`}
             </button>
           )}
         </div>
@@ -480,110 +319,41 @@ export default function ContactsPage() {
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const queryClient = useQueryClient()
 
-  const loadCustomFields = async () => {
-    const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true })
-    if (data) setCustomFields(data)
-  }
-
+  const loadCustomFields = async () => { const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true }); if (data) setCustomFields(data) }
   useEffect(() => { loadCustomFields() }, [])
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['contacts', search, page],
-    queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (search) params.set('search', search)
-      const { data } = await contactApi.get(`/contacts?${params}`)
-      return data
-    },
-  })
+  const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
+  const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] } })
 
-  const { data: tags = [] } = useQuery({
-    queryKey: ['tags'],
-    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
-  })
+  const createTagMutation = useMutation({ mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) }, onSuccess: () => { toast.success('Tag criada!'); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) }, onError: () => toast.error('Erro ao criar tag') })
+  const deleteTagMutation = useMutation({ mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) }, onSuccess: () => { toast.success('Tag excluída!'); queryClient.invalidateQueries({ queryKey: ['tags'] }) }, onError: () => toast.error('Erro ao excluir tag') })
+  const createMutation = useMutation({ mutationFn: async () => { const { data } = await contactApi.post('/contacts', { ...form, metadata: createMetadata }); return data }, onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }); setCreateMetadata({}) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro') })
+  const updateMutation = useMutation({ mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) }, onSuccess: () => { toast.success('Atualizado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro') })
+  const deleteMutation = useMutation({ mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) }, onSuccess: () => { toast.success('Excluído(s)!'); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error('Erro ao excluir') })
+  const deleteAllMutation = useMutation({ mutationFn: async () => { await contactApi.delete('/contacts/all') }, onSuccess: () => { toast.success('Todos excluídos!'); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error('Erro') })
 
-  const createTagMutation = useMutation({
-    mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) },
-    onSuccess: () => { toast.success('Tag criada!'); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) },
-    onError: () => toast.error('Erro ao criar tag'),
-  })
-  const deleteTagMutation = useMutation({
-    mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) },
-    onSuccess: () => { toast.success('Tag excluída!'); queryClient.invalidateQueries({ queryKey: ['tags'] }) },
-    onError: () => toast.error('Erro ao excluir tag'),
-  })
-  const createMutation = useMutation({
-    mutationFn: async () => { const { data } = await contactApi.post('/contacts', { ...form, metadata: createMetadata }); return data },
-    onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }); setCreateMetadata({}) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro'),
-  })
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) },
-    onSuccess: () => { toast.success('Contato atualizado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar'),
-  })
-  const deleteMutation = useMutation({
-    mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) },
-    onSuccess: () => { toast.success('Contato(s) excluído(s)!'); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
-    onError: () => toast.error('Erro ao excluir'),
-  })
-  const deleteAllMutation = useMutation({
-    mutationFn: async () => { await contactApi.delete('/contacts/all') },
-    onSuccess: () => { toast.success('Todos os contatos foram excluídos!'); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) },
-    onError: () => toast.error('Erro ao excluir todos os contatos'),
-  })
-
-  const handleExport = async () => {
-    const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' })
-    const url = URL.createObjectURL(data)
-    const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click()
-    toast.success('CSV exportado!')
-  }
-
+  const handleExport = async () => { const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' }); const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click(); toast.success('CSV exportado!') }
   const handleExportExcel = async () => {
     try {
       let allContacts: any[] = []; let p = 1
-      while (true) {
-        const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`)
-        const rows = data?.data || []
-        allContacts = [...allContacts, ...rows]
-        if (!data?.meta?.hasMore) break
-        p++
-      }
-      if (allContacts.length === 0) { toast.error('Nenhum contato para exportar'); return }
-      const rows = allContacts.map((c: any) => {
-        const base: any = {
-          telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '',
-          tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '),
-          ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '',
-        }
-        customFields.forEach(cf => { base[cf.label] = c.metadata?.[cf.name] ?? '' })
-        return base
-      })
-      const ws = XLSX.utils.json_to_sheet(rows)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
-      XLSX.writeFile(wb, 'contatos.xlsx')
-      toast.success(`${allContacts.length} contatos exportados!`)
-    } catch { toast.error('Erro ao exportar Excel') }
+      while (true) { const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`); const rows = data?.data || []; allContacts = [...allContacts, ...rows]; if (!data?.meta?.hasMore) break; p++ }
+      if (allContacts.length === 0) { toast.error('Nenhum contato'); return }
+      const rows = allContacts.map((c: any) => { const base: any = { telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '', tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '), ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '' }; customFields.forEach(cf => { base[cf.label] = c.metadata?.[cf.name] ?? '' }); return base })
+      const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Contatos'); XLSX.writeFile(wb, 'contatos.xlsx'); toast.success(`${allContacts.length} exportados!`)
+    } catch { toast.error('Erro ao exportar') }
   }
 
-  const handleDelete = (id: string, name: string) => { if (confirm(`Excluir contato "${name}"?`)) deleteMutation.mutate([id]) }
+  const handleDelete = (id: string, name: string) => { if (confirm(`Excluir "${name}"?`)) deleteMutation.mutate([id]) }
   const handleDeleteSelected = () => { if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected)) }
-  const handleDeleteAll = () => { if (confirm(`⚠️ Excluir TODOS os ${meta?.total?.toLocaleString()} contatos? Essa ação não pode ser desfeita.`)) deleteAllMutation.mutate() }
+  const handleDeleteAll = () => { if (confirm(`⚠️ Excluir TODOS os ${meta?.total?.toLocaleString()} contatos?`)) deleteAllMutation.mutate() }
   const startEdit = (c: any) => { setEditingId(c.id); setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '', metadata: c.metadata || {} }) }
   const saveEdit = () => { if (!editingId) return; updateMutation.mutate({ id: editingId, data: editForm }) }
   const toggleSelect = (id: string) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next) }
   const toggleAll = () => { if (selected.size === contacts.length) setSelected(new Set()); else setSelected(new Set(contacts.map((c: any) => c.id))) }
 
   const renderCustomFieldInput = (field: CustomField, value: any, onChange: (val: any) => void, compact = false) => {
-    const style = compact ? { ...inputStyle, padding: '6px 10px', fontSize: '13px' } : inputStyle
-    if (field.type === 'select') return (
-      <select style={{ ...style, cursor: 'pointer' }} value={value || ''} onChange={e => onChange(e.target.value)}>
-        <option value="">— selecionar —</option>
-        {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    )
+    const style = compact ? { ...inp, padding: '6px 10px', fontSize: '13px' } : inp
+    if (field.type === 'select') return <select style={{ ...style, cursor: 'pointer' }} value={value || ''} onChange={e => onChange(e.target.value)}><option value="">— selecionar —</option>{(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
     if (field.type === 'date') return <input type="date" style={style} value={value || ''} onChange={e => onChange(e.target.value)} />
     if (field.type === 'number') return <input type="number" style={style} value={value || ''} onChange={e => onChange(e.target.value)} placeholder="0" />
     return <input type="text" style={style} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={field.label} />
@@ -593,63 +363,57 @@ export default function ContactsPage() {
   const meta = data?.meta
   const allSelected = contacts.length > 0 && selected.size === contacts.length
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
-
-  const tableColumns = [
-    { key: 'name', label: 'Nome', width: '2.5fr' },
-    { key: 'phone', label: 'Telefone', width: '1.5fr' },
-    { key: 'email', label: 'Email', width: '1.5fr' },
-    ...customFields.map(cf => ({ key: `meta_${cf.name}`, label: cf.label, width: '1fr', customField: cf })),
-    { key: 'last_interaction', label: 'Última interação', width: '1fr' },
-  ]
+  const tableColumns = [{ key: 'name', label: 'Nome', width: '2.5fr' },{ key: 'phone', label: 'Telefone', width: '1.5fr' },{ key: 'email', label: 'Email', width: '1.5fr' },...customFields.map(cf => ({ key: `meta_${cf.name}`, label: cf.label, width: '1fr', customField: cf })),{ key: 'last_interaction', label: 'Última interação', width: '1fr' }]
   const gridTemplateColumns = `40px ${tableColumns.map(c => c.width).join(' ')} 80px`
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px' }}>
+    <div style={{ padding: '28px 32px', maxWidth: '1400px', background: '#f4f4f5', minHeight: '100%' }}>
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
       {showCustomFields && <CustomFieldsModal onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>CRM de Contatos</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>
-            {meta?.total ? `${meta.total.toLocaleString()} contatos na sua base` : '0 contatos'}
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>CRM de Contatos</h1>
+          <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>
+            {meta?.total ? `${meta.total.toLocaleString()} contatos` : '0 contatos'}
             {customFields.length > 0 && ` · ${customFields.length} campo${customFields.length > 1 ? 's' : ''} personalizado${customFields.length > 1 ? 's' : ''}`}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {selected.size > 0 && (
             <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
-              style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <Trash2 size={13} /> Excluir {selected.size}
             </button>
           )}
           {meta?.total > 0 && (
             <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
-              style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
-              Excluir todos
+              style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Excluir todos
             </button>
           )}
-          <button onClick={handleExport} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Download size={13} /> Exportar CSV
+          <button onClick={handleExport} style={{ padding: '8px 12px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
+            <Download size={13} /> CSV
           </button>
-          <button onClick={handleExportExcel} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FileSpreadsheet size={13} /> Exportar Excel
+          <button onClick={handleExportExcel} style={{ padding: '8px 12px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
+            <FileSpreadsheet size={13} /> Excel
           </button>
-          <button onClick={() => setShowImport(true)} style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Upload size={13} /> Importar Excel
+          <button onClick={() => setShowImport(true)} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Upload size={13} /> Importar
           </button>
           <button onClick={() => setShowCustomFields(true)}
-            style={{ padding: '8px 14px', background: customFields.length > 0 ? '#faf5ff' : '#fff', border: `1px solid ${customFields.length > 0 ? '#a855f7' : '#e5e7eb'}`, borderRadius: '6px', color: customFields.length > 0 ? '#7c3aed' : '#6b7280', fontSize: '13px', fontWeight: customFields.length > 0 ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            style={{ padding: '8px 12px', background: customFields.length > 0 ? '#faf5ff' : '#fff', border: `1px solid ${customFields.length > 0 ? '#a855f7' : '#e4e4e7'}`, borderRadius: '8px', color: customFields.length > 0 ? '#7c3aed' : '#52525b', fontSize: '13px', fontWeight: customFields.length > 0 ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Settings2 size={13} /> Campos {customFields.length > 0 && `(${customFields.length})`}
           </button>
           <button onClick={() => setShowTags(!showTags)}
-            style={{ padding: '8px 14px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#16a34a' : '#e5e7eb'}`, borderRadius: '6px', color: showTags ? '#16a34a' : '#6b7280', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Tag size={13} /> Tags {tags.length > 0 && `(${tags.length})`}
+            style={{ padding: '8px 12px', background: showTags ? '#f0fdf4' : '#fff', border: `1px solid ${showTags ? '#22c55e' : '#e4e4e7'}`, borderRadius: '8px', color: showTags ? '#16a34a' : '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Tag size={13} /> Tags {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
           </button>
           <button onClick={() => setShowCreate(!showCreate)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            style={{ padding: '8px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 3px rgba(34,197,94,0.3)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
             <Plus size={13} /> Novo contato
           </button>
         </div>
@@ -657,38 +421,39 @@ export default function ContactsPage() {
 
       {/* Painel de tags */}
       {showTags && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Gerenciar tags</h3>
-            <button onClick={() => setShowTags(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}><X size={16} /></button>
+            <h3 style={{ fontWeight: 700, fontSize: '14px', color: '#18181b', margin: 0 }}>Gerenciar tags</h3>
+            <button onClick={() => setShowTags(false)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', color: '#71717a', padding: '5px', display: 'flex' }}><X size={15} /></button>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '180px' }}>
-              <label style={labelStyle}>Nome da tag</label>
-              <input style={inputStyle} placeholder="Ex: Lead quente, Cliente VIP..." value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }} />
+              <label style={lbl}>Nome da tag</label>
+              <input style={inp} placeholder="Ex: Lead quente, Cliente VIP..." value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }}
+                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
+                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
             </div>
             <div>
-              <label style={labelStyle}>Cor</label>
+              <label style={lbl}>Cor</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '220px' }}>
-                {TAG_COLORS.map(c => <div key={c} onClick={() => setNewTagColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? '#111827' : 'transparent'}`, transition: 'border 0.1s' }} />)}
+                {TAG_COLORS.map(c => <div key={c} onClick={() => setNewTagColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? '#18181b' : 'transparent'}`, transition: 'border 0.1s' }} />)}
               </div>
             </div>
             <button onClick={() => createTagMutation.mutate()} disabled={!newTagName || createTagMutation.isPending}
-              style={{ padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newTagName ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-              {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
-              Criar tag
+              style={{ padding: '9px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newTagName ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+              {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Criar tag
             </button>
           </div>
-          {tags.length === 0 ? <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag criada ainda.</p> : (
+          {(tags as any[]).length === 0 ? <p style={{ fontSize: '13px', color: '#a1a1aa' }}>Nenhuma tag criada ainda.</p> : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {tags.map((tag: any) => (
-                <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}15`, border: `1px solid ${tag.color || '#6b7280'}40` }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>{tag.name}</span>
-                  <button onClick={() => { if (confirm(`Excluir tag "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: '#9ca3af', marginLeft: '2px' }}
+              {(tags as any[]).map((tag: any) => (
+                <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#18181b' }}>{tag.name}</span>
+                  <button onClick={() => { if (confirm(`Excluir "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: '#d4d4d8', marginLeft: '2px' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'}>
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'}>
                     <X size={12} />
                   </button>
                 </div>
@@ -700,106 +465,101 @@ export default function ContactsPage() {
 
       {/* Create form */}
       {showCreate && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>Novo contato</h3>
-            <button onClick={() => setShowCreate(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}><X size={16} /></button>
+            <h3 style={{ fontWeight: 700, fontSize: '14px', color: '#18181b', margin: 0 }}>Novo contato</h3>
+            <button onClick={() => setShowCreate(false)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', color: '#71717a', padding: '5px', display: 'flex' }}><X size={15} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-            <div><label style={labelStyle}>Telefone *</label><input style={inputStyle} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-            <div><label style={labelStyle}>Nome</label><input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-            <div><label style={labelStyle}>Empresa</label><input style={inputStyle} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
+            <div><label style={lbl}>Telefone *</label><input style={inp} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><label style={lbl}>Nome</label><input style={inp} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+            <div><label style={lbl}>Email</label><input style={inp} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            <div><label style={lbl}>Empresa</label><input style={inp} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
             {customFields.map(cf => (
               <div key={cf.id}>
-                <label style={labelStyle}>{cf.label}{cf.required && <span style={{ color: '#dc2626', marginLeft: '2px' }}>*</span>}</label>
+                <label style={lbl}>{cf.label}{cf.required && <span style={{ color: '#dc2626', marginLeft: '2px' }}>*</span>}</label>
                 {renderCustomFieldInput(cf, createMetadata[cf.name], val => setCreateMetadata({ ...createMetadata, [cf.name]: val }))}
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!form.phone || createMutation.isPending}
-              style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.phone ? 0.5 : 1 }}>
-              {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              Criar contato
+              style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.phone ? 0.5 : 1 }}>
+              {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />} Criar contato
             </button>
-            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>Cancelar</button>
+            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
-        <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-        <input style={{ ...inputStyle, paddingLeft: '36px', background: '#fff' }} placeholder="Buscar por nome ou número..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+        <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
+        <input style={{ ...inp, paddingLeft: '36px' }} placeholder="Buscar por nome ou número..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+          onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
+          onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto' }}>
+      <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
         {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} /></div>
+          <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
         ) : contacts.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
-            <User size={28} color="#e5e7eb" style={{ margin: '0 auto 10px' }} />
-            <p style={{ color: '#9ca3af', fontSize: '14px' }}>Nenhum contato encontrado</p>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <User size={22} color="#d4d4d8" />
+            </div>
+            <p style={{ color: '#a1a1aa', fontSize: '14px' }}>Nenhum contato encontrado</p>
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: '11px 20px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', alignItems: 'center', minWidth: '700px' }}>
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
-              {tableColumns.map(col => (
-                <span key={col.key} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col.label}</span>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: '11px 20px', background: '#fafafa', borderBottom: '1px solid #f4f4f5', alignItems: 'center', minWidth: '700px' }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#22c55e' }} />
+              {tableColumns.map(col => <span key={col.key} style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col.label}</span>)}
               <span></span>
             </div>
             {contacts.map((c: any) => {
               const isEditing = editingId === c.id
               const av = getAvatarColor(c.name)
               return (
-                <div key={c.id} style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f9fafb', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s', minWidth: '700px' }}>
-                  <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#16a34a' }} />
-                  {/* Nome */}
+                <div key={c.id} style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f4f4f5', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s', minWidth: '700px' }}>
+                  <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#22c55e' }} />
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>{getInitials(c.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {isEditing
-                        ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#111827' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /></>}
+                        ? <input style={{ ...inp, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
+                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: '#18181b' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /></>}
                     </div>
                   </div>
-                  {/* Telefone */}
-                  <span style={{ color: '#374151', fontSize: '13px' }}>{c.phone}</span>
-                  {/* Email */}
+                  <span style={{ color: '#52525b', fontSize: '13px' }}>{c.phone}</span>
                   {isEditing
-                    ? <input style={{ ...inputStyle, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
-                    : <span style={{ color: '#6b7280', fontSize: '13px' }}>{c.email || '—'}</span>}
-                  {/* Campos personalizados */}
+                    ? <input style={{ ...inp, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+                    : <span style={{ color: '#71717a', fontSize: '13px' }}>{c.email || '—'}</span>}
                   {customFields.map(cf => (
                     isEditing
                       ? <div key={cf.id}>{renderCustomFieldInput(cf, editForm.metadata[cf.name], val => setEditForm({ ...editForm, metadata: { ...editForm.metadata, [cf.name]: val } }), true)}</div>
-                      : <span key={cf.id} style={{ color: '#6b7280', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.metadata?.[cf.name] || '—'}</span>
+                      : <span key={cf.id} style={{ color: '#71717a', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.metadata?.[cf.name] || '—'}</span>
                   ))}
-                  {/* Última interação */}
-                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>{c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</span>
-                  {/* Ações */}
+                  <span style={{ color: '#a1a1aa', fontSize: '12px' }}>{c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</span>
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                       <>
-                        <button onClick={saveEdit} disabled={updateMutation.isPending} style={{ background: '#16a34a', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}>
+                        <button onClick={saveEdit} disabled={updateMutation.isPending} style={{ background: '#22c55e', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#fff', padding: '5px', display: 'flex' }}>
                           {updateMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
                         </button>
-                        <button onClick={() => setEditingId(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#6b7280', padding: '5px', display: 'flex' }}><X size={13} /></button>
+                        <button onClick={() => setEditingId(null)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#71717a', padding: '5px', display: 'flex' }}><X size={13} /></button>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                        <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#d4d4d8', padding: '5px', display: 'flex' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8' }}>
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => handleDelete(c.id, c.name || c.phone)} style={{ background: 'none', border: 'none', borderRadius: '5px', cursor: 'pointer', color: '#9ca3af', padding: '5px', display: 'flex' }}
+                        <button onClick={() => handleDelete(c.id, c.name || c.phone)} style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#d4d4d8', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}>
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8' }}>
                           <Trash2 size={13} />
                         </button>
                       </>
@@ -814,18 +574,18 @@ export default function ContactsPage() {
 
       {meta && meta.total > 20 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
-          <span style={{ color: '#6b7280', fontSize: '13px' }}>{((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos</span>
+          <span style={{ color: '#71717a', fontSize: '13px' }}>{((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos</span>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}><ChevronLeft size={14} /></button>
-            <span style={{ padding: '6px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#374151' }}>{page} / {totalPages}</span>
-            <button disabled={!meta.hasMore} onClick={() => setPage(p => p + 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', color: !meta.hasMore ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center' }}><ChevronRight size={14} /></button>
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '7px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d4d4d8' : '#52525b', display: 'flex', alignItems: 'center' }}><ChevronLeft size={14} /></button>
+            <span style={{ padding: '6px 12px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '13px', color: '#52525b' }}>{page} / {totalPages}</span>
+            <button disabled={!meta.hasMore} onClick={() => setPage(p => p + 1)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '7px', cursor: !meta.hasMore ? 'not-allowed' : 'pointer', color: !meta.hasMore ? '#d4d4d8' : '#52525b', display: 'flex', alignItems: 'center' }}><ChevronRight size={14} /></button>
           </div>
         </div>
       )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        input:focus, select:focus { border-color: #16a34a !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.1) !important; }
+        input:focus, select:focus { border-color: #22c55e !important; box-shadow: 0 0 0 3px rgba(34,197,94,0.1) !important; }
       `}</style>
     </div>
   )
