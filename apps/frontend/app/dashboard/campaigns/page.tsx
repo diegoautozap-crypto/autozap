@@ -189,37 +189,36 @@ export default function CampaignsPage() {
                 </div>
 
                 {/* Rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
                 {paginatedCampaigns.map((camp: any) => {
                   const s = S[camp.status] || S.draft
                   const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
                   const isSelected = selectedCamp?.id === camp.id
                   return (
                     <div key={camp.id} onClick={() => setSelectedCamp(camp)}
-                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '14px 18px', borderRadius: '10px', cursor: 'pointer', background: isSelected ? '#1e2d40' : '#161b27', alignItems: 'center', border: `1px solid ${isSelected ? '#22c55e33' : 'rgba(255,255,255,0.06)'}`, transition: 'all 0.15s', boxShadow: isSelected ? '0 0 0 1px #22c55e33' : 'none' }}
-                      onMouseEnter={e => { if (!isSelected) { (e.currentTarget as HTMLDivElement).style.background = '#1a2030'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)' } }}
-                      onMouseLeave={e => { if (!isSelected) { (e.currentTarget as HTMLDivElement).style.background = '#161b27'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.06)' } }}>
+                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '13px 20px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: `3px solid ${isSelected ? '#22c55e' : 'transparent'}` }}
+                      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
+                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
 
                       <div>
-                        <div style={{ fontWeight: 500, color: '#fff', fontSize: '13.5px', letterSpacing: '-0.01em', marginBottom: '2px' }}>{camp.name}</div>
+                        <div style={{ fontWeight: 500, color: '#18181b', fontSize: '13.5px', letterSpacing: '-0.01em', marginBottom: '2px' }}>{camp.name}</div>
                         {camp.scheduled_at && camp.status === 'scheduled' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#a78bfa', fontWeight: 500, marginTop: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#7c3aed', fontWeight: 500, marginTop: '2px' }}>
                             <Clock size={10} />{new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
-                        <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '99px', overflow: 'hidden', marginTop: '7px', width: '80%' }}>
-                          <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s', boxShadow: p > 0 ? `0 0 6px ${s.bar}66` : 'none' }} />
+                        <div style={{ height: '3px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '80%' }}>
+                          <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
                         </div>
                       </div>
 
-                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{camp.total_contacts.toLocaleString()}</span>
+                      <span style={{ color: '#71717a', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{camp.total_contacts.toLocaleString()}</span>
 
-                      <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ color: '#18181b', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
                         {camp.sent_count.toLocaleString()}
-                        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginLeft: '4px' }}>({p}%)</span>
+                        <span style={{ color: '#a1a1aa', fontSize: '11px', marginLeft: '4px' }}>({p}%)</span>
                       </span>
 
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', background: `${s.bar}18`, borderRadius: '6px', border: `1px solid ${s.bar}33` }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', background: s.bg, borderRadius: '6px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
                         <span style={{ fontSize: '12px', fontWeight: 600, color: s.color }}>{s.label}</span>
                       </div>
@@ -227,7 +226,7 @@ export default function CampaignsPage() {
                       <div onClick={e => e.stopPropagation()}>
                         {camp.status === 'running' ? (
                           <button onClick={() => pauseMutation.mutate(camp.id)}
-                            style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
+                            style={{ padding: '5px 10px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#71717a', fontWeight: 500 }}>
                             <Pause size={10} /> Pausar
                           </button>
                         ) : ['draft', 'paused'].includes(camp.status) ? (
@@ -240,7 +239,6 @@ export default function CampaignsPage() {
                     </div>
                   )
                 })}
-                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (
