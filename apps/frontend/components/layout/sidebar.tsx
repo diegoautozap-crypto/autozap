@@ -10,19 +10,6 @@ import {
   LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle,
 } from 'lucide-react'
 
-const T = {
-  bg:       '#0A0A0B',
-  surface:  '#111113',
-  surface2: '#18181B',
-  border:   '#1F1F23',
-  border2:  '#2A2A30',
-  text:     '#FAFAFA',
-  muted:    '#71717A',
-  subtle:   '#3F3F46',
-  accent:   '#22C55E',
-  accentGlow: 'rgba(34,197,94,0.15)',
-}
-
 const ALL_NAV = [
   { href: '/dashboard',           label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },
@@ -40,7 +27,7 @@ const ALL_NAV = [
 const ADMIN_PAGES = ALL_NAV.map(n => n.href)
 
 const ROLE_LABEL: Record<string, string> = {
-  owner: 'Owner', admin: 'Admin', supervisor: 'Supervisor', agent: 'Atendente',
+  owner: 'WhatsApp CRM', admin: 'WhatsApp CRM', supervisor: 'Supervisor', agent: 'Atendente',
 }
 
 function UsageBar() {
@@ -56,20 +43,20 @@ function UsageBar() {
   }, [])
 
   const isWarning = pct > 80
-  const color = isWarning ? '#F59E0B' : T.accent
+  const color = isWarning ? '#f97316' : '#22c55e'
 
   return (
-    <div style={{ padding: '12px 14px', borderTop: `1px solid ${T.border}` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '7px', alignItems: 'center' }}>
-        <span style={{ fontSize: '10px', color: T.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Uso mensal</span>
-        <span style={{ fontSize: '11px', color, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+    <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>Uso do mês</span>
+        <span style={{ fontSize: '11px', color, fontWeight: 700 }}>{pct}%</span>
       </div>
-      <div style={{ height: '2px', background: T.border2, borderRadius: '99px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.6s ease', boxShadow: `0 0 6px ${color}66` }} />
+      <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '99px', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.5s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
-        <span style={{ fontSize: '10px', color: T.subtle, fontVariantNumeric: 'tabular-nums' }}>{sent.toLocaleString()}</span>
-        <span style={{ fontSize: '10px', color: T.subtle }}>{limit ? limit.toLocaleString() : '∞'}</span>
+        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{sent.toLocaleString()} msgs</span>
+        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{limit ? limit.toLocaleString() : '∞'}</span>
       </div>
     </div>
   )
@@ -115,7 +102,7 @@ export function Sidebar() {
   useEffect(() => {
     if (allowedPages === null || isAdmin) return
     const ok = allowedPages.some(p => p === '/dashboard' ? pathname === '/dashboard' : pathname === p || pathname.startsWith(p + '/'))
-    if (!ok) { toast.error('Sem permissão'); router.replace('/dashboard/inbox') }
+    if (!ok) { toast.error('Você não tem permissão para acessar essa página'); router.replace('/dashboard/inbox') }
   }, [allowedPages, isAdmin, router, pathname])
 
   const nav = ALL_NAV.filter(item => isAdmin ? true : (allowedPages || []).includes(item.href))
@@ -124,32 +111,31 @@ export function Sidebar() {
     await logout(); toast.success('Até logo!'); router.push('/login')
   }
 
-  const userName    = (user as any)?.name || (user as any)?.email?.split('@')[0] || 'Usuário'
-  const userInitial = userName.charAt(0).toUpperCase()
-
   return (
     <aside style={{
       width: '220px',
-      background: T.surface,
-      borderRight: `1px solid ${T.border}`,
-      display: 'flex', flexDirection: 'column',
-      height: '100%', flexShrink: 0,
+      background: '#161b27',
+      borderRight: 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      flexShrink: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: '18px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ padding: '20px 16px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '30px', height: '30px',
-            background: T.accent,
+            width: '32px', height: '32px',
+            background: '#22c55e',
             borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, boxShadow: `0 0 12px ${T.accentGlow}`,
+            flexShrink: 0,
           }}>
-            <ZapIcon size={15} color="#000" fill="#000" />
+            <ZapIcon size={16} color="#fff" fill="#fff" />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: T.text, letterSpacing: '-0.03em', lineHeight: 1.1 }}>AutoZap</div>
-            <div style={{ fontSize: '10px', color: T.muted, marginTop: '2px', fontWeight: 500, letterSpacing: '0.01em' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#fff', letterSpacing: '-0.02em' }}>AutoZap</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>
               {ROLE_LABEL[currentRole] || 'WhatsApp CRM'}
             </div>
           </div>
@@ -157,40 +143,53 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
+      <nav style={{ flex: 1, padding: '4px 8px', overflowY: 'auto' }}>
         {!isAdmin && allowedPages === null ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '4px 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
             {[1, 2, 3].map(i => (
-              <div key={i} style={{ height: '34px', borderRadius: '7px', background: T.surface2, opacity: 1 - i * 0.25 }} className="sk" />
+              <div key={i} style={{ height: '36px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', opacity: 1 - i * 0.2 }} />
             ))}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {nav.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               const isError  = href === '/dashboard/errors'
-              const activeClr = isError ? '#F87171' : T.accent
-              const activeBg  = isError ? 'rgba(239,68,68,0.08)' : T.accentGlow
 
               return (
-                <button key={href} onClick={() => router.push(href)}
+                <button
+                  key={href}
+                  onClick={() => router.push(href)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '9px',
-                    padding: '8px 10px', borderRadius: '7px',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '9px 12px', borderRadius: '8px',
                     width: '100%', border: 'none', cursor: 'pointer', textAlign: 'left',
-                    background: isActive ? activeBg : 'transparent',
-                    color: isActive ? activeClr : T.muted,
-                    fontSize: '13px', fontWeight: isActive ? 600 : 400,
-                    transition: 'all 0.1s ease', letterSpacing: '-0.01em',
-                    position: 'relative',
+                    background: isActive
+                      ? isError ? 'rgba(239,68,68,0.15)' : '#22c55e'
+                      : 'transparent',
+                    color: isActive
+                      ? isError ? '#f87171' : '#fff'
+                      : isError ? '#f87171' : 'rgba(255,255,255,0.5)',
+                    fontSize: '13.5px',
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.12s ease',
                   }}
-                  onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = T.surface2; (e.currentTarget as HTMLButtonElement).style.color = T.text } }}
-                  onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = T.muted } }}
+                  onMouseEnter={e => {
+                    if (!isActive) {
+                      const el = e.currentTarget as HTMLButtonElement
+                      el.style.background = 'rgba(255,255,255,0.06)'
+                      el.style.color = isError ? '#f87171' : 'rgba(255,255,255,0.85)'
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) {
+                      const el = e.currentTarget as HTMLButtonElement
+                      el.style.background = 'transparent'
+                      el.style.color = isError ? '#f87171' : 'rgba(255,255,255,0.5)'
+                    }
+                  }}
                 >
-                  {isActive && (
-                    <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: '2px', height: '16px', background: activeClr, borderRadius: '0 2px 2px 0', boxShadow: `0 0 6px ${activeClr}88` }} />
-                  )}
-                  <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                  <Icon size={15} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
                   <span>{label}</span>
                 </button>
               )
@@ -201,37 +200,37 @@ export function Sidebar() {
 
       {isAdmin && <UsageBar />}
 
-      {/* Footer */}
-      <div style={{ padding: '8px 8px 12px', borderTop: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '8px', background: T.surface2, border: `1px solid ${T.border}`, marginBottom: '4px' }}>
-          <div style={{
-            width: '26px', height: '26px', borderRadius: '7px',
-            background: T.accentGlow, border: `1px solid ${T.accent}33`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '11px', fontWeight: 700, color: T.accent, flexShrink: 0,
-          }}>
-            {userInitial}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{userName}</div>
-            <div style={{ fontSize: '10px', color: T.muted, fontWeight: 500, marginTop: '1px' }}>{ROLE_LABEL[currentRole] || 'Usuário'}</div>
-          </div>
-        </div>
-        <button onClick={handleLogout}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '7px', width: '100%', border: 'none', cursor: 'pointer', background: 'transparent', color: T.subtle, fontSize: '12.5px', fontWeight: 500, transition: 'all 0.1s ease', letterSpacing: '-0.01em' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = '#F87171' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = T.subtle }}>
-          <LogOut size={13} strokeWidth={1.8} />
+      {/* Logout */}
+      <div style={{ padding: '8px 8px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '9px 12px', borderRadius: '8px',
+            width: '100%', border: 'none', cursor: 'pointer',
+            background: 'transparent',
+            color: 'rgba(255,255,255,0.35)',
+            fontSize: '13.5px', fontWeight: 400,
+            transition: 'all 0.12s ease',
+          }}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'rgba(239,68,68,0.1)'
+            el.style.color = '#f87171'
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'transparent'
+            el.style.color = 'rgba(255,255,255,0.35)'
+          }}
+        >
+          <LogOut size={15} strokeWidth={1.8} />
           <span>Sair</span>
         </button>
       </div>
 
       <style>{`
-        .sk { animation: skp 1.4s ease-in-out infinite; }
-        @keyframes skp { 0%,100%{opacity:.5} 50%{opacity:.15} }
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${T.border2}; border-radius: 99px; }
+        @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:.2} }
       `}</style>
     </aside>
   )
