@@ -62,7 +62,7 @@ const updateStatusSchema = z.object({ status: z.enum(['open', 'waiting', 'closed
 const assignSchema = z.object({ userId: z.string().uuid().nullable() })
 const pipelineSchema = z.object({
   stage: z.string().min(1).max(100),
-  pipelineId: z.string().uuid().optional(),
+  pipelineId: z.string().uuid().nullable().optional(),
 })
 const noteSchema = z.object({ body: z.string().min(1).max(5000) })
 const quickReplySchema = z.object({ title: z.string().min(1).max(200), body: z.string().min(1).max(5000) })
