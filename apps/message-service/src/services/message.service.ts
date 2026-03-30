@@ -32,6 +32,49 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }
 
+// ─── Webhook dispatcher ───────────────────────────────────────────────────────
+async function dispatchWebhook(tenantId: string, event: string, payload: object): Promise<void> {
+  try {
+    const { data: configs } = await db
+      .from('webhook_configs')
+      .select('url, events, secret')
+      .eq('tenant_id', tenantId)
+      .eq('active', true)
+
+    if (!configs || configs.length === 0) return
+
+    for (const config of configs) {
+      const events: string[] = config.events || []
+      if (!events.includes(event) && !events.includes('*')) continue
+
+      const body = JSON.stringify({
+        event,
+        timestamp: new Date().toISOString(),
+        tenant_id: tenantId,
+        data: payload,
+      })
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+      // Assinar o payload com HMAC-SHA256 se o cliente configurou um secret
+      if (config.secret) {
+        const crypto = await import('crypto')
+        const sig = crypto.createHmac('sha256', config.secret).update(body).digest('hex')
+        headers['X-AutoZap-Signature'] = `sha256=${sig}`
+      }
+
+      fetch(config.url, { method: 'POST', headers, body })
+        .then(async (res) => {
+          if (!res.ok) logger.warn('Webhook delivery failed', { url: config.url, status: res.status, event })
+          else logger.info('Webhook delivered', { url: config.url, event })
+        })
+        .catch(err => logger.error('Webhook dispatch error', { url: config.url, event, err }))
+    }
+  } catch (err) {
+    logger.error('dispatchWebhook error', { tenantId, event, err })
+  }
+}
+
 async function saveMessageError(params: {
   tenantId: string; channelId?: string; phone?: string; errorCode?: string
   errorMessage?: string; messageId?: string; rawPayload?: object
@@ -94,7 +137,6 @@ export class MessageService {
     }
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
 
-    // ✅ Adicionado phone e contactName para o hook de notificações do frontend
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,
       contactId: contact.id,
@@ -102,6 +144,18 @@ export class MessageService {
       contactName: senderName || contact.name || msg.from,
       body: msg.body,
       contentType: msg.contentType,
+      timestamp: msg.timestamp,
+    })
+
+    // ─── Webhook: nova mensagem recebida ──────────────────────────────────────
+    dispatchWebhook(tenantId, 'message.received', {
+      conversation_id: conversation.id,
+      contact_id: contact.id,
+      contact_name: senderName || contact.name || msg.from,
+      phone: msg.from,
+      body: msg.body,
+      content_type: msg.contentType,
+      media_url: msg.mediaUrl || null,
       timestamp: msg.timestamp,
     })
 
@@ -152,6 +206,10 @@ export class MessageService {
       .eq('tenant_id', tenantId)
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     emitPusher(tenantId, 'conversation.updated', { conversationId, botActive: false })
+
+    // ─── Webhook: humano assumiu conversa ─────────────────────────────────────
+    dispatchWebhook(tenantId, 'conversation.assigned', { conversation_id: conversationId })
+
     logger.info('Bot pausado — humano assumiu', { conversationId, tenantId })
   }
 
@@ -203,6 +261,24 @@ export class MessageService {
     if (row.conversation_id) {
       emitPusher(tenantId, 'message.status', { externalId, status, conversationId: row.conversation_id })
     }
+  }
+
+  // ─── Webhook disparado quando conversa muda de status (aberta/fechada) ──────
+  async notifyConversationStatusChanged(tenantId: string, conversationId: string, status: string, contactPhone?: string): Promise<void> {
+    dispatchWebhook(tenantId, 'conversation.status_changed', {
+      conversation_id: conversationId,
+      status,
+      phone: contactPhone || null,
+    })
+  }
+
+  // ─── Webhook disparado quando card é movido no pipeline ──────────────────────
+  async notifyPipelineMoved(tenantId: string, conversationId: string, stage: string, contactPhone?: string): Promise<void> {
+    dispatchWebhook(tenantId, 'pipeline.stage_changed', {
+      conversation_id: conversationId,
+      stage,
+      phone: contactPhone || null,
+    })
   }
 
   private async savePending(externalId: string, tenantId: string, status: string, timestamp: Date, errorMessage?: string): Promise<void> {
