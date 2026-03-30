@@ -35,10 +35,6 @@ function clearBadge() {
   if (originalTitle) document.title = originalTitle
 }
 
-function isViewingInbox(): boolean {
-  return document.hasFocus() && window.location.pathname.includes('/inbox')
-}
-
 export function useNotifications() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
@@ -71,7 +67,7 @@ export function useNotifications() {
 
     if (Notification.permission !== 'granted') return
 
-    // Sem ícone — evita 404 que cancela silenciosamente a notificação no Chrome
+    // Sem verificação de foco — notifica sempre
     const n = new Notification(title, { body })
     n.onclick = () => {
       window.focus()
@@ -102,7 +98,6 @@ export function useNotifications() {
     const channel = pusher.subscribe(`tenant-${tenantId}`)
 
     channel.bind('inbound.message', (data: any) => {
-      if (isViewingInbox()) return
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
