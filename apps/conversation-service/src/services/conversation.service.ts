@@ -15,25 +15,6 @@ export interface ConversationFilter {
   limit?: number
 }
 
-const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
-const PUSHER_KEY     = process.env.PUSHER_KEY
-const PUSHER_SECRET  = process.env.PUSHER_SECRET
-const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'sa1'
-
-async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
-  if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
-  try {
-    const body = JSON.stringify({ name: event, channel: `tenant-${tenantId}`, data: JSON.stringify(data) })
-    const crypto = await import('crypto')
-    const ts  = Math.floor(Date.now() / 1000)
-    const md5 = crypto.createHash('md5').update(body).digest('hex')
-    const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
-    await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
-  } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
-}
-
-const DEFAULT_STAGES = ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
-
 export class ConversationService {
 
   async listConversations(tenantId: string, filter: ConversationFilter = {}) {
@@ -43,7 +24,8 @@ export class ConversationService {
     let query = db
       .from('conversations')
       .select(`
-        id, status, pipeline_stage, pipeline_id, unread_count, last_message, last_message_at, created_at,
+        id, status, pipeline_stage, unread_count, last_message, last_message_at, created_at,
+        bot_active, assigned_to,
         contacts(id, name, phone, avatar_url),
         channels(id, name, type),
         users!conversations_assigned_to_fkey(id, name, avatar_url)
@@ -55,9 +37,7 @@ export class ConversationService {
     if (status) query = query.eq('status', status)
     if (assignedTo) query = query.eq('assigned_to', assignedTo)
     if (channelId) query = query.eq('channel_id', channelId)
-    if (allowedChannels && allowedChannels.length > 0) {
-      query = query.in('channel_id', allowedChannels)
-    }
+    if (allowedChannels?.length) query = query.in('channel_id', allowedChannels)
 
     const { data, count, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
@@ -95,7 +75,7 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-    emitPusher(tenantId, 'conversation.updated', { conversationId, status })
+    logger.info('Conversation status updated', { conversationId, status })
     return data
   }
 
@@ -109,24 +89,22 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-    emitPusher(tenantId, 'conversation.updated', { conversationId, assignedTo: userId })
     return data
   }
 
-  async updatePipelineStage(conversationId: string, tenantId: string, stage: string, pipelineId?: string) {
-    const updateData: any = { pipeline_stage: stage }
-    if (pipelineId) updateData.pipeline_id = pipelineId
+  async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage, pipelineId?: string) {
+    const update: any = { pipeline_stage: stage }
+    if (pipelineId !== undefined) update.pipeline_id = pipelineId || null
 
     const { data, error } = await db
       .from('conversations')
-      .update(updateData)
+      .update(update)
       .eq('id', conversationId)
       .eq('tenant_id', tenantId)
       .select()
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
-    emitPusher(tenantId, 'conversation.updated', { conversationId, pipelineStage: stage, pipelineId })
     return data
   }
 
@@ -155,31 +133,32 @@ export class ConversationService {
     return (data || []).reverse()
   }
 
+  // ─── Pipeline board com filtros ───────────────────────────────────────────
   async getPipelineBoard(tenantId: string, channelId?: string, campaignId?: string, pipelineId?: string) {
-    // Busca colunas — filtra por pipeline se fornecido
+    // Busca colunas dinâmicas configuradas pelo tenant
     let colQuery = db
       .from('pipeline_columns')
-      .select('key, label')
+      .select('key')
       .eq('tenant_id', tenantId)
       .order('sort_order', { ascending: true })
 
     if (pipelineId) {
       colQuery = colQuery.eq('pipeline_id', pipelineId)
     } else {
-      // Sem pipeline selecionada — pega colunas sem pipeline_id (legado)
       colQuery = colQuery.is('pipeline_id', null)
     }
 
-    const { data: dbColumns } = await colQuery
-
-    const stages = dbColumns && dbColumns.length > 0
-      ? dbColumns.map((c: any) => c.key)
-      : DEFAULT_STAGES
+    const { data: colData } = await colQuery
+    const stages: string[] = colData && colData.length > 0
+      ? colData.map((c: any) => c.key)
+      : ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
     let query = db
       .from('conversations')
       .select(`
-        id, pipeline_stage, pipeline_id, last_message, last_message_at, unread_count, channel_id, campaign_id,
+        id, pipeline_stage, pipeline_id, last_message, last_message_at,
+        unread_count, channel_id, campaign_id, bot_active, assigned_to,
+        deal_value,
         contacts(id, name, phone, avatar_url, contact_tags(tag_id, tags(id, name, color))),
         channels(id, name)
       `)
@@ -198,16 +177,17 @@ export class ConversationService {
     const { data, error } = await query
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
+    // Inicializa board com todas as colunas
     const board: Record<string, any[]> = {}
-    stages.forEach((s: string) => board[s] = [])
+    stages.forEach(s => { board[s] = [] })
 
     ;(data || []).forEach((conv: any) => {
       const stage = conv.pipeline_stage || stages[0] || 'lead'
       if (board[stage] !== undefined) {
         board[stage].push(conv)
       } else {
+        // Coluna não existe mais — coloca na primeira
         const firstStage = stages[0] || 'lead'
-        if (!board[firstStage]) board[firstStage] = []
         board[firstStage].push(conv)
       }
     })
