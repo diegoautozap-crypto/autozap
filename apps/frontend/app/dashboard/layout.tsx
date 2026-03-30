@@ -6,13 +6,17 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { TrialBanner } from '@/components/layout/TrialBanner'
 import { useNotifications } from '@/hooks/useNotifications'
 
+// Componente separado — só monta quando o usuário já está autenticado
+// Isso garante que o tenantId está disponível quando o Pusher conecta
+function NotificationsProvider() {
+  useNotifications()
+  return null
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, validateSession } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
-
-  // Inicializa notificações push, som e badge — ativo enquanto o dashboard estiver montado
-  useNotifications()
 
   useEffect(() => { setHydrated(true) }, [])
 
@@ -27,6 +31,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      {/* Só monta aqui — depois que hydrated=true e isAuthenticated=true */}
+      <NotificationsProvider />
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />
