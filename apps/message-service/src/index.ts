@@ -2,7 +2,6 @@ import 'dotenv/config'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
-import compression from 'compression'
 import zlib from 'zlib'
 import messageRoutes from './routes/message.routes'
 import automationRoutes from './routes/automation.routes'
@@ -19,50 +18,49 @@ app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
 
-// ─── Descompressão de requests gzip/deflate (necessário para Make/Zapier) ─────
+// ─── Captura o body bruto ANTES do express.json() ─────────────────────────────
+// Necessário para descompressão de gzip/deflate (Make, Zapier comprimem o body)
+app.use(express.raw({ type: '*/*', limit: '10mb' }))
+
+// ─── Descompressão e parse do body ───────────────────────────────────────────
 app.use((req: any, res: any, next: any) => {
-  const encoding = req.headers['content-encoding']
-  if (!encoding) return next()
+  const encoding = (req.headers['content-encoding'] || '').toLowerCase()
+  const contentType = (req.headers['content-type'] || '').toLowerCase()
+  const raw: Buffer | undefined = Buffer.isBuffer(req.body) ? req.body : undefined
+
+  // Se não tem body ou já foi parseado como objeto, passa direto
+  if (!raw || raw.length === 0) {
+    if (!req.body || Buffer.isBuffer(req.body)) req.body = {}
+    return next()
+  }
+
+  const parseJson = (text: string) => {
+    try { req.body = JSON.parse(text) } catch { req.body = {} }
+  }
 
   if (encoding === 'gzip') {
-    const gunzip = zlib.createGunzip()
-    const chunks: Buffer[] = []
-    req.pipe(gunzip)
-    gunzip.on('data', (chunk: Buffer) => chunks.push(chunk))
-    gunzip.on('end', () => {
-      const body = Buffer.concat(chunks).toString('utf8')
-      try {
-        req.body = JSON.parse(body)
-      } catch {
-        req.body = body
-      }
+    zlib.gunzip(raw, (err, result) => {
+      if (err) { req.body = {}; return next() }
       delete req.headers['content-encoding']
+      parseJson(result.toString('utf8'))
       next()
     })
-    gunzip.on('error', () => next())
   } else if (encoding === 'deflate') {
-    const inflate = zlib.createInflate()
-    const chunks: Buffer[] = []
-    req.pipe(inflate)
-    inflate.on('data', (chunk: Buffer) => chunks.push(chunk))
-    inflate.on('end', () => {
-      const body = Buffer.concat(chunks).toString('utf8')
-      try {
-        req.body = JSON.parse(body)
-      } catch {
-        req.body = body
-      }
+    zlib.inflate(raw, (err, result) => {
+      if (err) { req.body = {}; return next() }
       delete req.headers['content-encoding']
+      parseJson(result.toString('utf8'))
       next()
     })
-    inflate.on('error', () => next())
+  } else if (contentType.includes('application/json') || contentType.includes('text/')) {
+    parseJson(raw.toString('utf8'))
+    next()
   } else {
+    // Tenta parsear como JSON de qualquer forma
+    parseJson(raw.toString('utf8'))
     next()
   }
 })
-
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'message-service' })
