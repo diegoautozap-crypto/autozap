@@ -12,11 +12,12 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-// ── Rate limit preciso: 20 requests/segundo = 1200/min ───────────────────────
-const GUPSHUP_RPS        = 20       // requests por segundo permitidos pela Gupshup
-const INTERVAL_MS        = 1000 / GUPSHUP_RPS  // 50ms entre cada request
-const LOGICAL_BATCH      = 500      // busca 500 contatos por vez do DB
-const CONCURRENCY        = 20       // máximo de requests em voo ao mesmo tempo
+// Teto absoluto da Gupshup — 20 req/s = 1200/min
+// Mesmo que o usuário configure mais, nunca ultrapassa esse valor
+const GUPSHUP_MAX_RPS    = 20
+const GUPSHUP_MAX_PER_MIN = GUPSHUP_MAX_RPS * 60  // 1200
+const LOGICAL_BATCH      = 500
+const CONCURRENCY        = 20
 const MESSAGE_ID_RETRIES = 2
 
 function getRedisConnection() {
@@ -32,12 +33,15 @@ function getRedisConnection() {
 
 const connection = getRedisConnection()
 
-// ─── Rate limiter baseado em token bucket ─────────────────────────────────────
-// Garante exatamente 20 req/s sem bursts que causam 429 na Gupshup
+// ─── Rate limiter configurável ────────────────────────────────────────────────
+// Garante exatamente N req/s sem bursts que causam 429 na Gupshup
+// intervalMs vem do messagesPerMin configurado pelo usuário (com teto de 1200/min)
 class RateLimiter {
   private lastCallTime = 0
   private queue: Array<() => void> = []
   private processing = false
+
+  constructor(private intervalMs: number) {}
 
   async acquire(): Promise<void> {
     return new Promise(resolve => {
@@ -51,8 +55,8 @@ class RateLimiter {
     while (this.queue.length > 0) {
       const now = Date.now()
       const elapsed = now - this.lastCallTime
-      if (elapsed < INTERVAL_MS) {
-        await sleep(INTERVAL_MS - elapsed)
+      if (elapsed < this.intervalMs) {
+        await sleep(this.intervalMs - elapsed)
       }
       this.lastCallTime = Date.now()
       const resolve = this.queue.shift()
@@ -60,6 +64,13 @@ class RateLimiter {
     }
     this.processing = false
   }
+}
+
+/** Converte messagesPerMin → intervalMs com teto da Gupshup */
+function getIntervalMs(messagesPerMin: number): number {
+  const clamped = Math.min(Math.max(messagesPerMin, 1), GUPSHUP_MAX_PER_MIN)
+  const rps = clamped / 60
+  return Math.floor(1000 / rps)
 }
 
 export interface InboxJob {
@@ -193,22 +204,18 @@ async function sendViaFetch(
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
-      headers: {
-        'apikey': parsed.apiKey,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cache-Control': 'no-cache',
-      },
+      headers: { 'apikey': parsed.apiKey, 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
       body,
     })
 
-    const data = await response.json() as any
-
-    // Se Gupshup retornar 429 (rate limit), espera 1s e tenta de novo
+    // Gupshup retornou 429 — espera 1s e tenta de novo
     if (response.status === 429) {
       logger.warn('Gupshup 429 rate limit hit', { phone, attempt })
       await sleep(1000)
       return sendViaFetch(parsed, phone, message, attempt + 1)
     }
+
+    const data = await response.json() as any
 
     logger.info('Gupshup send response', {
       phone, status: data.status, messageId: data.messageId,
@@ -250,7 +257,7 @@ async function processContact(
   const messageDbId = generateId()
 
   try {
-    // Aguarda sua vez no rate limiter — garante 20 req/s exatos
+    // Aguarda sua vez no rate limiter — garante o intervalo configurado pelo usuário
     await rateLimiter.acquire()
 
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
@@ -301,10 +308,18 @@ async function processContact(
 }
 
 async function processCampaignJob(job: any) {
-  const { campaignId, tenantId, channelId, batchSize } = job.data
+  const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
+
+  // Aplica teto da Gupshup — nunca ultrapassa 1200/min independente do que o usuário configurou
+  const effectivePerMin = Math.min(messagesPerMin || 60, GUPSHUP_MAX_PER_MIN)
+  const intervalMs = getIntervalMs(effectivePerMin)
+
   logger.info('Campaign job started', {
     campaignId, tenantId,
-    rateLimit: `${GUPSHUP_RPS} req/s (${GUPSHUP_RPS * 60}/min)`,
+    configuredPerMin: messagesPerMin,
+    effectivePerMin,
+    intervalMs,
+    rateLabel: `${effectivePerMin}/min (~${(effectivePerMin / 60).toFixed(1)} req/s)`,
   })
 
   if (!await checkPlanLimit(tenantId)) {
@@ -318,8 +333,7 @@ async function processCampaignJob(job: any) {
   if (!curlTemplate) throw new Error('No curl template configured')
   const parsed = parseCurlTemplate(curlTemplate)
 
-  // Um rate limiter por campanha — garante 20 req/s independente do batchSize
-  const rateLimiter = new RateLimiter()
+  const rateLimiter = new RateLimiter(intervalMs)
   const limit = pLimit(CONCURRENCY)
   let processed = 0
   const startTime = Date.now()
@@ -346,15 +360,14 @@ async function processCampaignJob(job: any) {
       }
     }
 
-    // Processa todos os contatos do batch em paralelo controlado pelo rate limiter
     const results = await Promise.all(
       contacts.map(contact =>
         limit(() => processContact(contact, campaignId, tenantId, channelId, parsed, rateLimiter))
       )
     )
 
-    const sentCount = results.filter(r => r === 'sent').length
-    const failCount = results.filter(r => r === 'failed').length
+    const sentCount  = results.filter(r => r === 'sent').length
+    const failCount  = results.filter(r => r === 'failed').length
     processed += sentCount
 
     const elapsed = (Date.now() - startTime) / 1000
@@ -366,6 +379,7 @@ async function processCampaignJob(job: any) {
       sent: sentCount, failed: failCount,
       totalProcessed: processed,
       actualRps: actualRps.toFixed(1),
+      effectivePerMin,
     })
   }
 
@@ -384,7 +398,7 @@ export function startCampaignWorker(): Worker {
     logger.error('Legacy campaign job failed', { jobId: job?.id, error: err.message })
   )
 
-  logger.info(`Campaign worker initialized — rate limit: ${GUPSHUP_RPS} req/s`)
+  logger.info(`Campaign worker initialized — max rate: ${GUPSHUP_MAX_PER_MIN}/min`)
   return legacyWorker
 }
 
@@ -392,20 +406,11 @@ async function emitProgress(campaignId: string, tenantId: string): Promise<void>
   if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
   try {
     const progress = await campaignService.getProgress(campaignId, tenantId)
-    const body = JSON.stringify({
-      name: 'campaign.progress',
-      channel: `tenant-${tenantId}`,
-      data: JSON.stringify({ campaignId, ...progress }),
-    })
+    const body = JSON.stringify({ name: 'campaign.progress', channel: `tenant-${tenantId}`, data: JSON.stringify({ campaignId, ...progress }) })
     const crypto = await import('crypto')
     const ts  = Math.floor(Date.now() / 1000)
     const md5 = crypto.createHash('md5').update(body).digest('hex')
-    const sig = crypto.createHmac('sha256', PUSHER_SECRET)
-      .update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`)
-      .digest('hex')
-    await fetch(
-      `https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
-    )
+    const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
+    await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }

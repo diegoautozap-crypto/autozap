@@ -24,6 +24,25 @@ const inp: React.CSSProperties = {
   color: '#18181b', fontFamily: 'inherit', transition: 'all 0.15s',
 }
 
+function speedHint(messagesPerMin: number, contactsText: string): string {
+  const totalContacts = contactsText.split('\n').filter(Boolean).length
+  const mins = totalContacts > 0 ? Math.ceil(totalContacts / messagesPerMin) : null
+
+  const speedLabel = messagesPerMin >= 1200
+    ? '⚡ Velocidade máxima (teto da Gupshup)'
+    : messagesPerMin >= 600
+    ? '🚀 Rápido'
+    : '🐢 Conservador'
+
+  if (!mins) return speedLabel
+
+  const timeLabel = mins < 60
+    ? `${mins}min`
+    : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? `${mins % 60}min` : ''}`
+
+  return `${speedLabel} · ${totalContacts.toLocaleString()} contatos = ~${timeLabel}`
+}
+
 export default function CampaignsPage() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal]               = useState(false)
@@ -31,7 +50,7 @@ export default function CampaignsPage() {
   const [curlText, setCurlText]                 = useState('')
   const [campaignName, setCampaignName]         = useState('')
   const [selectedChannel, setSelectedChannel]   = useState('')
-  const [messagesPerMin, setMessagesPerMin]     = useState(60)
+  const [messagesPerMin, setMessagesPerMin]     = useState(1200)  // padrão: velocidade máxima
   const [selectedCamp, setSelectedCamp]         = useState<any>(null)
   const [page, setPage]                         = useState(1)
   const [useTemplate, setUseTemplate]           = useState(true)
@@ -82,6 +101,7 @@ export default function CampaignsPage() {
     setCampaignName(''); setContactsText(''); setCurlText('')
     setSelectedChannel(''); setSelectedTemplate(''); setTemplateVars([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
+    setMessagesPerMin(1200)
   }
 
   const createMutation = useMutation({
@@ -101,7 +121,7 @@ export default function CampaignsPage() {
       return campData.data
     },
     onSuccess: camp => {
-      toast.success(scheduleMode === 'scheduled' ? `Agendada!` : 'Campanha criada e iniciada!')
+      toast.success(scheduleMode === 'scheduled' ? 'Agendada!' : 'Campanha criada e iniciada!')
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false); setSelectedCamp(camp); resetModal()
     },
@@ -134,7 +154,7 @@ export default function CampaignsPage() {
   return (
     <div style={{ padding: '28px 32px', height: '100%', display: 'flex', flexDirection: 'column', background: '#f4f4f5' }}>
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>Campanhas</h1>
@@ -158,7 +178,7 @@ export default function CampaignsPage() {
 
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
 
-        {/* ── Tabela ─────────────────────────────────────────────────────── */}
+        {/* ── Tabela ── */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
             {isLoading ? (
@@ -181,14 +201,12 @@ export default function CampaignsPage() {
               </div>
             ) : (
               <>
-                {/* Header */}
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '11px 20px', background: '#fafafa', borderBottom: '1px solid #f4f4f5' }}>
                   {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
                     <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
                 </div>
 
-                {/* Rows */}
                 {paginatedCampaigns.map((camp: any) => {
                   const s = S[camp.status] || S.draft
                   const p = camp.total_contacts > 0 ? Math.round((camp.sent_count / camp.total_contacts) * 100) : 0
@@ -198,7 +216,6 @@ export default function CampaignsPage() {
                       style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '13px 20px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: `3px solid ${isSelected ? '#22c55e' : 'transparent'}` }}
                       onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
                       onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
-
                       <div>
                         <div style={{ fontWeight: 500, color: '#18181b', fontSize: '13.5px', letterSpacing: '-0.01em', marginBottom: '2px' }}>{camp.name}</div>
                         {camp.scheduled_at && camp.status === 'scheduled' && (
@@ -210,19 +227,15 @@ export default function CampaignsPage() {
                           <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
                         </div>
                       </div>
-
                       <span style={{ color: '#71717a', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{camp.total_contacts.toLocaleString()}</span>
-
                       <span style={{ color: '#18181b', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
                         {camp.sent_count.toLocaleString()}
                         <span style={{ color: '#a1a1aa', fontSize: '11px', marginLeft: '4px' }}>({p}%)</span>
                       </span>
-
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', background: s.bg, borderRadius: '6px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
                         <span style={{ fontSize: '12px', fontWeight: 600, color: s.color }}>{s.label}</span>
                       </div>
-
                       <div onClick={e => e.stopPropagation()}>
                         {camp.status === 'running' ? (
                           <button onClick={() => pauseMutation.mutate(camp.id)}
@@ -240,7 +253,6 @@ export default function CampaignsPage() {
                   )
                 })}
 
-                {/* Pagination */}
                 {totalPages > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #f4f4f5', marginTop: 'auto' }}>
                     <span style={{ fontSize: '12px', color: '#a1a1aa' }}>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns}</span>
@@ -267,7 +279,7 @@ export default function CampaignsPage() {
           </div>
         </div>
 
-        {/* ── Painel lateral ─────────────────────────────────────────────── */}
+        {/* ── Painel lateral ── */}
         <div style={{ width: '268px', flexShrink: 0 }}>
           {selectedCamp ? (
             <div style={{ background: '#161b27', border: 'none', borderRadius: '12px', overflow: 'hidden', position: 'sticky', top: 0, boxShadow: '0 4px 20px rgba(0,0,0,.15)' }}>
@@ -286,7 +298,6 @@ export default function CampaignsPage() {
                   <X size={14} />
                 </button>
               </div>
-
               <div style={{ padding: '16px 18px' }}>
                 {selectedCamp.scheduled_at && selectedCamp.status === 'scheduled' && (
                   <div style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -297,8 +308,6 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                 )}
-
-                {/* Progress */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progresso</span>
@@ -308,8 +317,6 @@ export default function CampaignsPage() {
                     <div style={{ width: `${pct}%`, height: '100%', background: '#22c55e', borderRadius: '99px', transition: 'width 0.5s ease', boxShadow: '0 0 8px rgba(34,197,94,0.4)' }} />
                   </div>
                 </div>
-
-                {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
                   {[
                     { label: 'Total',     value: total,     color: 'rgba(255,255,255,0.5)', icon: BarChart2 },
@@ -327,7 +334,6 @@ export default function CampaignsPage() {
                     </div>
                   ))}
                 </div>
-
                 {sent > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     {[
@@ -344,8 +350,6 @@ export default function CampaignsPage() {
                     ))}
                   </div>
                 )}
-
-                {/* Actions */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {selectedCamp.status === 'running' && (
                     <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
@@ -387,7 +391,7 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      {/* ── Modal ──────────────────────────────────────────────────────────── */}
+      {/* ── Modal ── */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
           <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
@@ -486,9 +490,23 @@ export default function CampaignsPage() {
                 )}
               </div>
 
+              {/* ── Campo de velocidade atualizado ── */}
               <div>
-                <Lbl>Mensagens por minuto (anti-ban)</Lbl>
-                <input type="number" min="1" max="300" style={{ ...inp, width: '100px' } as any} value={messagesPerMin} onChange={e => setMessagesPerMin(Number(e.target.value))} />
+                <Lbl>Velocidade de disparo</Lbl>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number" min="1" max="1200"
+                    style={{ ...inp, width: '100px' } as any}
+                    value={messagesPerMin}
+                    onChange={e => setMessagesPerMin(Math.min(1200, Math.max(1, Number(e.target.value))))}
+                    onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
+                    onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }}
+                  />
+                  <span style={{ fontSize: '13px', color: '#71717a' }}>msg/min</span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px', margin: '6px 0 0' }}>
+                  {speedHint(messagesPerMin, contactsText)}
+                </p>
               </div>
 
               <div>
