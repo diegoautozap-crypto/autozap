@@ -8,6 +8,7 @@ import { getTenantCampaignQueue } from '../workers/campaign.worker'
 export interface CreateCampaignInput {
   tenantId: string
   channelId: string
+  extraChannelIds?: string[]   // canais adicionais para disparo paralelo
   name: string
   messageTemplate: string
   contentType?: string
@@ -16,6 +17,7 @@ export interface CreateCampaignInput {
   batchSize?: number
   messagesPerMin?: number
   curlTemplate?: string
+  copies?: string[]            // lista de cURLs para rotacionar aleatoriamente
   createdBy: string
 }
 
@@ -28,7 +30,11 @@ export interface CampaignContact {
 export class CampaignService {
 
   async createCampaign(input: CreateCampaignInput) {
-    const { tenantId, channelId, name, messageTemplate, contentType, mediaUrl, scheduledAt, batchSize, messagesPerMin, curlTemplate, createdBy } = input
+    const {
+      tenantId, channelId, extraChannelIds, name, messageTemplate,
+      contentType, mediaUrl, scheduledAt, batchSize, messagesPerMin,
+      curlTemplate, copies, createdBy,
+    } = input
 
     const { data, error } = await db.from('campaigns').insert({
       id: generateId(),
@@ -36,12 +42,15 @@ export class CampaignService {
       channel_id: channelId,
       name,
       message_template: messageTemplate || ' ',
-      curl_template: curlTemplate,
+      curl_template: curlTemplate || (copies?.[0] ?? null),
+      // Salva copies e canais extras como JSONB
+      copies: copies && copies.length > 0 ? copies : null,
+      extra_channel_ids: extraChannelIds && extraChannelIds.length > 0 ? extraChannelIds : null,
       content_type: contentType || 'text',
       media_url: mediaUrl,
       scheduled_at: scheduledAt,
       batch_size: batchSize || 500,
-      messages_per_min: messagesPerMin || 20,
+      messages_per_min: messagesPerMin || 1200,
       status: scheduledAt ? 'scheduled' : 'draft',
       created_by: createdBy,
     }).select().single()
@@ -69,10 +78,7 @@ export class CampaignService {
       if (error) throw new AppError('DB_ERROR', error.message, 500)
     }
 
-    await db.from('campaigns')
-      .update({ total_contacts: rows.length })
-      .eq('id', campaignId)
-
+    await db.from('campaigns').update({ total_contacts: rows.length }).eq('id', campaignId)
     logger.info('Contacts added to campaign', { campaignId, count: rows.length })
     return rows.length
   }
@@ -93,7 +99,6 @@ export class CampaignService {
         ...row,
       },
     }))
-
     return this.addContacts(campaignId, tenantId, contacts)
   }
 
@@ -111,7 +116,6 @@ export class CampaignService {
 
   async listCampaigns(tenantId: string, page = 1, limit = 20) {
     const offset = (page - 1) * limit
-
     const { data, count, error } = await db
       .from('campaigns')
       .select('id, name, status, total_contacts, sent_count, delivered_count, read_count, failed_count, created_at, started_at, completed_at, channels(name)', { count: 'exact' })
@@ -137,29 +141,31 @@ export class CampaignService {
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // ✅ Enfileira na fila ISOLADA do tenant
-    // Garante que campanhas de tenants diferentes nunca se bloqueiam
+    // ✅ Enfileira na fila isolada do tenant com copies e canais extras
     const tenantQueue = getTenantCampaignQueue(tenantId)
     await tenantQueue.add(`campaign-${campaignId}`, {
       campaignId,
       tenantId,
       channelId: campaign.channel_id,
       batchSize: campaign.batch_size || 500,
-      messagesPerMin: campaign.messages_per_min || 20,
+      messagesPerMin: campaign.messages_per_min || 1200,
+      // Passa copies e canais extras para o worker rotacionar
+      copies: (campaign as any).copies || null,
+      extraChannelIds: (campaign as any).extra_channel_ids || [],
     })
 
-    logger.info('Campaign enqueued on tenant queue', {
-      campaignId,
-      tenantId,
+    logger.info('Campaign enqueued', {
+      campaignId, tenantId,
       queueName: `campaign_queue:tenant-${tenantId}`,
+      copies: ((campaign as any).copies || []).length,
+      extraChannels: ((campaign as any).extra_channel_ids || []).length,
     })
 
     return campaign
   }
 
   async pauseCampaign(campaignId: string, tenantId: string) {
-    await db.from('campaigns').update({ status: 'paused' })
-      .eq('id', campaignId).eq('tenant_id', tenantId)
+    await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId).eq('tenant_id', tenantId)
   }
 
   async deleteCampaign(campaignId: string, tenantId: string) {
@@ -182,30 +188,24 @@ export class CampaignService {
       .eq('campaign_id', campaignId)
       .eq('status', 'pending')
       .limit(batchSize)
-
     return data || []
   }
 
   async markContactSent(contactId: string, messageUuid: string) {
     await db.from('campaign_contacts').update({
-      status: 'sent',
-      message_uuid: messageUuid,
-      sent_at: new Date(),
+      status: 'sent', message_uuid: messageUuid, sent_at: new Date(),
     }).eq('id', contactId)
   }
 
   async markContactFailed(contactId: string, errorMessage: string) {
     await db.from('campaign_contacts').update({
-      status: 'failed',
-      error_message: errorMessage,
+      status: 'failed', error_message: errorMessage,
     }).eq('id', contactId)
   }
 
   async incrementCounter(campaignId: string, field: 'sent_count' | 'delivered_count' | 'read_count' | 'failed_count') {
     await db.rpc('increment_campaign_counter', {
-      p_campaign_id: campaignId,
-      p_field: field,
-      p_count: 1,
+      p_campaign_id: campaignId, p_field: field, p_count: 1,
     })
   }
 
@@ -220,13 +220,8 @@ export class CampaignService {
 
     const processed = (campaign.sent_count || 0) + (campaign.failed_count || 0)
     if (processed >= campaign.total_contacts) {
-      await db.from('campaigns').update({
-        status: 'completed',
-        completed_at: new Date(),
-      }).eq('id', campaignId)
-
+      await db.from('campaigns').update({ status: 'completed', completed_at: new Date() }).eq('id', campaignId)
       logger.info('Campaign completed', { campaignId })
-
       this.notifyCampaignCompleted(campaign).catch(err =>
         logger.error('Failed to send campaign completed email', { err })
       )
@@ -245,15 +240,10 @@ export class CampaignService {
     if (!owner?.email) return
 
     await sendCampaignCompletedEmail({
-      to: owner.email,
-      name: owner.name,
-      campaignName: campaign.name,
-      total: campaign.total_contacts || 0,
-      sent: campaign.sent_count || 0,
-      delivered: campaign.delivered_count || 0,
-      read: campaign.read_count || 0,
-      failed: campaign.failed_count || 0,
-      campaignId: campaign.id,
+      to: owner.email, name: owner.name, campaignName: campaign.name,
+      total: campaign.total_contacts || 0, sent: campaign.sent_count || 0,
+      delivered: campaign.delivered_count || 0, read: campaign.read_count || 0,
+      failed: campaign.failed_count || 0, campaignId: campaign.id,
     })
   }
 
@@ -263,12 +253,12 @@ export class CampaignService {
 
   async getProgress(campaignId: string, tenantId: string) {
     const campaign = await this.getCampaign(campaignId, tenantId)
-    const total = campaign.total_contacts || 0
-    const sent = campaign.sent_count || 0
+    const total    = campaign.total_contacts || 0
+    const sent     = campaign.sent_count || 0
     const delivered = campaign.delivered_count || 0
-    const read = campaign.read_count || 0
-    const failed = campaign.failed_count || 0
-    const pending = total - sent - failed
+    const read     = campaign.read_count || 0
+    const failed   = campaign.failed_count || 0
+    const pending  = total - sent - failed
 
     return {
       total, sent, delivered, read, failed, pending,

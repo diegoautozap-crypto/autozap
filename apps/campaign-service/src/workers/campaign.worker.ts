@@ -12,13 +12,11 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-// Teto absoluto da Gupshup — 20 req/s = 1200/min
-// Mesmo que o usuário configure mais, nunca ultrapassa esse valor
-const GUPSHUP_MAX_RPS    = 20
-const GUPSHUP_MAX_PER_MIN = GUPSHUP_MAX_RPS * 60  // 1200
-const LOGICAL_BATCH      = 500
-const CONCURRENCY        = 20
-const MESSAGE_ID_RETRIES = 2
+const GUPSHUP_MAX_RPS     = 20       // 20 req/s = 1200/min por canal
+const GUPSHUP_MAX_PER_MIN = GUPSHUP_MAX_RPS * 60
+const LOGICAL_BATCH       = 500
+const CONCURRENCY_PER_CH  = 20       // requests paralelos por canal
+const MESSAGE_ID_RETRIES  = 2
 
 function getRedisConnection() {
   try {
@@ -33,9 +31,7 @@ function getRedisConnection() {
 
 const connection = getRedisConnection()
 
-// ─── Rate limiter configurável ────────────────────────────────────────────────
-// Garante exatamente N req/s sem bursts que causam 429 na Gupshup
-// intervalMs vem do messagesPerMin configurado pelo usuário (com teto de 1200/min)
+// ─── Rate limiter por canal ────────────────────────────────────────────────────
 class RateLimiter {
   private lastCallTime = 0
   private queue: Array<() => void> = []
@@ -55,9 +51,7 @@ class RateLimiter {
     while (this.queue.length > 0) {
       const now = Date.now()
       const elapsed = now - this.lastCallTime
-      if (elapsed < this.intervalMs) {
-        await sleep(this.intervalMs - elapsed)
-      }
+      if (elapsed < this.intervalMs) await sleep(this.intervalMs - elapsed)
       this.lastCallTime = Date.now()
       const resolve = this.queue.shift()
       if (resolve) resolve()
@@ -66,11 +60,14 @@ class RateLimiter {
   }
 }
 
-/** Converte messagesPerMin → intervalMs com teto da Gupshup */
 function getIntervalMs(messagesPerMin: number): number {
   const clamped = Math.min(Math.max(messagesPerMin, 1), GUPSHUP_MAX_PER_MIN)
-  const rps = clamped / 60
-  return Math.floor(1000 / rps)
+  return Math.floor(1000 / (clamped / 60))
+}
+
+// ─── Sorteia copy aleatória ────────────────────────────────────────────────────
+function pickRandomCopy(copies: string[]): string {
+  return copies[Math.floor(Math.random() * copies.length)]
 }
 
 export interface InboxJob {
@@ -81,26 +78,23 @@ export interface InboxJob {
 export const inboxQueue = new Queue<InboxJob>('inbox_queue', {
   connection,
   defaultJobOptions: {
-    attempts: 5,
-    backoff: { type: 'exponential', delay: 2000 },
-    removeOnComplete: { count: 1000 },
-    removeOnFail:    { count: 500 },
+    attempts: 5, backoff: { type: 'exponential', delay: 2000 },
+    removeOnComplete: { count: 1000 }, removeOnFail: { count: 500 },
   },
 })
 
 export interface CampaignJob {
   campaignId: string; tenantId: string; channelId: string
   batchSize: number; messagesPerMin: number
+  // Novos campos para multicopy e multicanal
+  copies?: string[]           // lista de cURLs para rotacionar
+  extraChannelIds?: string[]  // canais adicionais para disparar em paralelo
 }
 
 export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
   return new Queue<CampaignJob>(`campaign_queue:tenant-${tenantId}`, {
     connection,
-    defaultJobOptions: {
-      attempts: 1,
-      removeOnComplete: { count: 100 },
-      removeOnFail:    { count: 500 },
-    },
+    defaultJobOptions: { attempts: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
   })
 }
 
@@ -113,17 +107,9 @@ const activeWorkers = new Map<string, Worker<CampaignJob>>()
 
 function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
   if (activeWorkers.has(tenantId)) return activeWorkers.get(tenantId)!
-
   const queueName = `campaign_queue:tenant-${tenantId}`
-  const worker = new Worker<CampaignJob>(queueName, processCampaignJob, {
-    connection,
-    concurrency: 1,
-  })
-
-  worker.on('failed', (job, err) =>
-    logger.error('Campaign job failed', { tenantId, jobId: job?.id, error: err.message })
-  )
-
+  const worker = new Worker<CampaignJob>(queueName, processCampaignJob, { connection, concurrency: 1 })
+  worker.on('failed', (job, err) => logger.error('Campaign job failed', { tenantId, jobId: job?.id, error: err.message }))
   logger.info('Campaign worker created for tenant', { tenantId, queueName })
   activeWorkers.set(tenantId, worker)
   return worker
@@ -141,16 +127,12 @@ interface ParsedCurl { apiKey: string; bodyTemplate: string }
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
-
   let bodyTemplate = ''
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
   const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
-
-  if (singleQ) {
-    bodyTemplate = singleQ[1]
-  } else if (doubleQ) {
-    bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
-  } else if (curlStr.includes('--data-urlencode')) {
+  if (singleQ) { bodyTemplate = singleQ[1] }
+  else if (doubleQ) { bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\') }
+  else if (curlStr.includes('--data-urlencode')) {
     const extract = (fieldName: string): string => {
       const pattern = new RegExp(`--data-urlencode\\s+"${fieldName}=([\\s\\S]*?)(?="\\s+--|"\\s*$)`)
       const m = curlStr.match(pattern)
@@ -170,7 +152,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     }
     if (fields.length > 0) bodyTemplate = fields.join('&')
   }
-
   bodyTemplate = bodyTemplate
     .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
@@ -178,16 +159,11 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     .replace(/\{\{phone\}\}/gi, '__PHONE__')
     .replace(/\{\{numero\}\}/gi, '__PHONE__')
     .replace(/\{\{telefone\}\}/gi, '__PHONE__')
-
-  logger.info('Curl parsed', { apiKey: apiKey.slice(0, 8) + '...', hasPhone: bodyTemplate.includes('__PHONE__') })
   return { apiKey, bodyTemplate }
 }
 
 async function sendViaFetch(
-  parsed: ParsedCurl,
-  phone: string,
-  message: string,
-  attempt = 0,
+  parsed: ParsedCurl, phone: string, message: string, attempt = 0,
 ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   try {
     let body = parsed.bodyTemplate.replace('__PHONE__', encodeURIComponent(phone))
@@ -201,54 +177,32 @@ async function sendViaFetch(
         } catch (e) { logger.warn('Failed to replace template params', { error: (e as any).message }) }
       }
     }
-
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
       headers: { 'apikey': parsed.apiKey, 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
       body,
     })
-
-    // Gupshup retornou 429 — espera 1s e tenta de novo
     if (response.status === 429) {
       logger.warn('Gupshup 429 rate limit hit', { phone, attempt })
       await sleep(1000)
       return sendViaFetch(parsed, phone, message, attempt + 1)
     }
-
     const data = await response.json() as any
-
-    logger.info('Gupshup send response', {
-      phone, status: data.status, messageId: data.messageId,
-      attempt, fullResponse: JSON.stringify(data).slice(0, 300),
-    })
-
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
-
     if (data.status === 'submitted' || data.messageId || data.status === 'success') {
       if (!data.messageId) {
-        if (attempt < MESSAGE_ID_RETRIES) {
-          logger.warn('Gupshup missing messageId — retrying', { phone, attempt: attempt + 1 })
-          await sleep(500)
-          return sendViaFetch(parsed, phone, message, attempt + 1)
-        }
+        if (attempt < MESSAGE_ID_RETRIES) { await sleep(500); return sendViaFetch(parsed, phone, message, attempt + 1) }
         return { ok: false, error: 'Gupshup did not return messageId after retries' }
       }
       return { ok: true, messageId: data.messageId || data.id }
     }
-
     return { ok: false, error: JSON.stringify(data) }
-  } catch (err: any) {
-    return { ok: false, error: err.message }
-  }
+  } catch (err: any) { return { ok: false, error: err.message } }
 }
 
 async function processContact(
-  contact: any,
-  campaignId: string,
-  tenantId: string,
-  channelId: string,
-  parsed: ParsedCurl,
-  rateLimiter: RateLimiter,
+  contact: any, campaignId: string, tenantId: string, channelId: string,
+  parsed: ParsedCurl, rateLimiter: RateLimiter,
 ): Promise<'sent' | 'failed'> {
   const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
   const contactMessage = rawMessage.replace(/\\r\\n/g, '\r').replace(/\\r/g, '\r').replace(/\\n/g, '\n').trim()
@@ -257,9 +211,7 @@ async function processContact(
   const messageDbId = generateId()
 
   try {
-    // Aguarda sua vez no rate limiter — garante o intervalo configurado pelo usuário
     await rateLimiter.acquire()
-
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
@@ -269,17 +221,9 @@ async function processContact(
     }
 
     const { error: upsertError } = await db.from('messages').upsert({
-      id:           messageDbId,
-      message_uuid: messageUuid,
-      tenant_id:    tenantId,
-      channel_id:   channelId,
-      direction:    'outbound',
-      content_type: 'text',
-      body:         bodyForDb || '(template)',
-      status:       'sent',
-      sent_at:      new Date(),
-      campaign_id:  campaignId,
-      external_id:  result.messageId,
+      id: messageDbId, message_uuid: messageUuid, tenant_id: tenantId, channel_id: channelId,
+      direction: 'outbound', content_type: 'text', body: bodyForDb || '(template)',
+      status: 'sent', sent_at: new Date(), campaign_id: campaignId, external_id: result.messageId,
     }, { onConflict: 'external_id' })
 
     if (upsertError) {
@@ -289,8 +233,7 @@ async function processContact(
     }
 
     inboxQueue.add('create-inbox', {
-      tenantId, channelId,
-      phone:       contact.phone.replace(/^\+/, ''),
+      tenantId, channelId, phone: contact.phone.replace(/^\+/, ''),
       messageDbId, body: bodyForDb || '(template)', campaignId,
     }).catch(err => logger.warn('Failed to enqueue inbox job', { phone: contact.phone, err: err.message }))
 
@@ -299,7 +242,6 @@ async function processContact(
     try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
 
     return 'sent'
-
   } catch (err: any) {
     await campaignService.markContactFailed(contact.id, err.message)
     await campaignService.incrementCounter(campaignId, 'failed_count')
@@ -308,18 +250,22 @@ async function processContact(
 }
 
 async function processCampaignJob(job: any) {
-  const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
+  const { campaignId, tenantId, channelId, batchSize, messagesPerMin, copies, extraChannelIds } = job.data
 
-  // Aplica teto da Gupshup — nunca ultrapassa 1200/min independente do que o usuário configurou
   const effectivePerMin = Math.min(messagesPerMin || 60, GUPSHUP_MAX_PER_MIN)
   const intervalMs = getIntervalMs(effectivePerMin)
 
+  // Todos os canais disponíveis para este job
+  const allChannelIds = [channelId, ...(extraChannelIds || [])].filter(Boolean)
+  const channelCount  = allChannelIds.length
+
+  // Copies disponíveis para rotacionar
+  const availableCopies: string[] = copies && copies.length > 0 ? copies : []
+
   logger.info('Campaign job started', {
-    campaignId, tenantId,
-    configuredPerMin: messagesPerMin,
-    effectivePerMin,
-    intervalMs,
-    rateLabel: `${effectivePerMin}/min (~${(effectivePerMin / 60).toFixed(1)} req/s)`,
+    campaignId, tenantId, effectivePerMin, channelCount,
+    copyCount: availableCopies.length,
+    totalRate: effectivePerMin * channelCount,
   })
 
   if (!await checkPlanLimit(tenantId)) {
@@ -329,12 +275,19 @@ async function processCampaignJob(job: any) {
   }
 
   const campaign = await campaignService.getCampaign(campaignId, tenantId)
-  const curlTemplate = (campaign as any).curl_template
-  if (!curlTemplate) throw new Error('No curl template configured')
-  const parsed = parseCurlTemplate(curlTemplate)
 
-  const rateLimiter = new RateLimiter(intervalMs)
-  const limit = pLimit(CONCURRENCY)
+  // Parseia todas as copies — cada canal vai usar uma copy aleatória por contato
+  const curlTemplate = (campaign as any).curl_template
+  if (!curlTemplate && availableCopies.length === 0) throw new Error('No curl template configured')
+
+  // Se não tem copies salvas, usa o curl_template principal
+  const allCopies = availableCopies.length > 0 ? availableCopies : [curlTemplate]
+  const parsedCopies = allCopies.map(c => parseCurlTemplate(c))
+
+  // Cria um rate limiter e um pool de concorrência por canal
+  const channelLimiters = allChannelIds.map(() => new RateLimiter(intervalMs))
+  const channelLimits   = allChannelIds.map(() => pLimit(CONCURRENCY_PER_CH))
+
   let processed = 0
   const startTime = Date.now()
 
@@ -351,7 +304,6 @@ async function processCampaignJob(job: any) {
       break
     }
 
-    // Verifica plan limit a cada 500 mensagens
     if (processed > 0 && processed % 500 === 0) {
       if (!await checkPlanLimit(tenantId)) {
         await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
@@ -360,26 +312,35 @@ async function processCampaignJob(job: any) {
       }
     }
 
+    // Distribui contatos entre canais em round-robin
+    // Cada contato recebe uma copy aleatória E um canal aleatório
     const results = await Promise.all(
-      contacts.map(contact =>
-        limit(() => processContact(contact, campaignId, tenantId, channelId, parsed, rateLimiter))
-      )
+      contacts.map((contact, idx) => {
+        const channelIdx = idx % channelCount
+        const chId       = allChannelIds[channelIdx]
+        const limiter    = channelLimiters[channelIdx]
+        const pool       = channelLimits[channelIdx]
+        // Sorteia copy aleatória para este contato
+        const parsed     = parsedCopies[Math.floor(Math.random() * parsedCopies.length)]
+
+        return pool(() => processContact(contact, campaignId, tenantId, chId, parsed, limiter))
+      })
     )
 
-    const sentCount  = results.filter(r => r === 'sent').length
-    const failCount  = results.filter(r => r === 'failed').length
+    const sentCount = results.filter(r => r === 'sent').length
     processed += sentCount
 
-    const elapsed = (Date.now() - startTime) / 1000
-    const actualRps = processed / elapsed
+    const elapsed    = (Date.now() - startTime) / 1000
+    const actualRps  = processed / elapsed
+    const totalRate  = effectivePerMin * channelCount
 
     await emitProgress(campaignId, tenantId)
     logger.info('Batch dispatched', {
       campaignId, tenantId,
-      sent: sentCount, failed: failCount,
+      sent: sentCount, failed: contacts.length - sentCount,
       totalProcessed: processed,
       actualRps: actualRps.toFixed(1),
-      effectivePerMin,
+      configuredRate: `${totalRate}/min (${channelCount}ch × ${effectivePerMin}/min)`,
     })
   }
 
@@ -398,7 +359,7 @@ export function startCampaignWorker(): Worker {
     logger.error('Legacy campaign job failed', { jobId: job?.id, error: err.message })
   )
 
-  logger.info(`Campaign worker initialized — max rate: ${GUPSHUP_MAX_PER_MIN}/min`)
+  logger.info(`Campaign worker initialized — max rate: ${GUPSHUP_MAX_PER_MIN}/min per channel`)
   return legacyWorker
 }
 
