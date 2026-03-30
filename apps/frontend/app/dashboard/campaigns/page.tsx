@@ -448,16 +448,19 @@ export default function CampaignsPage() {
                       </div>
                     ) : (
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a' }}>
-                            Selecione os templates — serão rotacionados aleatoriamente
+                            Templates — selecione um ou mais
                           </span>
                           {selectedTemplates.length > 0 && (
                             <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
-                              <Shuffle size={11} /> {selectedTemplates.length}
+                              <Shuffle size={11} /> {selectedTemplates.length} selecionado{selectedTemplates.length > 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
+                        <p style={{ fontSize: '11px', color: '#a1a1aa', margin: '0 0 8px' }}>
+                          Selecione múltiplos para rotacionar aleatoriamente entre os contatos
+                        </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
                           {(templates as any[]).map((t: any) => {
                             const sel = selectedTemplates.includes(t.id)
@@ -555,7 +558,10 @@ export default function CampaignsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input type="number" min="1" max="1200" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
-                    onChange={e => setMessagesPerMin(Math.min(1200, Math.max(1, Number(e.target.value))))}
+                    onChange={e => {
+                      const val = Number(e.target.value)
+                      if (!isNaN(val)) setMessagesPerMin(Math.min(1200, Math.max(1, val)))
+                    }}
                     onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                     onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
                   <span style={{ fontSize: '13px', color: '#71717a' }}>msg/min por canal</span>
