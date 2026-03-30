@@ -755,6 +755,20 @@ export default function InboxPage() {
               {(customFields as any[]).filter((cf: any) => contactDetail?.metadata?.[cf.name] != null && contactDetail?.metadata?.[cf.name] !== '').map((cf: any) => (
                 <div key={cf.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cf.label}</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{String(contactDetail.metadata[cf.name])}</p></div></div>
               ))}
+              {contactDetail?.metadata && (() => {
+                const customFieldNames = new Set((customFields as any[]).map((cf: any) => cf.name))
+                return Object.entries(contactDetail.metadata)
+                  .filter(([key, val]) => !customFieldNames.has(key) && val != null && String(val) !== '')
+                  .map(([key, val]) => (
+                    <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{key}</p>
+                        <p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{String(val)}</p>
+                      </div>
+                    </div>
+                  ))
+              })()}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><Clock size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Última interação</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail?.last_interaction_at ? new Date(contactDetail.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</p></div></div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <MessageSquare size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -836,3 +850,4 @@ export default function InboxPage() {
     </div>
   )
 }
+
