@@ -51,9 +51,8 @@ export function useNotifications() {
     try {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' })
       swRegistered.current = true
-      console.log('[Notifications] Service worker registrado')
     } catch (err) {
-      console.warn('[Notifications] SW registration failed:', err)
+      console.warn('SW registration failed:', err)
     }
   }, [])
 
@@ -62,18 +61,22 @@ export function useNotifications() {
     if (Notification.permission === 'default') {
       await Notification.requestPermission()
     }
-    console.log('[Notifications] Permissão:', Notification.permission)
   }, [])
 
   const showNotification = useCallback((title: string, body: string, url = '/dashboard/inbox') => {
     if (typeof window === 'undefined') return
-    console.log('[Notifications] Disparando notificação:', { title, body })
+
     playNotificationSound()
     incrementBadge()
-    if (Notification.permission === 'granted' && !document.hasFocus()) {
-      const options: any = { body, icon: '/icon-192.png', tag: 'autozap-message', renotify: true }
-      const n = new Notification(title, options)
-      n.onclick = () => { window.focus(); window.location.href = url; n.close() }
+
+    if (Notification.permission !== 'granted') return
+
+    // Sem ícone — evita 404 que cancela silenciosamente a notificação no Chrome
+    const n = new Notification(title, { body })
+    n.onclick = () => {
+      window.focus()
+      window.location.href = url
+      n.close()
     }
   }, [])
 
@@ -91,36 +94,15 @@ export function useNotifications() {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-
-    console.log('[Notifications] tenantId:', tenantId)
-    console.log('[Notifications] Pusher key existe:', !!key)
-
-    if (!key || !tenantId) {
-      console.warn('[Notifications] Abortando — key ou tenantId ausente')
-      return
-    }
+    if (!key || !tenantId) return
 
     const pusher = new Pusher(key, { cluster })
     pusherRef.current = pusher
 
-    const channelName = `tenant-${tenantId}`
-    console.log('[Notifications] Inscrevendo no canal:', channelName)
-    const channel = pusher.subscribe(channelName)
-
-    channel.bind('pusher:subscription_succeeded', () => {
-      console.log('[Notifications] ✅ Inscrito com sucesso no canal:', channelName)
-    })
-
-    channel.bind('pusher:subscription_error', (err: any) => {
-      console.error('[Notifications] ❌ Erro ao inscrever no canal:', err)
-    })
+    const channel = pusher.subscribe(`tenant-${tenantId}`)
 
     channel.bind('inbound.message', (data: any) => {
-      console.log('[Notifications] 🔔 inbound.message recebido:', data)
-      if (isViewingInbox()) {
-        console.log('[Notifications] Ignorando — usuário está no inbox com foco')
-        return
-      }
+      if (isViewingInbox()) return
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
@@ -130,7 +112,7 @@ export function useNotifications() {
 
     return () => {
       channel.unbind_all()
-      pusher.unsubscribe(channelName)
+      pusher.unsubscribe(`tenant-${tenantId}`)
       pusher.disconnect()
       pusherRef.current = null
     }
