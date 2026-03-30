@@ -11,12 +11,6 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Pusher from 'pusher-js'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const DEFAULT_COLUMNS = [
   { key: 'lead',         label: 'Lead',        color: '#6b7280' },
@@ -74,8 +68,9 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
   )
 }
 
-function ManageColumnsModal({ columns, tenantId, pipelineId, onClose, onSaved, board }: {
-  columns: any[]; tenantId: string; pipelineId: string | null
+// ── ManageColumnsModal — migrado para backend ──────────────────────────────────
+function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
+  columns: any[]; pipelineId: string | null
   onClose: () => void; onSaved: () => void; board: Record<string, any[]> | undefined
 }) {
   const [localCols, setLocalCols] = useState(columns.map(c => ({ ...c })))
@@ -104,8 +99,7 @@ function ManageColumnsModal({ columns, tenantId, pipelineId, onClose, onSaved, b
     setLocalCols(c => [...c, {
       id: `new_${Date.now()}`,
       key: newLabel.toLowerCase().replace(/\s+/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-      label: newLabel.trim(), color: newColor, sort_order: c.length,
-      tenant_id: tenantId, pipeline_id: pipelineId, _isNew: true,
+      label: newLabel.trim(), color: newColor, sort_order: c.length, _isNew: true,
     }])
     setNewLabel(''); setNewColor('#6b7280')
   }
@@ -123,25 +117,24 @@ function ManageColumnsModal({ columns, tenantId, pipelineId, onClose, onSaved, b
     setEditingId(null)
   }
 
+  const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
   const handleSave = async () => {
     setSaving(true)
-    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
     try {
       const removedIds = columns.map(c => c.id).filter(id => isUUID(id) && !localCols.find(l => l.id === id))
-      if (removedIds.length > 0) await supabase.from('pipeline_columns').delete().in('id', removedIds)
-      const upserts = localCols.map((col, i) => ({
-        ...((!col._isNew && isUUID(col.id)) ? { id: col.id } : {}),
-        tenant_id: tenantId, pipeline_id: pipelineId,
-        key: col.key, label: col.label, color: col.color, sort_order: i,
-      }))
-      const toInsert = upserts.filter(u => !u.id)
-      const toUpdate = upserts.filter(u => !!u.id)
-      if (toInsert.length > 0) { const { error } = await supabase.from('pipeline_columns').insert(toInsert); if (error) throw error }
-      for (const u of toUpdate) { const { error } = await supabase.from('pipeline_columns').update({ label: u.label, color: u.color, sort_order: u.sort_order }).eq('id', u.id); if (error) throw error }
+
+      // ✅ Backend seguro — em vez de supabase direto
+      await conversationApi.put('/pipeline-columns', {
+        columns: localCols.map((col, i) => ({ ...col, sort_order: i })),
+        pipelineId: pipelineId,
+        removedIds,
+      })
+
       toast.success('Colunas salvas!')
       onSaved(); onClose()
     } catch (e: any) {
-      toast.error('Erro ao salvar: ' + (e.message || 'tente novamente'))
+      toast.error('Erro ao salvar: ' + (e?.response?.data?.error?.message || e.message || 'tente novamente'))
     } finally { setSaving(false) }
   }
 
@@ -217,7 +210,7 @@ export default function PipelinePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
-  const tenantId = (user as any)?.tenantId || (user as any)?.tid || process.env.NEXT_PUBLIC_TENANT_ID || ''
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid || ''
 
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState('all')
@@ -245,15 +238,13 @@ export default function PipelinePage() {
     staleTime: 30000,
   })
 
+  // ✅ Pipeline columns — backend seguro
   const { data: dbColumns, isLoading: colsLoading, refetch: refetchCols } = useQuery({
     queryKey: ['pipeline-columns', tenantId, selectedPipelineId],
     queryFn: async () => {
-      if (!tenantId) return null
-      let query = supabase.from('pipeline_columns').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true })
-      if (selectedPipelineId) { query = query.eq('pipeline_id', selectedPipelineId) } else { query = query.is('pipeline_id', null) }
-      const { data, error } = await query
-      if (error) throw error
-      return data as any[]
+      const params = selectedPipelineId ? `?pipelineId=${selectedPipelineId}` : ''
+      const { data } = await conversationApi.get(`/pipeline-columns${params}`)
+      return data.data as any[]
     },
     staleTime: 30000,
   })
@@ -313,25 +304,13 @@ export default function PipelinePage() {
 
   const createPipelineMutation = useMutation({
     mutationFn: async (name: string) => { const { data } = await conversationApi.post('/pipelines', { name }); return data.data },
-    onSuccess: (pipeline) => {
-      toast.success('Pipeline criada!')
-      refetchPipelines()
-      setSelectedPipelineId(pipeline.id)
-      setShowNewPipeline(false)
-      setNewPipelineName('')
-    },
+    onSuccess: (pipeline) => { toast.success('Pipeline criada!'); refetchPipelines(); setSelectedPipelineId(pipeline.id); setShowNewPipeline(false); setNewPipelineName('') },
     onError: () => toast.error('Erro ao criar pipeline'),
   })
 
   const deletePipelineMutation = useMutation({
     mutationFn: async (id: string) => { await conversationApi.delete(`/pipelines/${id}`) },
-    onSuccess: () => {
-      toast.success('Pipeline removida')
-      setSelectedPipelineId(null)
-      setLocalStages(null)
-      refetchPipelines()
-      queryClient.refetchQueries({ queryKey: ['pipeline-board'] })
-    },
+    onSuccess: () => { toast.success('Pipeline removida'); setSelectedPipelineId(null); setLocalStages(null); refetchPipelines(); queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) },
     onError: () => toast.error('Erro ao remover pipeline'),
   })
 
@@ -375,9 +354,14 @@ export default function PipelinePage() {
     const [moved] = arr.splice(fromIdx, 1)
     arr.splice(toIdx, 0, moved)
     setLocalStages(arr); setDraggingColKey(null); setOverColKey(null)
+
+    // ✅ Reordenar via backend seguro
     const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
-    const updates = arr.filter(c => isUUID(c.id)).map((c, i) => ({ id: c.id, sort_order: i }))
-    if (updates.length > 0) { for (const u of updates) await supabase.from('pipeline_columns').update({ sort_order: u.sort_order }).eq('id', u.id); refetchCols() }
+    const colsToUpdate = arr.filter(c => isUUID(c.id)).map((c, i) => ({ ...c, sort_order: i }))
+    if (colsToUpdate.length > 0) {
+      await conversationApi.put('/pipeline-columns', { columns: colsToUpdate, pipelineId: selectedPipelineId, removedIds: [] })
+      refetchCols()
+    }
   }
   const handleColDragEnd = () => { setDraggingColKey(null); setOverColKey(null) }
 
@@ -403,7 +387,6 @@ export default function PipelinePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
 
-      {/* ── Header ── */}
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #e4e4e7', background: '#fff', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
@@ -412,46 +395,37 @@ export default function PipelinePage() {
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
-              <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }}
-                style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+              <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todos os canais</option>
                 {(channels as any[]).map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             )}
             {(campaigns as any[]).length > 0 && (
-              <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }}
-                style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+              <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todas as campanhas</option>
                 {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
-            <button onClick={() => setShowManage(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
+            <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
               <Settings2 size={13} /> Colunas
             </button>
-            <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
+            <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}>
-              <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
-              Atualizar
+              <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> Atualizar
             </button>
           </div>
         </div>
 
-        {/* ── Pipeline tabs ── */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => { setSelectedPipelineId(null); setLocalStages(null); localBoardRef.current = null }}
+          <button onClick={() => { setSelectedPipelineId(null); setLocalStages(null); localBoardRef.current = null }}
             style={{ padding: '5px 14px', borderRadius: '99px', fontSize: '13px', fontWeight: selectedPipelineId === null ? 700 : 500, cursor: 'pointer', border: 'none', background: selectedPipelineId === null ? '#18181b' : '#f4f4f5', color: selectedPipelineId === null ? '#fff' : '#71717a', transition: 'all 0.15s' }}>
             Principal
           </button>
-
           {(pipelines as any[]).map((p: any) => (
-            <div key={p.id}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '99px', background: selectedPipelineId === p.id ? '#18181b' : '#f4f4f5', cursor: 'pointer', transition: 'all 0.15s' }}
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '99px', background: selectedPipelineId === p.id ? '#18181b' : '#f4f4f5', cursor: 'pointer', transition: 'all 0.15s' }}
               onClick={() => { setSelectedPipelineId(p.id); setLocalStages(null); localBoardRef.current = null }}>
               {editingPipelineId === p.id ? (
                 <input autoFocus value={editingPipelineName} onChange={e => setEditingPipelineName(e.target.value)}
@@ -464,39 +438,22 @@ export default function PipelinePage() {
               )}
               {selectedPipelineId === p.id && !editingPipelineId && (
                 <>
-                  <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'}
-                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}>
-                    <Pencil size={11} />
-                  </button>
-                  <button onClick={e => { e.stopPropagation(); if (confirm(`Remover pipeline "${p.name}"?`)) deletePipelineMutation.mutate(p.id) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}
-                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}>
-                    <X size={11} />
-                  </button>
+                  <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}><Pencil size={11} /></button>
+                  <button onClick={e => { e.stopPropagation(); if (confirm(`Remover pipeline "${p.name}"?`)) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}><X size={11} /></button>
                 </>
               )}
             </div>
           ))}
-
           {showNewPipeline ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
               <input autoFocus placeholder="Nome da pipeline…" value={newPipelineName} onChange={e => setNewPipelineName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()); if (e.key === 'Escape') { setShowNewPipeline(false); setNewPipelineName('') } }}
                 style={{ border: 'none', background: 'transparent', fontSize: '13px', color: '#18181b', outline: 'none', width: '130px' }} />
-              <button onClick={() => { if (newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()) }}
-                style={{ background: '#22c55e', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                <Check size={10} color="#fff" strokeWidth={3} />
-              </button>
-              <button onClick={() => { setShowNewPipeline(false); setNewPipelineName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }}>
-                <X size={12} />
-              </button>
+              <button onClick={() => { if (newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()) }} style={{ background: '#22c55e', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><Check size={10} color="#fff" strokeWidth={3} /></button>
+              <button onClick={() => { setShowNewPipeline(false); setNewPipelineName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }}><X size={12} /></button>
             </div>
           ) : (
-            <button onClick={() => setShowNewPipeline(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'none', border: '1.5px dashed #e4e4e7', fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', transition: 'all 0.15s' }}
+            <button onClick={() => setShowNewPipeline(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'none', border: '1.5px dashed #e4e4e7', fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
               <Plus size={12} /> Nova pipeline
@@ -505,7 +462,6 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* ── Board ── */}
       {(isLoading || colsLoading) ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
@@ -523,8 +479,6 @@ export default function PipelinePage() {
                   onDrop={e => { if (draggingColKey) handleColDrop(e, stage.key); else handleDrop(e, stage.key) }}
                   onDragLeave={() => { setOverStage(null); setOverColKey(null) }}
                   style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: isOver ? stage.bg : '#fff', border: `1px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : '#e4e4e7'}`, borderRadius: '12px', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s, opacity 0.15s', opacity: draggingColKey === stage.key ? 0.4 : 1, boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-
-                  {/* Coluna header */}
                   <div data-col-header draggable onDragStart={e => handleColDragStart(e, stage.key)} onDragEnd={handleColDragEnd}
                     style={{ padding: '12px 14px', borderBottom: `1px solid ${stage.border}`, background: stage.bg, flexShrink: 0, cursor: 'grab', userSelect: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -535,8 +489,6 @@ export default function PipelinePage() {
                       <span style={{ fontSize: '11px', fontWeight: 700, color: stage.color, background: `${stage.color}18`, border: `1px solid ${stage.color}25`, padding: '1px 8px', borderRadius: '99px' }}>{cards.length}</span>
                     </div>
                   </div>
-
-                  {/* Cards */}
                   <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {cards.length === 0 ? (
                       <div style={{ padding: '24px 10px', textAlign: 'center' }}>
@@ -548,17 +500,12 @@ export default function PipelinePage() {
                       const av = getAvatarColor(name)
                       const isDragging = draggingId === conv.id
                       return (
-                        <div key={conv.id} draggable data-card
-                          onDragStart={e => handleDragStart(e, conv.id)}
-                          onDragEnd={handleDragEnd}
-                          onClick={() => router.push('/dashboard/inbox')}
+                        <div key={conv.id} draggable data-card onDragStart={e => handleDragStart(e, conv.id)} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
                           style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : '0 1px 2px rgba(0,0,0,.04)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
                           onMouseEnter={e => { if (!isDragging) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
                           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(0,0,0,.04)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
-                              {getInitials(name)}
-                            </div>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: '#18181b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
@@ -574,16 +521,13 @@ export default function PipelinePage() {
                 </div>
               )
             })}
-
             {stages.length === 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                 <div style={{ textAlign: 'center', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '40px 48px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
                   <Settings2 size={28} color="#d4d4d8" style={{ margin: '0 auto 12px' }} />
                   <p style={{ fontSize: '14px', color: '#71717a', fontWeight: 500, marginBottom: '4px' }}>Nenhuma coluna configurada</p>
                   <p style={{ fontSize: '13px', color: '#a1a1aa', marginBottom: '16px' }}>Crie colunas para organizar suas conversas</p>
-                  <button onClick={() => setShowManage(true)} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
-                    Criar colunas
-                  </button>
+                  <button onClick={() => setShowManage(true)} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Criar colunas</button>
                 </div>
               </div>
             )}
@@ -593,8 +537,7 @@ export default function PipelinePage() {
 
       {showManage && (
         <ManageColumnsModal
-          columns={dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS.map((c, i) => ({ ...c, id: c.key, sort_order: i, tenant_id: tenantId, pipeline_id: selectedPipelineId }))}
-          tenantId={tenantId}
+          columns={dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS.map((c, i) => ({ ...c, id: c.key, sort_order: i }))}
           pipelineId={selectedPipelineId}
           onClose={() => setShowManage(false)}
           onSaved={handleColumnsSaved}

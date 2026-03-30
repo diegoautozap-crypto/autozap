@@ -13,10 +13,14 @@ import {
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
+// Supabase usado APENAS para storage de mídia (upload de arquivos)
+// Todas as queries de dados foram migradas para o backend seguro
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 const CONVERSATION_SERVICE_URL = process.env.NEXT_PUBLIC_CONVERSATION_SERVICE_URL || ''
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const statusFilters = [
   { key: 'all',     label: 'Todas' },
@@ -99,26 +103,33 @@ function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; c
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 
+// ── QuickRepliesModal — migrado para backend ───────────────────────────────────
 function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
-  const { user } = useAuthStore()
-  const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')
   const [search, setSearch] = useState('')
+
+  // ✅ Backend seguro — em vez de supabase direto
   const { data: replies = [], isLoading } = useQuery({
     queryKey: ['quick-replies'],
-    queryFn: async () => { const { data } = await supabase.from('quick_replies').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }); return data || [] },
-    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/quick-replies')
+      return data.data || []
+    },
   })
   const createMutation = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from('quick_replies').insert({ tenant_id: tenantId, title: newTitle, body: newBody }); if (error) throw error },
+    mutationFn: async () => {
+      await conversationApi.post('/quick-replies', { title: newTitle, body: newBody })
+    },
     onSuccess: () => { toast.success('Resposta rápida criada!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
     onError: () => toast.error('Erro ao criar'),
   })
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from('quick_replies').delete().eq('id', id); if (error) throw error },
+    mutationFn: async (id: string) => {
+      await conversationApi.delete(`/quick-replies/${id}`)
+    },
     onSuccess: () => { toast.success('Removida!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }) },
   })
   const filtered = replies.filter((r: any) => !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.body.toLowerCase().includes(search.toLowerCase()))
@@ -343,22 +354,29 @@ export default function InboxPage() {
     enabled: !!selectedConvId,
     refetchInterval: 3000,
   })
+
+  // ✅ Notas — backend seguro
   const { data: notes = [] } = useQuery({
     queryKey: ['notes', selectedConvId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('conversation_notes').select('*').eq('conversation_id', selectedConvId).eq('tenant_id', tenantId).order('created_at', { ascending: true })
-      if (error) { console.error('Notes error:', error); return [] }
-      return data || []
+      const { data } = await conversationApi.get(`/conversations/${selectedConvId}/notes`)
+      return data.data || []
     },
-    enabled: !!selectedConvId && !!tenantId,
+    enabled: !!selectedConvId,
   })
   const saveNoteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('conversation_notes').insert({ conversation_id: selectedConvId, tenant_id: tenantId, user_id: (user as any)?.userId, body: noteText })
-      if (error) throw error
+      await conversationApi.post(`/conversations/${selectedConvId}/notes`, { body: noteText })
     },
     onSuccess: () => { toast.success('Nota salva!'); setNoteText(''); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) },
     onError: () => toast.error('Erro ao salvar nota'),
+  })
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      await conversationApi.delete(`/conversations/${selectedConvId}/notes/${noteId}`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }),
+    onError: () => toast.error('Erro ao deletar nota'),
   })
 
   const contactId = selectedConv?.contact_id
@@ -370,32 +388,40 @@ export default function InboxPage() {
   const contactTags = (contactDetail?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
   const botActive = selectedConv?.bot_active !== false
 
+  // ✅ Custom fields — backend seguro
   const { data: customFields = [] } = useQuery({
-    queryKey: ['custom-fields-inbox', tenantId],
+    queryKey: ['custom-fields-inbox'],
     queryFn: async () => {
-      if (!tenantId) return []
-      const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true })
-      return data || []
+      const { data } = await conversationApi.get('/custom-fields')
+      return data.data || []
     },
     staleTime: 60000,
-    enabled: !!tenantId && !!contactId,
+    enabled: !!contactId,
   })
 
+  // ✅ Pipeline info — backend seguro
   const { data: pipelineInfo } = useQuery({
     queryKey: ['conv-pipeline', selectedConvId, selectedConv?.pipeline_stage, selectedConv?.pipeline_id],
     queryFn: async () => {
       if (!selectedConv?.pipeline_stage) return null
-      let colQuery = supabase.from('pipeline_columns').select('label, color').eq('tenant_id', tenantId).eq('key', selectedConv.pipeline_stage)
-      if (selectedConv.pipeline_id) { colQuery = colQuery.eq('pipeline_id', selectedConv.pipeline_id) } else { colQuery = colQuery.is('pipeline_id', null) }
-      const { data: colData } = await colQuery.maybeSingle()
+      const params = new URLSearchParams()
+      if (selectedConv.pipeline_id) params.set('pipelineId', selectedConv.pipeline_id)
+      const { data } = await conversationApi.get(`/pipeline-columns?${params.toString()}`)
+      const columns = data.data || []
+      const col = columns.find((c: any) => c.key === selectedConv.pipeline_stage)
       let pipelineName = 'Principal'
       if (selectedConv.pipeline_id) {
-        const { data: pipData } = await supabase.from('pipelines').select('name').eq('id', selectedConv.pipeline_id).single()
-        if (pipData?.name) pipelineName = pipData.name
+        const { data: pipData } = await conversationApi.get('/pipelines')
+        const pip = (pipData.data || []).find((p: any) => p.id === selectedConv.pipeline_id)
+        if (pip?.name) pipelineName = pip.name
       }
-      return { pipelineName, columnLabel: colData?.label || selectedConv.pipeline_stage, columnColor: colData?.color || '#6b7280' }
+      return {
+        pipelineName,
+        columnLabel: col?.label || selectedConv.pipeline_stage,
+        columnColor: col?.color || '#6b7280',
+      }
     },
-    enabled: !!selectedConvId && !!tenantId && !!selectedConv?.pipeline_stage,
+    enabled: !!selectedConvId && !!selectedConv?.pipeline_stage,
   })
 
   const { data: teamMembers } = useQuery({
@@ -449,6 +475,7 @@ export default function InboxPage() {
     setPendingFile({ file, previewUrl: URL.createObjectURL(file), contentType: getContentType(file) })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
+  // ✅ Upload de mídia — mantém Supabase storage (só para arquivos, não dados)
   const uploadAndSend = async (file: File, contentType: string) => {
     setUploading(true)
     try {
@@ -517,37 +544,25 @@ export default function InboxPage() {
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
 
-      {/* ── Coluna esquerda — lista de conversas ── */}
+      {/* ── Coluna esquerda ── */}
       <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* Header */}
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f4f4f5', flexShrink: 0 }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', marginBottom: '10px', letterSpacing: '-0.02em' }}>Inbox</h2>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
-            <input
-              style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const }}
-              placeholder="Buscar contato..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <input style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const }} placeholder="Buscar contato..." value={search} onChange={e => setSearch(e.target.value)}
               onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }}
-            />
+              onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }} />
           </div>
         </div>
-
-        {/* Filtro de canal */}
         {visibleChannels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid #f4f4f5', flexShrink: 0 }}>
-            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} style={{ width: '100%', padding: '7px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
               <option value="all">Todos os canais</option>
               {visibleChannels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
             </select>
           </div>
         )}
-
-        {/* Filtros de status */}
         <div style={{ padding: '6px 8px', borderBottom: '1px solid #f4f4f5', display: 'flex', gap: '3px', flexShrink: 0 }}>
           {statusFilters.map(f => {
             const count = statusCounts?.[f.key as keyof typeof statusCounts]
@@ -557,27 +572,16 @@ export default function InboxPage() {
               <button key={f.key} onClick={() => setStatusFilter(f.key)}
                 style={{ flex: 1, padding: '5px 4px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: isActive ? '#22c55e' : 'transparent', color: isActive ? '#fff' : '#71717a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', whiteSpace: 'nowrap', transition: 'all 0.1s' }}>
                 {f.label}
-                {showBadge && (
-                  <span style={{ fontSize: '10px', fontWeight: 700, background: isActive ? 'rgba(255,255,255,0.25)' : '#f4f4f5', color: isActive ? '#fff' : '#71717a', padding: '0px 5px', borderRadius: '99px', lineHeight: '16px', flexShrink: 0 }}>
-                    {count > 99 ? '99+' : count}
-                  </span>
-                )}
+                {showBadge && <span style={{ fontSize: '10px', fontWeight: 700, background: isActive ? 'rgba(255,255,255,0.25)' : '#f4f4f5', color: isActive ? '#fff' : '#71717a', padding: '0px 5px', borderRadius: '99px', lineHeight: '16px', flexShrink: 0 }}>{count > 99 ? '99+' : count}</span>}
               </button>
             )
           })}
         </div>
-
-        {/* Lista */}
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
           {loadingConvs && convPage === 1
             ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
             : conversations.length === 0
-            ? <div style={{ padding: '40px', textAlign: 'center' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                  <MessageSquare size={18} color="#d4d4d8" />
-                </div>
-                <p style={{ color: '#a1a1aa', fontSize: '13px' }}>Nenhuma conversa</p>
-              </div>
+            ? <div style={{ padding: '40px', textAlign: 'center' }}><div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}><MessageSquare size={18} color="#d4d4d8" /></div><p style={{ color: '#a1a1aa', fontSize: '13px' }}>Nenhuma conversa</p></div>
             : conversations.map((conv: any) => {
               const isSel = selectedConvId === conv.id
               const name = conv.contacts?.name || conv.contacts?.phone || undefined
@@ -592,11 +596,7 @@ export default function InboxPage() {
                   onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{getInitials(name)}</div>
-                    {!convBotActive && (
-                      <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '14px', height: '14px', borderRadius: '50%', background: '#f97316', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Bot pausado">
-                        <UserCheck size={8} color="#fff" />
-                      </div>
-                    )}
+                    {!convBotActive && <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '14px', height: '14px', borderRadius: '50%', background: '#f97316', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Bot pausado"><UserCheck size={8} color="#fff" /></div>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
@@ -619,14 +619,11 @@ export default function InboxPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {!selectedConvId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: '#f4f4f5' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#fff', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-              <MessageSquare size={24} color="#d4d4d8" />
-            </div>
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#fff', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}><MessageSquare size={24} color="#d4d4d8" /></div>
             <p style={{ color: '#a1a1aa', fontSize: '14px', fontWeight: 500 }}>Selecione uma conversa</p>
           </div>
         ) : (
           <>
-            {/* Header do chat */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{getInitials(contactName)}</div>
@@ -645,12 +642,10 @@ export default function InboxPage() {
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {selectedConv?.status !== 'closed' && (
                   botActive
-                    ? <button onClick={() => takeOverMutation.mutate()} disabled={takeOverMutation.isPending}
-                        style={{ padding: '5px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    ? <button onClick={() => takeOverMutation.mutate()} disabled={takeOverMutation.isPending} style={{ padding: '5px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         {takeOverMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={12} />} Assumir
                       </button>
-                    : <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending}
-                        style={{ padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    : <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending} style={{ padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         {releaseBotMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={12} />} Liberar bot
                       </button>
                 )}
@@ -658,26 +653,19 @@ export default function InboxPage() {
                   ? <button onClick={closeConv} style={{ padding: '5px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>Fechar</button>
                   : <button onClick={openConv} style={{ padding: '5px 12px', background: '#22c55e', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Reabrir</button>
                 }
-                <button onClick={() => setShowProfile(p => !p)}
-                  style={{ padding: '5px 10px', background: showProfile ? '#f0fdf4' : '#fafafa', border: `1px solid ${showProfile ? '#bbf7d0' : '#e4e4e7'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showProfile ? '#16a34a' : '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                <button onClick={() => setShowProfile(p => !p)} style={{ padding: '5px 10px', background: showProfile ? '#f0fdf4' : '#fafafa', border: `1px solid ${showProfile ? '#bbf7d0' : '#e4e4e7'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showProfile ? '#16a34a' : '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <User size={13} /> Perfil
                 </button>
               </div>
             </div>
 
-            {/* Banner bot pausado */}
             {!botActive && selectedConv?.status !== 'closed' && (
               <div style={{ padding: '8px 16px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <UserCheck size={14} color="#ea580c" />
-                  <span style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>Atendimento humano ativo — o bot não está respondendo</span>
-                </div>
-                <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending}
-                  style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Reativar bot</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><UserCheck size={14} color="#ea580c" /><span style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>Atendimento humano ativo — o bot não está respondendo</span></div>
+                <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending} style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Reativar bot</button>
               </div>
             )}
 
-            {/* Mensagens */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f4f4f5' }}>
               {loadingMessages
                 ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
@@ -702,41 +690,32 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Preview de arquivo pendente */}
             {pendingFile && !isRecording && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {pendingFile.contentType === 'image'
                   ? <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
-                  : <div style={{ width: '48px', height: '48px', background: '#dcfce7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {pendingFile.contentType === 'audio' ? <Music size={20} color="#16a34a" /> : <FileText size={20} color="#16a34a" />}
-                    </div>
+                  : <div style={{ width: '48px', height: '48px', background: '#dcfce7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingFile.contentType === 'audio' ? <Music size={20} color="#16a34a" /> : <FileText size={20} color="#16a34a" />}</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '13px', fontWeight: 500, color: '#18181b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.file.name}</p>
                   <p style={{ fontSize: '11px', color: '#71717a', margin: 0 }}>{(pendingFile.file.size / 1024).toFixed(0)} KB · {pendingFile.contentType}</p>
                 </div>
-                <button onClick={handleSendFile} disabled={uploading}
-                  style={{ padding: '6px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button onClick={handleSendFile} disabled={uploading} style={{ padding: '6px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}{uploading ? 'Enviando...' : 'Enviar'}
                 </button>
                 <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', padding: '4px', display: 'flex' }}><X size={16} /></button>
               </div>
             )}
 
-            {/* Respostas rápidas */}
             {showQuickReplies && <QuickRepliesModal onSelect={text => { setMessageText(text); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />}
 
-            {/* Input area */}
             {selectedConv?.status !== 'closed' ? (
               <div style={{ borderTop: '1px solid #e4e4e7', background: '#fff', flexShrink: 0, position: 'relative' }}>
-                {/* Tabs mensagem / nota */}
                 <div style={{ display: 'flex', borderBottom: '1px solid #f4f4f5' }}>
-                  <button onClick={() => setInputMode('message')}
-                    style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'message' ? '#22c55e' : '#a1a1aa', borderBottom: inputMode === 'message' ? '2px solid #22c55e' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px', transition: 'color 0.1s' }}>
+                  <button onClick={() => setInputMode('message')} style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'message' ? '#22c55e' : '#a1a1aa', borderBottom: inputMode === 'message' ? '2px solid #22c55e' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px', transition: 'color 0.1s' }}>
                     <MessageSquare size={12} /> Mensagem
                   </button>
-                  <button onClick={() => setInputMode('note')}
-                    style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'note' ? '#d97706' : '#a1a1aa', borderBottom: inputMode === 'note' ? '2px solid #d97706' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px', transition: 'color 0.1s' }}>
+                  <button onClick={() => setInputMode('note')} style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'note' ? '#d97706' : '#a1a1aa', borderBottom: inputMode === 'note' ? '2px solid #d97706' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px', transition: 'color 0.1s' }}>
                     <StickyNote size={12} /> Nota interna
                   </button>
                 </div>
@@ -747,56 +726,28 @@ export default function InboxPage() {
                       <span style={{ fontSize: '14px', color: '#ef4444', fontWeight: 600 }}>Gravando... {formatTime(recordingSeconds)}</span>
                       <div style={{ flex: 1 }} />
                       <button onClick={cancelRecording} style={{ padding: '6px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
-                      <button onClick={stopRecording} disabled={uploading}
-                        style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <button onClick={stopRecording} disabled={uploading} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         {uploading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Square size={13} fill="#fff" />}{uploading ? 'Enviando...' : 'Parar e enviar'}
                       </button>
                     </div>
                   ) : inputMode === 'message' ? (
                     <div style={{ display: 'flex', gap: '7px', alignItems: 'flex-end' }}>
                       <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: 'none' }} onChange={handleFileSelect} />
-                      <button onClick={() => fileInputRef.current?.click()} style={btnStyle} title="Anexar arquivo"
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#18181b' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}>
-                        <Paperclip size={15} />
-                      </button>
-                      <button onClick={startRecording} style={btnStyle} title="Gravar áudio"
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#18181b' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}>
-                        <Mic size={15} />
-                      </button>
-                      <button onClick={() => setShowQuickReplies(p => !p)}
-                        style={{ ...btnStyle, background: showQuickReplies ? '#f0fdf4' : '#fafafa', color: showQuickReplies ? '#22c55e' : '#71717a', border: `1px solid ${showQuickReplies ? '#bbf7d0' : '#e4e4e7'}` }}
-                        title="Respostas rápidas">
-                        <Zap size={15} />
-                      </button>
-                      <textarea
-                        style={{ flex: 1, padding: '9px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto', transition: 'all 0.1s' }}
-                        placeholder="Digite uma mensagem... (Enter envia)"
-                        value={messageText}
-                        onChange={e => setMessageText(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                      <button onClick={() => fileInputRef.current?.click()} style={btnStyle} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#18181b' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}><Paperclip size={15} /></button>
+                      <button onClick={startRecording} style={btnStyle} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#18181b' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}><Mic size={15} /></button>
+                      <button onClick={() => setShowQuickReplies(p => !p)} style={{ ...btnStyle, background: showQuickReplies ? '#f0fdf4' : '#fafafa', color: showQuickReplies ? '#22c55e' : '#71717a', border: `1px solid ${showQuickReplies ? '#bbf7d0' : '#e4e4e7'}` }}><Zap size={15} /></button>
+                      <textarea style={{ flex: 1, padding: '9px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto', transition: 'all 0.1s' }} placeholder="Digite uma mensagem... (Enter envia)" value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={handleKeyDown}
                         onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
-                        onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }}
-                      />
-                      <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()}
-                        style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#22c55e' : '#e4e4e7', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.1s' }}>
+                        onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }} />
+                      <button onClick={handleSendText} disabled={sendMutation.isPending || !messageText.trim()} style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: messageText.trim() ? '#22c55e' : '#e4e4e7', border: 'none', cursor: messageText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.1s' }}>
                         {sendMutation.isPending ? <Loader2 size={15} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} color={messageText.trim() ? '#fff' : '#a1a1aa'} />}
                       </button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: '7px', alignItems: 'flex-end' }}>
-                      <textarea
-                        style={{ flex: 1, padding: '9px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }}
-                        placeholder="Escreva uma nota interna... (visível só para a equipe)"
-                        value={noteText}
-                        onChange={e => setNoteText(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onFocus={e => { e.currentTarget.style.borderColor = '#d97706' }}
-                        onBlur={e => { e.currentTarget.style.borderColor = '#fde68a' }}
-                      />
-                      <button onClick={() => saveNoteMutation.mutate()} disabled={saveNoteMutation.isPending || !noteText.trim()}
-                        style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: noteText.trim() ? '#d97706' : '#e4e4e7', border: 'none', cursor: noteText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <textarea style={{ flex: 1, padding: '9px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto' }} placeholder="Escreva uma nota interna... (visível só para a equipe)" value={noteText} onChange={e => setNoteText(e.target.value)} onKeyDown={handleKeyDown}
+                        onFocus={e => { e.currentTarget.style.borderColor = '#d97706' }} onBlur={e => { e.currentTarget.style.borderColor = '#fde68a' }} />
+                      <button onClick={() => saveNoteMutation.mutate()} disabled={saveNoteMutation.isPending || !noteText.trim()} style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: noteText.trim() ? '#d97706' : '#e4e4e7', border: 'none', cursor: noteText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {saveNoteMutation.isPending ? <Loader2 size={15} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <StickyNote size={15} color={noteText.trim() ? '#fff' : '#a1a1aa'} />}
                       </button>
                     </div>
@@ -815,67 +766,37 @@ export default function InboxPage() {
       {/* ── Direita — perfil ── */}
       {selectedConvId && showProfile && (
         <div style={{ width: '248px', flexShrink: 0, background: '#fff', borderLeft: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Avatar e nome */}
           <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f4f4f5', textAlign: 'center', flexShrink: 0 }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, margin: '0 auto 10px' }}>{getInitials(contactName)}</div>
             <p style={{ fontWeight: 700, fontSize: '14px', color: '#18181b', marginBottom: '2px', letterSpacing: '-0.01em' }}>{contactName || '??'}</p>
             <p style={{ fontSize: '12px', color: '#a1a1aa' }}>{selectedConv?.contacts?.phone}</p>
             {selectedChannelName && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', display: 'inline-block', marginTop: '6px' }}>{selectedChannelName}</span>}
           </div>
-
-          {/* Infos */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
             <p style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Informações</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
-
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <Phone size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
                 <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Telefone</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{selectedConv?.contacts?.phone || '—'}</p></div>
               </div>
-
-              {contactDetail?.email && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail.email}</p></div>
-                </div>
-              )}
-
-              {contactDetail?.company && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Empresa</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail.company}</p></div>
-                </div>
-              )}
-
+              {contactDetail?.email && <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail.email}</p></div></div>}
+              {contactDetail?.company && <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Empresa</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail.company}</p></div></div>}
               {(customFields as any[]).filter((cf: any) => contactDetail?.metadata?.[cf.name] != null && contactDetail?.metadata?.[cf.name] !== '').map((cf: any) => (
-                <div key={cf.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cf.label}</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{String(contactDetail.metadata[cf.name])}</p></div>
-                </div>
+                <div key={cf.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><User size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cf.label}</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{String(contactDetail.metadata[cf.name])}</p></div></div>
               ))}
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <Clock size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Última interação</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail?.last_interaction_at ? new Date(contactDetail.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</p></div>
-              </div>
-
-              {/* Status */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><Clock size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} /><div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Última interação</p><p style={{ fontSize: '13px', color: '#18181b', margin: 0 }}>{contactDetail?.last_interaction_at ? new Date(contactDetail.last_interaction_at).toLocaleDateString('pt-BR') : '—'}</p></div></div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <MessageSquare size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</p>
+                <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</p>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: selectedConv?.status === 'open' ? '#16a34a' : selectedConv?.status === 'closed' ? '#71717a' : '#d97706', background: selectedConv?.status === 'open' ? '#f0fdf4' : selectedConv?.status === 'closed' ? '#f4f4f5' : '#fffbeb', border: `1px solid ${selectedConv?.status === 'open' ? '#bbf7d0' : selectedConv?.status === 'closed' ? '#e4e4e7' : '#fde68a'}`, padding: '2px 8px', borderRadius: '99px', display: 'inline-block' }}>
                     {selectedConv?.status === 'open' ? 'Aberta' : selectedConv?.status === 'closed' ? 'Fechada' : 'Aguardando'}
                   </span>
                 </div>
               </div>
-
-              {/* Pipeline */}
               {pipelineInfo && (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                   <GitBranch size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div>
-                    <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pipeline</p>
+                  <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pipeline</p>
                     <p style={{ fontSize: '11px', color: '#71717a', margin: '0 0 4px', fontWeight: 500 }}>{pipelineInfo.pipelineName}</p>
                     <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '99px', background: `${pipelineInfo.columnColor}18`, color: pipelineInfo.columnColor, border: `1px solid ${pipelineInfo.columnColor}30`, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pipelineInfo.columnColor, flexShrink: 0, display: 'inline-block' }} />
@@ -884,55 +805,38 @@ export default function InboxPage() {
                   </div>
                 </div>
               )}
-
-              {/* Bot */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <Bot size={13} color="#a1a1aa" style={{ marginTop: '2px', flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bot</p>
+                <div><p style={{ fontSize: '10px', color: '#a1a1aa', margin: '0 0 3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bot</p>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: botActive ? '#16a34a' : '#ea580c', background: botActive ? '#f0fdf4' : '#fff7ed', border: `1px solid ${botActive ? '#bbf7d0' : '#fed7aa'}`, padding: '2px 8px', borderRadius: '99px', display: 'inline-block' }}>{botActive ? 'Ativo' : 'Pausado'}</span>
                 </div>
               </div>
-
-              {/* Atendente */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <UserCheck size={13} color="#a1a1aa" />
-                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atendente</p>
-                </div>
-                <select value={selectedConv?.assigned_to || ''} onChange={e => assignMutation.mutate(e.target.value || null)} disabled={assignMutation.isPending}
-                  style={{ width: '100%', padding: '6px 8px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><UserCheck size={13} color="#a1a1aa" /><p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atendente</p></div>
+                <select value={selectedConv?.assigned_to || ''} onChange={e => assignMutation.mutate(e.target.value || null)} disabled={assignMutation.isPending} style={{ width: '100%', padding: '6px 8px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
                   <option value="">Sem atribuição</option>
                   {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
                 </select>
               </div>
-
-              {/* Tags */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <Tag size={13} color="#a1a1aa" />
-                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tags</p>
-                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Tag size={13} color="#a1a1aa" /><p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tags</p></div>
                 <InboxTagEditor contactId={contactId!} contactTags={contactTags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contact', contactId] }); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} />
               </div>
             </div>
 
             {/* Notas internas */}
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f4f4f5' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                <StickyNote size={13} color="#d97706" />
-                <p style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Notas internas</p>
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}><StickyNote size={13} color="#d97706" /><p style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Notas internas</p></div>
               {(notes as any[]).length === 0
                 ? <p style={{ fontSize: '12px', color: '#d4d4d8', textAlign: 'center', padding: '8px 0' }}>Nenhuma nota ainda</p>
-                : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {(notes as any[]).map((note: any) => (
                       <div key={note.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
                         <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 6px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <p style={{ fontSize: '10px', color: '#d97706', margin: 0 }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                          <button onClick={async () => { await supabase.from('conversation_notes').delete().eq('id', note.id); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) }}
+                          {/* ✅ Deletar nota via backend */}
+                          <button onClick={() => deleteNoteMutation.mutate(note.id)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#fde68a', display: 'flex' }}
                             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fde68a'}>
@@ -942,13 +846,11 @@ export default function InboxPage() {
                       </div>
                     ))}
                   </div>
-                )}
+              }
             </div>
 
-            {/* Link para CRM */}
             <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f4f4f5' }}>
-              <a href="/dashboard/contacts"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', textDecoration: 'none', color: '#18181b', fontSize: '13px', fontWeight: 500, transition: 'all 0.1s' }}
+              <a href="/dashboard/contacts" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', textDecoration: 'none', color: '#18181b', fontSize: '13px', fontWeight: 500, transition: 'all 0.1s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#22c55e' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#fafafa'; (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e4e4e7' }}>
                 Ver no CRM <ChevronRight size={13} />
