@@ -12,12 +12,11 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-// ── Configurações de velocidade ───────────────────────────────────────────────
-// LOGICAL_BATCH: quantos contatos processa por iteração
-// CONCURRENCY: requests paralelos simultâneos para a Gupshup
-// Aumentar CONCURRENCY além de 100 pode causar rate limit na Gupshup
-const LOGICAL_BATCH      = 200  // era 50
-const CONCURRENCY        = 50   // era 10
+// ── Rate limit preciso: 20 requests/segundo = 1200/min ───────────────────────
+const GUPSHUP_RPS        = 20       // requests por segundo permitidos pela Gupshup
+const INTERVAL_MS        = 1000 / GUPSHUP_RPS  // 50ms entre cada request
+const LOGICAL_BATCH      = 500      // busca 500 contatos por vez do DB
+const CONCURRENCY        = 20       // máximo de requests em voo ao mesmo tempo
 const MESSAGE_ID_RETRIES = 2
 
 function getRedisConnection() {
@@ -32,6 +31,36 @@ function getRedisConnection() {
 }
 
 const connection = getRedisConnection()
+
+// ─── Rate limiter baseado em token bucket ─────────────────────────────────────
+// Garante exatamente 20 req/s sem bursts que causam 429 na Gupshup
+class RateLimiter {
+  private lastCallTime = 0
+  private queue: Array<() => void> = []
+  private processing = false
+
+  async acquire(): Promise<void> {
+    return new Promise(resolve => {
+      this.queue.push(resolve)
+      if (!this.processing) this.processQueue()
+    })
+  }
+
+  private async processQueue() {
+    this.processing = true
+    while (this.queue.length > 0) {
+      const now = Date.now()
+      const elapsed = now - this.lastCallTime
+      if (elapsed < INTERVAL_MS) {
+        await sleep(INTERVAL_MS - elapsed)
+      }
+      this.lastCallTime = Date.now()
+      const resolve = this.queue.shift()
+      if (resolve) resolve()
+    }
+    this.processing = false
+  }
+}
 
 export interface InboxJob {
   tenantId: string; channelId: string; phone: string
@@ -53,7 +82,6 @@ export interface CampaignJob {
   batchSize: number; messagesPerMin: number
 }
 
-/** Retorna a fila exclusiva do tenant — campaign_queue:tenant-{id} */
 export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
   return new Queue<CampaignJob>(`campaign_queue:tenant-${tenantId}`, {
     connection,
@@ -65,7 +93,6 @@ export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
   })
 }
 
-// Fila legada — mantida para retrocompatibilidade com jobs antigos
 export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   connection,
   defaultJobOptions: { attempts: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
@@ -166,15 +193,26 @@ async function sendViaFetch(
 
     const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
       method: 'POST',
-      headers: { 'apikey': parsed.apiKey, 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
+      headers: {
+        'apikey': parsed.apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache',
+      },
       body,
     })
 
     const data = await response.json() as any
 
+    // Se Gupshup retornar 429 (rate limit), espera 1s e tenta de novo
+    if (response.status === 429) {
+      logger.warn('Gupshup 429 rate limit hit', { phone, attempt })
+      await sleep(1000)
+      return sendViaFetch(parsed, phone, message, attempt + 1)
+    }
+
     logger.info('Gupshup send response', {
       phone, status: data.status, messageId: data.messageId,
-      attempt, fullResponse: JSON.stringify(data).slice(0, 500),
+      attempt, fullResponse: JSON.stringify(data).slice(0, 300),
     })
 
     if (data.status === 'error') return { ok: false, error: JSON.stringify(data.message) }
@@ -182,8 +220,8 @@ async function sendViaFetch(
     if (data.status === 'submitted' || data.messageId || data.status === 'success') {
       if (!data.messageId) {
         if (attempt < MESSAGE_ID_RETRIES) {
-          logger.warn('Gupshup response missing messageId — retrying', { phone, attempt: attempt + 1 })
-          await sleep(1000)
+          logger.warn('Gupshup missing messageId — retrying', { phone, attempt: attempt + 1 })
+          await sleep(500)
           return sendViaFetch(parsed, phone, message, attempt + 1)
         }
         return { ok: false, error: 'Gupshup did not return messageId after retries' }
@@ -203,6 +241,7 @@ async function processContact(
   tenantId: string,
   channelId: string,
   parsed: ParsedCurl,
+  rateLimiter: RateLimiter,
 ): Promise<'sent' | 'failed'> {
   const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
   const contactMessage = rawMessage.replace(/\\r\\n/g, '\r').replace(/\\r/g, '\r').replace(/\\n/g, '\n').trim()
@@ -211,6 +250,9 @@ async function processContact(
   const messageDbId = generateId()
 
   try {
+    // Aguarda sua vez no rate limiter — garante 20 req/s exatos
+    await rateLimiter.acquire()
+
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
@@ -259,8 +301,11 @@ async function processContact(
 }
 
 async function processCampaignJob(job: any) {
-  const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
-  logger.info('Campaign job started', { campaignId, tenantId, messagesPerMin, queue: job.queueName })
+  const { campaignId, tenantId, channelId, batchSize } = job.data
+  logger.info('Campaign job started', {
+    campaignId, tenantId,
+    rateLimit: `${GUPSHUP_RPS} req/s (${GUPSHUP_RPS * 60}/min)`,
+  })
 
   if (!await checkPlanLimit(tenantId)) {
     await db.from('campaigns').update({ status: 'failed' }).eq('id', campaignId)
@@ -273,14 +318,11 @@ async function processCampaignJob(job: any) {
   if (!curlTemplate) throw new Error('No curl template configured')
   const parsed = parseCurlTemplate(curlTemplate)
 
-  // Delay só se o usuário configurou menos de 200/min explicitamente (campanha de teste)
-  // Para disparos normais, sem delay — deixa a concorrência (50 paralelos) controlar a velocidade
-  const delayPerMessage = (messagesPerMin > 0 && messagesPerMin < 200)
-    ? Math.floor(60000 / messagesPerMin)
-    : 0
-
+  // Um rate limiter por campanha — garante 20 req/s independente do batchSize
+  const rateLimiter = new RateLimiter()
   const limit = pLimit(CONCURRENCY)
   let processed = 0
+  const startTime = Date.now()
 
   while (true) {
     const progress = await campaignService.getProgress(campaignId, tenantId)
@@ -295,39 +337,41 @@ async function processCampaignJob(job: any) {
       break
     }
 
-    for (let i = 0; i < contacts.length; i += LOGICAL_BATCH) {
-      const check = await campaignService.getProgress(campaignId, tenantId)
-      if (check.status !== 'running') break
-
-      // Verifica plan limit a cada 500 mensagens — era a cada 50, muito overhead de DB
-      if (processed > 0 && processed % 500 === 0) {
-        if (!await checkPlanLimit(tenantId)) {
-          await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
-          logger.warn('Campaign paused — plan limit', { campaignId, processed })
-          break
-        }
+    // Verifica plan limit a cada 500 mensagens
+    if (processed > 0 && processed % 500 === 0) {
+      if (!await checkPlanLimit(tenantId)) {
+        await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
+        logger.warn('Campaign paused — plan limit', { campaignId, processed })
+        break
       }
-
-      const chunk = contacts.slice(i, i + LOGICAL_BATCH)
-      const results = await Promise.all(
-        chunk.map((contact, idx) =>
-          limit(async () => {
-            if (delayPerMessage > 0 && idx > 0) await sleep(delayPerMessage)
-            return processContact(contact, campaignId, tenantId, channelId, parsed)
-          })
-        )
-      )
-
-      const sentCount = results.filter(r => r === 'sent').length
-      processed += sentCount
-
-      await emitProgress(campaignId, tenantId)
-      logger.info('Batch dispatched', { campaignId, tenantId, sent: sentCount, failed: chunk.length - sentCount, totalProcessed: processed })
     }
+
+    // Processa todos os contatos do batch em paralelo controlado pelo rate limiter
+    const results = await Promise.all(
+      contacts.map(contact =>
+        limit(() => processContact(contact, campaignId, tenantId, channelId, parsed, rateLimiter))
+      )
+    )
+
+    const sentCount = results.filter(r => r === 'sent').length
+    const failCount = results.filter(r => r === 'failed').length
+    processed += sentCount
+
+    const elapsed = (Date.now() - startTime) / 1000
+    const actualRps = processed / elapsed
+
+    await emitProgress(campaignId, tenantId)
+    logger.info('Batch dispatched', {
+      campaignId, tenantId,
+      sent: sentCount, failed: failCount,
+      totalProcessed: processed,
+      actualRps: actualRps.toFixed(1),
+    })
   }
 
   await campaignService.checkCompletion(campaignId)
-  logger.info('Campaign job finished', { campaignId, tenantId, processed })
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
+  logger.info('Campaign job finished', { campaignId, tenantId, processed, totalTimeSec: totalTime })
 }
 
 export function startCampaignWorker(): Worker {
@@ -340,7 +384,7 @@ export function startCampaignWorker(): Worker {
     logger.error('Legacy campaign job failed', { jobId: job?.id, error: err.message })
   )
 
-  logger.info('Campaign worker initialized (legacy + per-tenant)')
+  logger.info(`Campaign worker initialized — rate limit: ${GUPSHUP_RPS} req/s`)
   return legacyWorker
 }
 
@@ -348,11 +392,20 @@ async function emitProgress(campaignId: string, tenantId: string): Promise<void>
   if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
   try {
     const progress = await campaignService.getProgress(campaignId, tenantId)
-    const body = JSON.stringify({ name: 'campaign.progress', channel: `tenant-${tenantId}`, data: JSON.stringify({ campaignId, ...progress }) })
+    const body = JSON.stringify({
+      name: 'campaign.progress',
+      channel: `tenant-${tenantId}`,
+      data: JSON.stringify({ campaignId, ...progress }),
+    })
     const crypto = await import('crypto')
     const ts  = Math.floor(Date.now() / 1000)
     const md5 = crypto.createHash('md5').update(body).digest('hex')
-    const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
-    await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+    const sig = crypto.createHmac('sha256', PUSHER_SECRET)
+      .update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`)
+      .digest('hex')
+    await fetch(
+      `https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+    )
   } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
 }
