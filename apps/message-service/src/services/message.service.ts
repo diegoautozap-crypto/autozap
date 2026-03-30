@@ -60,7 +60,6 @@ export class MessageService {
     }).select('id').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     const lastMsg = input.body || `[${input.contentType}]`
-    // Atendente respondeu — conversa vira 'open'
     await db.from('conversations').update({
       last_message: lastMsg,
       last_message_at: new Date(),
@@ -85,7 +84,6 @@ export class MessageService {
       external_id: msg.externalId, status: 'delivered',
       sent_at: msg.timestamp, delivered_at: msg.timestamp,
     })
-    // Cliente mandou mensagem — conversa vira 'waiting'
     await db.from('conversations').update({
       last_message: msg.body || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
@@ -95,7 +93,17 @@ export class MessageService {
       await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
     }
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
-    emitPusher(tenantId, 'inbound.message', { conversationId: conversation.id, contactId: contact.id, body: msg.body, contentType: msg.contentType, timestamp: msg.timestamp })
+
+    // ✅ Adicionado phone e contactName para o hook de notificações do frontend
+    emitPusher(tenantId, 'inbound.message', {
+      conversationId: conversation.id,
+      contactId: contact.id,
+      phone: msg.from,
+      contactName: senderName || contact.name || msg.from,
+      body: msg.body,
+      contentType: msg.contentType,
+      timestamp: msg.timestamp,
+    })
 
     const { data: convData } = await db
       .from('conversations')
@@ -248,7 +256,6 @@ export class MessageService {
   private async findOrCreateConversation(tenantId: string, channelId: string, contactId: string, channelType: string) {
     const { data: existing } = await db.from('conversations').select('id, unread_count').eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId).in('status', ['open','waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (existing) return existing
-    // Nova conversa começa como 'waiting' — atendente ainda não abriu
     const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
