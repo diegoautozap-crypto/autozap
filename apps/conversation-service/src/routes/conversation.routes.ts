@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { conversationService } from '../services/conversation.service'
 import { requireAuth, validate } from '../middleware/conversation.middleware'
-import { ok, paginationSchema } from '@autozap/utils'
+import { ok, paginationSchema, generateId } from '@autozap/utils'
 import { db } from '../lib/db'
 import { decryptCredentials } from '../lib/crypto'
 
@@ -64,6 +64,20 @@ const pipelineSchema = z.object({
   stage: z.string().min(1).max(100),
   pipelineId: z.string().uuid().optional(),
 })
+const noteSchema = z.object({ body: z.string().min(1).max(5000) })
+const quickReplySchema = z.object({ title: z.string().min(1).max(200), body: z.string().min(1).max(5000) })
+const pipelineColumnSchema = z.object({
+  columns: z.array(z.object({
+    id: z.string().optional(),
+    key: z.string().min(1).max(100),
+    label: z.string().min(1).max(100),
+    color: z.string().optional().default('#6b7280'),
+    sort_order: z.number().int().min(0),
+    _isNew: z.boolean().optional(),
+  })),
+  pipelineId: z.string().uuid().nullable().optional(),
+  removedIds: z.array(z.string().uuid()).optional(),
+})
 
 // ─── Pipeline CRUD ────────────────────────────────────────────────────────────
 
@@ -121,6 +135,194 @@ router.delete('/pipelines/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Pipeline Columns ─────────────────────────────────────────────────────────
+
+// GET /pipeline-columns?pipelineId=xxx
+router.get('/pipeline-columns', async (req, res, next) => {
+  try {
+    const { pipelineId } = req.query as any
+    let query = db
+      .from('pipeline_columns')
+      .select('*')
+      .eq('tenant_id', req.auth.tid)
+      .order('sort_order', { ascending: true })
+
+    if (pipelineId) {
+      query = query.eq('pipeline_id', pipelineId)
+    } else {
+      query = query.is('pipeline_id', null)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// PUT /pipeline-columns — upsert + delete em uma chamada
+router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res, next) => {
+  try {
+    const { columns, pipelineId = null, removedIds = [] } = req.body
+    const tenantId = req.auth.tid
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
+    // Deletar colunas removidas — garantindo que pertencem ao tenant
+    if (removedIds.length > 0) {
+      const { error } = await db
+        .from('pipeline_columns')
+        .delete()
+        .in('id', removedIds)
+        .eq('tenant_id', tenantId)
+      if (error) throw error
+    }
+
+    // Inserir novas colunas
+    const toInsert = columns
+      .filter((c: any) => c._isNew || !c.id || !isUUID(c.id))
+      .map((c: any, i: number) => ({
+        tenant_id: tenantId,
+        pipeline_id: pipelineId,
+        key: c.key,
+        label: c.label,
+        color: c.color || '#6b7280',
+        sort_order: c.sort_order ?? i,
+      }))
+
+    if (toInsert.length > 0) {
+      const { error } = await db.from('pipeline_columns').insert(toInsert)
+      if (error) throw error
+    }
+
+    // Atualizar existentes — sempre validando tenant_id
+    const toUpdate = columns.filter((c: any) => !c._isNew && c.id && isUUID(c.id))
+    for (const col of toUpdate) {
+      const { error } = await db
+        .from('pipeline_columns')
+        .update({ label: col.label, color: col.color, sort_order: col.sort_order })
+        .eq('id', col.id)
+        .eq('tenant_id', tenantId) // ← garante que não atualiza de outro tenant
+      if (error) throw error
+    }
+
+    // Retorna as colunas atualizadas
+    let q = db
+      .from('pipeline_columns')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
+    q = pipelineId ? q.eq('pipeline_id', pipelineId) : q.is('pipeline_id', null)
+
+    const { data, error } = await q
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// ─── Notas internas ───────────────────────────────────────────────────────────
+
+// GET /conversations/:id/notes
+router.get('/conversations/:id/notes', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('conversation_notes')
+      .select('*')
+      .eq('conversation_id', req.params.id)
+      .eq('tenant_id', req.auth.tid) // ← isolamento por tenant
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// POST /conversations/:id/notes
+router.post('/conversations/:id/notes', validate(noteSchema), async (req, res, next) => {
+  try {
+    const { body: noteBody } = req.body
+    const { data, error } = await db
+      .from('conversation_notes')
+      .insert({
+        conversation_id: req.params.id,
+        tenant_id: req.auth.tid,
+        user_id: req.auth.sub,
+        body: noteBody,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// DELETE /conversations/:id/notes/:noteId
+router.delete('/conversations/:id/notes/:noteId', async (req, res, next) => {
+  try {
+    const { error } = await db
+      .from('conversation_notes')
+      .delete()
+      .eq('id', req.params.noteId)
+      .eq('tenant_id', req.auth.tid) // ← garante que só deleta nota do próprio tenant
+    if (error) throw error
+    res.json(ok({ message: 'Note deleted' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Respostas rápidas ────────────────────────────────────────────────────────
+
+// GET /quick-replies
+router.get('/quick-replies', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('quick_replies')
+      .select('*')
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// POST /quick-replies
+router.post('/quick-replies', validate(quickReplySchema), async (req, res, next) => {
+  try {
+    const { title, body: replyBody } = req.body
+    const { data, error } = await db
+      .from('quick_replies')
+      .insert({ tenant_id: req.auth.tid, title, body: replyBody })
+      .select()
+      .single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// DELETE /quick-replies/:id
+router.delete('/quick-replies/:id', async (req, res, next) => {
+  try {
+    const { error } = await db
+      .from('quick_replies')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid) // ← garante isolamento
+    if (error) throw error
+    res.json(ok({ message: 'Quick reply deleted' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Campos personalizados ────────────────────────────────────────────────────
+
+// GET /custom-fields
+router.get('/custom-fields', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('custom_fields')
+      .select('*')
+      .eq('tenant_id', req.auth.tid)
+      .order('sort_order', { ascending: true })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
 // ─── Conversation Routes ───────────────────────────────────────────────────────
 
 router.get('/conversations', async (req, res, next) => {
@@ -145,8 +347,6 @@ router.get('/conversations', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ─── GET /conversations/counts ────────────────────────────────────────────────
-// Retorna { all, open, waiting, closed } respeitando permissões do usuário
 router.get('/conversations/counts', async (req, res, next) => {
   try {
     const { channelId } = req.query as any
