@@ -273,8 +273,9 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
                           value={field.contactField || 'custom'}
                           onChange={e => {
                             const fields = [...(d.fields || [])]
-                            const labels: Record<string, string> = { phone: 'Telefone', name: 'Nome', email: 'Email', custom: field.label || '' }
-                            fields[idx] = { ...fields[idx], contactField: e.target.value, label: labels[e.target.value] || field.label }
+                            const defaultLabels: Record<string, string> = { phone: 'Telefone', name: 'Nome', email: 'Email' }
+                            const newLabel = e.target.value === 'custom' ? (field.label || '') : defaultLabels[e.target.value] || ''
+                            fields[idx] = { ...fields[idx], contactField: e.target.value, label: newLabel }
                             onUpdate(node.id, { fields })
                           }}
                           style={{ ...inputStyle, flex: 1, fontSize: '11px', padding: '5px 8px', background: '#fff', marginRight: '6px' }}
