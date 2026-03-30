@@ -7,13 +7,16 @@ import { TrialBanner } from '@/components/layout/TrialBanner'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, validateSession } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
-    if (hydrated && !isAuthenticated) router.push('/login')
+    if (!hydrated) return
+    // Valida sessão toda vez que o layout monta — detecta inconsistência na hora
+    validateSession()
+    if (!isAuthenticated) router.push('/login')
   }, [hydrated, isAuthenticated, router])
 
   if (!hydrated) return null
