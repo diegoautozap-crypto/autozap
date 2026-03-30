@@ -1,19 +1,15 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, AlignLeft,
+  RefreshCw, AlignLeft, Link,
 } from 'lucide-react'
-
-// ─── Tipos consolidados ────────────────────────────────────────────────────────
-// send_message   → subtipo: text | image | video | audio | document
-// tag_contact    → subtipo: add | remove
-// loop           → subtipo: repeat | retry | while
 
 export const NODE_COLORS: Record<string, string> = {
   trigger_keyword:       '#16a34a',
   trigger_first_message: '#16a34a',
   trigger_any_reply:     '#16a34a',
   trigger_outside_hours: '#16a34a',
+  trigger_webhook:       '#0891b2',
   send_message:          '#2563eb',
   input:                 '#0284c7',
   condition:             '#ea580c',
@@ -34,6 +30,7 @@ export const NODE_ICONS: Record<string, any> = {
   trigger_first_message: Zap,
   trigger_any_reply:     Reply,
   trigger_outside_hours: Clock,
+  trigger_webhook:       Link,
   send_message:          MessageSquare,
   input:                 AlignLeft,
   condition:             GitBranch,
@@ -54,6 +51,7 @@ export const NODE_LABELS: Record<string, string> = {
   trigger_first_message: 'Primeira mensagem',
   trigger_any_reply:     'Qualquer resposta',
   trigger_outside_hours: 'Fora do horário',
+  trigger_webhook:       'Webhook de entrada',
   send_message:          'Enviar mensagem',
   input:                 'Aguardar resposta',
   condition:             'Condição',
@@ -69,7 +67,6 @@ export const NODE_LABELS: Record<string, string> = {
   loop:                  'Loop',
 }
 
-// Subtipos para nodes consolidados
 export const SEND_SUBTYPES = [
   { value: 'text',     label: 'Texto',      emoji: '💬' },
   { value: 'image',    label: 'Imagem',     emoji: '🖼️' },
@@ -89,7 +86,6 @@ export const LOOP_SUBTYPES = [
   { value: 'while',  label: 'Enquanto',    emoji: '♾️', desc: 'Repete enquanto condição' },
 ]
 
-// Mapa de compatibilidade: tipos legados → novo tipo consolidado
 export const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
   send_image:    { type: 'send_message', subtype: 'image' },
   send_video:    { type: 'send_message', subtype: 'video' },

@@ -17,7 +17,6 @@ import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, defaultBranch } from './components/constants'
 
-// ─── Custom Edge ──────────────────────────────────────────────────────────────
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
   const [hovered, setHovered] = useState(false)
@@ -50,7 +49,9 @@ const TRIGGER_NODES = [
   { type: 'trigger_first_message', label: 'Primeira mensagem' },
   { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
   { type: 'trigger_outside_hours', label: 'Fora do horário' },
+  { type: 'trigger_webhook',       label: 'Webhook de entrada' },
 ]
+
 const ACTION_NODES = [
   { type: 'send_message',   label: 'Enviar mensagem' },
   { type: 'input',          label: 'Aguardar resposta' },
@@ -67,7 +68,6 @@ const ACTION_NODES = [
   { type: 'end',            label: 'Finalizar flow' },
 ]
 
-// Mapeamento de tipos legados para os novos tipos consolidados
 const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
   send_image:    { type: 'send_message', subtype: 'image' },
   send_video:    { type: 'send_message', subtype: 'video' },
@@ -119,17 +119,26 @@ export default function FlowEditorPage() {
     if (!flowData || initialized) return
     setFlowName(flowData.name || '')
     setNodes((flowData.nodes || []).map((n: any) => {
-      // Migrar tipos legados para os novos tipos consolidados
       const legacy = LEGACY_TYPE_MAP[n.type]
       const nodeType = legacy ? legacy.type : n.type
       const nodeSubtype = legacy ? legacy.subtype : (n.data?.subtype || undefined)
       return {
         id: n.id, type: 'flowNode',
         position: { x: n.position_x, y: n.position_y },
-        data: { type: nodeType, ...n.data, ...(nodeSubtype ? { subtype: nodeSubtype } : {}) },
+        data: {
+          type: nodeType,
+          ...n.data,
+          ...(nodeSubtype ? { subtype: nodeSubtype } : {}),
+          ...(nodeType === 'trigger_webhook' ? { flowId: id } : {}),
+        },
       }
     }))
-    setEdges((flowData.edges || []).map((e: any) => ({ id: e.id, source: e.source_node, target: e.target_node, sourceHandle: e.source_handle || 'success', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } })))
+    setEdges((flowData.edges || []).map((e: any) => ({
+      id: e.id, source: e.source_node, target: e.target_node,
+      sourceHandle: e.source_handle || 'success',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
+      style: { stroke: '#d1d5db', strokeWidth: 2 },
+    })))
     setInitialized(true)
   }, [flowData, initialized, setNodes, setEdges])
 
@@ -163,7 +172,15 @@ export default function FlowEditorPage() {
 
   const addNode = (type: string) => {
     const nodeId = `node_${Date.now()}`
-    setNodes((nds: Node[]) => [...nds, { id: nodeId, type: 'flowNode', position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 }, data: { type, ...(type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}) } }])
+    setNodes((nds: Node[]) => [...nds, {
+      id: nodeId, type: 'flowNode',
+      position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
+      data: {
+        type,
+        ...(type === 'trigger_webhook' ? { flowId: id } : {}),
+        ...(type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}),
+      },
+    }])
     setIsDirty(true)
   }
 
@@ -199,7 +216,12 @@ export default function FlowEditorPage() {
       idMap.set(n.id, newId)
       return { ...n, id: newId, selected: true, position: { x: n.position.x + offset, y: n.position.y + offset }, data: { ...n.data } }
     })
-    const newEdges: Edge[] = copiedNodes.edges.map(e => ({ ...e, id: `edge_${Date.now()}_${Math.random().toString(36).slice(2)}`, source: idMap.get(e.source) || e.source, target: idMap.get(e.target) || e.target }))
+    const newEdges: Edge[] = copiedNodes.edges.map(e => ({
+      ...e,
+      id: `edge_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      source: idMap.get(e.source) || e.source,
+      target: idMap.get(e.target) || e.target,
+    }))
     setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes])
     setEdges(eds => [...eds, ...newEdges])
     setIsDirty(true)
@@ -217,7 +239,6 @@ export default function FlowEditorPage() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
-      {/* Header */}
       <div style={{ height: '56px', background: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '12px', flexShrink: 0, zIndex: 20 }}>
         <button onClick={() => router.push('/dashboard/flows')}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '13px', padding: '6px 8px', borderRadius: '6px' }}
@@ -231,7 +252,6 @@ export default function FlowEditorPage() {
           style={{ border: 'none', outline: 'none', fontSize: '15px', fontWeight: 600, color: '#111827', background: 'transparent', minWidth: '200px' }} />
         {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● Não salvo</span>}
         <div style={{ flex: 1 }} />
-
         {copiedNodes && copiedNodes.nodes.length > 0 && (
           <button onClick={pasteNodes} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '13px', fontWeight: 600, color: '#16a34a', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#dcfce7'}
@@ -240,14 +260,12 @@ export default function FlowEditorPage() {
             Colar ({copiedNodes.nodes.length})
           </button>
         )}
-
         <button onClick={copySelected} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: '#6b7280', cursor: 'pointer' }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copiar selecionados
         </button>
-
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
@@ -256,7 +274,6 @@ export default function FlowEditorPage() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Sidebar */}
         <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Gatilhos</p>
           {TRIGGER_NODES.map(n => {
@@ -286,7 +303,6 @@ export default function FlowEditorPage() {
           })}
         </div>
 
-        {/* Canvas */}
         <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>
           <ReactFlow
             nodes={nodesWithDelete}
@@ -327,8 +343,15 @@ export default function FlowEditorPage() {
         </div>
 
         {selectedNode && (
-          <NodeConfigPanel node={selectedNode} tags={tags} flows={allFlows} tenantId={tenantId}
-            onUpdate={updateNodeData} onClose={() => setSelectedNode(null)} onDelete={deleteNode} />
+          <NodeConfigPanel
+            node={selectedNode}
+            tags={tags}
+            flows={allFlows}
+            tenantId={tenantId}
+            onUpdate={updateNodeData}
+            onClose={() => setSelectedNode(null)}
+            onDelete={deleteNode}
+          />
         )}
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

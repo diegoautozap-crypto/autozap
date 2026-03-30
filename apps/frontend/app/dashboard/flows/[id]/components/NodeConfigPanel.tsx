@@ -1,15 +1,21 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
+
+import { useState } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { Node } from '@xyflow/react'
-import { X } from 'lucide-react'
+import { X, Copy, RefreshCw, Loader2 } from 'lucide-react'
 import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
+import { messageApi } from '@/lib/api'
+import { toast } from 'sonner'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+const MESSAGE_SERVICE_URL = process.env.NEXT_PUBLIC_MESSAGE_SERVICE_URL || 'https://autozapmessage-service-production.up.railway.app'
 
 export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose, onDelete }: {
   node: Node; tags: any[]; flows: any[]; tenantId: string
@@ -66,6 +72,38 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
     enabled: d.type === 'move_pipeline',
   })
 
+  // ── Webhook token para trigger_webhook ────────────────────────────────────
+  const { data: flowData, refetch: refetchFlow } = useQuery({
+    queryKey: ['flow-webhook-token', d.flowId],
+    queryFn: async () => {
+      if (!d.flowId) return null
+      const { data } = await messageApi.get(`/flows/${d.flowId}`)
+      return data.data
+    },
+    enabled: d.type === 'trigger_webhook' && !!d.flowId,
+  })
+
+  const [generatingToken, setGeneratingToken] = useState(false)
+  const webhookToken = flowData?.webhook_token
+  const webhookUrl = webhookToken
+    ? `${MESSAGE_SERVICE_URL}/webhook/flow/${d.flowId}/${webhookToken}`
+    : null
+
+  const generateToken = async () => {
+    if (!d.flowId) return
+    setGeneratingToken(true)
+    try {
+      await messageApi.post(`/flows/${d.flowId}/webhook-token`)
+      refetchFlow()
+      toast.success('URL gerada!')
+    } catch { toast.error('Erro ao gerar URL') }
+    finally { setGeneratingToken(false) }
+  }
+
+  const copyUrl = () => {
+    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success('URL copiada!') }
+  }
+
   const SubtypeSelector = ({ options }: { options: { value: string; label: string; emoji: string; desc?: string }[] }) => (
     <div>
       <label style={labelStyle}>Tipo</label>
@@ -96,7 +134,6 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
     <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e4e4e7', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
       onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
 
-      {/* Header */}
       <div style={{ padding: '16px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>
@@ -148,6 +185,58 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
           <div><label style={labelStyle}>Fim do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
+        {/* ── Trigger Webhook ─────────────────────────────────────────────── */}
+        {d.type === 'trigger_webhook' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#0369a1', lineHeight: 1.5 }}>
+              Este flow dispara quando um sistema externo (Make, Zapier, formulário da Meta) faz um POST na URL abaixo.
+            </div>
+
+            {!webhookUrl ? (
+              <div style={{ textAlign: 'center', padding: '16px', background: '#fafafa', borderRadius: '8px', border: '1px solid #f4f4f5' }}>
+                <p style={{ fontSize: '12px', color: '#71717a', marginBottom: '10px' }}>Salve o flow primeiro, depois gere a URL</p>
+                <button onClick={generateToken} disabled={generatingToken || !d.flowId}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: '#0891b2', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: generatingToken ? 'not-allowed' : 'pointer', opacity: !d.flowId ? 0.5 : 1 }}>
+                  {generatingToken ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={12} />}
+                  Gerar URL
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label style={labelStyle}>URL do webhook</label>
+                <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '9px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <code style={{ flex: 1, fontSize: '10px', color: '#18181b', wordBreak: 'break-all' }}>{webhookUrl}</code>
+                  <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0891b2', display: 'flex', flexShrink: 0 }} title="Copiar URL">
+                    <Copy size={13} />
+                  </button>
+                  <button onClick={generateToken} disabled={generatingToken} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }} title="Gerar nova URL">
+                    <RefreshCw size={13} />
+                  </button>
+                </div>
+                <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Cole essa URL no Make, Zapier ou qualquer sistema externo</p>
+              </div>
+            )}
+
+            <div>
+              <label style={labelStyle}>Variáveis disponíveis no flow</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {[
+                  ['{{webhook_phone_number}}', 'Telefone'],
+                  ['{{webhook_full_name}}', 'Nome'],
+                  ['{{webhook_email}}', 'Email'],
+                  ['{{webhook_campaign_name}}', 'Campanha'],
+                  ['{{webhook_message}}', 'Mensagem'],
+                ].map(([varName, desc]) => (
+                  <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <code style={{ fontSize: '10px', background: '#f0f9ff', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>{varName}</code>
+                    <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {d.type === 'send_message' && (<>
           <SubtypeSelector options={SEND_SUBTYPES} />
           {(d.subtype === 'text' || !d.subtype) && (
@@ -174,7 +263,7 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
           <div>
             <label style={labelStyle}>Salvar resposta como variável</label>
             <input style={inputStyle} placeholder="nome" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' + (d.saveAs || 'variavel') + '}}'} nos próximos nós</p>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{'} + (d.saveAs || 'variavel') + '}}' nos próximos nós</p>
           </div>
         </>)}
 
@@ -200,7 +289,9 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
         {d.type === 'webhook' && (<>
           <div><label style={labelStyle}>URL</label><input style={inputStyle} placeholder="https://api.seusite.com/webhook" value={d.url || ''} onChange={e => onUpdate(node.id, { url: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>Método HTTP</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.method || 'POST'} onChange={e => onUpdate(node.id, { method: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option></select></div>
-          {(d.method || 'POST') !== 'GET' && <div><label style={labelStyle}>Body (JSON)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }} placeholder={'{\n  "phone": "{{phone}}"\n}'} value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
+          {(d.method || 'POST') !== 'GET' && <div><label style={labelStyle}>Body (JSON)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }} placeholder='{
+  "phone": "{{phone}}"
+}' value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
           <div><label style={labelStyle}>Salvar resposta como variável</label><input style={inputStyle} placeholder="resposta_webhook" value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
@@ -271,10 +362,7 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#6d28d9' }}>
               Conecte a saída <strong>Loop</strong> aos nós que devem repetir. <strong>Concluído</strong> segue após terminar todas as repetições.
             </div>
-            <div>
-              <label style={labelStyle}>Número de repetições</label>
-              <input type="number" min="1" max="100" style={inputStyle} value={d.times ?? 1} onChange={e => onUpdate(node.id, { times: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} />
-            </div>
+            <div><label style={labelStyle}>Número de repetições</label><input type="number" min="1" max="100" style={inputStyle} value={d.times ?? 1} onChange={e => onUpdate(node.id, { times: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
           {d.subtype === 'retry' && (<>
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#ea580c' }}>
@@ -291,10 +379,7 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
             {!['is_empty', 'is_not_empty'].includes(d.conditionOperator || 'is_empty') && (
               <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="valor para comparar" value={d.conditionValue || ''} onChange={e => onUpdate(node.id, { conditionValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
             )}
-            <div>
-              <label style={labelStyle}>Máximo de iterações (segurança)</label>
-              <input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} />
-            </div>
+            <div><label style={labelStyle}>Máximo de iterações (segurança)</label><input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
         </>)}
 
@@ -303,7 +388,6 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
         )}
       </div>
 
-      {/* Footer */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid #f4f4f5' }}>
         <button onClick={() => onDelete(node.id)}
           style={{ width: '100%', padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.1s' }}
@@ -312,6 +396,7 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
           Remover nó
         </button>
       </div>
+      <style>{"@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
     </div>
   )
 }

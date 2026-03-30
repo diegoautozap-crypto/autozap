@@ -214,4 +214,21 @@ router.get('/flows/:id/logs', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Gera token único para webhook de entrada do flow ─────────────────────────
+router.post('/flows/:id/webhook-token', async (req, res, next) => {
+  try {
+    const crypto = await import('crypto')
+    const token = crypto.randomBytes(24).toString('hex')
+    const { data, error } = await db
+      .from('flows')
+      .update({ webhook_token: token, updated_at: new Date() })
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select('id, webhook_token')
+      .single()
+    if (error || !data) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
+    res.json(ok({ token }))
+  } catch (err) { next(err) }
+})
+
 export default router
