@@ -4,7 +4,6 @@ import { useEffect, useRef, useCallback } from 'react'
 import Pusher from 'pusher-js'
 import { useAuthStore } from '@/store/auth.store'
 
-// ── Som de notificação gerado via Web Audio API (sem arquivo externo) ─────────
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
@@ -22,7 +21,6 @@ function playNotificationSound() {
   } catch {}
 }
 
-// ── Badge no título da aba ────────────────────────────────────────────────────
 let unreadCount = 0
 let originalTitle = ''
 
@@ -37,14 +35,12 @@ function clearBadge() {
   if (originalTitle) document.title = originalTitle
 }
 
-// ── Hook principal ────────────────────────────────────────────────────────────
 export function useNotifications() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const pusherRef = useRef<Pusher | null>(null)
   const swRegistered = useRef(false)
 
-  // Registra service worker
   const registerSW = useCallback(async () => {
     if (swRegistered.current || typeof window === 'undefined') return
     if (!('serviceWorker' in navigator)) return
@@ -56,7 +52,6 @@ export function useNotifications() {
     }
   }, [])
 
-  // Pede permissão de notificação
   const requestPermission = useCallback(async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) return
     if (Notification.permission === 'default') {
@@ -64,24 +59,21 @@ export function useNotifications() {
     }
   }, [])
 
-  // Dispara notificação nativa
   const showNotification = useCallback((title: string, body: string, url = '/dashboard/inbox') => {
     if (typeof window === 'undefined') return
 
-    // Som sempre toca independente de permissão
     playNotificationSound()
-
-    // Badge no título
     incrementBadge()
 
-    // Notificação nativa do browser
     if (Notification.permission === 'granted') {
-      const n = new Notification(title, {
+      // Usa cast para any para evitar erro de tipo com propriedades experimentais
+      const options: any = {
         body,
         icon: '/icon-192.png',
         tag: 'autozap-message',
         renotify: true,
-      })
+      }
+      const n = new Notification(title, options)
       n.onclick = () => {
         window.focus()
         window.location.href = url
@@ -90,20 +82,17 @@ export function useNotifications() {
     }
   }, [])
 
-  // Limpa badge quando janela fica em foco
   useEffect(() => {
     const handleFocus = () => clearBadge()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
-  // Inicializa SW + permissão
   useEffect(() => {
     registerSW()
     requestPermission()
   }, [registerSW, requestPermission])
 
-  // Escuta eventos do Pusher
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
@@ -115,14 +104,11 @@ export function useNotifications() {
     const channel = pusher.subscribe(`tenant-${tenantId}`)
 
     channel.bind('inbound.message', (data: any) => {
-      // Só notifica se a janela não está em foco
       if (document.hasFocus()) return
-
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
         : 'Nova mensagem'
-
       showNotification(`💬 ${contactName}`, preview, '/dashboard/inbox')
     })
 
