@@ -35,7 +35,6 @@ function clearBadge() {
   if (originalTitle) document.title = originalTitle
 }
 
-// Verifica se o usuário está ativamente vendo o inbox
 function isViewingInbox(): boolean {
   return document.hasFocus() && window.location.pathname.includes('/inbox')
 }
@@ -52,8 +51,9 @@ export function useNotifications() {
     try {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' })
       swRegistered.current = true
+      console.log('[Notifications] Service worker registrado')
     } catch (err) {
-      console.warn('SW registration failed:', err)
+      console.warn('[Notifications] SW registration failed:', err)
     }
   }, [])
 
@@ -62,31 +62,18 @@ export function useNotifications() {
     if (Notification.permission === 'default') {
       await Notification.requestPermission()
     }
+    console.log('[Notifications] Permissão:', Notification.permission)
   }, [])
 
   const showNotification = useCallback((title: string, body: string, url = '/dashboard/inbox') => {
     if (typeof window === 'undefined') return
-
-    // Som sempre toca (exceto se está no inbox com foco)
+    console.log('[Notifications] Disparando notificação:', { title, body })
     playNotificationSound()
-
-    // Badge no título sempre incrementa
     incrementBadge()
-
-    // Popup só aparece se não estiver com a janela em foco
     if (Notification.permission === 'granted' && !document.hasFocus()) {
-      const options: any = {
-        body,
-        icon: '/icon-192.png',
-        tag: 'autozap-message',
-        renotify: true,
-      }
+      const options: any = { body, icon: '/icon-192.png', tag: 'autozap-message', renotify: true }
       const n = new Notification(title, options)
-      n.onclick = () => {
-        window.focus()
-        window.location.href = url
-        n.close()
-      }
+      n.onclick = () => { window.focus(); window.location.href = url; n.close() }
     }
   }, [])
 
@@ -104,28 +91,46 @@ export function useNotifications() {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-    if (!key || !tenantId) return
+
+    console.log('[Notifications] tenantId:', tenantId)
+    console.log('[Notifications] Pusher key existe:', !!key)
+
+    if (!key || !tenantId) {
+      console.warn('[Notifications] Abortando — key ou tenantId ausente')
+      return
+    }
 
     const pusher = new Pusher(key, { cluster })
     pusherRef.current = pusher
 
-    const channel = pusher.subscribe(`tenant-${tenantId}`)
+    const channelName = `tenant-${tenantId}`
+    console.log('[Notifications] Inscrevendo no canal:', channelName)
+    const channel = pusher.subscribe(channelName)
+
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('[Notifications] ✅ Inscrito com sucesso no canal:', channelName)
+    })
+
+    channel.bind('pusher:subscription_error', (err: any) => {
+      console.error('[Notifications] ❌ Erro ao inscrever no canal:', err)
+    })
 
     channel.bind('inbound.message', (data: any) => {
-      // Não notifica só se estiver no inbox COM foco
-      if (isViewingInbox()) return
-
+      console.log('[Notifications] 🔔 inbound.message recebido:', data)
+      if (isViewingInbox()) {
+        console.log('[Notifications] Ignorando — usuário está no inbox com foco')
+        return
+      }
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
         : 'Nova mensagem'
-
       showNotification(`💬 ${contactName}`, preview, '/dashboard/inbox')
     })
 
     return () => {
       channel.unbind_all()
-      pusher.unsubscribe(`tenant-${tenantId}`)
+      pusher.unsubscribe(channelName)
       pusher.disconnect()
       pusherRef.current = null
     }
