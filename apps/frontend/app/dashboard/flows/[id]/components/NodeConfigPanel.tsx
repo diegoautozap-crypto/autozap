@@ -240,6 +240,102 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
         )}
 
 
+
+        {d.type === 'create_contact' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#15803d', lineHeight: 1.5 }}>
+              Cria ou atualiza o contato com os dados do webhook. Campos extras aparecem no painel lateral do inbox.
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={labelStyle}>Campos</label>
+                <button
+                  onClick={() => {
+                    const fields = d.fields || []
+                    onUpdate(node.id, { fields: [...fields, { label: '', variable: '', contactField: 'custom' }] })
+                  }}
+                  style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  + Adicionar campo
+                </button>
+              </div>
+
+              {(d.fields || []).length === 0 ? (
+                <div style={{ background: '#fafafa', border: '1px dashed #e4e4e7', borderRadius: '8px', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#a1a1aa' }}>
+                  Adicione campos para criar o contato
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(d.fields || []).map((field: any, idx: number) => (
+                    <div key={idx} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <select
+                          value={field.contactField || 'custom'}
+                          onChange={e => {
+                            const fields = [...(d.fields || [])]
+                            const labels: Record<string, string> = { phone: 'Telefone', name: 'Nome', email: 'Email', custom: field.label || '' }
+                            fields[idx] = { ...fields[idx], contactField: e.target.value, label: labels[e.target.value] || field.label }
+                            onUpdate(node.id, { fields })
+                          }}
+                          style={{ ...inputStyle, flex: 1, fontSize: '11px', padding: '5px 8px', background: '#fff', marginRight: '6px' }}
+                          onFocus={focusInput} onBlur={blurInput}>
+                          <option value="phone">📱 Telefone</option>
+                          <option value="name">👤 Nome</option>
+                          <option value="email">📧 Email</option>
+                          <option value="custom">✏️ Campo extra</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            const fields = (d.fields || []).filter((_: any, i: number) => i !== idx)
+                            onUpdate(node.id, { fields })
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: '11px', flexShrink: 0 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}>
+                          remover
+                        </button>
+                      </div>
+                      {field.contactField === 'custom' && (
+                        <div style={{ marginBottom: '6px' }}>
+                          <input
+                            placeholder="Nome do campo (ex: Cidade, Produto)"
+                            value={field.label || ''}
+                            onChange={e => {
+                              const fields = [...(d.fields || [])]
+                              fields[idx] = { ...fields[idx], label: e.target.value }
+                              onUpdate(node.id, { fields })
+                            }}
+                            style={{ ...inputStyle, fontSize: '11px', padding: '5px 8px' }}
+                            onFocus={focusInput} onBlur={blurInput}
+                          />
+                        </div>
+                      )}
+                      <input
+                        placeholder="Variável (ex: {{webhook_phone}})"
+                        value={field.variable || ''}
+                        onChange={e => {
+                          const fields = [...(d.fields || [])]
+                          fields[idx] = { ...fields[idx], variable: e.target.value }
+                          onUpdate(node.id, { fields })
+                        }}
+                        style={{ ...inputStyle, fontSize: '11px', padding: '5px 8px', fontFamily: 'monospace' }}
+                        onFocus={focusInput} onBlur={blurInput}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px', fontSize: '11px', color: '#71717a' }}>
+              <p style={{ fontWeight: 600, marginBottom: '4px' }}>Exemplo de configuração:</p>
+              <p>📱 Telefone → <code style={{ color: '#0891b2' }}>{'{{webhook_phone}}'}</code></p>
+              <p>👤 Nome → <code style={{ color: '#0891b2' }}>{'{{webhook_name}}'}</code></p>
+              <p>✏️ Cidade → <code style={{ color: '#0891b2' }}>{'{{webhook_cidade}}'}</code></p>
+            </div>
+          </div>
+        )}
+
         {d.type === 'map_fields' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>

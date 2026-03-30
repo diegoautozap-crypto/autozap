@@ -470,6 +470,244 @@ export class FlowEngine {
         }
 
 
+
+        case 'create_contact': {
+          // Campos obrigatórios
+          const phoneRaw = this.interpolate(data?.phone || '', ctx, variables).replace(/\D/g, '')
+          const name = this.interpolate(data?.name || '', ctx, variables).trim()
+          const email = this.interpolate(data?.email || '', ctx, variables).trim()
+
+          if (!phoneRaw) {
+            logger.warn('create_contact: telefone vazio', { nodeId: node.id })
+            break
+          }
+
+          // Normaliza telefone brasileiro
+          let normalizedPhone = phoneRaw.replace(/^\+/, '')
+          if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
+            normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
+          }
+
+          // Cria ou atualiza contato
+          const { data: existingContact } = await db
+            .from('contacts')
+            .select('id, metadata')
+            .eq('tenant_id', ctx.tenantId)
+            .eq('phone', normalizedPhone)
+            .maybeSingle()
+
+          let finalContactId: string
+          let existingMetadata: Record<string, any> = {}
+
+          if (existingContact) {
+            finalContactId = existingContact.id
+            existingMetadata = existingContact.metadata || {}
+            const update: any = { last_interaction_at: new Date() }
+            if (name) update.name = name
+            if (email) update.email = email
+            await db.from('contacts').update(update).eq('id', finalContactId)
+          } else {
+            const { generateId } = await import('@autozap/utils')
+            const { data: newContact, error: contactError } = await db
+              .from('contacts')
+              .insert({
+                id: generateId(),
+                tenant_id: ctx.tenantId,
+                phone: normalizedPhone,
+                name: name || normalizedPhone,
+                email: email || null,
+                origin: 'webhook',
+                status: 'active',
+                last_interaction_at: new Date(),
+              })
+              .select('id')
+              .single()
+            if (contactError || !newContact) break
+            finalContactId = newContact.id
+          }
+
+          // Processa campos extras — cria campo personalizado se não existir
+          const extraFields: { label: string; value: string }[] = data?.extraFields || []
+          if (extraFields.length > 0) {
+            const metadata = { ...existingMetadata }
+
+            for (const field of extraFields) {
+              const label = field.label?.trim()
+              const value = this.interpolate(field.value || '', ctx, variables).trim()
+              if (!label || !value) continue
+
+              // Cria o campo personalizado no tenant se não existir
+              const fieldKey = label.toLowerCase().replace(/\s+/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              const { data: existingField } = await db
+                .from('custom_fields')
+                .select('id')
+                .eq('tenant_id', ctx.tenantId)
+                .eq('key', fieldKey)
+                .maybeSingle()
+
+              if (!existingField) {
+                const { generateId } = await import('@autozap/utils')
+                const { count } = await db
+                  .from('custom_fields')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('tenant_id', ctx.tenantId)
+                await db.from('custom_fields').insert({
+                  id: generateId(),
+                  tenant_id: ctx.tenantId,
+                  key: fieldKey,
+                  label,
+                  type: 'text',
+                  sort_order: count || 0,
+                })
+              }
+
+              metadata[fieldKey] = value
+            }
+
+            await db.from('contacts').update({ metadata }).eq('id', finalContactId)
+          }
+
+          // Atualiza ctx para que os próximos nós usem o contato correto
+          ctx.contactId = finalContactId
+          ctx.phone = normalizedPhone
+
+          // Cria ou reutiliza conversa no inbox
+          const { data: existingConv } = await db
+            .from('conversations')
+            .select('id')
+            .eq('tenant_id', ctx.tenantId)
+            .eq('contact_id', finalContactId)
+            .eq('channel_id', ctx.channelId)
+            .in('status', ['open', 'waiting'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (existingConv) {
+            ctx.conversationId = existingConv.id
+          } else {
+            const { generateId } = await import('@autozap/utils')
+            const { data: channel } = await db.from('channels').select('type').eq('id', ctx.channelId).single()
+            const { data: newConv } = await db
+              .from('conversations')
+              .insert({
+                id: generateId(),
+                tenant_id: ctx.tenantId,
+                contact_id: finalContactId,
+                channel_id: ctx.channelId,
+                channel_type: channel?.type || 'whatsapp',
+                status: 'waiting',
+                pipeline_stage: 'lead',
+                bot_active: true,
+                unread_count: 1,
+                last_message: `Lead via webhook`,
+                last_message_at: new Date(),
+              })
+              .select('id')
+              .single()
+            if (newConv) ctx.conversationId = newConv.id
+          }
+
+          emitPusher(ctx.tenantId, 'conversation.updated', { conversationId: ctx.conversationId })
+          break
+        }
+
+
+        case 'create_contact': {
+          // Campos padrão configurados pelo usuário
+          // fields: [{ label: 'Telefone', variable: '{{webhook_phone}}', contactField: 'phone' }, ...]
+          const fields: any[] = data?.fields || []
+
+          const get = (variable: string) => this.interpolate(variable || '', ctx, variables).trim()
+
+          let phone = ''
+          let name = ''
+          let email = ''
+          const extraFields: Record<string, string> = {}
+
+          for (const f of fields) {
+            const val = get(f.variable)
+            if (!val) continue
+            if (f.contactField === 'phone') phone = val.replace(/\D/g, '')
+            else if (f.contactField === 'name') name = val
+            else if (f.contactField === 'email') email = val
+            else if (f.label) extraFields[f.label] = val
+          }
+
+          if (!phone && !name) break
+
+          // Normaliza telefone
+          let normalizedPhone = phone.replace(/^\+/, '')
+          if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
+            normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
+          }
+          const finalPhone = normalizedPhone || `webhook_${Date.now()}`
+
+          // Cria ou atualiza contato
+          const { data: existingContact } = await db
+            .from('contacts').select('id, metadata').eq('tenant_id', ctx.tenantId).eq('phone', finalPhone).maybeSingle()
+
+          let contactId: string
+          if (existingContact) {
+            contactId = existingContact.id
+            const metadata = { ...(existingContact.metadata || {}), ...extraFields }
+            const update: any = { last_interaction_at: new Date(), metadata }
+            if (name) update.name = name
+            if (email) update.email = email
+            await db.from('contacts').update(update).eq('id', contactId)
+          } else {
+            const metadata = Object.keys(extraFields).length > 0 ? extraFields : null
+            const { data: newContact } = await db
+              .from('contacts')
+              .insert({ id: generateId(), tenant_id: ctx.tenantId, phone: finalPhone, name: name || finalPhone, email: email || null, origin: 'webhook', status: 'active', metadata, last_interaction_at: new Date() })
+              .select('id').single()
+            if (!newContact) break
+            contactId = newContact.id
+          }
+
+          // Cria ou reutiliza conversa
+          const { data: existingConv } = await db
+            .from('conversations').select('id').eq('tenant_id', ctx.tenantId).eq('contact_id', contactId)
+            .eq('channel_id', ctx.channelId).in('status', ['open', 'waiting'])
+            .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+          let conversationId: string
+          if (existingConv) {
+            conversationId = existingConv.id
+          } else {
+            const { data: channel } = await db.from('channels').select('type').eq('id', ctx.channelId).single()
+            const notePreview = name ? `Lead: ${name}` : `Lead via webhook`
+            const { data: newConv } = await db
+              .from('conversations')
+              .insert({ id: generateId(), tenant_id: ctx.tenantId, contact_id: contactId, channel_id: ctx.channelId, channel_type: channel?.type || 'whatsapp', status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message: notePreview, last_message_at: new Date() })
+              .select('id').single()
+            if (!newConv) break
+            conversationId = newConv.id
+          }
+
+          // Salva nota interna com todos os dados organizados
+          const noteLines = ['📋 Lead criado via webhook']
+          if (name) noteLines.push(`👤 Nome: ${name}`)
+          if (finalPhone && !finalPhone.startsWith('webhook_')) noteLines.push(`📱 Telefone: ${finalPhone}`)
+          if (email) noteLines.push(`📧 Email: ${email}`)
+          for (const [label, val] of Object.entries(extraFields)) {
+            noteLines.push(`• ${label}: ${val}`)
+          }
+          await db.from('conversation_notes').insert({
+            conversation_id: conversationId, tenant_id: ctx.tenantId, body: noteLines.join('\n')
+          })
+
+          // Atualiza contexto para os próximos nós usarem
+          ctx.contactId = contactId
+          ctx.conversationId = conversationId
+          if (finalPhone && !finalPhone.startsWith('webhook_')) ctx.phone = finalPhone
+
+          // Emite evento Pusher para abrir no inbox
+          emitPusher(ctx.tenantId, 'conversation.updated', { conversationId, contactId })
+
+          break
+        }
+
         case 'map_fields': {
           // Mapeia campos do webhook para variáveis com nomes limpos
           // mappings: [{ from: '{{webhook_phone}}', to: 'telefone' }, ...]

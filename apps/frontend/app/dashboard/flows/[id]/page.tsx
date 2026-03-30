@@ -54,6 +54,7 @@ const TRIGGER_NODES = [
 
 const ACTION_NODES = [
   { type: 'map_fields',     label: 'Mapear campos' },
+  { type: 'create_contact', label: 'Criar contato' },
   { type: 'send_message',   label: 'Enviar mensagem' },
   { type: 'input',          label: 'Aguardar resposta' },
   { type: 'condition',      label: 'Condição' },
