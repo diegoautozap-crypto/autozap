@@ -263,7 +263,7 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
           <div>
             <label style={labelStyle}>Salvar resposta como variável</label>
             <input style={inputStyle} placeholder="nome" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{'} + (d.saveAs || 'variavel') + '}}' nos próximos nós</p>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' }{d.saveAs || 'variavel'}{'}}' } nos próximos nós</p>
           </div>
         </>)}
 
