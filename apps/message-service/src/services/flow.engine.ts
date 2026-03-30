@@ -469,6 +469,49 @@ export class FlowEngine {
           return { success: true }
         }
 
+
+        case 'map_fields': {
+          // Mapeia campos do webhook para variáveis com nomes limpos
+          // mappings: [{ from: '{{webhook_phone}}', to: 'telefone' }, ...]
+          const mappings: any[] = data?.mappings || []
+          for (const m of mappings) {
+            if (!m.from || !m.to) continue
+            const val = this.interpolate(m.from, ctx, variables)
+            if (val) variables[m.to] = val
+          }
+
+          // Se mapeou telefone, atualiza o contato
+          const phoneVar = mappings.find((m: any) => m.to === 'telefone' || m.to === 'phone')
+          if (phoneVar) {
+            const newPhone = this.interpolate(phoneVar.from, ctx, variables).replace(/\D/g, '')
+            if (newPhone && newPhone !== ctx.phone) {
+              let normalized = newPhone.replace(/^\+/, '')
+              if (normalized.startsWith('55') && normalized.length === 12) {
+                normalized = normalized.slice(0, 4) + '9' + normalized.slice(4)
+              }
+              // Atualiza telefone do contato
+              await db.from('contacts').update({ phone: normalized }).eq('id', ctx.contactId)
+              ctx.phone = normalized
+            }
+          }
+
+          // Atualiza nome se mapeado
+          const nameVar = mappings.find((m: any) => m.to === 'nome' || m.to === 'name')
+          if (nameVar) {
+            const newName = this.interpolate(nameVar.from, ctx, variables)
+            if (newName) await db.from('contacts').update({ name: newName }).eq('id', ctx.contactId)
+          }
+
+          // Atualiza email se mapeado
+          const emailVar = mappings.find((m: any) => m.to === 'email')
+          if (emailVar) {
+            const newEmail = this.interpolate(emailVar.from, ctx, variables)
+            if (newEmail) await db.from('contacts').update({ email: newEmail }).eq('id', ctx.contactId)
+          }
+
+          break
+        }
+
         case 'add_tag': {
           if (!data?.tagId) break
           await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: data.tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })

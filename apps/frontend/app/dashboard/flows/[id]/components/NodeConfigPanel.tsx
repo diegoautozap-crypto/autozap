@@ -302,6 +302,95 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
           </div>
         )}
 
+
+        {d.type === 'map_fields' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>
+              Mapeie os campos recebidos pelo webhook para variáveis que você vai usar nos próximos nós.
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={labelStyle}>Mapeamentos</label>
+                <button
+                  onClick={() => {
+                    const mappings = d.mappings || []
+                    onUpdate(node.id, { mappings: [...mappings, { from: '', to: '' }] })
+                  }}
+                  style={{ fontSize: '11px', fontWeight: 600, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  + Adicionar
+                </button>
+              </div>
+
+              {(d.mappings || []).length === 0 ? (
+                <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '7px', padding: '12px', fontSize: '12px', color: '#a1a1aa', textAlign: 'center' }}>
+                  Clique em + Adicionar para mapear os campos
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(d.mappings || []).map((mapping: any, idx: number) => (
+                    <div key={idx} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#71717a' }}>Campo {idx + 1}</span>
+                        <button
+                          onClick={() => {
+                            const mappings = (d.mappings || []).filter((_: any, i: number) => i !== idx)
+                            onUpdate(node.id, { mappings })
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: '11px' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}>
+                          remover
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '10px' }}>Variável de origem (ex: {'{{webhook_phone}}'})</label>
+                          <input
+                            placeholder="{{webhook_phone}}"
+                            value={mapping.from || ''}
+                            onChange={e => {
+                              const mappings = [...(d.mappings || [])]
+                              mappings[idx] = { ...mappings[idx], from: e.target.value }
+                              onUpdate(node.id, { mappings })
+                            }}
+                            style={{ ...inputStyle, fontSize: '12px', padding: '6px 8px' }}
+                            onFocus={focusInput} onBlur={blurInput}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ ...labelStyle, fontSize: '10px' }}>Salvar como variável</label>
+                          <input
+                            placeholder="telefone"
+                            value={mapping.to || ''}
+                            onChange={e => {
+                              const mappings = [...(d.mappings || [])]
+                              mappings[idx] = { ...mappings[idx], to: e.target.value.replace(/\s/g, '_').toLowerCase() }
+                              onUpdate(node.id, { mappings })
+                            }}
+                            style={{ ...inputStyle, fontSize: '12px', padding: '6px 8px' }}
+                            onFocus={focusInput} onBlur={blurInput}
+                          />
+                          <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>
+                            Use {'{{' }{mapping.to || 'variavel'}{'}}' } nos próximos nós
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>Variáveis especiais:</p>
+              <p style={{ fontSize: '11px', color: '#a1a1aa', lineHeight: 1.6 }}>
+                Se você salvar como <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>telefone</code>, <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>nome</code> ou <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>email</code>, o contato será atualizado automaticamente.
+              </p>
+            </div>
+          </div>
+        )}
+
         {d.type === 'send_message' && (<>
           <SubtypeSelector options={SEND_SUBTYPES} />
           {(d.subtype === 'text' || !d.subtype) && (

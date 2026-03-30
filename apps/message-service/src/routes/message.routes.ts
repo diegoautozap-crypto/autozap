@@ -213,7 +213,41 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
 })
 
 // ─── Webhook de entrada para flows (com mapeamento de campos) ─────────────────
-router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
+router.post('/webhook/flow/:flowId/:token',
+  // Aceita body raw (gzip, deflate, json) — necessário para Make/Zapier
+  (req: any, res: any, next: any) => {
+    // Se já tem body parseado (ex: curl), passa direto
+    if (req.body && Object.keys(req.body).length > 0) return next()
+    
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', async () => {
+      try {
+        const raw = Buffer.concat(chunks)
+        const encoding = req.headers['content-encoding']
+        let text: string
+        
+        if (encoding === 'gzip') {
+          const zlib = await import('zlib')
+          text = await new Promise((resolve, reject) => {
+            zlib.gunzip(raw, (err, result) => err ? reject(err) : resolve(result.toString('utf8')))
+          })
+        } else if (encoding === 'deflate') {
+          const zlib = await import('zlib')
+          text = await new Promise((resolve, reject) => {
+            zlib.inflate(raw, (err, result) => err ? reject(err) : resolve(result.toString('utf8')))
+          })
+        } else {
+          text = raw.toString('utf8')
+        }
+        
+        try { req.body = JSON.parse(text) } catch { req.body = {} }
+        next()
+      } catch { req.body = {}; next() }
+    })
+    req.on('error', () => { req.body = {}; next() })
+  },
+  async (req, res, next) => {
   try {
     // Busca o flow e seu mapeamento de campos configurado
     const { data: flow, error } = await db
@@ -239,20 +273,21 @@ router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
     const source = resolveField(body, 'source', fieldMap) || 'webhook'
     const messageBody = resolveField(body, 'message', fieldMap) || `Lead via ${source}`
 
-    if (!phone) { res.status(400).json({ error: 'Campo de telefone é obrigatório. Configure o mapeamento no nó Webhook de entrada.' }); return }
-
     const { data: channel } = await db
       .from('channels').select('id, type').eq('tenant_id', tenantId).limit(1).single()
 
     if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado para este tenant' }); return }
 
-    let normalizedPhone = phone.replace(/^\+/, '')
+    // Normaliza telefone — se não veio telefone, usa um placeholder temporário
+    let normalizedPhone = phone ? phone.replace(/^\+/, '') : ''
     if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
       normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
     }
+    // Se não tem telefone, usa webhook_temp_ + timestamp para criar contato temporário
+    const tempPhone = normalizedPhone || `webhook_temp_${Date.now()}`
 
     const { data: existingContact } = await db
-      .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', normalizedPhone).maybeSingle()
+      .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', tempPhone).maybeSingle()
 
     let contactId: string
     if (existingContact) {
@@ -261,11 +296,12 @@ router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
     } else {
       const { data: newContact, error: contactError } = await db
         .from('contacts')
-        .insert({ id: generateId(), tenant_id: tenantId, phone: normalizedPhone, name: name || normalizedPhone, email: email || null, origin: source, status: 'active', last_interaction_at: new Date() })
+        .insert({ id: generateId(), tenant_id: tenantId, phone: tempPhone, name: name || tempPhone, email: email || null, origin: source, status: 'active', last_interaction_at: new Date() })
         .select('id').single()
       if (contactError || !newContact) { res.status(500).json({ error: 'Erro ao criar contato' }); return }
       contactId = newContact.id
     }
+    normalizedPhone = tempPhone
 
     const { data: existingConv } = await db
       .from('conversations').select('id').eq('tenant_id', tenantId).eq('contact_id', contactId)
