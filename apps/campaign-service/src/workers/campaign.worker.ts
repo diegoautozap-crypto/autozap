@@ -1,4 +1,4 @@
-import { Worker, Queue, QueueEvents } from 'bullmq'
+import { Worker, Queue } from 'bullmq'
 import pLimit from 'p-limit'
 import { logger } from '../lib/logger'
 import { campaignService } from '../services/campaign.service'
@@ -12,8 +12,12 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-const LOGICAL_BATCH      = 50
-const CONCURRENCY        = 10
+// ── Configurações de velocidade ───────────────────────────────────────────────
+// LOGICAL_BATCH: quantos contatos processa por iteração
+// CONCURRENCY: requests paralelos simultâneos para a Gupshup
+// Aumentar CONCURRENCY além de 100 pode causar rate limit na Gupshup
+const LOGICAL_BATCH      = 200  // era 50
+const CONCURRENCY        = 50   // era 10
 const MESSAGE_ID_RETRIES = 2
 
 function getRedisConnection() {
@@ -29,7 +33,6 @@ function getRedisConnection() {
 
 const connection = getRedisConnection()
 
-// ─── Fila de inbox (compartilhada — sem dados sensíveis entre tenants) ─────────
 export interface InboxJob {
   tenantId: string; channelId: string; phone: string
   messageDbId: string; body: string; campaignId: string
@@ -45,16 +48,12 @@ export const inboxQueue = new Queue<InboxJob>('inbox_queue', {
   },
 })
 
-// ─── Fila de campanha ISOLADA por tenant ───────────────────────────────────────
-// Nome: campaign_queue:tenant-{tenantId}
-// Garante que um tenant com 10k msgs não bloqueia os outros
-
 export interface CampaignJob {
   campaignId: string; tenantId: string; channelId: string
   batchSize: number; messagesPerMin: number
 }
 
-/** Retorna (ou cria) a fila exclusiva do tenant */
+/** Retorna a fila exclusiva do tenant — campaign_queue:tenant-{id} */
 export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
   return new Queue<CampaignJob>(`campaign_queue:tenant-${tenantId}`, {
     connection,
@@ -66,24 +65,21 @@ export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
   })
 }
 
-// Mantém a fila global como alias para compatibilidade com código legado
-// (campanhas antigas que possam estar na fila ainda serão processadas)
+// Fila legada — mantida para retrocompatibilidade com jobs antigos
 export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   connection,
   defaultJobOptions: { attempts: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
 })
 
-// ─── Map de workers ativos por tenant ─────────────────────────────────────────
 const activeWorkers = new Map<string, Worker<CampaignJob>>()
 
-/** Cria (se ainda não existir) um worker dedicado para o tenant */
 function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
   if (activeWorkers.has(tenantId)) return activeWorkers.get(tenantId)!
 
   const queueName = `campaign_queue:tenant-${tenantId}`
   const worker = new Worker<CampaignJob>(queueName, processCampaignJob, {
     connection,
-    concurrency: 1, // 1 campanha por vez por tenant — evita sobrecarga
+    concurrency: 1,
   })
 
   worker.on('failed', (job, err) =>
@@ -95,7 +91,6 @@ function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
   return worker
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 async function checkPlanLimit(tenantId: string): Promise<boolean> {
   try {
     const { data } = await db.rpc('tenant_can_send', { p_tenant_id: tenantId, p_count: 1 })
@@ -103,14 +98,13 @@ async function checkPlanLimit(tenantId: string): Promise<boolean> {
   } catch { return true }
 }
 
-interface ParsedCurl { apiKey: string; bodyTemplate: string; messagesPerMin?: number }
+interface ParsedCurl { apiKey: string; bodyTemplate: string }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
 
   let bodyTemplate = ''
-
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
   const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
 
@@ -130,7 +124,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
       const raw = nextFlag === -1 ? curlStr.slice(startVal) : curlStr.slice(startVal, nextFlag)
       return raw.replace(/"?\s*$/, '').trim()
     }
-
     const fields: string[] = []
     const fieldNames = ['channel', 'source', 'destination', 'src.name', 'template', 'message', 'postbackTexts']
     for (const name of fieldNames) {
@@ -193,7 +186,6 @@ async function sendViaFetch(
           await sleep(1000)
           return sendViaFetch(parsed, phone, message, attempt + 1)
         }
-        logger.warn('Gupshup response missing messageId after retries', { phone })
         return { ok: false, error: 'Gupshup did not return messageId after retries' }
       }
       return { ok: true, messageId: data.messageId || data.id }
@@ -222,7 +214,6 @@ async function processContact(
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
-      logger.error('Send failed or missing messageId', { phone: contact.phone, error: result.error })
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
@@ -243,7 +234,6 @@ async function processContact(
     }, { onConflict: 'external_id' })
 
     if (upsertError) {
-      logger.error('Failed to persist message', { phone: contact.phone, messageId: result.messageId, error: upsertError.message })
       await campaignService.markContactFailed(contact.id, `DB error: ${upsertError.message}`)
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
@@ -262,14 +252,12 @@ async function processContact(
     return 'sent'
 
   } catch (err: any) {
-    logger.error('processContact error', { phone: contact.phone, error: err.message })
     await campaignService.markContactFailed(contact.id, err.message)
     await campaignService.incrementCounter(campaignId, 'failed_count')
     return 'failed'
   }
 }
 
-// ─── Lógica principal do job (extraída para reutilizar em ambos os workers) ───
 async function processCampaignJob(job: any) {
   const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
   logger.info('Campaign job started', { campaignId, tenantId, messagesPerMin, queue: job.queueName })
@@ -285,7 +273,12 @@ async function processCampaignJob(job: any) {
   if (!curlTemplate) throw new Error('No curl template configured')
   const parsed = parseCurlTemplate(curlTemplate)
 
-  const delayPerMessage = messagesPerMin > 0 ? Math.floor(60000 / messagesPerMin) : 0
+  // Delay só se o usuário configurou menos de 200/min explicitamente (campanha de teste)
+  // Para disparos normais, sem delay — deixa a concorrência (50 paralelos) controlar a velocidade
+  const delayPerMessage = (messagesPerMin > 0 && messagesPerMin < 200)
+    ? Math.floor(60000 / messagesPerMin)
+    : 0
+
   const limit = pLimit(CONCURRENCY)
   let processed = 0
 
@@ -306,7 +299,8 @@ async function processCampaignJob(job: any) {
       const check = await campaignService.getProgress(campaignId, tenantId)
       if (check.status !== 'running') break
 
-      if (processed > 0 && processed % 50 === 0) {
+      // Verifica plan limit a cada 500 mensagens — era a cada 50, muito overhead de DB
+      if (processed > 0 && processed % 500 === 0) {
         if (!await checkPlanLimit(tenantId)) {
           await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
           logger.warn('Campaign paused — plan limit', { campaignId, processed })
@@ -336,15 +330,9 @@ async function processCampaignJob(job: any) {
   logger.info('Campaign job finished', { campaignId, tenantId, processed })
 }
 
-// ─── Worker principal (exportado) ────────────────────────────────────────────
-// Inicia o worker da fila legada (campaign_queue) e garante que o worker
-// do tenant seja criado quando um job chegar nessa fila
 export function startCampaignWorker(): Worker {
-  // Worker legado — processa campanhas antigas que ainda estejam na fila global
   const legacyWorker = new Worker<CampaignJob>('campaign_queue', async (job) => {
-    // Garante que o worker do tenant existe para futuras campanhas
     ensureTenantWorker(job.data.tenantId)
-    // Processa este job diretamente (retrocompatibilidade)
     await processCampaignJob(job)
   }, { connection, concurrency: 1 })
 
@@ -356,7 +344,6 @@ export function startCampaignWorker(): Worker {
   return legacyWorker
 }
 
-// ─── Emit Pusher progress ─────────────────────────────────────────────────────
 async function emitProgress(campaignId: string, tenantId: string): Promise<void> {
   if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
   try {
