@@ -179,7 +179,13 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
       if (edgesError) throw new AppError('DB_ERROR', edgesError.message, 500)
     }
 
-    await db.from('flows').update({ updated_at: new Date() }).eq('id', req.params.id)
+    // ─── Salva o mapeamento de campos do nó trigger_webhook no flow ───────────
+    const webhookNode = nodes.find((n: any) => n.type === 'trigger_webhook')
+    const flowUpdate: any = { updated_at: new Date() }
+    if (webhookNode?.data?.fieldMap !== undefined) {
+      flowUpdate.webhook_field_map = webhookNode.data.fieldMap
+    }
+    await db.from('flows').update(flowUpdate).eq('id', req.params.id)
 
     res.json(ok({ message: 'Grafo salvo com sucesso' }))
   } catch (err) {
