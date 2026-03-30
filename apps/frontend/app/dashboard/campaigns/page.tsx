@@ -28,13 +28,9 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
   const totalContacts = contactsText.split('\n').filter(Boolean).length
   const effectiveRate = messagesPerMin * Math.max(channelCount, 1)
   const mins = totalContacts > 0 ? Math.ceil(totalContacts / effectiveRate) : null
-
   const speedLabel = effectiveRate >= 1200
     ? `⚡ ${effectiveRate.toLocaleString()}/min (${channelCount} canal${channelCount > 1 ? 'is' : ''} em paralelo)`
-    : effectiveRate >= 600
-    ? `🚀 ${effectiveRate.toLocaleString()}/min`
-    : `🐢 ${effectiveRate.toLocaleString()}/min`
-
+    : effectiveRate >= 600 ? `🚀 ${effectiveRate.toLocaleString()}/min` : `🐢 ${effectiveRate.toLocaleString()}/min`
   if (!mins) return speedLabel
   const timeLabel = mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? `${mins % 60}min` : ''}`
   return `${speedLabel} · ${totalContacts.toLocaleString()} contatos = ~${timeLabel}`
@@ -42,16 +38,18 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
 
 export default function CampaignsPage() {
   const queryClient = useQueryClient()
-  const [showModal, setShowModal]             = useState(false)
-  const [contactsText, setContactsText]       = useState('')
-  const [copies, setCopies]                   = useState<string[]>([''])  // lista de cURLs
-  const [campaignName, setCampaignName]       = useState('')
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([])  // múltiplos canais
-  const [messagesPerMin, setMessagesPerMin]   = useState(1200)
-  const [selectedCamp, setSelectedCamp]       = useState<any>(null)
-  const [page, setPage]                       = useState(1)
-  const [scheduleMode, setScheduleMode]       = useState<'now' | 'scheduled'>('now')
-  const [scheduledAt, setScheduledAt]         = useState('')
+  const [showModal, setShowModal]               = useState(false)
+  const [contactsText, setContactsText]         = useState('')
+  const [curlCopies, setCurlCopies]             = useState<string[]>([''])
+  const [campaignName, setCampaignName]         = useState('')
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
+  const [messagesPerMin, setMessagesPerMin]     = useState(1200)
+  const [selectedCamp, setSelectedCamp]         = useState<any>(null)
+  const [page, setPage]                         = useState(1)
+  const [useTemplate, setUseTemplate]           = useState(true)
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
+  const [scheduleMode, setScheduleMode]         = useState<'now' | 'scheduled'>('now')
+  const [scheduledAt, setScheduledAt]           = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -62,6 +60,11 @@ export default function CampaignsPage() {
   const { data: channels = [] } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
+  })
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates', selectedChannels[0]],
+    queryFn: async () => { const { data } = await campaignApi.get(`/templates?channelId=${selectedChannels[0]}`); return data.data || [] },
+    enabled: !!selectedChannels[0] && useTemplate,
   })
   const { data: progress } = useQuery({
     queryKey: ['progress', selectedCamp?.id],
@@ -82,37 +85,32 @@ export default function CampaignsPage() {
   }
 
   const resetModal = () => {
-    setCampaignName(''); setContactsText(''); setCopies([''])
-    setSelectedChannels([]); setScheduleMode('now'); setScheduledAt('')
+    setCampaignName(''); setContactsText(''); setCurlCopies([''])
+    setSelectedChannels([]); setSelectedTemplates([])
+    setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
     setMessagesPerMin(1200)
   }
 
-  const toggleChannel = (id: string) => {
-    setSelectedChannels(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    )
-  }
+  const toggleChannel  = (id: string) => setSelectedChannels(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  const toggleTemplate = (id: string) => setSelectedTemplates(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+  const addCurlCopy    = () => setCurlCopies(prev => [...prev, ''])
+  const removeCurlCopy = (i: number) => setCurlCopies(prev => prev.filter((_, idx) => idx !== i))
+  const updateCurlCopy = (i: number, val: string) => setCurlCopies(prev => prev.map((c, idx) => idx === i ? val : c))
 
-  const addCopy = () => setCopies(prev => [...prev, ''])
-  const removeCopy = (i: number) => setCopies(prev => prev.filter((_, idx) => idx !== i))
-  const updateCopy = (i: number, val: string) => setCopies(prev => prev.map((c, idx) => idx === i ? val : c))
-
-  const validCopies = copies.filter(c => c.trim())
-  const isValid = campaignName && selectedChannels.length > 0 && validCopies.length > 0
+  const validCurlCopies = curlCopies.filter(c => c.trim())
+  const isValid = campaignName && selectedChannels.length > 0 &&
+    (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0)
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      // Usa o primeiro canal como principal, os demais como secundários
       const [primaryChannel, ...extraChannels] = selectedChannels
-      const payload: any = {
-        channelId: primaryChannel,
-        extraChannelIds: extraChannels,
-        name: campaignName,
-        messageTemplate: ' ',
-        messagesPerMin,
-        curlTemplate: validCopies[0],
-        // Copies extras para rotacionar (salvas como JSON no campo copies)
-        copies: validCopies,
+      const payload: any = { channelId: primaryChannel, extraChannelIds: extraChannels, name: campaignName, messageTemplate: ' ', messagesPerMin }
+      if (useTemplate) {
+        payload.templateId  = selectedTemplates[0]
+        if (selectedTemplates.length > 1) payload.templateIds = selectedTemplates
+      } else {
+        payload.curlTemplate = validCurlCopies[0]
+        payload.copies       = validCurlCopies
       }
       if (scheduleMode === 'scheduled' && scheduledAt) payload.scheduledAt = new Date(scheduledAt).toISOString()
       const { data: campData } = await campaignApi.post('/campaigns', payload)
@@ -405,20 +403,20 @@ export default function CampaignsPage() {
                   onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
               </div>
 
-              {/* Canais — múltipla seleção */}
+              {/* Canais */}
               <div>
                 <Lbl>Canais WhatsApp — selecione um ou mais para disparar em paralelo</Lbl>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {(channels as any[]).map((ch: any) => {
-                    const selected = selectedChannels.includes(ch.id)
+                    const sel = selectedChannels.includes(ch.id)
                     return (
                       <div key={ch.id} onClick={() => toggleChannel(ch.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${selected ? '#22c55e' : '#e4e4e7'}`, background: selected ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
-                        <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${selected ? '#22c55e' : '#d4d4d8'}`, background: selected ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          {selected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : '#e4e4e7'}`, background: sel ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
+                        <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : '#d4d4d8'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: 500, color: selected ? '#15803d' : '#18181b' }}>{ch.name}</span>
-                        {selected && <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>1.200/min</span>}
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: sel ? '#15803d' : '#18181b' }}>{ch.name}</span>
+                        {sel && <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>1.200/min</span>}
                       </div>
                     )
                   })}
@@ -430,41 +428,103 @@ export default function CampaignsPage() {
                 )}
               </div>
 
-              {/* Copies rotacionadas */}
+              {/* Toggle Template / cURL */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <Lbl>cURLs do Gupshup — copies rotacionadas aleatoriamente</Lbl>
-                  <button onClick={addCopy} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px', color: '#16a34a', fontWeight: 600, cursor: 'pointer' }}>
-                    <Plus size={11} /> Adicionar copy
-                  </button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {copies.map((copy, i) => (
-                    <div key={i} style={{ position: 'relative' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <Shuffle size={11} color="#a1a1aa" />
-                        <span style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 600 }}>Copy {i + 1}</span>
-                        {copies.length > 1 && (
-                          <button onClick={() => removeCopy(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '2px', display: 'flex' }}
-                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'}>
-                            <X size={12} />
-                          </button>
-                        )}
-                      </div>
-                      <textarea
-                        style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '11.5px', lineHeight: 1.6 } as any}
-                        placeholder="curl -X POST https://api.gupshup.io/..."
-                        value={copy}
-                        onChange={e => updateCopy(i, e.target.value)}
-                      />
-                    </div>
+                <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '13px' }}>
+                  {[{ v: true, label: 'Templates salvos' }, { v: false, label: 'cURL manual' }].map(opt => (
+                    <button key={String(opt.v)} onClick={() => { setUseTemplate(opt.v); setSelectedTemplates([]); setCurlCopies(['']) }}
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate === opt.v ? '#fff' : 'transparent', color: useTemplate === opt.v ? '#18181b' : '#71717a', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
-                {copies.length > 1 && (
-                  <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
-                    🎲 {copies.filter(c => c.trim()).length} copies — cada contato recebe uma aleatoriamente
-                  </p>
+
+                {useTemplate ? (
+                  // ── Modo Template: checkboxes múltiplos ──
+                  selectedChannels.length > 0 ? (
+                    (templates as any[]).length === 0 ? (
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '13px 15px' }}>
+                        <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 500, margin: 0 }}>Nenhum template para este canal</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a' }}>
+                            Selecione os templates — serão rotacionados aleatoriamente
+                          </span>
+                          {selectedTemplates.length > 0 && (
+                            <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
+                              <Shuffle size={11} /> {selectedTemplates.length}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                          {(templates as any[]).map((t: any) => {
+                            const sel = selectedTemplates.includes(t.id)
+                            return (
+                              <div key={t.id} onClick={() => toggleTemplate(t.id)}
+                                style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : '#e4e4e7'}`, background: sel ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
+                                <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : '#d4d4d8'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                                  {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: sel ? '#15803d' : '#18181b' }}>{t.name}</span>
+                                    <span style={{ fontSize: '10px', background: sel ? '#dcfce7' : '#f4f4f5', color: sel ? '#15803d' : '#a1a1aa', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>{t.category}</span>
+                                  </div>
+                                  <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.body}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {selectedTemplates.length > 1 && (
+                          <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
+                            🎲 Cada contato receberá um dos {selectedTemplates.length} templates aleatoriamente
+                          </p>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ background: '#fafafa', borderRadius: '8px', padding: '14px 16px', textAlign: 'center', border: '1px solid #f4f4f5' }}>
+                      <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>Selecione um canal para ver os templates</p>
+                    </div>
+                  )
+                ) : (
+                  // ── Modo cURL: múltiplas copies ──
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a' }}>cURLs do Gupshup — rotacionados aleatoriamente</span>
+                      <button onClick={addCurlCopy} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px', color: '#16a34a', fontWeight: 600, cursor: 'pointer' }}>
+                        <Plus size={11} /> Adicionar copy
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {curlCopies.map((copy, i) => (
+                        <div key={i}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <Shuffle size={11} color="#a1a1aa" />
+                            <span style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 600 }}>Copy {i + 1}</span>
+                            {curlCopies.length > 1 && (
+                              <button onClick={() => removeCurlCopy(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '2px', display: 'flex' }}
+                                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'}>
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '11.5px', lineHeight: 1.6 } as any}
+                            placeholder="curl -X POST https://api.gupshup.io/..."
+                            value={copy} onChange={e => updateCurlCopy(i, e.target.value)} />
+                        </div>
+                      ))}
+                    </div>
+                    {validCurlCopies.length > 1 && (
+                      <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
+                        🎲 {validCurlCopies.length} copies — cada contato recebe uma aleatoriamente
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -479,7 +539,8 @@ export default function CampaignsPage() {
                   <p style={{ fontSize: '13px', color: '#71717a', margin: 0 }}>Upload <strong style={{ color: '#18181b' }}>.csv</strong></p>
                 </div>
                 <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
-                <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any} placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
+                <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
+                  placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
                 {contactsText && (
                   <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
