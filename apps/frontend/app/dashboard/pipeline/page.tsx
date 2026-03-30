@@ -74,7 +74,10 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
 
   if (editing) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }} onClick={e => e.stopPropagation()}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
+        draggable={false}>
         <span style={{ fontSize: '11px', color: '#a1a1aa' }}>R$</span>
         <input
           autoFocus
@@ -90,7 +93,11 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
   }
 
   return (
-    <div onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', cursor: 'pointer' }}
+    <div
+      onClick={startEdit}
+      onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
+      draggable={false}
+      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', cursor: 'pointer' }}
       title="Clique para definir valor">
       {value ? (
         <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(value)}</span>
