@@ -36,9 +36,21 @@ const subscribeSchema = z.object({
   cpfCnpj: z.string().optional(),
 })
 
-// Schema de permissões por role
 const permissionsSchema = z.object({
   permissions: z.record(z.array(z.string())),
+})
+
+const webhookSchema = z.object({
+  url: z.string().url(),
+  events: z.array(z.string()).min(1),
+  secret: z.string().nullable().optional(),
+})
+
+const webhookUpdateSchema = z.object({
+  active: z.boolean().optional(),
+  url: z.string().url().optional(),
+  events: z.array(z.string()).optional(),
+  secret: z.string().nullable().optional(),
 })
 
 // ─── Webhook do Asaas (público — sem auth) ────────────────────────────────────
@@ -88,7 +100,6 @@ router.get('/subscription', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /tenant/usage
 router.get('/usage', async (req, res, next) => {
   try {
     const tenant = await tenantService.getTenant(req.auth.tid)
@@ -135,6 +146,96 @@ router.patch('/permissions', requireRole('admin', 'owner'), validate(permissions
 
     if (error) throw new Error(error.message)
     res.json(ok({ message: 'Permissões salvas com sucesso' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Webhooks ─────────────────────────────────────────────────────────────────
+
+router.get('/webhooks', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { data, error } = await db
+      .from('webhook_configs')
+      .select('id, url, events, active, created_at')
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.post('/webhooks', validate(webhookSchema), async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { url, events, secret } = req.body
+    const { data, error } = await db
+      .from('webhook_configs')
+      .insert({ tenant_id: req.auth.tid, url, events, secret: secret || null, active: true })
+      .select()
+      .single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/webhooks/:id', validate(webhookUpdateSchema), async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { data, error } = await db
+      .from('webhook_configs')
+      .update(req.body)
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select()
+      .single()
+    if (error) throw error
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/webhooks/:id', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { error } = await db
+      .from('webhook_configs')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+    if (error) throw error
+    res.json(ok({ message: 'Webhook removed' }))
+  } catch (err) { next(err) }
+})
+
+router.post('/webhooks/:id/test', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const { data: wh, error } = await db
+      .from('webhook_configs')
+      .select('url, secret')
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .single()
+    if (error || !wh) { res.status(404).json({ error: 'Webhook not found' }); return }
+
+    const body = JSON.stringify({
+      event: 'test',
+      timestamp: new Date().toISOString(),
+      tenant_id: req.auth.tid,
+      data: { message: 'Este é um evento de teste do AutoZap!' },
+    })
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (wh.secret) {
+      const crypto = await import('crypto')
+      const sig = crypto.createHmac('sha256', wh.secret).update(body).digest('hex')
+      headers['X-AutoZap-Signature'] = `sha256=${sig}`
+    }
+
+    const response = await fetch(wh.url, { method: 'POST', headers, body })
+    if (!response.ok) {
+      res.status(400).json({ error: `Webhook retornou status ${response.status}` }); return
+    }
+    res.json(ok({ message: 'Evento de teste enviado com sucesso!' }))
   } catch (err) { next(err) }
 })
 
@@ -248,7 +349,7 @@ router.get('/analytics', async (req, res, next) => {
             lastInbound[m.conversation_id] = t
           } else if (m.direction === 'outbound' && lastInbound[m.conversation_id]) {
             const diff = (t - lastInbound[m.conversation_id]) / 1000 / 60
-            if (diff > 0 && diff < 1440) responsePairs.push(diff) // ignora > 24h
+            if (diff > 0 && diff < 1440) responsePairs.push(diff)
             delete lastInbound[m.conversation_id]
           }
         }
@@ -295,11 +396,9 @@ router.get('/analytics', async (req, res, next) => {
       totalSent, totalDelivered, totalRead,
       deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
       readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
-      byDay,
-      byAgent,
+      byDay, byAgent,
       avgResponseMinutes: agentAvgResponseMinutes,
-      activeFlowsToday,
-      flowExecutionsToday,
+      activeFlowsToday, flowExecutionsToday,
       agentConversations: filterUserId ? agentConversations : null,
       agentClosedLast7d: filterUserId ? agentClosedLast7d : null,
     }))
