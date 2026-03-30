@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
@@ -49,6 +49,110 @@ function formatCpfCnpj(value: string) {
     .replace(/(\d{3})(\d)/, '$1/$2')
     .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
 }
+
+
+// ── Webhook de Entrada (Lead Capture) ─────────────────────────────────────────
+function InboundWebhookSection() {
+  const { user } = useAuthStore()
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid || ''
+  const [showToken, setShowToken] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-webhook-token'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant')
+      return data.data
+    },
+  })
+
+  useEffect(() => {
+    if (tenantData?.webhookToken) setToken(tenantData.webhookToken)
+  }, [tenantData])
+
+  const webhookUrl = token
+    ? `https://autozapmessage-service-production.up.railway.app/webhook/lead/${token}`
+    : null
+
+  const handleGenerate = async () => {
+    setGenerating(true)
+    try {
+      const { data } = await tenantApi.post('/tenant/webhook-token')
+      setToken(data.data.token)
+      toast.success('Token gerado!')
+    } catch { toast.error('Erro ao gerar token') }
+    finally { setGenerating(false) }
+  }
+
+  const copyUrl = () => {
+    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success('URL copiada!') }
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhook de Entrada — Captura de Leads</span>
+        <p style={{ fontSize: '12px', color: '#71717a' }}>Receba leads de formulários da Meta, Zapier, Make ou qualquer sistema externo direto no CRM</p>
+      </div>
+
+      {!token ? (
+        <div style={{ textAlign: 'center', padding: '20px', background: '#fafafa', borderRadius: '9px', border: '1px solid #f4f4f5' }}>
+          <p style={{ fontSize: '13px', color: '#71717a', marginBottom: '12px' }}>Gere sua URL única para receber leads externos</p>
+          <button onClick={handleGenerate} disabled={generating}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>
+            {generating ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
+            Gerar URL
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <code style={{ flex: 1, fontSize: '11px', color: '#18181b', wordBreak: 'break-all' as const }}>
+              {showToken ? webhookUrl : webhookUrl?.replace(/\/[^/]+$/, '/••••••••••••')}
+            </code>
+            <button onClick={() => setShowToken(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}>
+              {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}>
+              <Copy size={14} />
+            </button>
+          </div>
+
+          <div style={{ fontSize: '12px', color: '#71717a', marginBottom: '12px', lineHeight: 1.6 }}>
+            <p style={{ fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>Campos aceitos no POST:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              {[
+                ['phone / phone_number', 'Telefone (obrigatório)'],
+                ['name / full_name', 'Nome do contato'],
+                ['email', 'Email'],
+                ['source / campaign_name', 'Origem do lead'],
+                ['message / mensagem', 'Mensagem inicial'],
+              ].map(([field, desc]) => (
+                <div key={field} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                  <code style={{ fontSize: '10px', background: '#f4f4f5', padding: '1px 5px', borderRadius: '4px', color: '#18181b', flexShrink: 0 }}>{field}</code>
+                  <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <details>
+            <summary style={{ fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', userSelect: 'none' as const }}>Ver exemplo de payload</summary>
+            <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto' as const, lineHeight: 1.5 }}>{JSON.stringify({
+              phone_number: '5511999999999',
+              full_name: 'João Silva',
+              email: 'joao@email.com',
+              campaign_name: 'Black Friday 2026',
+              message: 'Quero mais informações',
+            }, null, 2)}</pre>
+          </details>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 // ── Seção de Webhooks ──────────────────────────────────────────────────────────
 function WebhooksSection() {
@@ -418,7 +522,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* ── Webhooks ── */}
+        {/* ── Webhook de Entrada ── */}
+        <InboundWebhookSection />
+
+        {/* ── Webhooks de Saída ── */}
         <WebhooksSection />
 
         {/* Planos */}
