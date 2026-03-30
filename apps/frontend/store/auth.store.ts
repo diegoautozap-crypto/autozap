@@ -48,7 +48,6 @@ function forceLogout(reason: string) {
   console.warn('[Auth] Sessão inválida:', reason)
   localStorage.clear()
   clearAuthCookie()
-  // Reload limpa qualquer estado em memória
   window.location.href = '/login'
 }
 
@@ -61,8 +60,6 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
 
-      // ── Valida se o token em memória bate com o usuário logado ────────────
-      // Chamada na inicialização do layout — detecta inconsistência na hora
       validateSession: () => {
         const { user, accessToken } = get()
         if (!user || !accessToken) return
@@ -73,13 +70,27 @@ export const useAuthStore = create<AuthState>()(
           return
         }
 
-        // Se o tenantId do token não bate com o user salvo → sessão contaminada
+        // ✅ Se o token está expirado, NÃO força logout aqui
+        // O interceptor do api.ts vai renovar automaticamente no próximo request
+        // Forçar logout aqui causaria deslogin desnecessário durante o refresh
+        const now = Math.floor(Date.now() / 1000)
+        const isExpired = payload.exp && payload.exp < now
+        if (isExpired) {
+          // Token expirado mas temos refresh token — deixa o api.ts renovar
+          // Só força logout se não tiver refresh token
+          const refreshToken = localStorage.getItem('refreshToken')
+          if (!refreshToken) {
+            forceLogout('token expirado e sem refresh token')
+          }
+          return
+        }
+
+        // Token ainda válido — verifica consistência
         if (payload.tid && user.tenantId && payload.tid !== user.tenantId) {
           forceLogout(`tenant_id inconsistente: token=${payload.tid} store=${user.tenantId}`)
           return
         }
 
-        // Se o userId do token não bate → sessão de outro usuário
         if (payload.sub && user.userId && payload.sub !== user.userId) {
           forceLogout(`userId inconsistente: token=${payload.sub} store=${user.userId}`)
           return
@@ -107,7 +118,6 @@ export const useAuthStore = create<AuthState>()(
 
           const user = meRes.data.data
 
-          // Valida que o token bate com o user retornado pelo /me
           const payload = parseJwt(accessToken)
           if (payload?.tid && user?.tenantId && payload.tid !== user.tenantId) {
             localStorage.clear()

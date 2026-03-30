@@ -8,7 +8,7 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
 
 // ⚠️ Access token: 5 minutos — renovado silenciosamente pelo frontend
 // NÃO usar JWT_EXPIRES_IN do env — valor fixo para segurança
-const ACCESS_EXPIRES = '5m'
+const ACCESS_EXPIRES = '15m'
 
 // Refresh token: 7 dias — se ficar 7 dias sem abrir o sistema, faz login de novo
 const REFRESH_EXPIRES_DAYS = 7
