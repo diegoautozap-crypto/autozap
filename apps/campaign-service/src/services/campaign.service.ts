@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
-import { AppError, NotFoundError, generateId, paginationMeta, randomBetween, sleep } from '@autozap/utils'
+import { AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
 import { sendCampaignCompletedEmail } from '../lib/email'
+import { getTenantCampaignQueue } from '../workers/campaign.worker'
 
 export interface CreateCampaignInput {
   tenantId: string
@@ -136,7 +137,23 @@ export class CampaignService {
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    logger.info('Campaign started', { campaignId, tenantId })
+    // ✅ Enfileira na fila ISOLADA do tenant
+    // Garante que campanhas de tenants diferentes nunca se bloqueiam
+    const tenantQueue = getTenantCampaignQueue(tenantId)
+    await tenantQueue.add(`campaign-${campaignId}`, {
+      campaignId,
+      tenantId,
+      channelId: campaign.channel_id,
+      batchSize: campaign.batch_size || 500,
+      messagesPerMin: campaign.messages_per_min || 20,
+    })
+
+    logger.info('Campaign enqueued on tenant queue', {
+      campaignId,
+      tenantId,
+      queueName: `campaign_queue:tenant-${tenantId}`,
+    })
+
     return campaign
   }
 
@@ -210,7 +227,6 @@ export class CampaignService {
 
       logger.info('Campaign completed', { campaignId })
 
-      // Envia email de notificação ao dono do tenant (non-blocking)
       this.notifyCampaignCompleted(campaign).catch(err =>
         logger.error('Failed to send campaign completed email', { err })
       )
@@ -218,7 +234,6 @@ export class CampaignService {
   }
 
   private async notifyCampaignCompleted(campaign: any): Promise<void> {
-    // Busca o owner do tenant para enviar o email
     const { data: owner } = await db
       .from('users')
       .select('name, email')
@@ -256,12 +271,7 @@ export class CampaignService {
     const pending = total - sent - failed
 
     return {
-      total,
-      sent,
-      delivered,
-      read,
-      failed,
-      pending,
+      total, sent, delivered, read, failed, pending,
       percentComplete: total > 0 ? Math.round((sent / total) * 100) : 0,
       status: campaign.status,
     }

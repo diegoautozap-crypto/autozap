@@ -1,4 +1,4 @@
-import { Worker, Queue } from 'bullmq'
+import { Worker, Queue, QueueEvents } from 'bullmq'
 import pLimit from 'p-limit'
 import { logger } from '../lib/logger'
 import { campaignService } from '../services/campaign.service'
@@ -12,8 +12,8 @@ const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
 const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'mt1'
 
-const LOGICAL_BATCH = 50
-const CONCURRENCY   = 10
+const LOGICAL_BATCH      = 50
+const CONCURRENCY        = 10
 const MESSAGE_ID_RETRIES = 2
 
 function getRedisConnection() {
@@ -29,6 +29,7 @@ function getRedisConnection() {
 
 const connection = getRedisConnection()
 
+// ─── Fila de inbox (compartilhada — sem dados sensíveis entre tenants) ─────────
 export interface InboxJob {
   tenantId: string; channelId: string; phone: string
   messageDbId: string; body: string; campaignId: string
@@ -44,16 +45,57 @@ export const inboxQueue = new Queue<InboxJob>('inbox_queue', {
   },
 })
 
+// ─── Fila de campanha ISOLADA por tenant ───────────────────────────────────────
+// Nome: campaign_queue:tenant-{tenantId}
+// Garante que um tenant com 10k msgs não bloqueia os outros
+
 export interface CampaignJob {
   campaignId: string; tenantId: string; channelId: string
   batchSize: number; messagesPerMin: number
 }
 
+/** Retorna (ou cria) a fila exclusiva do tenant */
+export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
+  return new Queue<CampaignJob>(`campaign_queue:tenant-${tenantId}`, {
+    connection,
+    defaultJobOptions: {
+      attempts: 1,
+      removeOnComplete: { count: 100 },
+      removeOnFail:    { count: 500 },
+    },
+  })
+}
+
+// Mantém a fila global como alias para compatibilidade com código legado
+// (campanhas antigas que possam estar na fila ainda serão processadas)
 export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
   connection,
   defaultJobOptions: { attempts: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
 })
 
+// ─── Map de workers ativos por tenant ─────────────────────────────────────────
+const activeWorkers = new Map<string, Worker<CampaignJob>>()
+
+/** Cria (se ainda não existir) um worker dedicado para o tenant */
+function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
+  if (activeWorkers.has(tenantId)) return activeWorkers.get(tenantId)!
+
+  const queueName = `campaign_queue:tenant-${tenantId}`
+  const worker = new Worker<CampaignJob>(queueName, processCampaignJob, {
+    connection,
+    concurrency: 1, // 1 campanha por vez por tenant — evita sobrecarga
+  })
+
+  worker.on('failed', (job, err) =>
+    logger.error('Campaign job failed', { tenantId, jobId: job?.id, error: err.message })
+  )
+
+  logger.info('Campaign worker created for tenant', { tenantId, queueName })
+  activeWorkers.set(tenantId, worker)
+  return worker
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 async function checkPlanLimit(tenantId: string): Promise<boolean> {
   try {
     const { data } = await db.rpc('tenant_can_send', { p_tenant_id: tenantId, p_count: 1 })
@@ -64,15 +106,12 @@ async function checkPlanLimit(tenantId: string): Promise<boolean> {
 interface ParsedCurl { apiKey: string; bodyTemplate: string; messagesPerMin?: number }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
-  // Junta linhas quebradas com \
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
 
   let bodyTemplate = ''
 
-  // Caso 1: -d 'body' aspas simples — body inteiro já montado
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
-  // Caso 2: -d "body" aspas duplas — body inteiro já montado
   const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
 
   if (singleQ) {
@@ -80,21 +119,15 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   } else if (doubleQ) {
     bodyTemplate = doubleQ[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
   } else if (curlStr.includes('--data-urlencode')) {
-    // Caso 3: --data-urlencode "campo=valor"
-    // Extrai cada campo pelo nome explicitamente — evita problema de aspas internas no JSON
     const extract = (fieldName: string): string => {
-      // Tenta formato: --data-urlencode "campo=valor com possíveis aspas"
-      // Usa o próximo --data-urlencode ou fim de string como delimitador
       const pattern = new RegExp(`--data-urlencode\\s+"${fieldName}=([\\s\\S]*?)(?="\\s+--|"\\s*$)`)
       const m = curlStr.match(pattern)
       if (m) return m[1]
-      // Fallback: até o próximo --data-urlencode ou fim
       const idx = curlStr.indexOf(`--data-urlencode "${fieldName}=`)
       if (idx === -1) return ''
       const startVal = idx + `--data-urlencode "${fieldName}=`.length
       const nextFlag = curlStr.indexOf('--data-urlencode', startVal)
       const raw = nextFlag === -1 ? curlStr.slice(startVal) : curlStr.slice(startVal, nextFlag)
-      // Remove aspas finais
       return raw.replace(/"?\s*$/, '').trim()
     }
 
@@ -102,14 +135,11 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     const fieldNames = ['channel', 'source', 'destination', 'src.name', 'template', 'message', 'postbackTexts']
     for (const name of fieldNames) {
       const val = extract(name)
-      if (val !== '') {
-        fields.push(`${encodeURIComponent(name)}=${encodeURIComponent(val)}`)
-      }
+      if (val !== '') fields.push(`${encodeURIComponent(name)}=${encodeURIComponent(val)}`)
     }
     if (fields.length > 0) bodyTemplate = fields.join('&')
   }
 
-  // Normaliza placeholder do número — aceita qualquer variante
   bodyTemplate = bodyTemplate
     .replace(/%7B%7Bdestination_phone_number%7D%7D/gi, '__PHONE__')
     .replace(/\{\{destination_phone_number\}\}/gi, '__PHONE__')
@@ -122,7 +152,6 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   return { apiKey, bodyTemplate }
 }
 
-// ─── Envia via Gupshup com retry para messageId ausente ──────────────────────
 async function sendViaFetch(
   parsed: ParsedCurl,
   phone: string,
@@ -164,7 +193,7 @@ async function sendViaFetch(
           await sleep(1000)
           return sendViaFetch(parsed, phone, message, attempt + 1)
         }
-        logger.warn('Gupshup response missing messageId after retries — marking failed', { phone })
+        logger.warn('Gupshup response missing messageId after retries', { phone })
         return { ok: false, error: 'Gupshup did not return messageId after retries' }
       }
       return { ok: true, messageId: data.messageId || data.id }
@@ -176,7 +205,6 @@ async function sendViaFetch(
   }
 }
 
-// ─── Processa um contato ──────────────────────────────────────────────────────
 async function processContact(
   contact: any,
   campaignId: string,
@@ -221,8 +249,6 @@ async function processContact(
       return 'failed'
     }
 
-    logger.info('Message persisted', { phone: contact.phone, messageDbId, externalId: result.messageId })
-
     inboxQueue.add('create-inbox', {
       tenantId, channelId,
       phone:       contact.phone.replace(/^\+/, ''),
@@ -243,82 +269,94 @@ async function processContact(
   }
 }
 
-// ─── Worker principal ─────────────────────────────────────────────────────────
-export function startCampaignWorker(): Worker {
-  const worker = new Worker<CampaignJob>('campaign_queue', async (job) => {
-    const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
-    logger.info('Campaign worker started', { campaignId, messagesPerMin })
+// ─── Lógica principal do job (extraída para reutilizar em ambos os workers) ───
+async function processCampaignJob(job: any) {
+  const { campaignId, tenantId, channelId, batchSize, messagesPerMin } = job.data
+  logger.info('Campaign job started', { campaignId, tenantId, messagesPerMin, queue: job.queueName })
 
-    if (!await checkPlanLimit(tenantId)) {
-      await db.from('campaigns').update({ status: 'failed' }).eq('id', campaignId)
-      logger.warn('Campaign blocked — plan limit reached', { campaignId })
-      return
+  if (!await checkPlanLimit(tenantId)) {
+    await db.from('campaigns').update({ status: 'failed' }).eq('id', campaignId)
+    logger.warn('Campaign blocked — plan limit reached', { campaignId })
+    return
+  }
+
+  const campaign = await campaignService.getCampaign(campaignId, tenantId)
+  const curlTemplate = (campaign as any).curl_template
+  if (!curlTemplate) throw new Error('No curl template configured')
+  const parsed = parseCurlTemplate(curlTemplate)
+
+  const delayPerMessage = messagesPerMin > 0 ? Math.floor(60000 / messagesPerMin) : 0
+  const limit = pLimit(CONCURRENCY)
+  let processed = 0
+
+  while (true) {
+    const progress = await campaignService.getProgress(campaignId, tenantId)
+    if (progress.status !== 'running') {
+      logger.info('Campaign stopped', { campaignId, status: progress.status })
+      break
     }
 
-    const campaign = await campaignService.getCampaign(campaignId, tenantId)
-    const curlTemplate = (campaign as any).curl_template
-    if (!curlTemplate) throw new Error('No curl template configured')
-    const parsed = parseCurlTemplate(curlTemplate)
+    const contacts = await campaignService.getPendingContacts(campaignId, batchSize)
+    if (contacts.length === 0) {
+      logger.info('No more pending contacts', { campaignId })
+      break
+    }
 
-    const delayPerMessage = messagesPerMin > 0 ? Math.floor(60000 / messagesPerMin) : 0
-    logger.info('Rate limit configured', { messagesPerMin, delayPerMessageMs: delayPerMessage })
+    for (let i = 0; i < contacts.length; i += LOGICAL_BATCH) {
+      const check = await campaignService.getProgress(campaignId, tenantId)
+      if (check.status !== 'running') break
 
-    const limit = pLimit(CONCURRENCY)
-    let processed = 0
-
-    while (true) {
-      const progress = await campaignService.getProgress(campaignId, tenantId)
-      if (progress.status !== 'running') {
-        logger.info('Campaign stopped', { campaignId, status: progress.status })
-        break
-      }
-
-      const contacts = await campaignService.getPendingContacts(campaignId, batchSize)
-      if (contacts.length === 0) {
-        logger.info('No more pending contacts', { campaignId })
-        break
-      }
-
-      for (let i = 0; i < contacts.length; i += LOGICAL_BATCH) {
-        const check = await campaignService.getProgress(campaignId, tenantId)
-        if (check.status !== 'running') break
-
-        if (processed > 0 && processed % 50 === 0) {
-          if (!await checkPlanLimit(tenantId)) {
-            await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
-            logger.warn('Campaign paused — plan limit', { campaignId, processed })
-            break
-          }
+      if (processed > 0 && processed % 50 === 0) {
+        if (!await checkPlanLimit(tenantId)) {
+          await db.from('campaigns').update({ status: 'paused' }).eq('id', campaignId)
+          logger.warn('Campaign paused — plan limit', { campaignId, processed })
+          break
         }
-
-        const chunk = contacts.slice(i, i + LOGICAL_BATCH)
-
-        const results = await Promise.all(
-          chunk.map((contact, idx) =>
-            limit(async () => {
-              if (delayPerMessage > 0 && idx > 0) await sleep(delayPerMessage)
-              return processContact(contact, campaignId, tenantId, channelId, parsed)
-            })
-          )
-        )
-
-        const sentCount = results.filter(r => r === 'sent').length
-        processed += sentCount
-
-        await emitProgress(campaignId, tenantId)
-        logger.info('Batch dispatched', { campaignId, sent: sentCount, failed: chunk.length - sentCount, totalProcessed: processed })
       }
+
+      const chunk = contacts.slice(i, i + LOGICAL_BATCH)
+      const results = await Promise.all(
+        chunk.map((contact, idx) =>
+          limit(async () => {
+            if (delayPerMessage > 0 && idx > 0) await sleep(delayPerMessage)
+            return processContact(contact, campaignId, tenantId, channelId, parsed)
+          })
+        )
+      )
+
+      const sentCount = results.filter(r => r === 'sent').length
+      processed += sentCount
+
+      await emitProgress(campaignId, tenantId)
+      logger.info('Batch dispatched', { campaignId, tenantId, sent: sentCount, failed: chunk.length - sentCount, totalProcessed: processed })
     }
+  }
 
-    await campaignService.checkCompletion(campaignId)
-    logger.info('Campaign worker finished', { campaignId, processed })
-  }, { connection, concurrency: 1 })
-
-  worker.on('failed', (job, err) => logger.error('Campaign job failed', { jobId: job?.id, error: err.message }))
-  logger.info('Campaign worker initialized')
-  return worker
+  await campaignService.checkCompletion(campaignId)
+  logger.info('Campaign job finished', { campaignId, tenantId, processed })
 }
 
+// ─── Worker principal (exportado) ────────────────────────────────────────────
+// Inicia o worker da fila legada (campaign_queue) e garante que o worker
+// do tenant seja criado quando um job chegar nessa fila
+export function startCampaignWorker(): Worker {
+  // Worker legado — processa campanhas antigas que ainda estejam na fila global
+  const legacyWorker = new Worker<CampaignJob>('campaign_queue', async (job) => {
+    // Garante que o worker do tenant existe para futuras campanhas
+    ensureTenantWorker(job.data.tenantId)
+    // Processa este job diretamente (retrocompatibilidade)
+    await processCampaignJob(job)
+  }, { connection, concurrency: 1 })
+
+  legacyWorker.on('failed', (job, err) =>
+    logger.error('Legacy campaign job failed', { jobId: job?.id, error: err.message })
+  )
+
+  logger.info('Campaign worker initialized (legacy + per-tenant)')
+  return legacyWorker
+}
+
+// ─── Emit Pusher progress ─────────────────────────────────────────────────────
 async function emitProgress(campaignId: string, tenantId: string): Promise<void> {
   if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
   try {
