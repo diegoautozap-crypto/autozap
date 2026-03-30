@@ -35,6 +35,11 @@ function clearBadge() {
   if (originalTitle) document.title = originalTitle
 }
 
+// Verifica se o usuário está ativamente vendo o inbox
+function isViewingInbox(): boolean {
+  return document.hasFocus() && window.location.pathname.includes('/inbox')
+}
+
 export function useNotifications() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
@@ -62,11 +67,14 @@ export function useNotifications() {
   const showNotification = useCallback((title: string, body: string, url = '/dashboard/inbox') => {
     if (typeof window === 'undefined') return
 
+    // Som sempre toca (exceto se está no inbox com foco)
     playNotificationSound()
+
+    // Badge no título sempre incrementa
     incrementBadge()
 
-    if (Notification.permission === 'granted') {
-      // Usa cast para any para evitar erro de tipo com propriedades experimentais
+    // Popup só aparece se não estiver com a janela em foco
+    if (Notification.permission === 'granted' && !document.hasFocus()) {
       const options: any = {
         body,
         icon: '/icon-192.png',
@@ -104,11 +112,14 @@ export function useNotifications() {
     const channel = pusher.subscribe(`tenant-${tenantId}`)
 
     channel.bind('inbound.message', (data: any) => {
-      if (document.hasFocus()) return
+      // Não notifica só se estiver no inbox COM foco
+      if (isViewingInbox()) return
+
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
         : 'Nova mensagem'
+
       showNotification(`💬 ${contactName}`, preview, '/dashboard/inbox')
     })
 
