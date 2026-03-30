@@ -137,7 +137,6 @@ router.delete('/pipelines/:id', async (req, res, next) => {
 
 // ─── Pipeline Columns ─────────────────────────────────────────────────────────
 
-// GET /pipeline-columns?pipelineId=xxx
 router.get('/pipeline-columns', async (req, res, next) => {
   try {
     const { pipelineId } = req.query as any
@@ -146,27 +145,23 @@ router.get('/pipeline-columns', async (req, res, next) => {
       .select('*')
       .eq('tenant_id', req.auth.tid)
       .order('sort_order', { ascending: true })
-
     if (pipelineId) {
       query = query.eq('pipeline_id', pipelineId)
     } else {
       query = query.is('pipeline_id', null)
     }
-
     const { data, error } = await query
     if (error) throw error
     res.json(ok(data || []))
   } catch (err) { next(err) }
 })
 
-// PUT /pipeline-columns — upsert + delete em uma chamada
 router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res, next) => {
   try {
     const { columns, pipelineId = null, removedIds = [] } = req.body
     const tenantId = req.auth.tid
     const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 
-    // Deletar colunas removidas — garantindo que pertencem ao tenant
     if (removedIds.length > 0) {
       const { error } = await db
         .from('pipeline_columns')
@@ -176,7 +171,6 @@ router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res,
       if (error) throw error
     }
 
-    // Inserir novas colunas
     const toInsert = columns
       .filter((c: any) => c._isNew || !c.id || !isUUID(c.id))
       .map((c: any, i: number) => ({
@@ -193,18 +187,16 @@ router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res,
       if (error) throw error
     }
 
-    // Atualizar existentes — sempre validando tenant_id
     const toUpdate = columns.filter((c: any) => !c._isNew && c.id && isUUID(c.id))
     for (const col of toUpdate) {
       const { error } = await db
         .from('pipeline_columns')
         .update({ label: col.label, color: col.color, sort_order: col.sort_order })
         .eq('id', col.id)
-        .eq('tenant_id', tenantId) // ← garante que não atualiza de outro tenant
+        .eq('tenant_id', tenantId)
       if (error) throw error
     }
 
-    // Retorna as colunas atualizadas
     let q = db
       .from('pipeline_columns')
       .select('*')
@@ -220,21 +212,19 @@ router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res,
 
 // ─── Notas internas ───────────────────────────────────────────────────────────
 
-// GET /conversations/:id/notes
 router.get('/conversations/:id/notes', async (req, res, next) => {
   try {
     const { data, error } = await db
       .from('conversation_notes')
       .select('*')
       .eq('conversation_id', req.params.id)
-      .eq('tenant_id', req.auth.tid) // ← isolamento por tenant
+      .eq('tenant_id', req.auth.tid)
       .order('created_at', { ascending: true })
     if (error) throw error
     res.json(ok(data || []))
   } catch (err) { next(err) }
 })
 
-// POST /conversations/:id/notes
 router.post('/conversations/:id/notes', validate(noteSchema), async (req, res, next) => {
   try {
     const { body: noteBody } = req.body
@@ -253,14 +243,13 @@ router.post('/conversations/:id/notes', validate(noteSchema), async (req, res, n
   } catch (err) { next(err) }
 })
 
-// DELETE /conversations/:id/notes/:noteId
 router.delete('/conversations/:id/notes/:noteId', async (req, res, next) => {
   try {
     const { error } = await db
       .from('conversation_notes')
       .delete()
       .eq('id', req.params.noteId)
-      .eq('tenant_id', req.auth.tid) // ← garante que só deleta nota do próprio tenant
+      .eq('tenant_id', req.auth.tid)
     if (error) throw error
     res.json(ok({ message: 'Note deleted' }))
   } catch (err) { next(err) }
@@ -268,7 +257,6 @@ router.delete('/conversations/:id/notes/:noteId', async (req, res, next) => {
 
 // ─── Respostas rápidas ────────────────────────────────────────────────────────
 
-// GET /quick-replies
 router.get('/quick-replies', async (req, res, next) => {
   try {
     const { data, error } = await db
@@ -281,7 +269,6 @@ router.get('/quick-replies', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /quick-replies
 router.post('/quick-replies', validate(quickReplySchema), async (req, res, next) => {
   try {
     const { title, body: replyBody } = req.body
@@ -295,14 +282,13 @@ router.post('/quick-replies', validate(quickReplySchema), async (req, res, next)
   } catch (err) { next(err) }
 })
 
-// DELETE /quick-replies/:id
 router.delete('/quick-replies/:id', async (req, res, next) => {
   try {
     const { error } = await db
       .from('quick_replies')
       .delete()
       .eq('id', req.params.id)
-      .eq('tenant_id', req.auth.tid) // ← garante isolamento
+      .eq('tenant_id', req.auth.tid)
     if (error) throw error
     res.json(ok({ message: 'Quick reply deleted' }))
   } catch (err) { next(err) }
@@ -310,7 +296,6 @@ router.delete('/quick-replies/:id', async (req, res, next) => {
 
 // ─── Campos personalizados ────────────────────────────────────────────────────
 
-// GET /custom-fields
 router.get('/custom-fields', async (req, res, next) => {
   try {
     const { data, error } = await db
@@ -323,7 +308,7 @@ router.get('/custom-fields', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ─── Conversation Routes ───────────────────────────────────────────────────────
+// ─── Conversations ────────────────────────────────────────────────────────────
 
 router.get('/conversations', async (req, res, next) => {
   try {
@@ -358,12 +343,10 @@ router.get('/conversations/counts', async (req, res, next) => {
         .from('conversations')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tid)
-
       if (status) q = q.eq('status', status)
       if (channelId) q = q.eq('channel_id', channelId)
       if (assignedTo) q = q.eq('assigned_to', assignedTo)
       if (allowedChannels?.length) q = q.in('channel_id', allowedChannels)
-
       const { count, error } = await q
       if (error) throw error
       return count || 0
@@ -455,6 +438,26 @@ router.get('/conversations/:id/messages', async (req, res, next) => {
     const { cursor, limit } = req.query as any
     const messages = await conversationService.getMessages(req.params.id, req.auth.tid, cursor, Number(limit) || 30)
     res.json(ok(messages))
+  } catch (err) { next(err) }
+})
+
+// ─── Valor monetário do negócio (pipeline) ────────────────────────────────────
+router.patch('/conversations/:id/deal-value', async (req, res, next) => {
+  try {
+    const { dealValue } = req.body
+    const parsed = dealValue === null || dealValue === undefined ? null : Number(dealValue)
+    if (parsed !== null && isNaN(parsed)) {
+      res.status(400).json({ error: 'dealValue must be a number or null' }); return
+    }
+    const { data, error } = await db
+      .from('conversations')
+      .update({ deal_value: parsed })
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select('id, deal_value')
+      .single()
+    if (error) throw error
+    res.json(ok(data))
   } catch (err) { next(err) }
 })
 
