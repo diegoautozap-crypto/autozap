@@ -5,8 +5,13 @@ import type { JwtPayload, UserRole } from '@autozap/types'
 
 const ACCESS_SECRET = process.env.JWT_SECRET!
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
-const ACCESS_EXPIRES = process.env.JWT_EXPIRES_IN || '365d'
-const REFRESH_EXPIRES = '30d'
+
+// ⚠️ Access token: 5 minutos — renovado silenciosamente pelo frontend
+// NÃO usar JWT_EXPIRES_IN do env — valor fixo para segurança
+const ACCESS_EXPIRES = '5m'
+
+// Refresh token: 7 dias — se ficar 7 dias sem abrir o sistema, faz login de novo
+const REFRESH_EXPIRES_DAYS = 7
 
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
   throw new Error('Missing JWT_SECRET or JWT_REFRESH_SECRET env vars')
@@ -49,6 +54,6 @@ export async function comparePassword(password: string, hash: string): Promise<b
 
 export function refreshExpiresAt(): Date {
   const d = new Date()
-  d.setDate(d.getDate() + 30)
+  d.setDate(d.getDate() + REFRESH_EXPIRES_DAYS)
   return d
 }
