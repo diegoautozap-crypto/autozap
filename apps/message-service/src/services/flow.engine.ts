@@ -17,6 +17,7 @@ interface FlowContext {
   phone: string
   messageBody: string
   isFirstMessage: boolean
+  webhookData?: Record<string, any>  // dados brutos do formulário externo
 }
 
 interface ConditionRule {
@@ -75,6 +76,28 @@ export class FlowEngine {
       }
     } catch (err) {
       logger.error('Flow engine error', { err, tenantId: ctx.tenantId })
+    }
+  }
+
+  // ─── Dispara um flow específico via webhook externo ────────────────────────
+  async processWebhookFlow(flowId: string, ctx: FlowContext): Promise<void> {
+    try {
+      const { data: flow } = await db.from('flows').select('*').eq('id', flowId).single()
+      if (!flow || !flow.is_active) return
+
+      // Injeta os dados do webhook como variáveis disponíveis no flow
+      // Ex: {{webhook_full_name}}, {{webhook_phone_number}}, {{webhook_email}}
+      const variables: Record<string, any> = {}
+      if (ctx.webhookData) {
+        for (const [key, val] of Object.entries(ctx.webhookData)) {
+          variables[`webhook_${key}`] = String(val ?? '')
+        }
+      }
+
+      logger.info('Flow triggered by webhook', { flowId, tenantId: ctx.tenantId })
+      await this.executeFlow(flow, ctx, variables)
+    } catch (err) {
+      logger.error('processWebhookFlow error', { err, flowId })
     }
   }
 
@@ -186,6 +209,9 @@ export class FlowEngine {
         })
       }
       case 'trigger_any_reply': return true
+      case 'trigger_webhook':
+        // Sempre verdadeiro — disparado diretamente via processWebhookFlow
+        return true
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
@@ -472,7 +498,6 @@ export class FlowEngine {
         case 'move_pipeline': {
           const stage = data?.stage
           if (!stage) break
-          // Salva pipeline_id junto — suporta múltiplas pipelines
           const pipelineId = data?.pipelineId || null
           await db.from('conversations').update({ pipeline_stage: stage, pipeline_id: pipelineId }).eq('id', ctx.conversationId)
           emitPusher(ctx.tenantId, 'conversation.updated', { conversationId: ctx.conversationId, pipelineStage: stage, pipelineId })

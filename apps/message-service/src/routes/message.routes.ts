@@ -283,4 +283,144 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+
+// ─── Webhook de entrada para flows ───────────────────────────────────────────
+// URL: POST /webhook/flow/:flowId/:token
+// Quando chamado, dispara o flow como se fosse uma mensagem recebida
+router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
+  try {
+    // Valida o token do flow
+    const { data: flow, error } = await db
+      .from('flows')
+      .select('id, tenant_id, is_active, webhook_token')
+      .eq('id', req.params.flowId)
+      .eq('webhook_token', req.params.token)
+      .single()
+
+    if (error || !flow) {
+      res.status(401).json({ error: 'Token inválido ou flow não encontrado' })
+      return
+    }
+
+    if (!flow.is_active) {
+      res.status(400).json({ error: 'Flow está pausado' })
+      return
+    }
+
+    const tenantId = flow.tenant_id
+    const body = req.body
+
+    // Normaliza campos — aceita diferentes formatos
+    const phone = (
+      body.phone_number || body.phone || body.telefone ||
+      body.celular || body.whatsapp || ''
+    ).toString().replace(/\D/g, '')
+
+    const name = (
+      body.full_name || body.name || body.nome ||
+      body.first_name || body.contact_name || phone
+    ).toString().trim()
+
+    const email = (body.email || '').toString().trim()
+    const source = (body.source || body.origem || body.campaign_name || 'webhook').toString()
+    const messageBody = (body.message || body.mensagem || body.texto || `Lead via ${source}`).toString()
+
+    if (!phone) {
+      res.status(400).json({ error: 'Campo phone/phone_number é obrigatório' })
+      return
+    }
+
+    // Busca o primeiro canal ativo do tenant
+    const { data: channel } = await db
+      .from('channels')
+      .select('id, type')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .limit(1)
+      .single()
+
+    if (!channel) {
+      res.status(400).json({ error: 'Nenhum canal ativo encontrado' })
+      return
+    }
+
+    // Normaliza telefone
+    let normalizedPhone = phone.replace(/^\+/, '')
+    if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
+      normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
+    }
+
+    // Cria ou atualiza contato
+    const { data: existingContact } = await db
+      .from('contacts')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('phone', normalizedPhone)
+      .maybeSingle()
+
+    let contactId: string
+    const { generateId } = await import('@autozap/utils')
+
+    if (existingContact) {
+      contactId = existingContact.id
+      await db.from('contacts').update({ name: name || undefined, email: email || undefined, last_interaction_at: new Date() }).eq('id', contactId)
+    } else {
+      const { data: newContact, error: contactError } = await db
+        .from('contacts')
+        .insert({ id: generateId(), tenant_id: tenantId, phone: normalizedPhone, name: name || normalizedPhone, email: email || null, origin: source, status: 'active', last_interaction_at: new Date() })
+        .select('id')
+        .single()
+      if (contactError || !newContact) { res.status(500).json({ error: 'Erro ao criar contato' }); return }
+      contactId = newContact.id
+    }
+
+    // Cria ou reutiliza conversa
+    const { data: existingConv } = await db
+      .from('conversations')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('contact_id', contactId)
+      .eq('channel_id', channel.id)
+      .in('status', ['open', 'waiting'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let conversationId: string
+
+    if (existingConv) {
+      conversationId = existingConv.id
+    } else {
+      const { data: newConv, error: convError } = await db
+        .from('conversations')
+        .insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channel.id, channel_type: channel.type, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message: messageBody, last_message_at: new Date() })
+        .select('id')
+        .single()
+      if (convError || !newConv) { res.status(500).json({ error: 'Erro ao criar conversa' }); return }
+      conversationId = newConv.id
+    }
+
+    // Dispara o flow com os dados do webhook como contexto
+    const { flowEngine } = await import('../services/flow.engine')
+    await flowEngine.processWebhookFlow(flow.id, {
+      tenantId,
+      channelId: channel.id,
+      contactId,
+      conversationId,
+      phone: normalizedPhone,
+      messageBody,
+      isFirstMessage: !existingConv,
+      webhookData: body, // dados brutos do formulário disponíveis como variáveis no flow
+    })
+
+    res.json({
+      success: true,
+      contact_id: contactId,
+      conversation_id: conversationId,
+      phone: normalizedPhone,
+      name,
+    })
+  } catch (err) { next(err) }
+})
+
 export default router
