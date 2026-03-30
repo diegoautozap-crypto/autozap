@@ -163,9 +163,9 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
     if (!phone) { res.status(400).json({ error: 'Campo de telefone é obrigatório' }); return }
 
     const { data: channel } = await db
-      .from('channels').select('id, type').eq('tenant_id', tenantId).eq('status', 'active').limit(1).single()
+      .from('channels').select('id, type').eq('tenant_id', tenantId).limit(1).single()
 
-    if (!channel) { res.status(400).json({ error: 'Nenhum canal ativo encontrado' }); return }
+    if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado para este tenant' }); return }
 
     let normalizedPhone = phone.replace(/^\+/, '')
     if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
@@ -242,9 +242,9 @@ router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
     if (!phone) { res.status(400).json({ error: 'Campo de telefone é obrigatório. Configure o mapeamento no nó Webhook de entrada.' }); return }
 
     const { data: channel } = await db
-      .from('channels').select('id, type').eq('tenant_id', tenantId).eq('status', 'active').limit(1).single()
+      .from('channels').select('id, type').eq('tenant_id', tenantId).limit(1).single()
 
-    if (!channel) { res.status(400).json({ error: 'Nenhum canal ativo encontrado' }); return }
+    if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado para este tenant' }); return }
 
     let normalizedPhone = phone.replace(/^\+/, '')
     if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
