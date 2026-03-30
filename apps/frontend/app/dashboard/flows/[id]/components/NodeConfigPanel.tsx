@@ -217,80 +217,17 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
               </div>
             )}
 
-            {/* ── Mapeamento de campos ── */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={labelStyle}>Mapeamento de campos</label>
-                <button
-                  onClick={() => {
-                    const map = d.fieldMap || []
-                    onUpdate(node.id, { fieldMap: [...map, { externalField: '', contactField: 'phone' }] })
-                  }}
-                  style={{ fontSize: '11px', fontWeight: 600, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  + Adicionar
-                </button>
-              </div>
-              <p style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
-                Defina qual campo do formulário externo corresponde a cada campo do contato
-              </p>
-              {(d.fieldMap || []).length === 0 ? (
-                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px', padding: '10px 12px', fontSize: '11px', color: '#92400e' }}>
-                  ⚠️ Sem mapeamento — o sistema tentará detectar os campos automaticamente. Adicione mapeamentos se os campos do formulário tiverem nomes diferentes.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(d.fieldMap || []).map((mapping: any, idx: number) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <input
-                        placeholder="campo externo (ex: telefone)"
-                        value={mapping.externalField || ''}
-                        onChange={e => {
-                          const map = [...(d.fieldMap || [])]
-                          map[idx] = { ...map[idx], externalField: e.target.value }
-                          onUpdate(node.id, { fieldMap: map })
-                        }}
-                        style={{ ...inputStyle, flex: 1, fontSize: '11px', padding: '6px 8px' }}
-                        onFocus={focusInput} onBlur={blurInput}
-                      />
-                      <span style={{ fontSize: '11px', color: '#a1a1aa', flexShrink: 0 }}>→</span>
-                      <select
-                        value={mapping.contactField || 'phone'}
-                        onChange={e => {
-                          const map = [...(d.fieldMap || [])]
-                          map[idx] = { ...map[idx], contactField: e.target.value }
-                          onUpdate(node.id, { fieldMap: map })
-                        }}
-                        style={{ ...inputStyle, flex: 1, fontSize: '11px', padding: '6px 8px', background: '#fafafa' }}
-                        onFocus={focusInput} onBlur={blurInput}>
-                        <option value="phone">Telefone</option>
-                        <option value="name">Nome</option>
-                        <option value="email">Email</option>
-                        <option value="source">Origem</option>
-                        <option value="message">Mensagem</option>
-                      </select>
-                      <button
-                        onClick={() => {
-                          const map = (d.fieldMap || []).filter((_: any, i: number) => i !== idx)
-                          onUpdate(node.id, { fieldMap: map })
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '4px', flexShrink: 0, display: 'flex' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <div>
               <label style={labelStyle}>Variáveis disponíveis no flow</label>
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
+                Todos os campos recebidos viram variáveis automaticamente. Use o nó <strong>Mapear campos</strong> para renomear ou transformar.
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {[
-                  ['{{webhook_telefone}}', 'valor bruto do campo telefone'],
-                  ['{{webhook_nome}}', 'valor bruto do campo nome'],
-                  ['{{webhook_email}}', 'valor bruto do campo email'],
+                  ['{{webhook_phone}}', 'telefone recebido'],
+                  ['{{webhook_name}}', 'nome recebido'],
+                  ['{{webhook_email}}', 'email recebido'],
+                  ['{{webhook_CAMPO}}', 'qualquer outro campo'],
                 ].map(([varName, desc]) => (
                   <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <code style={{ fontSize: '10px', background: '#f0f9ff', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>{varName}</code>
