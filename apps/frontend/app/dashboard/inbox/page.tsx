@@ -13,8 +13,6 @@ import {
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase usado APENAS para storage de mídia (upload de arquivos)
-// Todas as queries de dados foram migradas para o backend seguro
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -103,7 +101,6 @@ function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; c
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 
-// ── QuickRepliesModal — migrado para backend ───────────────────────────────────
 function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -111,25 +108,17 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   const [newBody, setNewBody] = useState('')
   const [search, setSearch] = useState('')
 
-  // ✅ Backend seguro — em vez de supabase direto
   const { data: replies = [], isLoading } = useQuery({
     queryKey: ['quick-replies'],
-    queryFn: async () => {
-      const { data } = await conversationApi.get('/quick-replies')
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await conversationApi.get('/quick-replies'); return data.data || [] },
   })
   const createMutation = useMutation({
-    mutationFn: async () => {
-      await conversationApi.post('/quick-replies', { title: newTitle, body: newBody })
-    },
+    mutationFn: async () => { await conversationApi.post('/quick-replies', { title: newTitle, body: newBody }) },
     onSuccess: () => { toast.success('Resposta rápida criada!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
     onError: () => toast.error('Erro ao criar'),
   })
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await conversationApi.delete(`/quick-replies/${id}`)
-    },
+    mutationFn: async (id: string) => { await conversationApi.delete(`/quick-replies/${id}`) },
     onSuccess: () => { toast.success('Removida!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }) },
   })
   const filtered = replies.filter((r: any) => !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.body.toLowerCase().includes(search.toLowerCase()))
@@ -191,9 +180,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
     enabled: !!tenantId,
     staleTime: 5000,
   })
-
   const activeIds = new Set(contactTags.map((t: any) => t.id))
-
   const toggle = async (tag: any) => {
     setLoading(tag.id)
     try {
@@ -292,6 +279,7 @@ export default function InboxPage() {
     refetchInterval: 15000,
   })
 
+  // ── Pusher WebSocket — substitui todo o polling ───────────────────────────
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
@@ -326,7 +314,7 @@ export default function InboxPage() {
       const { data } = await conversationApi.get(url)
       return data.data
     },
-    refetchInterval: convPage === 1 ? 5000 : false,
+    // ✅ sem refetchInterval — Pusher cuida das atualizações
   })
 
   useEffect(() => {
@@ -348,33 +336,26 @@ export default function InboxPage() {
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}`); return data.data },
     enabled: !!selectedConvId,
   })
+
   const { data: messages, isLoading: loadingMessages } = useQuery({
     queryKey: ['messages', selectedConvId],
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}/messages`); return data.data },
     enabled: !!selectedConvId,
-    refetchInterval: 3000,
+    // ✅ sem refetchInterval — Pusher invalida via inbound.message e message.status
   })
 
-  // ✅ Notas — backend seguro
   const { data: notes = [] } = useQuery({
     queryKey: ['notes', selectedConvId],
-    queryFn: async () => {
-      const { data } = await conversationApi.get(`/conversations/${selectedConvId}/notes`)
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}/notes`); return data.data || [] },
     enabled: !!selectedConvId,
   })
   const saveNoteMutation = useMutation({
-    mutationFn: async () => {
-      await conversationApi.post(`/conversations/${selectedConvId}/notes`, { body: noteText })
-    },
+    mutationFn: async () => { await conversationApi.post(`/conversations/${selectedConvId}/notes`, { body: noteText }) },
     onSuccess: () => { toast.success('Nota salva!'); setNoteText(''); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) },
     onError: () => toast.error('Erro ao salvar nota'),
   })
   const deleteNoteMutation = useMutation({
-    mutationFn: async (noteId: string) => {
-      await conversationApi.delete(`/conversations/${selectedConvId}/notes/${noteId}`)
-    },
+    mutationFn: async (noteId: string) => { await conversationApi.delete(`/conversations/${selectedConvId}/notes/${noteId}`) },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }),
     onError: () => toast.error('Erro ao deletar nota'),
   })
@@ -388,18 +369,13 @@ export default function InboxPage() {
   const contactTags = (contactDetail?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
   const botActive = selectedConv?.bot_active !== false
 
-  // ✅ Custom fields — backend seguro
   const { data: customFields = [] } = useQuery({
     queryKey: ['custom-fields-inbox'],
-    queryFn: async () => {
-      const { data } = await conversationApi.get('/custom-fields')
-      return data.data || []
-    },
+    queryFn: async () => { const { data } = await conversationApi.get('/custom-fields'); return data.data || [] },
     staleTime: 60000,
     enabled: !!contactId,
   })
 
-  // ✅ Pipeline info — backend seguro
   const { data: pipelineInfo } = useQuery({
     queryKey: ['conv-pipeline', selectedConvId, selectedConv?.pipeline_stage, selectedConv?.pipeline_id],
     queryFn: async () => {
@@ -415,11 +391,7 @@ export default function InboxPage() {
         const pip = (pipData.data || []).find((p: any) => p.id === selectedConv.pipeline_id)
         if (pip?.name) pipelineName = pip.name
       }
-      return {
-        pipelineName,
-        columnLabel: col?.label || selectedConv.pipeline_stage,
-        columnColor: col?.color || '#6b7280',
-      }
+      return { pipelineName, columnLabel: col?.label || selectedConv.pipeline_stage, columnColor: col?.color || '#6b7280' }
     },
     enabled: !!selectedConvId && !!selectedConv?.pipeline_stage,
   })
@@ -475,7 +447,6 @@ export default function InboxPage() {
     setPendingFile({ file, previewUrl: URL.createObjectURL(file), contentType: getContentType(file) })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
-  // ✅ Upload de mídia — mantém Supabase storage (só para arquivos, não dados)
   const uploadAndSend = async (file: File, contentType: string) => {
     setUploading(true)
     try {
@@ -824,7 +795,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Notas internas */}
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f4f4f5' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}><StickyNote size={13} color="#d97706" /><p style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Notas internas</p></div>
               {(notes as any[]).length === 0
@@ -835,7 +805,6 @@ export default function InboxPage() {
                         <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 6px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <p style={{ fontSize: '10px', color: '#d97706', margin: 0 }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                          {/* ✅ Deletar nota via backend */}
                           <button onClick={() => deleteNoteMutation.mutate(note.id)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#fde68a', display: 'flex' }}
                             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
