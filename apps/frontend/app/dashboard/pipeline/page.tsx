@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Loader2, MessageSquare, RefreshCw, Settings2, Plus, Trash2,
-  GripVertical, X, Check, Pencil,
+  GripVertical, X, Check, Pencil, DollarSign,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Pusher from 'pusher-js'
@@ -36,6 +36,71 @@ function getAvatarColor(n: string | undefined | null) {
     { bg: '#ffedd5', color: '#c2410c' }, { bg: '#e0f2fe', color: '#0369a1' },
   ]
   return colors[((n || '').charCodeAt(0) || 0) % colors.length]
+}
+
+function formatCurrency(val: number | null | undefined): string {
+  if (!val) return ''
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val)
+}
+
+function parseCurrency(s: string): number | null {
+  const cleaned = s.replace(/[^\d,\.]/g, '').replace(',', '.')
+  const n = parseFloat(cleaned)
+  return isNaN(n) ? null : n
+}
+
+// ── Inline value editor no card ───────────────────────────────────────────────
+function DealValueEditor({ convId, value, onSaved }: { convId: string; value: number | null; onSaved: (v: number | null) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [inputVal, setInputVal] = useState('')
+
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setInputVal(value ? String(value) : '')
+    setEditing(true)
+  }
+
+  const commit = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const parsed = parseCurrency(inputVal)
+    setEditing(false)
+    if (parsed !== value) {
+      try {
+        await conversationApi.patch(`/conversations/${convId}/deal-value`, { dealValue: parsed })
+        onSaved(parsed)
+      } catch { toast.error('Erro ao salvar valor') }
+    }
+  }
+
+  if (editing) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }} onClick={e => e.stopPropagation()}>
+        <span style={{ fontSize: '11px', color: '#a1a1aa' }}>R$</span>
+        <input
+          autoFocus
+          value={inputVal}
+          onChange={e => setInputVal(e.target.value)}
+          onBlur={() => commit()}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          placeholder="0"
+          style={{ width: '80px', fontSize: '12px', fontWeight: 600, border: 'none', borderBottom: '1.5px solid #22c55e', outline: 'none', background: 'transparent', color: '#18181b', padding: '1px 0' }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', cursor: 'pointer' }}
+      title="Clique para definir valor">
+      {value ? (
+        <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(value)}</span>
+      ) : (
+        <span style={{ fontSize: '11px', color: '#d4d4d8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <DollarSign size={10} /> valor
+        </span>
+      )}
+    </div>
+  )
 }
 
 function ContactTagBadges({ contact }: { contact: any }) {
@@ -68,7 +133,6 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
   )
 }
 
-// ── ManageColumnsModal — migrado para backend ──────────────────────────────────
 function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
   columns: any[]; pipelineId: string | null
   onClose: () => void; onSaved: () => void; board: Record<string, any[]> | undefined
@@ -123,14 +187,11 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
     setSaving(true)
     try {
       const removedIds = columns.map(c => c.id).filter(id => isUUID(id) && !localCols.find(l => l.id === id))
-
-      // ✅ Backend seguro — em vez de supabase direto
       await conversationApi.put('/pipeline-columns', {
         columns: localCols.map((col, i) => ({ ...col, sort_order: i })),
         pipelineId: pipelineId,
         removedIds,
       })
-
       toast.success('Colunas salvas!')
       onSaved(); onClose()
     } catch (e: any) {
@@ -225,6 +286,8 @@ export default function PipelinePage() {
   const [newPipelineName, setNewPipelineName] = useState('')
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null)
   const [editingPipelineName, setEditingPipelineName] = useState('')
+  // Cache local de valores para atualização otimista
+  const [dealValues, setDealValues] = useState<Record<string, number | null>>({})
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
 
@@ -238,7 +301,6 @@ export default function PipelinePage() {
     staleTime: 30000,
   })
 
-  // ✅ Pipeline columns — backend seguro
   const { data: dbColumns, isLoading: colsLoading, refetch: refetchCols } = useQuery({
     queryKey: ['pipeline-columns', tenantId, selectedPipelineId],
     queryFn: async () => {
@@ -292,6 +354,19 @@ export default function PipelinePage() {
   }, [user, queryClient, tenantId])
 
   const displayBoard = localBoardRef.current ?? board
+
+  // Calcula totais por coluna incluindo cache local de valores
+  const getColumnTotal = (stageKey: string): number => {
+    const cards = displayBoard?.[stageKey] || []
+    return cards.reduce((sum: number, conv: any) => {
+      const localVal = dealValues[conv.id]
+      const val = localVal !== undefined ? localVal : (conv.deal_value || 0)
+      return sum + (val || 0)
+    }, 0)
+  }
+
+  // Total geral do pipeline
+  const totalValue = stages.reduce((sum, s) => sum + getColumnTotal(s.key), 0)
   const totalConvs = displayBoard ? Object.values(displayBoard).reduce((acc, arr) => acc + arr.length, 0) : 0
 
   const moveMutation = useMutation({
@@ -354,8 +429,6 @@ export default function PipelinePage() {
     const [moved] = arr.splice(fromIdx, 1)
     arr.splice(toIdx, 0, moved)
     setLocalStages(arr); setDraggingColKey(null); setOverColKey(null)
-
-    // ✅ Reordenar via backend seguro
     const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
     const colsToUpdate = arr.filter(c => isUUID(c.id)).map((c, i) => ({ ...c, sort_order: i }))
     if (colsToUpdate.length > 0) {
@@ -391,7 +464,15 @@ export default function PipelinePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
             <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Pipeline</h1>
-            <p style={{ color: '#a1a1aa', fontSize: '13px', marginTop: '2px' }}>{totalConvs} conversas abertas</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+              <p style={{ color: '#a1a1aa', fontSize: '13px' }}>{totalConvs} conversas</p>
+              {totalValue > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#d4d4d8' }} />
+                  <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(totalValue)} em negociação</p>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
@@ -473,12 +554,15 @@ export default function PipelinePage() {
             {stages.map(stage => {
               const cards = displayBoard?.[stage.key] || []
               const isOver = overStage === stage.key
+              const colTotal = getColumnTotal(stage.key)
               return (
                 <div key={stage.key}
                   onDragOver={e => { if (draggingColKey) handleColDragOver(e, stage.key); else handleDragOver(e, stage.key) }}
                   onDrop={e => { if (draggingColKey) handleColDrop(e, stage.key); else handleDrop(e, stage.key) }}
                   onDragLeave={() => { setOverStage(null); setOverColKey(null) }}
                   style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: isOver ? stage.bg : '#fff', border: `1px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : '#e4e4e7'}`, borderRadius: '12px', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s, opacity 0.15s', opacity: draggingColKey === stage.key ? 0.4 : 1, boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+
+                  {/* ── Header da coluna com total monetário ── */}
                   <div data-col-header draggable onDragStart={e => handleColDragStart(e, stage.key)} onDragEnd={handleColDragEnd}
                     style={{ padding: '12px 14px', borderBottom: `1px solid ${stage.border}`, background: stage.bg, flexShrink: 0, cursor: 'grab', userSelect: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -488,7 +572,14 @@ export default function PipelinePage() {
                       </div>
                       <span style={{ fontSize: '11px', fontWeight: 700, color: stage.color, background: `${stage.color}18`, border: `1px solid ${stage.color}25`, padding: '1px 8px', borderRadius: '99px' }}>{cards.length}</span>
                     </div>
+                    {/* Total monetário da coluna */}
+                    {colTotal > 0 && (
+                      <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: 700, color: stage.color, opacity: 0.8 }}>
+                        {formatCurrency(colTotal)}
+                      </div>
+                    )}
                   </div>
+
                   <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {cards.length === 0 ? (
                       <div style={{ padding: '24px 10px', textAlign: 'center' }}>
@@ -499,6 +590,7 @@ export default function PipelinePage() {
                       const name = conv.contacts?.name || conv.contacts?.phone || '??'
                       const av = getAvatarColor(name)
                       const isDragging = draggingId === conv.id
+                      const currentValue = dealValues[conv.id] !== undefined ? dealValues[conv.id] : conv.deal_value
                       return (
                         <div key={conv.id} draggable data-card onDragStart={e => handleDragStart(e, conv.id)} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
                           style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : '0 1px 2px rgba(0,0,0,.04)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
@@ -510,6 +602,17 @@ export default function PipelinePage() {
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
                           {conv.last_message && <p style={{ fontSize: '11px', color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
+
+                          {/* ── Valor do negócio ── */}
+                          <DealValueEditor
+                            convId={conv.id}
+                            value={currentValue ?? null}
+                            onSaved={(v) => {
+                              setDealValues(prev => ({ ...prev, [conv.id]: v }))
+                              forceRender(n => n + 1)
+                            }}
+                          />
+
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                             {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}
                             {conv.unread_count > 0 && <span style={{ background: '#22c55e', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', marginLeft: 'auto' }}>{conv.unread_count}</span>}
