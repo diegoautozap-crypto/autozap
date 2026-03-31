@@ -6,6 +6,7 @@ import { requireAuth, requireRole, validate } from '../middleware/campaign.middl
 import { ok, paginationSchema, AppError } from '@autozap/utils'
 import { db } from '../lib/db'
 import { decryptCredentials } from '../lib/crypto'
+import { logger } from '../lib/logger'
 
 const router = Router()
 router.use(requireAuth)
@@ -219,7 +220,7 @@ router.post('/campaigns/:id/start', async (req, res, next) => {
     }
     await campaignService.startCampaign(req.params.id, req.auth.tid)
     res.json(ok({ message: 'Campaign started', campaignId: req.params.id }))
-  } catch (err) { next(err) }
+  } catch (err: any) { logger.error('START CAMPAIGN ERROR', { error: err.message, stack: err.stack, campaignId: req.params.id }); next(err) }
 })
 
 router.post('/campaigns/:id/pause', async (req, res, next) => {
