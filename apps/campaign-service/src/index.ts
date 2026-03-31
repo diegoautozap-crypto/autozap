@@ -18,11 +18,16 @@ app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
 app.use(express.json({ limit: '10mb' }))
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'campaign-service' }))
+app.get('/health', async (_req, res) => {
+  try {
+    const { error } = await (await import('./lib/db')).db.from('campaigns').select('id').limit(1)
+    res.json({ status: error ? 'degraded' : 'ok', service: 'campaign-service', db: error ? 'down' : 'ok' })
+  } catch { res.json({ status: 'degraded', service: 'campaign-service', db: 'down' }) }
+})
 app.use('/', campaignRoutes)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`campaign-service running on port ${PORT}`)
   startCampaignWorker()
   startInboxWorker()
@@ -30,5 +35,13 @@ app.listen(PORT, () => {
   startSchedulerWorker()
   logger.info('All workers started')
 })
+
+const shutdown = async (signal: string) => {
+  logger.info(`${signal} received, shutting down gracefully...`)
+  server.close(() => { logger.info('HTTP server closed'); process.exit(0) })
+  setTimeout(() => { logger.warn('Forced shutdown'); process.exit(1) }, 10000)
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
 
 export default app

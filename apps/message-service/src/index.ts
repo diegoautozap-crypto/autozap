@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
+import rateLimit from 'express-rate-limit'
 import zlib from 'zlib'
 import messageRoutes from './routes/message.routes'
 import automationRoutes from './routes/automation.routes'
@@ -62,16 +63,21 @@ app.use((req: any, res: any, next: any) => {
   }
 })
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'message-service' })
+app.get('/health', async (_req, res) => {
+  try {
+    const { error } = await (await import('./lib/db')).db.from('flows').select('id').limit(1)
+    res.json({ status: error ? 'degraded' : 'ok', service: 'message-service', db: error ? 'down' : 'ok' })
+  } catch { res.json({ status: 'degraded', service: 'message-service', db: 'down' }) }
 })
 
+// Rate limiting para webhooks (100 req/min por IP)
+app.use('/webhook', rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }))
 app.use('/', messageRoutes)
 app.use('/', automationRoutes)
 app.use('/', flowRoutes)
 app.use(errorHandler)
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   logger.info(`message-service running on port ${PORT}`)
   startMessageWorker()
   startRetryWorker()
@@ -80,5 +86,17 @@ app.listen(PORT, async () => {
   await startReconciliationJob()
   logger.info('All workers started')
 })
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  logger.info(`${signal} received, shutting down gracefully...`)
+  server.close(() => {
+    logger.info('HTTP server closed')
+    process.exit(0)
+  })
+  setTimeout(() => { logger.warn('Forced shutdown after timeout'); process.exit(1) }, 10000)
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
 
 export default app

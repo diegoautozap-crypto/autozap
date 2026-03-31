@@ -13,7 +13,12 @@ app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
 app.use(express.json({ limit: '10mb' })) // large for CSV imports
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'contact-service' }))
+app.get('/health', async (_req, res) => {
+  try {
+    const { error } = await (await import('./lib/db')).db.from('contacts').select('id').limit(1)
+    res.json({ status: error ? 'degraded' : 'ok', service: 'contact-service', db: error ? 'down' : 'ok' })
+  } catch { res.json({ status: 'degraded', service: 'contact-service', db: 'down' }) }
+})
 app.use('/', contactRoutes)
 app.use(errorHandler)
 app.listen(PORT, () => logger.info(`contact-service running on port ${PORT}`))

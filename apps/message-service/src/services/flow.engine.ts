@@ -121,8 +121,13 @@ interface ConditionBranch {
   rules: ConditionRule[]
 }
 
+let pusherFailCount = 0
+let pusherCircuitOpen = 0
+
 async function emitPusher(tenantId: string, event: string, data: object): Promise<void> {
   if (!PUSHER_APP_ID || !PUSHER_KEY || !PUSHER_SECRET) return
+  // Circuit breaker: se falhou 3x, para por 30s
+  if (pusherCircuitOpen > Date.now()) return
   try {
     const body = JSON.stringify({ name: event, channel: `tenant-${tenantId}`, data: JSON.stringify(data) })
     const crypto = await import('crypto')
@@ -130,7 +135,11 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
     const md5 = crypto.createHash('md5').update(body).digest('hex')
     const sig = crypto.createHmac('sha256', PUSHER_SECRET).update(`POST\n/apps/${PUSHER_APP_ID}/events\nauth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}`).digest('hex')
     await fetch(`https://api-${PUSHER_CLUSTER}.pusher.com/apps/${PUSHER_APP_ID}/events?auth_key=${PUSHER_KEY}&auth_timestamp=${ts}&auth_version=1.0&body_md5=${md5}&auth_signature=${sig}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
-  } catch (err) { logger.error('Failed to emit Pusher event', { err }) }
+    pusherFailCount = 0
+  } catch (err) {
+    pusherFailCount++
+    if (pusherFailCount >= 3) { pusherCircuitOpen = Date.now() + 30000; logger.warn('Pusher circuit breaker open for 30s') }
+  }
 }
 
 export class FlowEngine {
