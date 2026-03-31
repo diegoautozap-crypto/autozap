@@ -217,9 +217,8 @@ router.post('/campaigns/:id/start', async (req, res, next) => {
         throw new AppError('FORBIDDEN', 'Sem permissão para disparar campanhas', 403)
       }
     }
-    const campaign = await campaignService.startCampaign(req.params.id, req.auth.tid)
-    await campaignQueue.add('run', { campaignId: campaign.id, tenantId: req.auth.tid, channelId: campaign.channel_id, batchSize: campaign.batch_size, messagesPerMin: campaign.messages_per_min })
-    res.json(ok({ message: 'Campaign started', campaignId: campaign.id }))
+    await campaignService.startCampaign(req.params.id, req.auth.tid)
+    res.json(ok({ message: 'Campaign started', campaignId: req.params.id }))
   } catch (err) { next(err) }
 })
 
