@@ -243,6 +243,12 @@ export default function InboxPage() {
   const [noteText, setNoteText] = useState('')
   const [inputMode, setInputMode] = useState<'message' | 'note'>('message')
   const [statusFilter, setStatusFilter] = useState('open')
+  const statusFilters = [
+    { key: 'all', label: t('inbox.all') },
+    { key: 'open', label: t('inbox.open') },
+    { key: 'waiting', label: t('inbox.waiting') },
+    { key: 'closed', label: t('inbox.closed') },
+  ]
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
   const [bulkMode, setBulkMode] = useState(false)
   const [channelFilter, setChannelFilter] = useState('all')
