@@ -189,7 +189,7 @@ export default function FlowEditorPage() {
       })
       if (flowName) await messageApi.patch(`/flows/${id}`, { name: flowName })
     },
-    onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
+    onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flow', id] }); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
     onError: () => toast.error('Erro ao salvar'),
   })
 
@@ -198,8 +198,8 @@ export default function FlowEditorPage() {
     if (!analytics?.nodeStats) {
       // Limpa contadores quando analytics desativa
       if (!showAnalytics) {
-        setNodes(nds => nds.map(n => { const d = { ...(n.data as any) }; delete d._execCount; delete d._errorCount; return { ...n, data: d } }))
-        setEdges(eds => eds.map(e => ({ ...e, data: { ...(e.data || {}), _count: undefined } })))
+        setNodes(nds => nds.map(n => { const { _execCount, _errorCount, ...cleanData } = (n.data as any); return { ...n, data: cleanData } }))
+        setEdges(eds => eds.map(e => { const { _count, ...cleanData } = (e.data || {} as any); return { ...e, data: cleanData } }))
       }
       return
     }

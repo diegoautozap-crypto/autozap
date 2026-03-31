@@ -11,7 +11,7 @@ const flowSchema = z.object({
   name: z.string().min(1).max(255),
   channelId: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional().default(true),
-  cooldown_type: z.enum(['24h', 'once', 'always']).optional().default('24h'),
+  cooldown_type: z.enum(['24h', 'once', 'always']).optional().default('always'),
 })
 
 const graphSchema = z.object({
@@ -148,10 +148,10 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
     }
 
     const { error: delEdgesError } = await db.from('flow_edges').delete().eq('flow_id', req.params.id)
-    if (delEdgesError) console.error('[FLOW GRAPH] delete edges error', delEdgesError)
+    if (delEdgesError) throw new AppError('DB_ERROR', `Erro ao limpar edges: ${delEdgesError.message}`, 500)
 
     const { error: delNodesError } = await db.from('flow_nodes').delete().eq('flow_id', req.params.id)
-    if (delNodesError) console.error('[FLOW GRAPH] delete nodes error', delNodesError)
+    if (delNodesError) throw new AppError('DB_ERROR', `Erro ao limpar nodes: ${delNodesError.message}`, 500)
 
     if (nodes.length > 0) {
       const nodeRows = nodes.map((n: any) => ({
