@@ -166,9 +166,15 @@ router.post('/campaigns', async (req, res, next) => {
     }
 
     if (curlTemplate) {
+      // Substitui todas as variações de placeholders (com/sem espaço, underscore, case)
       curlTemplate = curlTemplate
-        .replace(/\{\{api_key\}\}/gi, apiKey).replace(/\{\{apikey\}\}/gi, apiKey)
-        .replace(/\{\{source\}\}/gi, source).replace(/\{\{src_name\}\}/gi, srcName || '').replace(/\{\{srcname\}\}/gi, srcName || '')
+        .replace(/\{\{\s*api[_\s]?key\s*\}\}/gi, apiKey)
+        .replace(/\{\{\s*source\s*\}\}/gi, source)
+        .replace(/\{\{\s*src[_\s.]?name\s*\}\}/gi, srcName || source)
+      // Se ainda tem apikey como placeholder, força substituição por pattern no header
+      if (curlTemplate.includes('{{') && apiKey) {
+        curlTemplate = curlTemplate.replace(/-H\s*["']apikey:\s*\{\{[^}]*\}\}["']/gi, `-H "apikey: ${apiKey}"`)
+      }
     }
 
     const campaign = await campaignService.createCampaign({ tenantId: req.auth.tid, createdBy: req.auth.sub, channelId, curlTemplate, ...rest })
