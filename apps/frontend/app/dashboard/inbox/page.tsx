@@ -555,6 +555,7 @@ export default function InboxPage() {
             onMouseEnter={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5' }}
             onMouseLeave={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
             <CheckCheck size={14} />
+          </button>
         </div>
         {/* Barra de ações em massa */}
         {bulkMode && (
