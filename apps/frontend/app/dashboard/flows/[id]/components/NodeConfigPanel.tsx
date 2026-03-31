@@ -82,6 +82,17 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
     e.currentTarget.style.background = '#fafafa'
   }
 
+  const { data: customFields = [] } = useQuery({
+    queryKey: ['custom-fields-flow', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return []
+      const { data } = await supabase.from('custom_fields').select('name, label').eq('tenant_id', tenantId).order('sort_order', { ascending: true })
+      return (data || []) as { name: string; label: string }[]
+    },
+    staleTime: 60000,
+    enabled: d.type === 'update_contact' || d.type === 'create_contact',
+  })
+
   const { data: pipelines = [] } = useQuery({
     queryKey: ['pipelines-flow', tenantId],
     queryFn: async () => {
@@ -578,11 +589,21 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               {fields.map((f, i) => (
                 <div key={i} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <select style={{ ...inputStyle, flex: 1, padding: '5px 8px', fontSize: '12px' }} value={f.field} onChange={e => updateField(i, { field: e.target.value, customField: '' })} onFocus={focusInput} onBlur={blurInput}>
+                    <select style={{ ...inputStyle, flex: 1, padding: '5px 8px', fontSize: '12px' }} value={f.field === 'custom' && f.customField ? `cf:${f.customField}` : f.field}
+                      onChange={e => {
+                        const v = e.target.value
+                        if (v.startsWith('cf:')) updateField(i, { field: 'custom', customField: v.slice(3) })
+                        else if (v === 'custom_new') updateField(i, { field: 'custom', customField: '' })
+                        else updateField(i, { field: v, customField: '' })
+                      }} onFocus={focusInput} onBlur={blurInput}>
                       <option value="name">Nome</option>
                       <option value="phone">Telefone</option>
                       <option value="email">Email</option>
-                      <option value="custom">Campo personalizado</option>
+                      {customFields.length > 0 && <option disabled>── Campos personalizados ──</option>}
+                      {customFields.map((cf: { name: string; label: string }) => (
+                        <option key={cf.name} value={`cf:${cf.name}`}>{cf.label}</option>
+                      ))}
+                      <option value="custom_new">+ Outro campo...</option>
                     </select>
                     {fields.length > 1 && (
                       <button onClick={() => removeField(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}
@@ -592,7 +613,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                       </button>
                     )}
                   </div>
-                  {f.field === 'custom' && (
+                  {f.field === 'custom' && !customFields.some(cf => cf.name === f.customField) && (
                     <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="Nome do campo (ex: cargo, empresa)" value={f.customField || ''} onChange={e => updateField(i, { customField: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
                   )}
                   <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="{{variavel}} ou texto fixo" value={f.value} onChange={e => updateField(i, { value: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
