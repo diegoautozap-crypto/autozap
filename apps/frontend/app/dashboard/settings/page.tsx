@@ -72,7 +72,7 @@ function InboundWebhookSection() {
   }, [tenantData])
 
   const webhookUrl = token
-    ? `https://autozapmessage-service-production.up.railway.app/webhook/lead/${token}`
+    ? `${process.env.NEXT_PUBLIC_MESSAGE_SERVICE_URL || ''}/webhook/lead/${token}`
     : null
 
   const handleGenerate = async () => {

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(grep -E \"\\\\.\\(ts|sql|js\\)$\")",
+      "Bash(find /c/Users/Adm/Desktop/autozap/apps -name *.sql -o -path */migrations/* -o -path */schema/*)",
+      "Bash(grep -r \"bypass\\\\|RLS\\\\|row.*level.*security\\\\|SECURITY\" /c/Users/Adm/Desktop/autozap/apps --include=*.ts)",
+      "Bash(grep -r \"isLoading\\\\|isPending\\\\|isError\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
+      "Bash(grep -n \"if.*useQuery\\\\|if.*useMutation\\\\|useQuery.*if\\\\|useMutation.*if\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
+      "Bash(grep -r \"hardcoded\\\\|localhost\\\\|http://\\\\|TODO\\\\|FIXME\\\\|BUG\\\\|HACK\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
+      "Bash(grep -rn process.env /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
+      "Bash(grep -rn \"aria-\\\\|role=\\\\|alt=\\\\|htmlFor\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
+      "Bash(grep:*)"
+    ]
+  }
+}

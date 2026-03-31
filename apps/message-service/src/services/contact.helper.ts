@@ -27,29 +27,34 @@ interface EnsureResult {
 export async function ensureContact(opts: EnsureContactOpts): Promise<{ contactId: string; isNew: boolean }> {
   const { tenantId, phone, name, email, origin = 'webhook', metadata } = opts
 
-  const { data: existing } = await db
-    .from('contacts').select('id, metadata').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
-
-  if (existing) {
-    const merged = { ...(existing.metadata || {}), ...(metadata || {}) }
-    const update: Record<string, unknown> = { last_interaction_at: new Date(), metadata: merged }
-    if (name) update.name = name
-    if (email) update.email = email
-    await db.from('contacts').update(update).eq('id', existing.id).eq('tenant_id', tenantId)
-    return { contactId: existing.id, isNew: false }
-  }
-
-  const { data: newContact } = await db
+  // Upsert para evitar race condition em requisições simultâneas
+  const { data: upserted } = await db
     .from('contacts')
-    .insert({
+    .upsert({
       id: generateId(), tenant_id: tenantId, phone, name: name || phone,
       email: email || null, origin, status: 'active', metadata: metadata || null,
       last_interaction_at: new Date(),
-    })
+    }, { onConflict: 'tenant_id,phone', ignoreDuplicates: false })
     .select('id').single()
 
-  if (!newContact) throw new Error('Erro ao criar contato')
-  return { contactId: newContact.id, isNew: true }
+  if (!upserted) {
+    // Fallback: busca o existente se upsert não retornou
+    const { data: existing } = await db
+      .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', phone).single()
+    if (!existing) throw new Error('Erro ao criar contato')
+    return { contactId: existing.id, isNew: false }
+  }
+
+  // Atualiza campos extras se contato já existia
+  if (name || email || metadata) {
+    const update: Record<string, unknown> = { last_interaction_at: new Date() }
+    if (name) update.name = name
+    if (email) update.email = email
+    if (metadata) update.metadata = metadata
+    await db.from('contacts').update(update).eq('id', upserted.id)
+  }
+
+  return { contactId: upserted.id, isNew: true }
 }
 
 export async function ensureConversation(opts: EnsureConversationOpts): Promise<{ conversationId: string; isNew: boolean }> {

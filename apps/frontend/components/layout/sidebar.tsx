@@ -7,7 +7,7 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon,
 } from 'lucide-react'
 
 const ALL_NAV = [
@@ -108,12 +108,25 @@ export function Sidebar() {
 
   const nav = ALL_NAV.filter(item => isAdmin ? true : (allowedPages || []).includes(item.href))
 
+  const [mobileOpen, setMobileOpen] = useState(false)
+
   const handleLogout = async () => {
     await logout(); toast.success('Até logo!'); router.push('/login')
   }
 
+  // Fecha sidebar ao navegar no mobile
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
   return (
-    <aside style={{
+    <>
+    {/* Botão hamburger mobile */}
+    <button className="sidebar-hamburger" onClick={() => setMobileOpen(true)}
+      style={{ position: 'fixed', top: '12px', left: '12px', zIndex: 1100, background: '#161b27', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', display: 'none', color: '#fff' }}>
+      <Menu size={20} />
+    </button>
+    {/* Overlay mobile */}
+    {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1199, display: 'none' }} />}
+    <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`} style={{
       width: '220px',
       background: '#161b27',
       borderRight: 'none',
@@ -232,7 +245,21 @@ export function Sidebar() {
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:.2} }
+        @media (max-width: 768px) {
+          .sidebar-hamburger { display: flex !important; }
+          .sidebar-overlay { display: block !important; }
+          .sidebar {
+            position: fixed !important;
+            left: -260px;
+            top: 0;
+            z-index: 1200;
+            transition: left 0.25s ease;
+            height: 100vh !important;
+          }
+          .sidebar.sidebar-open { left: 0; }
+        }
       `}</style>
     </aside>
+    </>
   )
 }

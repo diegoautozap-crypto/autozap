@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Providers } from '@/components/providers'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }} />
       </head>
       <body>
-        <Providers>
-          {children}
-          <Toaster richColors position="top-right" theme="system" />
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            {children}
+            <Toaster richColors position="top-right" theme="system" />
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   )

@@ -58,12 +58,18 @@ const asaasWebhookRouter = Router()
 
 asaasWebhookRouter.post('/billing/webhook/asaas', async (req, res) => {
   try {
+    // Verifica token de autenticação do webhook Asaas
+    const asaasToken = process.env.ASAAS_WEBHOOK_TOKEN
+    if (asaasToken) {
+      const provided = req.headers['asaas-access-token'] || req.query.token
+      if (provided !== asaasToken) { res.status(401).json({ error: 'Invalid webhook token' }); return }
+    }
     const { event, payment, subscription } = req.body
     await tenantService.processAsaasWebhook(event, { payment, subscription })
     res.json({ success: true })
   } catch (err) {
     console.error('Asaas webhook error:', err)
-    res.json({ success: true })
+    res.status(500).json({ success: false })
   }
 })
 

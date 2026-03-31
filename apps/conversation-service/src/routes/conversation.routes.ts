@@ -24,10 +24,10 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     const { mediaId } = req.params
     const { channelId } = req.query as any
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
-    // Busca canal — aceita com ou sem auth (mídia precisa ser acessível pelo browser)
-    // Mas restringe por tenant se autenticado
-    let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId)
-    if ((req as any).auth?.tid) channelQuery = channelQuery.eq('tenant_id', (req as any).auth.tid)
+    // Busca canal — sempre restringe por tenant via query param ou auth
+    const tenantId = (req as any).auth?.tid || req.query.t as string
+    if (!tenantId) { res.status(401).json({ error: 'Unauthorized' }); return }
+    let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId).eq('tenant_id', tenantId)
     const { data: channel } = await channelQuery.single()
     if (!channel) { res.status(404).json({ error: 'Channel not found' }); return }
     const credentials = decryptCredentials(channel.credentials)

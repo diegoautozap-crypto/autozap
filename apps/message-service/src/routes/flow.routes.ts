@@ -218,8 +218,11 @@ router.post('/flows/:id/run', async (req, res, next) => {
     if (!flow) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
     if (!flow.is_active) throw new AppError('INVALID_STATUS', 'Flow está pausado', 400)
 
-    // Busca contatos com as tags selecionadas
-    const { data: contactTagRows } = await db.from('contact_tags').select('contact_id').in('tag_id', tagIds)
+    // Valida que as tags pertencem ao tenant antes de buscar contatos
+    const { data: validTags } = await db.from('tags').select('id').eq('tenant_id', req.auth.tid).in('id', tagIds)
+    const validTagIds = (validTags || []).map((t: any) => t.id)
+    if (validTagIds.length === 0) { res.json(ok({ queued: 0 })); return }
+    const { data: contactTagRows } = await db.from('contact_tags').select('contact_id').in('tag_id', validTagIds)
     if (!contactTagRows || contactTagRows.length === 0) { res.json(ok({ queued: 0 })); return }
 
     const uniqueIds = [...new Set(contactTagRows.map(r => r.contact_id))]

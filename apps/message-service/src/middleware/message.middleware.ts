@@ -10,7 +10,8 @@ declare global {
 }
 
 const ACCESS_SECRET = process.env.JWT_SECRET!
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
+if (!INTERNAL_SECRET) console.error('⚠ INTERNAL_SECRET não configurado — rotas internas desprotegidas')
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization
