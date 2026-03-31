@@ -392,12 +392,12 @@ export default function ContactsPage() {
   const gridTemplateColumns = `40px ${tableColumns.map(c => c.width).join(' ')} 80px`
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '1400px', background: '#f4f4f5', minHeight: '100%' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '1400px', background: '#f4f4f5', minHeight: '100%' }}>
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
       {showCustomFields && <CustomFieldsModal tenantId={tenantId} onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>CRM de Contatos</h1>
           <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>
@@ -405,7 +405,7 @@ export default function ContactsPage() {
             {customFields.length > 0 && ` · ${customFields.length} campo${customFields.length > 1 ? 's' : ''} personalizado${customFields.length > 1 ? 's' : ''}`}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {selected.size > 0 && (
             <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -526,7 +526,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+      <div className="mobile-scroll-x" style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
         {isLoading ? (
           <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
         ) : contacts.length === 0 ? (
@@ -538,7 +538,7 @@ export default function ContactsPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: '11px 20px', background: '#fafafa', borderBottom: '1px solid #f4f4f5', alignItems: 'center', minWidth: '700px' }}>
+            <div className="mobile-full" style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: '11px 20px', background: '#fafafa', borderBottom: '1px solid #f4f4f5', alignItems: 'center', minWidth: '700px' }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#22c55e' }} />
               {tableColumns.map(col => <span key={col.key} style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col.label}</span>)}
               <span></span>
@@ -547,7 +547,7 @@ export default function ContactsPage() {
               const isEditing = editingId === c.id
               const av = getAvatarColor(c.name)
               return (
-                <div key={c.id} style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f4f4f5', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s', minWidth: '700px' }}>
+                <div key={c.id} className="mobile-full" style={{ display: 'grid', gridTemplateColumns, gap: '12px', padding: isEditing ? '10px 20px' : '12px 20px', borderBottom: '1px solid #f4f4f5', alignItems: 'center', background: selected.has(c.id) ? '#f0fdf4' : isEditing ? '#fafff6' : '#fff', transition: 'background 0.1s', minWidth: '700px' }}>
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#22c55e' }} />
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>{getInitials(c.name)}</div>

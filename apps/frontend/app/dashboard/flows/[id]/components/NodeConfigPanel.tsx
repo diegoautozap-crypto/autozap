@@ -183,7 +183,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
   )
 
   return (
-    <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e4e4e7', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
+    <div className="flow-config-panel" style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: '#fff', borderLeft: '1px solid #e4e4e7', zIndex: 10, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,.06)' }}
       onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
 
       <div style={{ padding: '16px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

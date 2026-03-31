@@ -437,8 +437,8 @@ export default function AutomationsPage() {
     )
 
   return (
-    <div style={{ padding: '32px', maxWidth: '900px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Automações</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Respostas automáticas baseadas em gatilhos</p>
@@ -476,7 +476,7 @@ export default function AutomationsPage() {
           {/* Gatilho */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '14px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>🎯 Gatilho — quando disparar</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
+            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
               {TRIGGER_TYPES.map(t => (
                 <div key={t.value} onClick={() => setForm({ ...form, trigger_type: t.value })}
                   style={{ border: `2px solid ${form.trigger_type === t.value ? '#16a34a' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', background: form.trigger_type === t.value ? '#f0fdf4' : '#fff' }}>
@@ -554,7 +554,7 @@ export default function AutomationsPage() {
           {/* Cooldown */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⏱ Frequência — quantas vezes disparar</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
               {[
                 { label: 'Sempre', desc: 'Toda vez que a condição for atendida', value: null },
                 { label: '24 horas', desc: 'Máx 1x por dia por contato', value: 1440 },

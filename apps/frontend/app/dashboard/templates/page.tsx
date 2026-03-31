@@ -124,14 +124,15 @@ export default function TemplatesPage() {
   const canSave = form.name && form.templateId && form.body && (editingId || selectedChannel)
 
   return (
-    <div style={{ padding: '32px', maxWidth: '900px' }}>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Templates</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Gerencie seus templates aprovados do WhatsApp</p>
         </div>
         <button
+          className="mobile-header-actions"
           onClick={() => { closeForm(); setShowForm(true) }}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={14} /> Novo template

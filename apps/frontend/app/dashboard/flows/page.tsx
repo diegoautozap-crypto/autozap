@@ -230,15 +230,15 @@ export default function FlowsPage() {
   const cooldownLabel = (type: string) => COOLDOWN_OPTIONS.find(o => o.value === type)?.label || '24 horas'
 
   return (
-    <div style={{ padding: '32px', maxWidth: '900px' }}>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Flows</h1>
           <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => setShowTemplates(true)}
             style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Copy size={14} /> Templates

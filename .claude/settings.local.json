@@ -14,7 +14,8 @@
       "Bash(grep -r \"hardcoded\\\\|localhost\\\\|http://\\\\|TODO\\\\|FIXME\\\\|BUG\\\\|HACK\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
       "Bash(grep -rn process.env /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
       "Bash(grep -rn \"aria-\\\\|role=\\\\|alt=\\\\|htmlFor\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(openssl rand:*)"
     ]
   }
 }

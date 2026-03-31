@@ -77,15 +77,15 @@ export default function ChannelsPage() {
   const blurInp  = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = '#e4e4e7'; e.target.style.boxShadow = 'none' }
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '860px', background: '#f4f4f5', minHeight: '100%' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '860px', background: '#f4f4f5', minHeight: '100%' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>Canais</h1>
           <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>Configure seus números do WhatsApp via Gupshup</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : '#fff', border: `1px solid ${atLimit ? '#fecaca' : '#e4e4e7'}`, padding: '4px 12px', borderRadius: '99px' }}>
             {channelCount}/{channelLimit} canal{channelLimit > 1 ? 'is' : ''}
           </div>

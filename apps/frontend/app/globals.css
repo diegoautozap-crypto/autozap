@@ -55,70 +55,117 @@ body {
 
 /* ─── Mobile responsivo (< 768px) ─────────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* Grids 3-4 colunas → 2 colunas */
-  [style*="grid-template-columns: repeat(4"],
-  [style*="grid-template-columns: repeat(3"] {
+  /* Espaço pro hamburger em todas as páginas */
+  .mobile-page {
+    padding: 56px 12px 12px !important;
+  }
+
+  /* Headers: título + botões em coluna */
+  .mobile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .mobile-header-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .mobile-header-actions > * {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  /* Grids: 2 colunas no mobile */
+  .mobile-grid-2 {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
-
-  /* Grids 2 colunas com sidebar fixa → 1 coluna */
-  [style*="grid-template-columns: 1fr 320px"] {
+  /* Grid 1 coluna */
+  .mobile-grid-1 {
     grid-template-columns: 1fr !important;
+    gap: 8px !important;
   }
 
-  /* Tabela de erros: 1 coluna */
-  [style*="grid-template-columns: 100px 140px"] {
-    grid-template-columns: 1fr !important;
-    gap: 4px !important;
+  /* Flex wrap */
+  .mobile-wrap {
+    flex-wrap: wrap !important;
   }
 
-  /* Paineis laterais fixos → full width */
-  [style*="width: 300px"][style*="flex-shrink"],
-  [style*="width: 248px"][style*="flex-shrink"],
-  [style*="width: 268px"][style*="flex-shrink"] {
+  /* Full width no mobile */
+  .mobile-full {
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
   }
 
-  /* Modais: respeitar largura da tela */
-  [style*="width: 480px"],
-  [style*="width: 460px"],
-  [style*="width: 380px"],
-  [style*="width: 640px"],
-  [style*="width: 520px"] {
+  /* Esconder no mobile */
+  .mobile-hide {
+    display: none !important;
+  }
+
+  /* Mostrar no mobile */
+  .mobile-show {
+    display: flex !important;
+  }
+
+  /* Tabela com scroll horizontal */
+  .mobile-scroll-x {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modais */
+  .mobile-modal {
     width: 94vw !important;
     max-width: 94vw !important;
   }
 
-  /* Tabelas com min-width: permitir scroll */
-  [style*="min-width: 700px"] {
-    min-width: unset !important;
+  /* Inbox: layout empilhado */
+  .inbox-layout {
+    flex-direction: column !important;
+    height: calc(100vh - 52px) !important;
   }
-
-  /* Inputs com largura fixa */
-  input[style*="width: 280px"],
-  input[style*="width: 200px"] {
+  .inbox-list {
+    width: 100% !important;
+    max-height: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e4e4e7 !important;
+  }
+  .inbox-chat {
+    display: none !important;
     width: 100% !important;
   }
-
-  /* Padding geral menor no mobile */
-  [style*="padding: 32px"] {
-    padding: 16px !important;
+  .inbox-chat.active {
+    display: flex !important;
   }
-  [style*="padding: 28px 32px"],
-  [style*="padding: 24px 32px"] {
-    padding: 14px 16px !important;
+  .inbox-profile {
+    display: none !important;
   }
 
-  /* Scroll suave no pipeline */
-  [style*="overflow-x: auto"] {
+  /* Pipeline: scroll horizontal suave */
+  .pipeline-board {
     -webkit-overflow-scrolling: touch;
   }
+  .pipeline-column {
+    min-width: 280px !important;
+  }
 
-  /* Flow editor: paineis laterais fullscreen */
-  [style*="width: 320px"][style*="position: absolute"] {
-    width: 100vw !important;
+  /* Flow editor */
+  .flow-sidebar {
+    position: fixed !important;
+    z-index: 100 !important;
     left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #fff !important;
+  }
+  .flow-config-panel {
+    width: 100vw !important;
     right: 0 !important;
   }
 }

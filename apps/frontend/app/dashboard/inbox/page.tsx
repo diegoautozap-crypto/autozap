@@ -523,12 +523,12 @@ export default function InboxPage() {
   const btnStyle: React.CSSProperties = { width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: '#fafafa', border: '1px solid #e4e4e7', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', transition: 'all 0.1s' }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
+    <div className="inbox-layout mobile-page" style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
 
       {/* ── Coluna esquerda ── */}
-      <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="inbox-list" style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f4f4f5', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', margin: 0 }}>Inbox</h2>
             <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }} title="Selecionar conversas"
               style={{ width: '28px', height: '28px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: bulkMode ? '#22c55e' : 'transparent', color: bulkMode ? '#fff' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
@@ -642,7 +642,7 @@ export default function InboxPage() {
       </div>
 
       {/* ── Centro — chat ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div className="inbox-chat" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {!selectedConvId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: '#f4f4f5' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#fff', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}><MessageSquare size={24} color="#d4d4d8" /></div>
@@ -665,7 +665,7 @@ export default function InboxPage() {
                   <p style={{ fontSize: '11px', color: '#a1a1aa', margin: 0, marginTop: '1px' }}>{selectedConv?.contacts?.phone}</p>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <div className="mobile-header-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {selectedConv?.status !== 'closed' && (
                   botActive
                     ? <button onClick={() => takeOverMutation.mutate()} disabled={takeOverMutation.isPending} style={{ padding: '5px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -845,7 +845,7 @@ export default function InboxPage() {
 
       {/* ── Direita — perfil ── */}
       {selectedConvId && showProfile && (
-        <div style={{ width: '248px', flexShrink: 0, background: '#fff', borderLeft: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="inbox-profile" style={{ width: '248px', flexShrink: 0, background: '#fff', borderLeft: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f4f4f5', textAlign: 'center', flexShrink: 0 }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, margin: '0 auto 10px' }}>{getInitials(contactName)}</div>
             <p style={{ fontWeight: 700, fontSize: '14px', color: '#18181b', marginBottom: '2px', letterSpacing: '-0.01em' }}>{contactName || '??'}</p>

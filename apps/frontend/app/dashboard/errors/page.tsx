@@ -64,9 +64,9 @@ export default function ErrorDashboard() {
   }
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="mobile-page" style={{ padding: '32px', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', margin: 0 }}>Dashboard de Erros WhatsApp</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>Visualização de erros do sistema de disparo</p>
@@ -84,7 +84,7 @@ export default function ErrorDashboard() {
       </div>
 
       {/* Cards de resumo */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px' }}>
           <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 8px' }}>Total de Erros</p>
           <p style={{ fontSize: '32px', fontWeight: 700, color: '#2563eb', margin: 0 }}>{errors.length.toLocaleString()}</p>
@@ -122,7 +122,7 @@ export default function ErrorDashboard() {
       </div>
 
       {/* Tabela de erros */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+      <div className="mobile-scroll-x" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', margin: 0 }}>Registros de Erro</h2>
         </div>

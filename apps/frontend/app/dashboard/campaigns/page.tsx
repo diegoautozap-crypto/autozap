@@ -211,15 +211,15 @@ export default function CampaignsPage() {
   )
 
   return (
-    <div style={{ padding: '28px 32px', height: '100%', display: 'flex', flexDirection: 'column', background: '#f4f4f5' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', height: '100%', display: 'flex', flexDirection: 'column', background: '#f4f4f5' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>Campanhas</h1>
           <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>Gerencie seus disparos em massa</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => refetch()} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fff'}>
@@ -323,7 +323,7 @@ export default function CampaignsPage() {
         </div>
 
         {/* Painel lateral */}
-        <div style={{ width: '268px', flexShrink: 0 }}>
+        <div className="mobile-full" style={{ width: '268px', flexShrink: 0 }}>
           {selectedCamp ? (
             <div style={{ background: '#161b27', borderRadius: '12px', overflow: 'hidden', position: 'sticky', top: 0, boxShadow: '0 4px 20px rgba(0,0,0,.15)' }}>
               <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

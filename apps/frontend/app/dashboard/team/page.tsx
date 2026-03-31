@@ -153,7 +153,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
           {/* Páginas */}
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📄 Páginas permitidas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {ALL_PAGES.map(page => {
                 const isChecked = (effectivePerms.allowed_pages || []).includes(page.href)
                 const isLocked = page.href === '/dashboard/inbox'
@@ -215,7 +215,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
           {/* Campanhas */}
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📦 Acesso a campanhas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {CAMPAIGN_ACCESS_OPTIONS.map(opt => {
                 const isSelected = effectivePerms.campaign_access === opt.value
                 return (
@@ -302,10 +302,10 @@ export default function TeamPage() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '900px' }}>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Equipe</h1>
           <p style={{ color: '#a1a1aa', fontSize: '13px', marginTop: '3px' }}>
@@ -323,7 +323,7 @@ export default function TeamPage() {
       </div>
 
       {/* Cards de roles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
+      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
         {ROLES.map(r => {
           const Icon = r.icon
           return (
@@ -359,7 +359,7 @@ export default function TeamPage() {
           </div>
           <div style={{ marginBottom: '16px' }}>
             <label style={labelStyle}>Tipo de acesso</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               {ROLES.map(r => {
                 const Icon = r.icon
                 return (

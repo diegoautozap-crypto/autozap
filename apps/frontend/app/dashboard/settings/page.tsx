@@ -441,9 +441,11 @@ export default function SettingsPage() {
   const barColor = trialExpired ? '#ef4444' : isWarning ? '#f97316' : '#22c55e'
 
   return (
-    <div style={{ padding: '32px', maxWidth: '700px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', marginBottom: '4px' }}>Plano e Configurações</h1>
-      <p style={{ color: '#a1a1aa', fontSize: '14px', marginBottom: '28px' }}>Gerencie sua conta e uso do plano</p>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '700px' }}>
+      <div className="mobile-header">
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', marginBottom: '4px' }}>Plano e Configurações</h1>
+        <p style={{ color: '#a1a1aa', fontSize: '14px', marginBottom: '28px' }}>Gerencie sua conta e uso do plano</p>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 

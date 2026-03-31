@@ -166,10 +166,10 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px' }}>
+    <div className="mobile-page" style={{ padding: '32px', maxWidth: '1200px' }}>
 
       {/* Saudação */}
-      <div style={{ marginBottom: '28px' }}>
+      <div className="mobile-header" style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
         <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
       </div>
@@ -177,14 +177,14 @@ export default function DashboardPage() {
       <OnboardingBanner channels={channels || []} templates={templates || []} campaigns={campaigns || []} />
 
       {/* Cards principais */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {metricCards.map(({ label, value, sub, icon, color, bg, href }) => (
           <MetricCard key={label} label={label} value={value} sub={sub} icon={icon} color={color} bg={bg} href={href} onClick={() => router.push(href)} />
         ))}
       </div>
 
       {/* Taxa cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         <StatCard label="Enviadas (30 dias)" value={totalSent.toLocaleString()} icon={Send}       color="#2563eb" bg="#eff6ff" />
         <StatCard label="Taxa de entrega"    value={`${deliveryRate}%`}          icon={CheckCheck} color="#22c55e" bg="#f0fdf4" />
         <StatCard label="Taxa de leitura"    value={`${readRate}%`}              icon={Eye}        color="#7c3aed" bg="#f5f3ff" />
@@ -215,7 +215,7 @@ export default function DashboardPage() {
 
       {/* Métricas do atendente selecionado */}
       {selectedAgent && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
           <StatCard label="Conversas abertas atribuídas"  value={agentConversations ?? '—'}              icon={MessageSquare} color="#22c55e" bg="#f0fdf4" />
           <StatCard label="Conversas fechadas (7 dias)"   value={agentClosedLast7d ?? '—'}               icon={CheckCheck}    color="#2563eb" bg="#eff6ff" />
           <StatCard label="Tempo médio de resposta (7d)"  value={formatResponseTime(avgResponseMinutes)} icon={Clock}         color="#ea580c" bg="#fff7ed" />
@@ -223,14 +223,14 @@ export default function DashboardPage() {
       )}
 
       {/* Métricas operacionais */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         <StatCard label="Tempo médio de resposta (7d)"       value={formatResponseTime(avgResponseMinutes)} icon={Clock}      color="#ea580c" bg="#fff7ed" />
         <StatCard label="Flows disparados hoje"               value={activeFlowsToday}                       icon={Workflow}   color="#22c55e" bg="#f0fdf4" onClick={() => router.push('/dashboard/flows')} />
         <StatCard label="Atendentes com conversas abertas"   value={byAgent.length}                          icon={UserCheck}  color="#2563eb" bg="#eff6ff" />
       </div>
 
       {/* Gráfico + Conversas por atendente */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '14px', marginBottom: '20px' }}>
+      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '14px', marginBottom: '20px' }}>
         {/* Gráfico de barras */}
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -300,7 +300,7 @@ export default function DashboardPage() {
           <TrendingUp size={14} color="#22c55e" />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#52525b' }}>Acesso rápido</span>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
             { label: 'Nova campanha',     href: '/dashboard/campaigns', primary: true,  roles: ['owner', 'admin'] },
             { label: 'Importar contatos', href: '/dashboard/contacts',  primary: false, roles: ['owner', 'admin', 'supervisor'] },

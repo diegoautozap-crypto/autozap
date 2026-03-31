@@ -476,10 +476,10 @@ export default function PipelinePage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
+    <div className="mobile-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
 
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #e4e4e7', background: '#fff', flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
             <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Pipeline</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
@@ -492,7 +492,7 @@ export default function PipelinePage() {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="mobile-header-actions mobile-wrap" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
               <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todos os canais</option>
@@ -592,7 +592,7 @@ export default function PipelinePage() {
           <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
         </div>
       ) : (
-        <div ref={boardScrollRef} onMouseDown={handleBoardMouseDown}
+        <div className="pipeline-board" ref={boardScrollRef} onMouseDown={handleBoardMouseDown}
           style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '20px 24px', cursor: isDraggingBoard ? 'grabbing' : 'grab', userSelect: 'none' }}>
           <div style={{ display: 'flex', gap: '12px', height: '100%', minWidth: 'max-content' }}>
             {stages.map(stage => {
@@ -601,6 +601,7 @@ export default function PipelinePage() {
               const colTotal = getColumnTotal(stage.key)
               return (
                 <div key={stage.key}
+                  className="pipeline-column"
                   onDragOver={e => { if (draggingColKey) handleColDragOver(e, stage.key); else handleDragOver(e, stage.key) }}
                   onDrop={e => { if (draggingColKey) handleColDrop(e, stage.key); else handleDrop(e, stage.key) }}
                   onDragLeave={() => { setOverStage(null); setOverColKey(null) }}

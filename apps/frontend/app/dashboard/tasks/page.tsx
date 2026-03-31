@@ -204,10 +204,10 @@ export default function TasksPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '960px', margin: '0 auto' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '960px', margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+      <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CheckSquare size={20} color="#22c55e" />
@@ -220,6 +220,7 @@ export default function TasksPage() {
           </div>
         </div>
         <button
+          className="mobile-header-actions"
           onClick={() => setShowModal(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
@@ -421,6 +422,7 @@ export default function TasksPage() {
           }}
         >
           <div
+            className="mobile-modal"
             onClick={e => e.stopPropagation()}
             style={{
               background: '#fff', borderRadius: '16px', padding: '28px',
