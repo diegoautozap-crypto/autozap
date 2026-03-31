@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi, contactApi } from '@/lib/api'
 import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
@@ -51,8 +51,14 @@ export default function CampaignsPage() {
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const [scheduleMode, setScheduleMode]         = useState<'now' | 'scheduled'>('now')
   const [scheduledAt, setScheduledAt]           = useState('')
-  const [contactMode, setContactMode]           = useState<'manual' | 'tag'>('manual')
+  const [contactMode, setContactMode]           = useState<'manual' | 'segment'>('manual')
   const [selectedTagIds, setSelectedTagIds]     = useState<string[]>([])
+  const [segNoInteraction, setSegNoInteraction] = useState<number>(0)
+  const [segOrigin, setSegOrigin]               = useState<string>('')
+  const [segCustomField, setSegCustomField]     = useState<string>('')
+  const [segCustomValue, setSegCustomValue]     = useState<string>('')
+  const [previewCount, setPreviewCount]         = useState<number | null>(null)
+  const [loadingPreview, setLoadingPreview]     = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -96,6 +102,8 @@ export default function CampaignsPage() {
     setSelectedChannels([]); setSelectedTemplates([]); setSelectedTagIds([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
     setMessagesPerMin(1200); setContactMode('manual')
+    setSegNoInteraction(0); setSegOrigin(''); setSegCustomField(''); setSegCustomValue('')
+    setPreviewCount(null)
   }
 
   const toggleChannel  = (id: string) => setSelectedChannels(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
@@ -105,7 +113,26 @@ export default function CampaignsPage() {
   const updateCurlCopy = (i: number, val: string) => setCurlCopies(prev => prev.map((c, idx) => idx === i ? val : c))
 
   const validCurlCopies = curlCopies.filter(c => c.trim())
-  const hasContacts = contactMode === 'tag' ? selectedTagIds.length > 0 : contactsText.trim().length > 0
+  const buildFilter = () => {
+    const f: any = {}
+    if (selectedTagIds.length > 0) f.tagIds = selectedTagIds
+    if (segNoInteraction > 0) f.noInteractionDays = segNoInteraction
+    if (segOrigin) f.origin = segOrigin
+    if (segCustomField && segCustomValue) { f.customField = segCustomField; f.customValue = segCustomValue }
+    return f
+  }
+  const hasSegmentFilter = selectedTagIds.length > 0 || segNoInteraction > 0 || segOrigin || (segCustomField && segCustomValue)
+  const hasContacts = contactMode === 'segment' ? hasSegmentFilter : contactsText.trim().length > 0
+
+  const loadPreview = async () => {
+    if (!hasSegmentFilter) return
+    setLoadingPreview(true)
+    try {
+      const { data } = await campaignApi.post('/contacts/preview', buildFilter())
+      setPreviewCount(data.data.total)
+    } catch { setPreviewCount(null) }
+    finally { setLoadingPreview(false) }
+  }
   const isValid = campaignName && selectedChannels.length > 0 &&
     (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0)
 
@@ -126,10 +153,10 @@ export default function CampaignsPage() {
       const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
 
-      if (contactMode === 'tag' && selectedTagIds.length > 0) {
-        toast.info('Carregando contatos por tag...')
-        const { data: tagResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-tag`, { tagIds: selectedTagIds })
-        toast.info(`${tagResult?.data?.imported || 0} contatos carregados`)
+      if (contactMode === 'segment' && hasSegmentFilter) {
+        toast.info('Carregando contatos por segmento...')
+        const { data: filterResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-filter`, buildFilter())
+        toast.info(`${filterResult?.data?.imported || 0} contatos carregados`)
       } else {
         const rows = contactsText.split('\n').filter(Boolean).map(line => {
           const parts = line.split(','); const phone = parts[0]?.trim().replace(/\D/g, '')
@@ -559,7 +586,7 @@ export default function CampaignsPage() {
               <div>
                 <Lbl>Destinatários</Lbl>
                 <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '10px' }}>
-                  {[{ v: 'tag', label: 'Por tag', Icon: Tag }, { v: 'manual', label: 'Lista manual', Icon: Upload }].map(({ v, label, Icon }) => (
+                  {[{ v: 'segment', label: 'Segmento', Icon: Tag }, { v: 'manual', label: 'Lista manual', Icon: Upload }].map(({ v, label, Icon }) => (
                     <button key={v} onClick={() => setContactMode(v as any)}
                       style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: contactMode === v ? '#fff' : 'transparent', color: contactMode === v ? '#18181b' : '#71717a', boxShadow: contactMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
                       <Icon size={13} /> {label}
@@ -567,30 +594,63 @@ export default function CampaignsPage() {
                   ))}
                 </div>
 
-                {contactMode === 'tag' ? (
-                  <div>
-                    {tags.length === 0 ? (
-                      <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada. Crie tags na página de Contatos.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {tags.map((tag: any) => {
-                          const sel = selectedTagIds.includes(tag.id)
-                          return (
-                            <div key={tag.id} onClick={() => setSelectedTagIds(prev => sel ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
-                              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                              <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
-                            </div>
-                          )
-                        })}
+                {contactMode === 'segment' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Tags */}
+                    <div>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tags</p>
+                      {tags.length === 0 ? (
+                        <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                          {tags.map((tag: any) => {
+                            const sel = selectedTagIds.includes(tag.id)
+                            return (
+                              <div key={tag.id} onClick={() => { setSelectedTagIds(prev => sel ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPreviewCount(null) }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '11px', fontWeight: 500, transition: 'all 0.1s' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                                <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Filtros extras */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sem interação há (dias)</p>
+                        <input type="number" min="0" style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} value={segNoInteraction || ''} placeholder="0" onChange={e => { setSegNoInteraction(Number(e.target.value) || 0); setPreviewCount(null) }} />
                       </div>
-                    )}
-                    {selectedTagIds.length > 0 && (
-                      <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                        {selectedTagIds.length} tag{selectedTagIds.length > 1 ? 's' : ''} selecionada{selectedTagIds.length > 1 ? 's' : ''} — contatos serão carregados ao criar
-                      </p>
-                    )}
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Origem</p>
+                        <select style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} value={segOrigin} onChange={e => { setSegOrigin(e.target.value); setPreviewCount(null) }}>
+                          <option value="">Todas</option>
+                          <option value="manual">Manual</option>
+                          <option value="csv_import">Importação CSV</option>
+                          <option value="webhook">Webhook</option>
+                          <option value="whatsapp">WhatsApp</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campo personalizado</p>
+                        <input style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} placeholder="interesse_principal" value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor do campo</p>
+                        <input style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} placeholder="comercial" value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    <button onClick={loadPreview} disabled={!hasSegmentFilter || loadingPreview}
+                      style={{ width: '100%', padding: '8px', background: hasSegmentFilter ? '#f0f9ff' : '#fafafa', border: `1px solid ${hasSegmentFilter ? '#bae6fd' : '#e4e4e7'}`, borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: hasSegmentFilter ? '#0369a1' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                      {loadingPreview ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={12} />}
+                      {previewCount !== null ? `${previewCount} contatos encontrados` : 'Contar contatos'}
+                    </button>
                   </div>
                 ) : (
                   <>

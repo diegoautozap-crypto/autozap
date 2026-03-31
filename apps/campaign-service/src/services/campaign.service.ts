@@ -28,6 +28,17 @@ export interface CampaignContact {
   variables?: Record<string, string>
 }
 
+export interface SegmentFilter {
+  tagIds?: string[]
+  status?: string
+  origin?: string
+  lastInteractionAfter?: string
+  lastInteractionBefore?: string
+  noInteractionDays?: number
+  customField?: string
+  customValue?: string
+}
+
 export class CampaignService {
 
   async createCampaign(input: CreateCampaignInput) {
@@ -105,35 +116,57 @@ export class CampaignService {
   }
 
   async addContactsByTag(campaignId: string, tenantId: string, tagIds: string[]) {
-    // Busca contatos únicos que têm qualquer uma das tags selecionadas
-    const { data: contactIds } = await db
-      .from('contact_tags')
-      .select('contact_id')
-      .in('tag_id', tagIds)
+    return this.addContactsByFilter(campaignId, tenantId, { tagIds })
+  }
 
-    if (!contactIds || contactIds.length === 0) return 0
+  async queryContactsByFilter(tenantId: string, filter: SegmentFilter): Promise<{ contacts: any[]; total: number }> {
+    let query = db.from('contacts').select('id, phone, name, email').eq('tenant_id', tenantId)
 
-    const uniqueIds = [...new Set(contactIds.map(r => r.contact_id))]
+    // Filtro por status
+    if (filter.status) query = query.eq('status', filter.status)
+    else query = query.eq('status', 'active')
 
-    const { data: contacts } = await db
-      .from('contacts')
-      .select('id, phone, name, email')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .in('id', uniqueIds)
+    // Filtro por última interação
+    if (filter.lastInteractionAfter) query = query.gte('last_interaction_at', filter.lastInteractionAfter)
+    if (filter.lastInteractionBefore) query = query.lte('last_interaction_at', filter.lastInteractionBefore)
+    if (filter.noInteractionDays) {
+      const cutoff = new Date(Date.now() - filter.noInteractionDays * 86400000).toISOString()
+      query = query.lte('last_interaction_at', cutoff)
+    }
 
-    if (!contacts || contacts.length === 0) return 0
+    // Filtro por origem
+    if (filter.origin) query = query.eq('origin', filter.origin)
 
-    const rows: CampaignContact[] = contacts
-      .filter(c => c.phone && c.phone.length >= 8 && !c.phone.startsWith('webhook_temp_'))
-      .map(c => ({
-        phone: c.phone,
-        name: c.name || c.phone,
-        contactId: c.id,
-        variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone },
-      }))
+    // Filtro por tags
+    if (filter.tagIds && filter.tagIds.length > 0) {
+      const { data: tagContacts } = await db.from('contact_tags').select('contact_id').in('tag_id', filter.tagIds)
+      if (!tagContacts || tagContacts.length === 0) return { contacts: [], total: 0 }
+      const uniqueIds = [...new Set(tagContacts.map(r => r.contact_id))]
+      query = query.in('id', uniqueIds)
+    }
 
-    if (rows.length === 0) return 0
+    // Filtro por campo personalizado (metadata)
+    if (filter.customField && filter.customValue !== undefined) {
+      query = query.contains('metadata', { [filter.customField]: filter.customValue })
+    }
+
+    const { data: contacts } = await query
+    if (!contacts) return { contacts: [], total: 0 }
+
+    const valid = contacts.filter(c => c.phone && c.phone.length >= 8 && !c.phone.startsWith('webhook_temp_'))
+    return { contacts: valid, total: valid.length }
+  }
+
+  async addContactsByFilter(campaignId: string, tenantId: string, filter: SegmentFilter) {
+    const { contacts } = await this.queryContactsByFilter(tenantId, filter)
+    if (contacts.length === 0) return 0
+
+    const rows: CampaignContact[] = contacts.map(c => ({
+      phone: c.phone,
+      name: c.name || c.phone,
+      contactId: c.id,
+      variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone },
+    }))
 
     return this.addContacts(campaignId, tenantId, rows)
   }

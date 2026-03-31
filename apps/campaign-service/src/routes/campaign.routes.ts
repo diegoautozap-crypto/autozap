@@ -215,6 +215,22 @@ router.post('/campaigns/:id/contacts/by-tag', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Preview de contatos por filtro (retorna contagem sem criar campanha)
+router.post('/contacts/preview', async (req, res, next) => {
+  try {
+    const { total } = await campaignService.queryContactsByFilter(req.auth.tid, req.body)
+    res.json(ok({ total }))
+  } catch (err) { next(err) }
+})
+
+// Adicionar contatos por filtro avançado (segmento)
+router.post('/campaigns/:id/contacts/by-filter', async (req, res, next) => {
+  try {
+    const count = await campaignService.addContactsByFilter(req.params.id, req.auth.tid, req.body)
+    res.json(ok({ imported: count }))
+  } catch (err) { next(err) }
+})
+
 router.post('/campaigns/:id/start', async (req, res, next) => {
   try {
     const role = req.auth.role
