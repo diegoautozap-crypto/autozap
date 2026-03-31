@@ -165,14 +165,15 @@ router.post('/campaigns', async (req, res, next) => {
       curlTemplate = `curl -X POST "https://api.gupshup.io/wa/api/v1/template/msg" -H "apikey: ${apiKey}" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "channel=whatsapp" --data-urlencode "source=${source}" --data-urlencode "destination={{phone}}" --data-urlencode "src.name=${srcName || source}" --data-urlencode "template=${templateParam}"`
     }
 
-    if (curlTemplate) {
-      // Normaliza: remove backslash de quebra de linha e junta tudo
-      curlTemplate = curlTemplate.replace(/\\\s*\n/g, ' ').replace(/\n/g, ' ')
-      // Substitui todas as variações de placeholders
-      curlTemplate = curlTemplate
-        .replace(/\{\{\s*api[_\s]?key\s*\}\}/gi, apiKey)
-        .replace(/\{\{\s*source\s*\}\}/gi, source)
-        .replace(/\{\{\s*src[_\s.]?name\s*\}\}/gi, srcName || source)
+    const replacePlaceholders = (tpl: string) => tpl
+      .replace(/\\\s*\n/g, ' ').replace(/\n/g, ' ')
+      .replace(/\{\{\s*api[_\s]?key\s*\}\}/gi, apiKey)
+      .replace(/\{\{\s*source\s*\}\}/gi, source)
+      .replace(/\{\{\s*src[_\s.]?name\s*\}\}/gi, srcName || source)
+
+    if (curlTemplate) curlTemplate = replacePlaceholders(curlTemplate)
+    if (rest.copies && Array.isArray(rest.copies)) {
+      rest.copies = rest.copies.map((c: string) => replacePlaceholders(c))
     }
 
     console.log('CURL AFTER REPLACE:', curlTemplate?.slice(0, 300))
