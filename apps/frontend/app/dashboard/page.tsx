@@ -9,6 +9,7 @@ import {
   Clock, UserCheck, Workflow, X,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
+import { GridSkeleton } from '@/components/ui/skeleton'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -122,11 +123,11 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
   const role = (user as any)?.role || 'agent'
 
-  const { data: campaigns } = useQuery({ queryKey: ['campaigns'], queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data }, refetchInterval: 15000 })
+  const { data: campaigns, isLoading: loadingCampaigns } = useQuery({ queryKey: ['campaigns'], queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data }, refetchInterval: 15000 })
   const { data: channels } = useQuery({ queryKey: ['channels'], queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data }, refetchInterval: 30000 })
   const { data: templates } = useQuery({ queryKey: ['templates'], queryFn: async () => { const { data } = await campaignApi.get('/templates'); return data.data }, refetchInterval: 30000 })
   const { data: conversations } = useQuery({ queryKey: ['conversations', 'open'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data }, refetchInterval: 15000 })
-  const { data: contactsMeta } = useQuery({ queryKey: ['contacts-count'], queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta }, refetchInterval: 15000 })
+  const { data: contactsMeta, isLoading: loadingContacts } = useQuery({ queryKey: ['contacts-count'], queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta }, refetchInterval: 15000 })
   const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data }, refetchInterval: 15000 })
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
@@ -177,11 +178,15 @@ export default function DashboardPage() {
       <OnboardingBanner channels={channels || []} templates={templates || []} campaigns={campaigns || []} />
 
       {/* Cards principais */}
-      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        {metricCards.map(({ label, value, sub, icon, color, bg, href }) => (
-          <MetricCard key={label} label={label} value={value} sub={sub} icon={icon} color={color} bg={bg} href={href} onClick={() => router.push(href)} />
-        ))}
-      </div>
+      {(loadingCampaigns && loadingContacts) ? (
+        <div style={{ marginBottom: '20px' }}><GridSkeleton cols={4} /></div>
+      ) : (
+        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+          {metricCards.map(({ label, value, sub, icon, color, bg, href }) => (
+            <MetricCard key={label} label={label} value={value} sub={sub} icon={icon} color={color} bg={bg} href={href} onClick={() => router.push(href)} />
+          ))}
+        </div>
+      )}
 
       {/* Taxa cards */}
       <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>

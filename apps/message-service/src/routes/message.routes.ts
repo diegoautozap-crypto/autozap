@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
-import { ok, generateId, normalizeBRPhone } from '@autozap/utils'
+import { ok, generateId, normalizeBRPhone, rateLimit } from '@autozap/utils'
 import { db } from '../lib/db'
 import { ensureContact, ensureConversation } from '../services/contact.helper'
 
@@ -141,7 +141,7 @@ router.post('/messages/conversations/:conversationId/release-bot', requireAuth, 
 })
 
 // ─── Webhook de entrada (público) — por tenant ────────────────────────────────
-router.post('/webhook/lead/:token', async (req, res, next) => {
+router.post('/webhook/lead/:token', rateLimit({ max: 120 }), async (req, res, next) => {
   try {
     const { data: tenant, error } = await db
       .from('tenants')
@@ -182,7 +182,7 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
 
 // ─── Webhook de entrada para flows (com mapeamento de campos) ─────────────────
 // Gzip/deflate já é descomprimido pelo middleware global em index.ts
-router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
+router.post('/webhook/flow/:flowId/:token', rateLimit({ max: 120 }), async (req, res, next) => {
   try {
     // Busca o flow e seu mapeamento de campos configurado
     const { data: flow, error } = await db

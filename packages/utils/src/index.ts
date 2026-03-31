@@ -145,6 +145,8 @@ export function normalizePhone(phone: string): string {
   return cleaned
 }
 
+export { rateLimit } from './rate-limit'
+
 export function normalizeBRPhone(phone: string): string {
   // Remove tudo que não é dígito, adiciona 9° dígito em celulares BR se necessário
   let normalized = phone.replace(/\D/g, '').replace(/^\+/, '')

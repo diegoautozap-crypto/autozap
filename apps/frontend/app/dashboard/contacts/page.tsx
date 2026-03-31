@@ -6,6 +6,7 @@ import { contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
+import { ListSkeleton } from '@/components/ui/skeleton'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
@@ -212,7 +213,9 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const parseFile = (file: File) => {
     setError('')
-    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { setError('Formato inválido. Use .xlsx, .xls ou .csv'); return }
+    const MAX_FILE_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_FILE_SIZE) { toast.error('Arquivo muito grande. O tamanho máximo é 10MB.'); return }
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { toast.error('Formato inválido. Use .xlsx, .xls ou .csv'); return }
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -528,7 +531,7 @@ export default function ContactsPage() {
       {/* Table */}
       <div className="mobile-scroll-x" style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
         {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
+          <div style={{ padding: '20px' }}><ListSkeleton rows={8} /></div>
         ) : contacts.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>

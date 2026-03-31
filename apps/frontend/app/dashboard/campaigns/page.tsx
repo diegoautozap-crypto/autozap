@@ -6,6 +6,7 @@ import { campaignApi, channelApi, contactApi } from '@/lib/api'
 import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
+import { ListSkeleton } from '@/components/ui/skeleton'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
@@ -239,8 +240,8 @@ export default function CampaignsPage() {
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
             {isLoading ? (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px' }}>
-                <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
+              <div style={{ flex: 1, padding: '20px' }}>
+                <ListSkeleton rows={5} />
               </div>
             ) : campaigns?.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '60px' }}>

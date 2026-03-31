@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
+import { ListSkeleton } from '@/components/ui/skeleton'
 
 const FLOW_TEMPLATES = [
   {
@@ -341,8 +342,8 @@ export default function FlowsPage() {
 
       {/* Lista */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '60px' }}>
-          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
+        <div style={{ padding: '20px' }}>
+          <ListSkeleton rows={5} />
         </div>
       ) : flows.length === 0 ? (
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '80px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>

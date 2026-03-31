@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
-import { ok } from '@autozap/utils'
+import { ok, rateLimit } from '@autozap/utils'
 import { encryptCredentials } from '../lib/crypto'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
@@ -182,7 +182,7 @@ router.get('/audio-proxy', async (req, res) => {
 })
 
 // ─── Gupshup Webhook (public) ─────────────────────────────────────────────────
-router.post('/webhook/gupshup/:apikey', async (req, res, next) => {
+router.post('/webhook/gupshup/:apikey', rateLimit({ max: 120 }), async (req, res, next) => {
   try {
     const { apikey } = req.params
     const payload = req.body

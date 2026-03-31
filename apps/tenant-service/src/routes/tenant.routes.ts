@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { tenantService } from '../services/tenant.service'
 import { requireAuth, requireRole, validate } from '../middleware/tenant.middleware'
-import { ok, paginationSchema } from '@autozap/utils'
+import { ok, paginationSchema, rateLimit } from '@autozap/utils'
 
 const router = Router()
 
@@ -56,7 +56,7 @@ const webhookUpdateSchema = z.object({
 // ─── Webhook do Asaas (público — sem auth) ────────────────────────────────────
 const asaasWebhookRouter = Router()
 
-asaasWebhookRouter.post('/billing/webhook/asaas', async (req, res) => {
+asaasWebhookRouter.post('/billing/webhook/asaas', rateLimit({ max: 30 }), async (req, res) => {
   try {
     // Verifica token de autenticação do webhook Asaas
     const asaasToken = process.env.ASAAS_WEBHOOK_TOKEN
