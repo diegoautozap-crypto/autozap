@@ -17,6 +17,42 @@ const supabase = createClient(
 
 const MESSAGE_SERVICE_URL = process.env.NEXT_PUBLIC_MESSAGE_SERVICE_URL || 'https://autozapmessage-service-production.up.railway.app'
 
+function KeywordChipInput({ keywords, onChange, inputStyle, placeholder }: { keywords: string[]; onChange: (kw: string[]) => void; inputStyle: React.CSSProperties; placeholder?: string }) {
+  const [text, setText] = useState('')
+
+  const addChip = () => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    if (!keywords.includes(trimmed.toLowerCase())) onChange([...keywords, trimmed])
+    setText('')
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: keywords.length > 0 ? '5px' : 0 }}>
+        {keywords.map((kw, i) => (
+          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '99px', fontSize: '11px', fontWeight: 600, color: '#15803d' }}>
+            {kw}
+            <button onClick={() => onChange(keywords.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px', color: '#86efac', display: 'flex', lineHeight: 1 }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#86efac'}>
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addChip() } }}
+        onBlur={addChip}
+        style={inputStyle}
+        placeholder={placeholder || (keywords.length === 0 ? 'Digite e aperte Enter...' : 'Adicionar mais...')}
+      />
+    </div>
+  )
+}
+
 export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdate, onClose, onDelete }: {
   node: Node; tags: any[]; flows: any[]; channels: any[]; tenantId: string
   onUpdate: (id: string, data: any) => void
@@ -150,11 +186,12 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
         {d.type === 'trigger_keyword' && (<>
           <div>
-            <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
-            <input style={inputStyle} placeholder="preço, valor, info"
-              defaultValue={(d.keywords || []).join(', ')}
-              onFocus={focusInput} onBlur={e => { blurInput(e); onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) }) }} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Clique fora do campo para salvar</p>
+            <label style={labelStyle}>Palavras-chave</label>
+            <KeywordChipInput
+              keywords={d.keywords || []}
+              onChange={keywords => onUpdate(node.id, { keywords })}
+              inputStyle={inputStyle}
+            />
           </div>
           <div>
             <label style={labelStyle}>Tipo de comparação</label>
@@ -168,9 +205,12 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'trigger_first_message' && (<>
           <div>
             <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
-            <input style={inputStyle} placeholder="Deixe vazio para qualquer mensagem"
-              defaultValue={(d.keywords || []).join(', ')}
-              onFocus={focusInput} onBlur={e => { blurInput(e); onUpdate(node.id, { keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) }) }} />
+            <KeywordChipInput
+              keywords={d.keywords || []}
+              onChange={keywords => onUpdate(node.id, { keywords })}
+              inputStyle={inputStyle}
+              placeholder="Deixe vazio para qualquer mensagem"
+            />
           </div>
         </>)}
 

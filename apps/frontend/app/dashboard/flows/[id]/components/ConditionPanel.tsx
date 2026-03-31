@@ -59,6 +59,48 @@ export function MediaUpload({ accept, label, currentUrl, onUploaded }: {
   )
 }
 
+function ChipInput({ value, onChange, inputStyle }: { value: string; onChange: (val: string) => void; inputStyle: React.CSSProperties }) {
+  const [text, setText] = useState('')
+  const chips = value ? value.split(',').map(v => v.trim()).filter(Boolean) : []
+
+  const addChip = () => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    const updated = chips.includes(trimmed.toLowerCase()) ? chips : [...chips, trimmed]
+    onChange(updated.join(', '))
+    setText('')
+  }
+
+  const removeChip = (index: number) => {
+    onChange(chips.filter((_, i) => i !== index).join(', '))
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: chips.length > 0 ? '5px' : 0 }}>
+        {chips.map((chip, i) => (
+          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '99px', fontSize: '11px', fontWeight: 600, color: '#15803d' }}>
+            {chip}
+            <button onClick={() => removeChip(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px', color: '#86efac', display: 'flex', lineHeight: 1 }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#86efac'}>
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addChip() } }}
+        onBlur={addChip}
+        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}
+        placeholder={chips.length === 0 ? 'Digite e aperte Enter...' : 'Adicionar mais...'}
+      />
+    </div>
+  )
+}
+
 export function ConditionPanel({ d, nodeId, inputStyle, onUpdate }: {
   d: any; nodeId: string; inputStyle: React.CSSProperties
   onUpdate: (id: string, data: any) => void
@@ -127,13 +169,13 @@ export function ConditionPanel({ d, nodeId, inputStyle, onUpdate }: {
                       style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
                       {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                     </select>
-                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (<>
-                      <input value={rule.value} onChange={e => updateRule(branch.id, rule.id, { value: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="1, conhecer, crm" />
-                      {['contains', 'not_contains', 'equals', 'not_equals'].includes(rule.operator) && (
-                        <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '2px 0 0 0' }}>Separe por vírgula para aceitar várias palavras</p>
-                      )}
-                    </>)}
+                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
+                      <ChipInput
+                        value={rule.value || ''}
+                        onChange={val => updateRule(branch.id, rule.id, { value: val })}
+                        inputStyle={inputStyle}
+                      />
+                    )}
                   </div>
                 </div>
               ))}
