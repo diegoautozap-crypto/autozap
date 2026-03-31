@@ -280,7 +280,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             </div>
             <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', background: 'var(--bg-input)', borderBottom: '1px solid var(--divider)', padding: '8px 12px', gap: '8px' }}>
-                {['Telefone','Nome','Email','Empresa'].map(h => <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
+                {[t('contacts.phone'), t('contacts.name'), t('contacts.email'), t('contacts.company')].map(h => <span key={h} style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
               </div>
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {validRows.slice(0, 50).map((r, i) => {
@@ -396,7 +396,7 @@ export default function ContactsPage() {
   const meta = data?.meta
   const allSelected = contacts.length > 0 && selected.size === contacts.length
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
-  const tableColumns = [{ key: 'name', label: 'Nome', width: '2.5fr' },{ key: 'phone', label: 'Telefone', width: '1.5fr' },{ key: 'email', label: 'Email', width: '1.5fr' },...customFields.map(cf => ({ key: `meta_${cf.name}`, label: cf.label, width: '1fr', customField: cf })),{ key: 'last_interaction', label: 'Última interação', width: '1fr' }]
+  const tableColumns = [{ key: 'name', label: t('contacts.name'), width: '2.5fr' },{ key: 'phone', label: t('contacts.phone'), width: '1.5fr' },{ key: 'email', label: t('contacts.email'), width: '1.5fr' },...customFields.map(cf => ({ key: `meta_${cf.name}`, label: cf.label, width: '1fr', customField: cf })),{ key: 'last_interaction', label: t('contacts.lastInteraction'), width: '1fr' }]
   const gridTemplateColumns = `40px ${tableColumns.map(c => c.width).join(' ')} 80px`
 
   return (
@@ -504,10 +504,10 @@ export default function ContactsPage() {
             <button onClick={() => setShowCreate(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', color: 'var(--text-muted)', padding: '5px', display: 'flex' }}><X size={15} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-            <div><label style={lbl}>Telefone *</label><input style={inp} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-            <div><label style={lbl}>Nome</label><input style={inp} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><label style={lbl}>Email</label><input style={inp} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-            <div><label style={lbl}>Empresa</label><input style={inp} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
+            <div><label style={lbl}>{t('contacts.phone')} *</label><input style={inp} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><label style={lbl}>{t('contacts.name')}</label><input style={inp} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+            <div><label style={lbl}>{t('contacts.email')}</label><input style={inp} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            <div><label style={lbl}>{t('contacts.company')}</label><input style={inp} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
             {customFields.map(cf => (
               <div key={cf.id}>
                 <label style={lbl}>{cf.label}{cf.required && <span style={{ color: '#dc2626', marginLeft: '2px' }}>*</span>}</label>

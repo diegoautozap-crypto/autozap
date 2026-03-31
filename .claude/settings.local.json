@@ -15,7 +15,8 @@
       "Bash(grep -rn process.env /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
       "Bash(grep -rn \"aria-\\\\|role=\\\\|alt=\\\\|htmlFor\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
       "Bash(grep:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(grep -rhoP t\\\\\\([''][a-zA-Z_.]+['']\\\\\\) apps/frontend/app/dashboard/)"
     ]
   }
 }

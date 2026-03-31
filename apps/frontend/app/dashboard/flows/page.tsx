@@ -7,6 +7,7 @@ import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
+import { useT } from '@/lib/i18n'
 
 const FLOW_TEMPLATES = [
   {
@@ -163,6 +164,7 @@ function CooldownSelector({ value, onChange }: { value: string; onChange: (v: st
 }
 
 export default function FlowsPage() {
+  const t = useT()
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showNew, setShowNew] = useState(false)
@@ -227,7 +229,7 @@ export default function FlowsPage() {
     setEditingFlow(f); setEditName(f.name); setEditChannelId(f.channel_id || ''); setEditCooldown(f.cooldown_type || '24h')
   }
 
-  const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || 'Todos os canais'
+  const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || t('flows.allChannels')
   const cooldownLabel = (type: string) => COOLDOWN_OPTIONS.find(o => o.value === type)?.label || '24 horas'
 
   return (
@@ -236,19 +238,19 @@ export default function FlowsPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Flows</h1>
-          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('flows.title')}</h1>
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>{t('flows.subtitleAlt')}</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => setShowTemplates(true)}
             style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Copy size={14} /> Templates
+            <Copy size={14} /> {t('flows.templates')}
           </button>
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
-            <Plus size={14} /> Novo flow
+            <Plus size={14} /> {t('flows.new')}
           </button>
         </div>
       </div>
@@ -256,7 +258,7 @@ export default function FlowsPage() {
       {/* Form novo flow */}
       {showNew && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '14px', letterSpacing: '-0.01em' }}>Novo flow</h3>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '14px', letterSpacing: '-0.01em' }}>{t('flows.newFlow')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div>
               <label style={labelStyle}>Nome *</label>
@@ -265,9 +267,9 @@ export default function FlowsPage() {
                 onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
             </div>
             <div>
-              <label style={labelStyle}>Canal (opcional)</label>
+              <label style={labelStyle}>{t('flows.channel')}</label>
               <select style={{ ...inputStyle }} value={newChannelId} onChange={e => setNewChannelId(e.target.value)}>
-                <option value="">Todos os canais</option>
+                <option value="">{t('flows.allChannels')}</option>
                 {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -282,11 +284,11 @@ export default function FlowsPage() {
             <button onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}
               style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newName ? 0.5 : 1 }}>
               {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
-              Criar e abrir editor
+              {t('flows.createAndOpen')}
             </button>
             <button onClick={() => { setShowNew(false); setNewName('') }}
               style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
-              Cancelar
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -299,7 +301,7 @@ export default function FlowsPage() {
           <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '480px', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid var(--border)', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Editar flow</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{t('flows.editFlow')}</h3>
               <button onClick={() => setEditingFlow(null)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
                 <X size={15} color="var(--text-muted)" />
               </button>
@@ -312,9 +314,9 @@ export default function FlowsPage() {
                   onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
               </div>
               <div>
-                <label style={labelStyle}>Canal</label>
+                <label style={labelStyle}>{t('flows.channel')}</label>
                 <select style={{ ...inputStyle }} value={editChannelId} onChange={e => setEditChannelId(e.target.value)}>
-                  <option value="">Todos os canais</option>
+                  <option value="">{t('flows.allChannels')}</option>
                   {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -329,11 +331,11 @@ export default function FlowsPage() {
               <button onClick={() => updateMutation.mutate()} disabled={!editName || updateMutation.isPending}
                 style={{ padding: '10px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !editName ? 0.5 : 1 }}>
                 {updateMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-                Salvar
+                {t('common.save')}
               </button>
               <button onClick={() => setEditingFlow(null)}
                 style={{ padding: '10px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
-                Cancelar
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -350,11 +352,11 @@ export default function FlowsPage() {
           <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
             <Workflow size={24} color="var(--text-faintest)" />
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>Nenhum flow criado</p>
-          <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginBottom: '20px' }}>Crie seu primeiro flow para montar automações visuais com múltiplos passos</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>{t('flows.noFlowsShort')}</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginBottom: '20px' }}>{t('flows.createFirstAlt')}</p>
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            Criar primeiro flow
+            {t('flows.createFirstFlow')}
           </button>
         </div>
       ) : (
@@ -374,11 +376,11 @@ export default function FlowsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                   <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', letterSpacing: '-0.01em' }}>{f.name}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: f.is_active ? '#dcfce7' : 'var(--bg)', color: f.is_active ? '#15803d' : 'var(--text-faint)', border: `1px solid ${f.is_active ? '#bbf7d0' : 'var(--border)'}` }}>
-                    {f.is_active ? 'Ativo' : 'Pausado'}
+                    {f.is_active ? t('flows.active') : t('flows.paused')}
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : 'Todos os canais'} · {cooldownLabel(f.cooldown_type || '24h')}
+                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : t('flows.allChannels')} · {cooldownLabel(f.cooldown_type || '24h')}
                 </p>
               </div>
 
@@ -414,8 +416,8 @@ export default function FlowsPage() {
           <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Templates de Flow</h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '3px' }}>Escolha um template pronto e personalize</p>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('flows.templateTitle')}</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '3px' }}>{t('flows.templateSubtitle')}</p>
               </div>
               <button onClick={() => setShowTemplates(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}><X size={15} color="var(--text-muted)" /></button>
             </div>

@@ -696,9 +696,9 @@ export default function PipelinePage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                 <div style={{ textAlign: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '40px 48px', boxShadow: 'var(--shadow)' }}>
                   <Settings2 size={28} color="var(--text-faintest)" style={{ margin: '0 auto 12px' }} />
-                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '4px' }}>Nenhuma coluna configurada</p>
-                  <p style={{ fontSize: '13px', color: 'var(--text-faint)', marginBottom: '16px' }}>Crie colunas para organizar suas conversas</p>
-                  <button onClick={() => setShowManage(true)} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Criar colunas</button>
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '4px' }}>{t('pipeline.noColumns')}</p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-faint)', marginBottom: '16px' }}>{t('pipeline.createColumnsSubtitle')}</p>
+                  <button onClick={() => setShowManage(true)} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>{t('pipeline.createColumns')}</button>
                 </div>
               </div>
             )}
