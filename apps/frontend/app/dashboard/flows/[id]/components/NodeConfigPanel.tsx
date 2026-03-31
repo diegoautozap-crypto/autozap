@@ -7,7 +7,7 @@ import { Node } from '@xyflow/react'
 import { X, Copy, RefreshCw, Loader2, Plus, Play } from 'lucide-react'
 import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
-import { messageApi, contactApi } from '@/lib/api'
+import { messageApi, contactApi, conversationApi } from '@/lib/api'
 import { toast } from 'sonner'
 
 const supabase = createClient(
@@ -122,6 +122,13 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
     },
     staleTime: 0,
     enabled: d.type === 'move_pipeline',
+  })
+
+  // ── Team members para assign_agent ────────────────────────────────────────
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['team-members-flow'],
+    queryFn: async () => { const { data } = await conversationApi.get('/team'); return data.data || [] },
+    enabled: d.type === 'assign_agent',
   })
 
   // ── Webhook token para trigger_webhook ────────────────────────────────────
@@ -239,6 +246,16 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'trigger_outside_hours' && (<>
           <div><label style={labelStyle}>Início do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>Fim do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Fuso horário</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.timezone || 'America/Sao_Paulo'} onChange={e => onUpdate(node.id, { timezone: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
+            <option value="America/Manaus">Manaus (GMT-4)</option>
+            <option value="America/Fortaleza">Fortaleza (GMT-3)</option>
+            <option value="America/New_York">New York (GMT-5)</option>
+            <option value="America/Chicago">Chicago (GMT-6)</option>
+            <option value="America/Los_Angeles">Los Angeles (GMT-8)</option>
+            <option value="Europe/London">London (GMT+0)</option>
+            <option value="Europe/Lisbon">Lisboa (GMT+0)</option>
+          </select></div>
         </>)}
 
         {/* ── Trigger Manual ──────────────────────────────────────────────── */}
@@ -561,13 +578,22 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <input style={inputStyle} placeholder="nome" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
             <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' }{d.saveAs || 'variavel'}{'}}' } nos próximos nós</p>
           </div>
+          <div>
+            <label style={labelStyle}>Timeout (horas)</label>
+            <input type="number" min="0" max="168" step="1" style={inputStyle} placeholder="0 = sem timeout" value={d.timeoutHours || ''} onChange={e => onUpdate(node.id, { timeoutHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Se não responder em {d.timeoutHours || 'X'}h, segue pela saída "timeout"</p>
+          </div>
         </>)}
 
         {d.type === 'condition' && (<ConditionPanel d={d} nodeId={node.id} inputStyle={inputStyle} onUpdate={onUpdate} />)}
 
         {d.type === 'ai' && (<>
           <div><label style={labelStyle}>Modo</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.mode || 'respond'} onChange={e => onUpdate(node.id, { mode: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="respond">Responder automaticamente</option><option value="classify">Classificar intenção</option><option value="extract">Extrair dado da mensagem</option><option value="summarize">Resumir mensagem</option></select></div>
-          <div><label style={labelStyle}>Chave da API OpenAI</label><input style={inputStyle} placeholder="sk-..." type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div>
+            <label style={labelStyle}>Chave da API OpenAI</label>
+            <input style={inputStyle} placeholder="sk-... (deixe vazio para usar a chave das Configurações)" type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '11px', color: '#0891b2', marginTop: '4px' }}>💡 Você pode configurar a chave uma vez em <a href="/dashboard/settings" style={{ color: '#0891b2', fontWeight: 600 }}>Configurações</a> e todos os nós usam automaticamente</p>
+          </div>
           <div><label style={labelStyle}>Modelo</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.model || 'gpt-4o-mini'} onChange={e => onUpdate(node.id, { model: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option><option value="gpt-4o">GPT-4o (mais inteligente)</option><option value="gpt-3.5-turbo">GPT-3.5 Turbo</option></select></div>
           {d.mode === 'respond' && <div><label style={labelStyle}>Instrução para a IA</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Você é um atendente da empresa X." value={d.systemPrompt || ''} onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
           {d.mode === 'classify' && <div><label style={labelStyle}>Categorias (separadas por vírgula)</label><input style={inputStyle} placeholder="comprar, suporte, cancelar" defaultValue={d.classifyOptions || ''} onFocus={focusInput} onBlur={e => { blurInput(e); onUpdate(node.id, { classifyOptions: e.target.value }) }} /></div>}
@@ -589,6 +615,19 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
   "phone": "{{phone}}"
 }' value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
           <div><label style={labelStyle}>Salvar resposta como variável</label><input style={inputStyle} placeholder="resposta_webhook" value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={labelStyle}>Headers (opcional)</label>
+              <button onClick={() => onUpdate(node.id, { headers: [...(d.headers || []), { key: '', value: '' }] })} style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+            </div>
+            {(d.headers || []).map((h: any, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                <input style={{ ...inputStyle, flex: 1, fontSize: '12px', padding: '6px 8px' }} placeholder="Authorization" value={h.key || ''} onChange={e => { const headers = [...(d.headers || [])]; headers[i] = { ...h, key: e.target.value }; onUpdate(node.id, { headers }) }} onFocus={focusInput} onBlur={blurInput} />
+                <input style={{ ...inputStyle, flex: 2, fontSize: '12px', padding: '6px 8px' }} placeholder="Bearer sk-xxx..." value={h.value || ''} onChange={e => { const headers = [...(d.headers || [])]; headers[i] = { ...h, value: e.target.value }; onUpdate(node.id, { headers }) }} onFocus={focusInput} onBlur={blurInput} />
+                <button onClick={() => { const headers = (d.headers || []).filter((_: any, j: number) => j !== i); onUpdate(node.id, { headers }) }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}>×</button>
+              </div>
+            ))}
+          </div>
         </>)}
 
         {d.type === 'wait' && (<>
@@ -620,15 +659,23 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'tag_contact' && (<>
           <SubtypeSelector options={TAG_SUBTYPES} />
           <div>
-            <label style={labelStyle}>{(d.subtype || 'add') === 'add' ? 'Tag para adicionar' : 'Tag para remover'}</label>
+            <label style={labelStyle}>{(d.subtype || 'add') === 'add' ? 'Tags para adicionar' : 'Tags para remover'}</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {tags.map((tag: any) => (
-                <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
-                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${d.tagId === tag.id ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: d.tagId === tag.id ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500 }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                  <span style={{ color: d.tagId === tag.id ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
-                </div>
-              ))}
+              {tags.map((tag: any) => {
+                const selectedIds: string[] = d.tagIds || (d.tagId ? [d.tagId] : [])
+                const isSelected = selectedIds.includes(tag.id)
+                return (
+                  <div key={tag.id} onClick={() => {
+                    const current: string[] = d.tagIds || (d.tagId ? [d.tagId] : [])
+                    const next = isSelected ? current.filter((id: string) => id !== tag.id) : [...current, tag.id]
+                    onUpdate(node.id, { tagIds: next, tagId: next[0] || null })
+                  }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${isSelected ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: isSelected ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500 }}>
+                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                    <span style={{ color: isSelected ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
           {(d.subtype || 'add') === 'add' && (
@@ -717,9 +764,17 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <div><label style={labelStyle}>Etapa do funil</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.stage || ''} onChange={e => { const selected = pipelineColumns.find((c: any) => c.key === e.target.value); onUpdate(node.id, { stage: e.target.value, stageLabel: selected?.label || e.target.value }) }} onFocus={focusInput} onBlur={blurInput}><option value="">Selecione uma etapa</option>{pipelineColumns.map((col: any) => <option key={col.key} value={col.key}>{col.label}</option>)}</select></div>
         </>)}
 
-        {d.type === 'assign_agent' && (
+        {d.type === 'assign_agent' && (<>
+          <div>
+            <label style={labelStyle}>Atribuir para</label>
+            <select style={{ ...inputStyle, background: '#fafafa' }} value={d.agentId || ''} onChange={e => onUpdate(node.id, { agentId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+              <option value="">Ninguém (só desativar bot)</option>
+              <option value="round_robin">🔄 Round-robin (menos ocupado)</option>
+              {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+            </select>
+          </div>
           <div><label style={labelStyle}>Mensagem para o cliente (opcional)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Aguarde, um atendente irá te responder." value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-        )}
+        </>)}
 
         {d.type === 'go_to' && (
           <div>
@@ -757,6 +812,32 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             )}
             <div><label style={labelStyle}>Máximo de iterações (segurança)</label><input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
+        </>)}
+
+        {d.type === 'transcribe_audio' && (<>
+          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#6d28d9' }}>
+            🎙️ Se o contato enviar <b>áudio</b>, transcreve para texto automaticamente. Se enviar <b>texto</b>, usa direto. O resultado fica na variável abaixo.
+          </div>
+          <div>
+            <label style={labelStyle}>Salvar transcrição como variável</label>
+            <input style={inputStyle} placeholder="transcricao" value={d.transcribeSaveAs || ''} onChange={e => onUpdate(node.id, { transcribeSaveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' }{d.transcribeSaveAs || 'transcricao'}{'}}' } nos próximos nós (ex: IA, condição)</p>
+          </div>
+          <div>
+            <label style={labelStyle}>Idioma do áudio</label>
+            <select style={{ ...inputStyle, background: '#fafafa' }} value={d.transcribeLanguage || 'pt'} onChange={e => onUpdate(node.id, { transcribeLanguage: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+              <option value="pt">Português</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="it">Italiano</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Chave OpenAI (opcional)</label>
+            <input style={inputStyle} placeholder="Deixe vazio para usar a chave das Configurações" type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+          </div>
         </>)}
 
         {d.type === 'end' && (

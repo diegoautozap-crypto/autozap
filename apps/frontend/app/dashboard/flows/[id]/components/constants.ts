@@ -1,7 +1,7 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, AlignLeft, Link, Play,
+  RefreshCw, AlignLeft, Link, Play, Mic,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -26,6 +26,7 @@ export const NODE_COLORS: Record<string, string> = {
   go_to:                 '#16a34a',
   end:                   '#dc2626',
   loop:                  '#7c3aed',
+  transcribe_audio:      '#7c3aed',
 }
 
 export const NODE_ICONS: Record<string, any> = {
@@ -50,6 +51,7 @@ export const NODE_ICONS: Record<string, any> = {
   go_to:                 CornerDownRight,
   end:                   Square,
   loop:                  RefreshCw,
+  transcribe_audio:      Mic,
 }
 
 export const NODE_LABELS: Record<string, string> = {
@@ -72,6 +74,7 @@ export const NODE_LABELS: Record<string, string> = {
   go_to:                 'Ir para outro flow',
   end:                   'Finalizar flow',
   loop:                  'Loop',
+  transcribe_audio:      'Transcrever áudio',
 }
 
 export const SEND_SUBTYPES = [
@@ -123,6 +126,10 @@ export const OPERATORS = [
   { value: 'not_equals',    label: 'É diferente de' },
   { value: 'starts_with',   label: 'Começa com' },
   { value: 'ends_with',     label: 'Termina com' },
+  { value: 'greater_than',  label: 'Maior que' },
+  { value: 'less_than',     label: 'Menor que' },
+  { value: 'greater_equal', label: 'Maior ou igual' },
+  { value: 'less_equal',    label: 'Menor ou igual' },
   { value: 'is_empty',      label: 'Está vazio' },
   { value: 'is_not_empty',  label: 'Não está vazio' },
 ]

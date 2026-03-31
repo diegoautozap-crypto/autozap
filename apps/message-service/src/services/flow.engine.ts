@@ -54,6 +54,7 @@ interface FlowNodeData {
   operator?: string
   value?: string
   tagId?: string
+  tagIds?: string[]
   customField?: string
   stage?: string
   pipelineId?: string
@@ -75,6 +76,12 @@ interface FlowNodeData {
   model?: string
   maxTokens?: number
   temperature?: number
+  timeoutHours?: number
+  headers?: { key: string; value: string }[]
+  timezone?: string
+  agentId?: string
+  transcribeSaveAs?: string
+  transcribeLanguage?: string
   seconds?: number
   minutes?: number
   hours?: number
@@ -313,8 +320,11 @@ export class FlowEngine {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
         const days = (Array.isArray(data?.days) ? data.days : [1, 2, 3, 4, 5]) as number[]
-        const now = new Date()
-        return !days.includes(now.getDay()) || now.getHours() < start || now.getHours() >= end
+        const tz = data?.timezone || 'America/Sao_Paulo'
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }))
+        const hour = now.getHours()
+        const day = now.getDay()
+        return !days.includes(day) || hour < start || hour >= end
       }
       default: return false
     }
@@ -376,7 +386,15 @@ export class FlowEngine {
           const message = this.interpolate(data?.message || '', ctx, variables)
           if (!message) break
           const ch = data?.channelId || ctx.channelId
-          if (data?.delay > 0) await new Promise(r => setTimeout(r, data.delay * 1000))
+          if (data?.delay && data.delay > 0) {
+            const delayMs = data.delay * 1000
+            // Cap sync delay at 30s; ignore longer delays (users should use wait node)
+            if (delayMs <= 30000) {
+              await new Promise(r => setTimeout(r, delayMs))
+            } else {
+              logger.warn('send_message delay exceeds 30s, skipping delay — use wait node instead', { delay: data.delay, nodeId: node.id })
+            }
+          }
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           break
         }
@@ -412,11 +430,25 @@ export class FlowEngine {
           const saveVar = data?.saveAs || 'resposta'
           const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
           const pendingConditionNodeId = (nextNode?.type === 'condition') ? nextNode.id : null
+          const inputStateId = stateId || generateId()
           await db.from('flow_states').upsert({
-            id: stateId || generateId(), flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+            id: inputStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
             conversation_id: ctx.conversationId, current_node_id: node.id, pending_condition_node_id: pendingConditionNodeId,
             variables, loop_counters: loopCounters, waiting_variable: saveVar, status: 'waiting', updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
+          // Schedule timeout if configured
+          if (data?.timeoutHours && data.timeoutHours > 0) {
+            const timeoutMs = data.timeoutHours * 3600000
+            const { flowResumeQueue } = await import('../workers/flow.worker')
+            const timeoutNodeId = this.getNextNode(node.id, 'timeout', edgeMap, nodeMap)?.id
+            if (timeoutNodeId) {
+              await flowResumeQueue.add('input-timeout', {
+                stateId: inputStateId, flowId, tenantId: ctx.tenantId,
+                contactId: ctx.contactId, conversationId: ctx.conversationId,
+                channelId: ctx.channelId, phone: ctx.phone, resumeNodeId: timeoutNodeId,
+              }, { delay: timeoutMs, jobId: `input-timeout-${ctx.conversationId}-${flowId}` })
+            }
+          }
           return { success: true, paused: true }
         }
 
@@ -444,6 +476,7 @@ export class FlowEngine {
           const current = loopCounters[countKey] || 0
           if (current < maxTimes) {
             loopCounters[countKey] = current + 1
+            variables['loop_index'] = String(current + 1)
             let loopNode = this.getNextNode(node.id, 'loop', edgeMap, nodeMap)
             let steps = 0
             while (loopNode && steps < 100) {
@@ -483,9 +516,85 @@ export class FlowEngine {
           return { success: true, nextHandle: 'done' }
         }
 
+        case 'transcribe_audio': {
+          // Se é áudio: baixa, transcreve com Whisper. Se é texto: usa direto.
+          const saveVar = data?.transcribeSaveAs || 'transcricao'
+          const contentType = ctx.messageBody ? 'text' : 'audio'
+
+          // Busca última mensagem pra saber o tipo
+          const { data: lastMsg } = await db.from('messages').select('content_type, media_url, body')
+            .eq('conversation_id', ctx.conversationId).eq('direction', 'inbound')
+            .order('created_at', { ascending: false }).limit(1).single()
+
+          if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
+            // Transcrever áudio via Whisper
+            let whisperKey = data?.apiKey
+            if (!whisperKey) {
+              const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+              whisperKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+            }
+            if (!whisperKey) { logger.warn('Transcribe node: no OpenAI API key'); variables[saveVar] = lastMsg.body || ''; break }
+
+            try {
+              // Baixa o áudio
+              const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
+              let audioUrl = lastMsg.media_url
+              if (!audioUrl.startsWith('http')) {
+                // Precisa do media proxy pra baixar
+                const creds = channel?.credentials ? JSON.parse(channel.credentials) : {}
+                const apiKey = creds?.apiKey
+                const metaToken = creds?.metaToken
+                if (/^\d+$/.test(audioUrl) && metaToken) {
+                  const metaRes = await fetch(`https://graph.facebook.com/v18.0/${audioUrl}`, { headers: { Authorization: `Bearer ${metaToken}` } })
+                  const metaData = await metaRes.json() as any
+                  audioUrl = metaData.url || audioUrl
+                  // Baixa com token
+                  const audioRes = await fetch(audioUrl, { headers: { Authorization: `Bearer ${metaToken}` } })
+                  const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+                  const { default: OpenAI } = await import('openai')
+                  const openai = new OpenAI({ apiKey: whisperKey })
+                  const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+                  const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
+                  variables[saveVar] = transcription.text || ''
+                } else if (apiKey) {
+                  const audioRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${audioUrl}`, { headers: { apikey: apiKey } })
+                  const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+                  const { default: OpenAI } = await import('openai')
+                  const openai = new OpenAI({ apiKey: whisperKey })
+                  const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+                  const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
+                  variables[saveVar] = transcription.text || ''
+                } else {
+                  variables[saveVar] = lastMsg.body || ''
+                }
+              } else {
+                // URL direta
+                const audioRes = await fetch(audioUrl)
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+                const { default: OpenAI } = await import('openai')
+                const openai = new OpenAI({ apiKey: whisperKey })
+                const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+                const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
+                variables[saveVar] = transcription.text || ''
+              }
+            } catch (err) {
+              logger.error('Transcribe audio error', { err: err instanceof Error ? err.message : String(err) })
+              variables[saveVar] = lastMsg.body || ''
+            }
+          } else {
+            // Texto normal — usa o body direto
+            variables[saveVar] = lastMsg?.body || ctx.messageBody || ''
+          }
+          break
+        }
+
         case 'ai': {
-          const openaiKey = data?.apiKey || process.env.OPENAI_API_KEY
-          if (!openaiKey) { logger.warn('AI node: no OpenAI API key configured'); break }
+          let openaiKey = data?.apiKey
+          if (!openaiKey) {
+            const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+            openaiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+          }
+          if (!openaiKey) { logger.warn('AI node: no OpenAI API key'); break }
           const { default: OpenAI } = await import('openai')
           const openai = new OpenAI({ apiKey: openaiKey, timeout: 30000, maxRetries: 1 })
           const aiMode = data?.mode || 'respond'
@@ -526,7 +635,13 @@ export class FlowEngine {
             const interpolatedBody = this.interpolate(data?.body || '{}', ctx, variables)
             try { JSON.parse(interpolatedBody); body = interpolatedBody } catch { body = JSON.stringify({ phone: ctx.phone, message: ctx.messageBody, contactId: ctx.contactId, conversationId: ctx.conversationId, ...variables }) }
           }
-          const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method !== 'GET' ? body : undefined, signal: AbortSignal.timeout(10000) })
+          const customHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+          if (data?.headers && Array.isArray(data.headers)) {
+            for (const h of data.headers) {
+              if (h.key && h.value) customHeaders[this.interpolate(h.key, ctx, variables)] = this.interpolate(h.value, ctx, variables)
+            }
+          }
+          const response = await fetch(url, { method, headers: customHeaders, body: method !== 'GET' ? body : undefined, signal: AbortSignal.timeout(10000) })
           const responseText = await response.text()
           if (data?.saveResponseAs) {
             try {
@@ -673,20 +788,17 @@ export class FlowEngine {
         }
 
         case 'tag_contact':
-        case 'add_tag': {
-          if (!data?.tagId) break
-          const tagAction = data?.subtype || 'add'
-          if (tagAction === 'remove') {
-            await db.from('contact_tags').delete().eq('contact_id', ctx.contactId).eq('tag_id', data.tagId)
-          } else {
-            await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: data.tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
-          }
-          break
-        }
-
+        case 'add_tag':
         case 'remove_tag': {
-          if (!data?.tagId) break
-          await db.from('contact_tags').delete().eq('contact_id', ctx.contactId).eq('tag_id', data.tagId)
+          const subtype = data?.subtype || (type === 'add_tag' ? 'add' : type === 'remove_tag' ? 'remove' : 'add')
+          const ids = data?.tagIds || (data?.tagId ? [data.tagId] : [])
+          for (const tagId of ids) {
+            if (subtype === 'add') {
+              await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: tagId }, { onConflict: 'contact_id,tag_id' })
+            } else {
+              await db.from('contact_tags').delete().eq('contact_id', ctx.contactId).eq('tag_id', tagId)
+            }
+          }
           break
         }
 
@@ -725,12 +837,35 @@ export class FlowEngine {
 
         case 'assign_agent': {
           if (data?.message) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: this.interpolate(data.message, ctx, variables) })
-          await db.from('conversations').update({ bot_active: false }).eq('id', ctx.conversationId)
+          const update: any = { bot_active: false }
+          if (data?.agentId === 'round_robin') {
+            // Find agent with least open conversations in this tenant
+            const { data: agents } = await db.from('users').select('id').eq('tenant_id', ctx.tenantId).eq('status', 'active')
+            if (agents?.length) {
+              const counts = await Promise.all(agents.map(async (a: any) => {
+                const { count } = await db.from('conversations').select('id', { count: 'exact', head: true }).eq('assigned_to', a.id).eq('status', 'open')
+                return { id: a.id, count: count || 0 }
+              }))
+              counts.sort((a: any, b: any) => a.count - b.count)
+              update.assigned_to = counts[0].id
+            }
+          } else if (data?.agentId) {
+            update.assigned_to = data.agentId
+          }
+          await db.from('conversations').update(update).eq('id', ctx.conversationId)
           break
         }
 
         case 'go_to': {
           if (!data?.targetFlowId) break
+          const visitedKey = '__visited_flows'
+          const visited = new Set((variables[visitedKey] || '').split(',').filter(Boolean))
+          if (visited.has(data.targetFlowId)) {
+            logger.warn('Flow recursion detected', { flowId, targetFlowId: data.targetFlowId })
+            break
+          }
+          visited.add(flowId)
+          variables[visitedKey] = Array.from(visited).join(',')
           const { data: targetFlow } = await db.from('flows').select('*').eq('id', data.targetFlowId).eq('tenant_id', ctx.tenantId).single()
           if (!targetFlow || !targetFlow.is_active) break
           await this.executeFlow(targetFlow, ctx, variables)
@@ -791,6 +926,10 @@ export class FlowEngine {
       case 'ends_with':    return values.length > 1 ? values.some(v => fv.endsWith(v)) : fv.endsWith(val)
       case 'is_empty':     return fv === ''
       case 'is_not_empty': return fv !== ''
+      case 'greater_than':  return Number(fv) > Number(val)
+      case 'less_than':     return Number(fv) < Number(val)
+      case 'greater_equal': return Number(fv) >= Number(val)
+      case 'less_equal':    return Number(fv) <= Number(val)
       default:             return values.length > 1 ? values.some(v => fv.includes(v)) : fv.includes(val)
     }
   }

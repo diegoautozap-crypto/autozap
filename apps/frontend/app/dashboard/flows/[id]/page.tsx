@@ -73,6 +73,7 @@ const ACTION_NODES = [
   { type: 'tag_contact',    label: 'Tags' },
   { type: 'update_contact', label: 'Atualizar contato' },
   { type: 'move_pipeline',  label: 'Mover no funil' },
+  { type: 'transcribe_audio', label: 'Transcrever áudio' },
   { type: 'assign_agent',   label: 'Atribuir agente' },
   { type: 'go_to',          label: 'Ir para outro flow' },
   { type: 'loop',           label: 'Loop' },
