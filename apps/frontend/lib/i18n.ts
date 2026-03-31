@@ -642,6 +642,11 @@ const translations: Record<string, Record<string, string>> = {
     'settings.webhookEvent.conversationAssignedDesc': 'Atendente assumiu ou liberou o bot',
     'settings.webhookEvent.pipelineChanged': 'Card movido no pipeline',
     'settings.webhookEvent.pipelineChangedDesc': 'Card foi arrastado para outra coluna',
+    'settings.toast.redirecting': 'Redirecionando para o pagamento...',
+    'settings.toast.errorPaymentLink': 'Erro ao gerar link de pagamento',
+    'settings.toast.errorSubscription': 'Erro ao criar assinatura',
+    'settings.toast.invalidCpfCnpj': 'CPF ou CNPJ inválido',
+    'settings.month': 'mês',
 
     // Errors
     'errors.title': 'Erros',
@@ -1487,6 +1492,11 @@ const translations: Record<string, Record<string, string>> = {
     'settings.webhookEvent.conversationAssignedDesc': 'Agent took over or released the bot',
     'settings.webhookEvent.pipelineChanged': 'Card moved in pipeline',
     'settings.webhookEvent.pipelineChangedDesc': 'Card was dragged to another column',
+    'settings.toast.redirecting': 'Redirecting to payment...',
+    'settings.toast.errorPaymentLink': 'Error generating payment link',
+    'settings.toast.errorSubscription': 'Error creating subscription',
+    'settings.toast.invalidCpfCnpj': 'Invalid CPF or CNPJ',
+    'settings.month': 'mo',
 
     'errors.title': 'Errors',
     'errors.subtitle': 'Monitor system errors',
@@ -2336,6 +2346,11 @@ const translations: Record<string, Record<string, string>> = {
     'settings.webhookEvent.conversationAssignedDesc': 'Agente tomó o liberó el bot',
     'settings.webhookEvent.pipelineChanged': 'Card movido en pipeline',
     'settings.webhookEvent.pipelineChangedDesc': 'Card fue arrastrado a otra columna',
+    'settings.toast.redirecting': 'Redirigiendo al pago...',
+    'settings.toast.errorPaymentLink': 'Error al generar enlace de pago',
+    'settings.toast.errorSubscription': 'Error al crear suscripción',
+    'settings.toast.invalidCpfCnpj': 'CPF o CNPJ inválido',
+    'settings.month': 'mes',
 
     // Errors
     'errors.title': 'Errores',

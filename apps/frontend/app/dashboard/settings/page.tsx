@@ -425,20 +425,20 @@ export default function SettingsPage() {
 
   const handleSubscribe = async (slug: string) => {
     const digits = cpfCnpj.replace(/\D/g, '')
-    if (digits.length !== 11 && digits.length !== 14) { toast.error('CPF ou CNPJ inválido'); return }
+    if (digits.length !== 11 && digits.length !== 14) { toast.error(t('settings.toast.invalidCpfCnpj')); return }
     setSubscribing(slug)
     try {
       const { data } = await tenantApi.post('/tenant/billing/subscribe', { planSlug: slug, cpfCnpj: digits })
       const paymentUrl = data.data?.paymentUrl
       if (paymentUrl) {
         window.open(paymentUrl, '_blank')
-        toast.success('Redirecionando para o pagamento...')
+        toast.success(t('settings.toast.redirecting'))
         setShowCpfModal(null); setCpfCnpj('')
       } else {
-        toast.error('Erro ao gerar link de pagamento')
+        toast.error(t('settings.toast.errorPaymentLink'))
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Erro ao criar assinatura')
+      toast.error(err?.response?.data?.error?.message || t('settings.toast.errorSubscription'))
     } finally { setSubscribing(null) }
   }
 
@@ -500,7 +500,7 @@ export default function SettingsPage() {
               <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ {t('settings.plan')} {planName} {t('settings.planActive')}</p>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{subscription?.status === 'active' ? t('settings.subscriptionActive') : t('settings.awaitingPayment')}</p>
             </div>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 14px', borderRadius: '99px' }}>{getPlanPrice(planSlug)}/mês</span>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 14px', borderRadius: '99px' }}>{getPlanPrice(planSlug)}/{t('settings.month')}</span>
           </div>
         )}
 
@@ -562,7 +562,7 @@ export default function SettingsPage() {
                   <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text)', marginBottom: '2px', letterSpacing: '-0.01em' }}>{PLAN_NAMES[slug]}</p>
                   <p style={{ color: 'var(--text-faint)', fontSize: '12px', marginBottom: '10px' }}>{PLAN_MSGS[slug]}</p>
                   <p style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text)', marginBottom: '12px', letterSpacing: '-0.02em' }}>
-                    {getPlanPrice(slug)}<span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-faint)' }}>/mês</span>
+                    {getPlanPrice(slug)}<span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-faint)' }}>/{t('settings.month')}</span>
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
                     {PLAN_FEATURES[slug]?.map(f => (
