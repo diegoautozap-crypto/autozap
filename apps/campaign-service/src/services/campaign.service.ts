@@ -8,7 +8,7 @@ import { getTenantCampaignQueue, ensureTenantWorker } from '../workers/campaign.
 export interface CreateCampaignInput {
   tenantId: string
   channelId: string
-  extraChannelIds?: string[]   // canais adicionais para disparo paralelo
+  extraChannelIds?: string[]
   name: string
   messageTemplate: string
   contentType?: string
@@ -17,8 +17,11 @@ export interface CreateCampaignInput {
   batchSize?: number
   messagesPerMin?: number
   curlTemplate?: string
-  copies?: string[]            // lista de cURLs para rotacionar aleatoriamente
+  copies?: string[]
   createdBy: string
+  recurrenceType?: 'none' | 'daily' | 'weekly' | 'monthly'
+  recurrenceFilter?: SegmentFilter
+  parentCampaignId?: string
 }
 
 export interface CampaignContact {
@@ -45,7 +48,7 @@ export class CampaignService {
     const {
       tenantId, channelId, extraChannelIds, name, messageTemplate,
       contentType, mediaUrl, scheduledAt, batchSize, messagesPerMin,
-      curlTemplate, copies, createdBy,
+      curlTemplate, copies, createdBy, recurrenceType, recurrenceFilter, parentCampaignId,
     } = input
 
     const { data, error } = await db.from('campaigns').insert({
@@ -55,7 +58,6 @@ export class CampaignService {
       name,
       message_template: messageTemplate || ' ',
       curl_template: curlTemplate || (copies?.[0] ?? null),
-      // Salva copies e canais extras como JSONB
       copies: copies && copies.length > 0 ? copies : null,
       extra_channel_ids: extraChannelIds && extraChannelIds.length > 0 ? extraChannelIds : null,
       content_type: contentType || 'text',
@@ -65,6 +67,9 @@ export class CampaignService {
       messages_per_min: messagesPerMin || 1200,
       status: scheduledAt ? 'scheduled' : 'draft',
       created_by: createdBy,
+      recurrence_type: recurrenceType || 'none',
+      recurrence_filter: recurrenceFilter || null,
+      parent_campaign_id: parentCampaignId || null,
     }).select().single()
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)

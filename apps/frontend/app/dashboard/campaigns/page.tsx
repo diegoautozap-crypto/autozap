@@ -57,6 +57,7 @@ export default function CampaignsPage() {
   const [segOrigin, setSegOrigin]               = useState<string>('')
   const [segCustomField, setSegCustomField]     = useState<string>('')
   const [segCustomValue, setSegCustomValue]     = useState<string>('')
+  const [recurrence, setRecurrence]             = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [previewCount, setPreviewCount]         = useState<number | null>(null)
   const [loadingPreview, setLoadingPreview]     = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -103,7 +104,7 @@ export default function CampaignsPage() {
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
     setMessagesPerMin(1200); setContactMode('manual')
     setSegNoInteraction(0); setSegOrigin(''); setSegCustomField(''); setSegCustomValue('')
-    setPreviewCount(null)
+    setPreviewCount(null); setRecurrence('none')
   }
 
   const toggleChannel  = (id: string) => setSelectedChannels(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
@@ -148,6 +149,10 @@ export default function CampaignsPage() {
         payload.copies       = validCurlCopies
       }
       if (scheduleMode === 'scheduled' && scheduledAt) payload.scheduledAt = new Date(scheduledAt).toISOString()
+      if (recurrence !== 'none') {
+        payload.recurrenceType = recurrence
+        if (contactMode === 'segment' && hasSegmentFilter) payload.recurrenceFilter = buildFilter()
+      }
 
       toast.info('Criando campanha...')
       const { data: campData } = await campaignApi.post('/campaigns', payload)
@@ -736,6 +741,30 @@ export default function CampaignsPage() {
                       </p>
                     )}
                   </div>
+                )}
+              </div>
+
+              {/* Recorrência */}
+              <div>
+                <Lbl>Repetir campanha?</Lbl>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    { v: 'none', label: 'Não repetir' },
+                    { v: 'daily', label: 'Diariamente' },
+                    { v: 'weekly', label: 'Semanalmente' },
+                    { v: 'monthly', label: 'Mensalmente' },
+                  ].map(({ v, label }) => (
+                    <button key={v} onClick={() => setRecurrence(v as any)}
+                      style={{ padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: `1.5px solid ${recurrence === v ? '#7c3aed' : '#e4e4e7'}`, background: recurrence === v ? '#f5f3ff' : '#fff', color: recurrence === v ? '#7c3aed' : '#71717a', cursor: 'pointer', transition: 'all 0.1s' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {recurrence !== 'none' && (
+                  <p style={{ fontSize: '11px', color: '#7c3aed', marginTop: '6px' }}>
+                    Após concluir, uma nova campanha será criada automaticamente para {recurrence === 'daily' ? 'o dia seguinte' : recurrence === 'weekly' ? 'a próxima semana' : 'o próximo mês'}.
+                    {contactMode === 'segment' ? ' Os contatos serão recarregados pelo segmento.' : ' Use segmento para recarregar contatos automaticamente.'}
+                  </p>
                 )}
               </div>
             </div>

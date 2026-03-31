@@ -15,6 +15,12 @@ ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS copies jsonb DEFAULT NULL;
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS extra_channel_ids jsonb DEFAULT NULL;
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS curl_template text DEFAULT NULL;
 
+-- Colunas de campanha recorrente
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS recurrence_type text DEFAULT 'none';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS recurrence_filter jsonb DEFAULT NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS parent_campaign_id uuid DEFAULT NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS last_recurrence_at timestamptz DEFAULT NULL;
+
 -- Cooldown padrão para 'always'
 ALTER TABLE flows ALTER COLUMN cooldown_type SET DEFAULT 'always';
 
