@@ -6,12 +6,11 @@ import type { JwtPayload, UserRole } from '@autozap/types'
 const ACCESS_SECRET = process.env.JWT_SECRET!
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
 
-// ⚠️ Access token: 5 minutos — renovado silenciosamente pelo frontend
-// NÃO usar JWT_EXPIRES_IN do env — valor fixo para segurança
-const ACCESS_EXPIRES = '15m'
+// Access token: 1 hora — renovado silenciosamente pelo frontend
+const ACCESS_EXPIRES = '1h'
 
-// Refresh token: 7 dias — se ficar 7 dias sem abrir o sistema, faz login de novo
-const REFRESH_EXPIRES_DAYS = 7
+// Refresh token: 30 dias — se ficar 30 dias sem abrir o sistema, faz login de novo
+const REFRESH_EXPIRES_DAYS = 30
 
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
   throw new Error('Missing JWT_SECRET or JWT_REFRESH_SECRET env vars')

@@ -378,7 +378,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: rawRefresh,
-      expiresIn: 15 * 60,
+      expiresIn: 3600,
     }
   }
 

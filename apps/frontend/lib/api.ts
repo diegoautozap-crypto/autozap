@@ -28,6 +28,7 @@ function forceLogout(reason: string) {
 
 // Renovação em andamento — evita múltiplas chamadas simultâneas
 let refreshPromise: Promise<string> | null = null
+let refreshRetried = false
 
 async function refreshAccessToken(): Promise<string> {
   if (refreshPromise) return refreshPromise
@@ -58,7 +59,22 @@ async function refreshAccessToken(): Promise<string> {
       localStorage.setItem('refreshToken', newRefreshToken)
 
       return newAccessToken
-    } catch (err) {
+    } catch (err: any) {
+      // Retry uma vez antes de deslogar (pode ser erro de rede passageiro)
+      if (!refreshRetried) {
+        refreshRetried = true
+        try {
+          await new Promise(r => setTimeout(r, 2000))
+          const refreshToken = localStorage.getItem('refreshToken')
+          if (!refreshToken) throw err
+          const { data } = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, { refreshToken })
+          localStorage.setItem('accessToken', data.data.accessToken)
+          localStorage.setItem('refreshToken', data.data.refreshToken)
+          refreshRetried = false
+          return data.data.accessToken
+        } catch { /* retry falhou, faz logout */ }
+      }
+      refreshRetried = false
       forceLogout('falha no refresh token')
       throw err
     } finally {
@@ -80,7 +96,7 @@ function shouldRefreshProactively(): boolean {
     const payload = parseJwt(token)
     if (!payload?.exp) return false
     const expiresIn = payload.exp - Math.floor(Date.now() / 1000)
-    return expiresIn < 60 // renova se faltar menos de 60 segundos
+    return expiresIn < 300 // renova se faltar menos de 5 minutos
   } catch {
     return false
   }
