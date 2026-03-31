@@ -12,7 +12,7 @@ import '@xyflow/react/dist/style.css'
 import { messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Save, ArrowLeft, Loader2, Workflow, BarChart2 } from 'lucide-react'
+import { Save, ArrowLeft, Loader2, Workflow } from 'lucide-react'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
@@ -105,14 +105,6 @@ export default function FlowEditorPage() {
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
-  const [showAnalytics, setShowAnalytics] = useState(false)
-  const { data: analytics } = useQuery({
-    queryKey: ['flow-analytics', id],
-    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=7`); return data.data },
-    enabled: showAnalytics,
-    refetchInterval: showAnalytics ? 10000 : false,
-  })
-
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
     queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}`); return data.data },
@@ -144,15 +136,6 @@ export default function FlowEditorPage() {
     })))
     setInitialized(true)
   }, [flowData, initialized, setNodes, setEdges])
-
-  // Injeta stats de analytics nos nós
-  useEffect(() => {
-    if (!analytics?.nodeStats || !showAnalytics) return
-    setNodes(nds => nds.map(n => ({
-      ...n,
-      data: { ...n.data, _stats: analytics.nodeStats[n.id] || null },
-    })))
-  }, [analytics?.nodeStats, showAnalytics])
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -283,21 +266,7 @@ export default function FlowEditorPage() {
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
           Salvar
         </button>
-        <button onClick={() => setShowAnalytics(p => !p)}
-          style={{ padding: '8px 14px', background: showAnalytics ? '#f5f3ff' : '#f9fafb', border: `1px solid ${showAnalytics ? '#ddd6fe' : '#e5e7eb'}`, borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: showAnalytics ? '#7c3aed' : '#6b7280' }}>
-          <BarChart2 size={13} /> {showAnalytics ? 'Ocultar stats' : 'Analytics'}
-        </button>
       </div>
-
-      {showAnalytics && analytics && (
-        <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '24px', alignItems: 'center', fontSize: '13px' }}>
-          <div><span style={{ color: '#a78bfa', fontWeight: 500 }}>Execuções:</span> <strong style={{ color: '#7c3aed' }}>{analytics.totalFlowRuns}</strong></div>
-          <div><span style={{ color: '#a78bfa', fontWeight: 500 }}>Contatos:</span> <strong style={{ color: '#7c3aed' }}>{analytics.uniqueContacts}</strong></div>
-          <div><span style={{ color: '#a78bfa', fontWeight: 500 }}>Nós processados:</span> <strong style={{ color: '#7c3aed' }}>{analytics.totalExecutions}</strong></div>
-          <div><span style={{ color: '#a78bfa', fontWeight: 500 }}>Erros:</span> <strong style={{ color: analytics.totalErrors > 0 ? '#ef4444' : '#7c3aed' }}>{analytics.totalErrors}</strong></div>
-          <span style={{ fontSize: '11px', color: '#a78bfa' }}>Últimos 7 dias</span>
-        </div>
-      )}
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>

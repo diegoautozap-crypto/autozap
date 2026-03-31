@@ -274,65 +274,6 @@ router.get('/flows/:id/logs', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /flows/:id/analytics — métricas agregadas por nó
-router.get('/flows/:id/analytics', async (req, res, next) => {
-  try {
-    const flowId = req.params.id
-    const tenantId = req.auth.tid
-    const days = Number(req.query.days) || 7
-
-    const since = new Date(Date.now() - days * 86400000).toISOString()
-
-    // Stats por nó
-    const { data: logs } = await db
-      .from('flow_logs')
-      .select('node_id, status, created_at')
-      .eq('flow_id', flowId)
-      .eq('tenant_id', tenantId)
-      .gte('created_at', since)
-
-    const nodeStats: Record<string, { success: number; error: number; total: number }> = {}
-    let totalExecutions = 0
-    let totalErrors = 0
-    let totalFlowRuns = 0
-    const dailyCounts: Record<string, number> = {}
-
-    for (const log of (logs || [])) {
-      // Stats por nó
-      if (!nodeStats[log.node_id]) nodeStats[log.node_id] = { success: 0, error: 0, total: 0 }
-      nodeStats[log.node_id].total++
-      if (log.status === 'success') nodeStats[log.node_id].success++
-      else if (log.status === 'error') { nodeStats[log.node_id].error++; totalErrors++ }
-      if (log.status === 'flow_executed') totalFlowRuns++
-      totalExecutions++
-
-      // Execuções por dia
-      const day = log.created_at?.slice(0, 10)
-      if (day) dailyCounts[day] = (dailyCounts[day] || 0) + 1
-    }
-
-    // Contatos únicos — precisa de query separada pois o select acima não tem contact_id
-    const { data: contactLogs } = await db
-      .from('flow_logs')
-      .select('contact_id')
-      .eq('flow_id', flowId)
-      .eq('tenant_id', tenantId)
-      .eq('status', 'flow_executed')
-      .gte('created_at', since)
-    const uniqueContacts = new Set((contactLogs || []).map(l => l.contact_id)).size
-
-    res.json(ok({
-      totalFlowRuns,
-      totalExecutions,
-      totalErrors,
-      uniqueContacts,
-      nodeStats,
-      dailyCounts,
-      period: `${days}d`,
-    }))
-  } catch (err) { next(err) }
-})
-
 // ─── Gera token único para webhook de entrada do flow ─────────────────────────
 router.post('/flows/:id/webhook-token', async (req, res, next) => {
   try {

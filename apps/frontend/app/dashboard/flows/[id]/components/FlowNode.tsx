@@ -217,20 +217,6 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       )}
-
-      {/* Analytics badge */}
-      {data._stats && (
-        <div style={{ position: 'absolute', bottom: -10, right: 8, display: 'flex', gap: '3px' }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '99px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
-            ✓ {data._stats.success}
-          </span>
-          {data._stats.error > 0 && (
-            <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-              ✗ {data._stats.error}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   )
 }
