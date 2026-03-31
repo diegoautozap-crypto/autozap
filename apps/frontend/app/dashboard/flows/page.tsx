@@ -5,7 +5,124 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { messageApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock } from 'lucide-react'
+import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
+
+const FLOW_TEMPLATES = [
+  {
+    id: 'welcome',
+    name: '👋 Boas-vindas',
+    desc: 'Saudação automática na primeira mensagem',
+    category: 'Simples',
+    nodes: [
+      { id: 'n1', type: 'trigger_first_message', position_x: 100, position_y: 200, data: { type: 'trigger_first_message', keywords: [] } },
+      { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Seja bem-vindo(a)! Como posso te ajudar hoje?' } },
+    ],
+    edges: [{ id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' }],
+  },
+  {
+    id: 'outside_hours',
+    name: '🕐 Fora do horário',
+    desc: 'Mensagem automática fora do expediente',
+    category: 'Simples',
+    nodes: [
+      { id: 'n1', type: 'trigger_outside_hours', position_x: 100, position_y: 200, data: { type: 'trigger_outside_hours', start: 9, end: 18 } },
+      { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Nosso horário de atendimento é de segunda a sexta, das 9h às 18h. Deixe sua mensagem que responderemos assim que possível! 😊' } },
+      { id: 'n3', type: 'end', position_x: 700, position_y: 200, data: { type: 'end' } },
+    ],
+    edges: [
+      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+    ],
+  },
+  {
+    id: 'lead_qualify',
+    name: '🎯 Qualificação de lead',
+    desc: 'Coleta nome, interesse e classifica o lead',
+    category: 'Intermediário',
+    nodes: [
+      { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'info', 'quero'], matchType: 'contains' } },
+      { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 😊 Para te atender melhor, qual é o seu nome?' } },
+      { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nome' } },
+      { id: 'n4', type: 'send_message', position_x: 880, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Prazer, {{nome}}! O que te interessa?\n\n1️⃣ Conhecer o produto\n2️⃣ Saber preços\n3️⃣ Suporte' } },
+      { id: 'n5', type: 'input', position_x: 1160, position_y: 200, data: { type: 'input', question: '', saveAs: 'interesse' } },
+      { id: 'n6', type: 'tag_contact', position_x: 1440, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
+      { id: 'n7', type: 'move_pipeline', position_x: 1440, position_y: 300, data: { type: 'move_pipeline', stage: 'qualificacao' } },
+      { id: 'n8', type: 'assign_agent', position_x: 1720, position_y: 200, data: { type: 'assign_agent', message: 'Obrigado, {{nome}}! Um atendente já vai te ajudar. 🚀' } },
+    ],
+    edges: [
+      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+      { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'success' },
+      { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
+      { id: 'e6', source_node: 'n5', target_node: 'n7', source_handle: 'success' },
+      { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
+    ],
+  },
+  {
+    id: 'satisfaction',
+    name: '⭐ Pesquisa de satisfação',
+    desc: 'Pergunta nota, classifica e adiciona tag',
+    category: 'Intermediário',
+    nodes: [
+      { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['pesquisa', 'avaliar', 'feedback'], matchType: 'contains' } },
+      { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Gostaríamos de saber sua opinião. De 1 a 5, como avalia nosso atendimento?' } },
+      { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nota' } },
+      { id: 'n4', type: 'condition', position_x: 880, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Nota alta (4-5)', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'nota', operator: 'contains', value: '4, 5' }] }, { id: 'b2', label: 'Nota baixa (1-3)', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'nota', operator: 'contains', value: '1, 2, 3' }] }] } },
+      { id: 'n5', type: 'send_message', position_x: 1200, position_y: 100, data: { type: 'send_message', subtype: 'text', message: 'Muito obrigado! 🎉 Ficamos felizes com sua avaliação!' } },
+      { id: 'n6', type: 'send_message', position_x: 1200, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo feedback. 🙏 Vamos melhorar! Um atendente vai entrar em contato.' } },
+      { id: 'n7', type: 'assign_agent', position_x: 1500, position_y: 350, data: { type: 'assign_agent' } },
+    ],
+    edges: [
+      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+      { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
+      { id: 'e5', source_node: 'n4', target_node: 'n6', source_handle: 'branch_b2' },
+      { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
+    ],
+  },
+  {
+    id: 'webhook_lead',
+    name: '🔗 Lead via formulário',
+    desc: 'Recebe lead do Make/Zapier, cria contato e envia mensagem',
+    category: 'Avançado',
+    nodes: [
+      { id: 'n1', type: 'trigger_webhook', position_x: 50, position_y: 200, data: { type: 'trigger_webhook' } },
+      { id: 'n2', type: 'create_contact', position_x: 350, position_y: 200, data: { type: 'create_contact', fields: [{ label: 'Telefone', variable: '{{webhook_phone}}', contactField: 'phone' }, { label: 'Nome', variable: '{{webhook_name}}', contactField: 'name' }, { label: 'Email', variable: '{{webhook_email}}', contactField: 'email' }] } },
+      { id: 'n3', type: 'send_message', position_x: 650, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá {{webhook_name}}! Recebemos seu contato. Em breve um consultor vai te atender! 🚀' } },
+      { id: 'n4', type: 'tag_contact', position_x: 950, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
+      { id: 'n5', type: 'move_pipeline', position_x: 950, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
+    ],
+    edges: [
+      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+      { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'success' },
+    ],
+  },
+  {
+    id: 'ai_support',
+    name: '🤖 Atendimento com IA',
+    desc: 'IA responde automaticamente e escala para humano quando necessário',
+    category: 'Avançado',
+    nodes: [
+      { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 200, data: { type: 'trigger_any_reply' } },
+      { id: 'n2', type: 'ai', position_x: 350, position_y: 200, data: { type: 'ai', mode: 'classify', classifyOptions: 'duvida, comprar, suporte, reclamação, outro', saveAs: 'intencao' } },
+      { id: 'n3', type: 'condition', position_x: 650, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Quer comprar', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'comprar' }] }, { id: 'b2', label: 'Reclamação', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'reclamação' }] }] } },
+      { id: 'n4', type: 'ai', position_x: 1000, position_y: 50, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um consultor de vendas simpático. Apresente os produtos e benefícios.' } },
+      { id: 'n5', type: 'assign_agent', position_x: 1000, position_y: 250, data: { type: 'assign_agent', message: 'Entendo sua preocupação. Vou te conectar com um atendente agora mesmo.' } },
+      { id: 'n6', type: 'ai', position_x: 1000, position_y: 400, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um assistente prestativo. Responda dúvidas de forma clara e objetiva.' } },
+    ],
+    edges: [
+      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'branch_b1' },
+      { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'branch_b2' },
+      { id: 'e5', source_node: 'n3', target_node: 'n6', source_handle: 'fallback' },
+    ],
+  },
+]
 
 const COOLDOWN_OPTIONS = [
   { value: '24h',    label: '24 horas',   desc: 'Dispara no máximo 1x por dia por conversa' },
@@ -48,6 +165,8 @@ export default function FlowsPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showNew, setShowNew] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [creatingTemplate, setCreatingTemplate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
   const [newCooldown, setNewCooldown] = useState('24h')
@@ -119,12 +238,18 @@ export default function FlowsPage() {
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Flows</h1>
           <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
         </div>
-        <button onClick={() => setShowNew(true)}
-          style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
-          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
-          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
-          <Plus size={14} /> Novo flow
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setShowTemplates(true)}
+            style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Copy size={14} /> Templates
+          </button>
+          <button onClick={() => setShowNew(true)}
+            style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
+            <Plus size={14} /> Novo flow
+          </button>
+        </div>
       </div>
 
       {/* Form novo flow */}
@@ -279,6 +404,66 @@ export default function FlowsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal de templates */}
+      {showTemplates && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#18181b', margin: 0 }}>Templates de Flow</h3>
+                <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '3px' }}>Escolha um template pronto e personalize</p>
+              </div>
+              <button onClick={() => setShowTemplates(false)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}><X size={15} color="#71717a" /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+              {['Simples', 'Intermediário', 'Avançado'].map(cat => {
+                const templates = FLOW_TEMPLATES.filter(t => t.category === cat)
+                if (templates.length === 0) return null
+                return (
+                  <div key={cat} style={{ marginBottom: '20px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{cat}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {templates.map(t => (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '1px solid #e4e4e7', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.1s' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#7c3aed'; (e.currentTarget as HTMLDivElement).style.background = '#faf5ff' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                          onClick={async () => {
+                            setCreatingTemplate(true)
+                            try {
+                              const { data: flowData } = await messageApi.post('/flows', { name: t.name.replace(/^.+\s/, ''), cooldown_type: 'always' })
+                              const flowId = flowData.data.id
+                              const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+                              const idMap: Record<string, string> = {}
+                              const nodes = t.nodes.map(n => { const newId = uid(); idMap[n.id] = newId; return { ...n, id: newId } })
+                              const edges = t.edges.map(e => ({ ...e, id: uid(), source_node: idMap[e.source_node], target_node: idMap[e.target_node] }))
+                              await messageApi.put(`/flows/${flowId}/graph`, { nodes, edges })
+                              toast.success(`Template "${t.name}" criado!`)
+                              queryClient.invalidateQueries({ queryKey: ['flows'] })
+                              setShowTemplates(false)
+                              router.push(`/dashboard/flows/${flowId}`)
+                            } catch { toast.error('Erro ao criar template') }
+                            finally { setCreatingTemplate(false) }
+                          }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                            {t.name.split(' ')[0]}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#18181b' }}>{t.name.split(' ').slice(1).join(' ')}</div>
+                            <div style={{ fontSize: '12px', color: '#71717a', marginTop: '2px' }}>{t.desc}</div>
+                            <div style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '3px' }}>{t.nodes.length} nós · {t.edges.length} conexões</div>
+                          </div>
+                          {creatingTemplate ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#7c3aed' }} /> : <ChevronRight size={16} color="#d4d4d8" />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
