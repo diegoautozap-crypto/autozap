@@ -37,6 +37,7 @@ function getAvatarColor(name: string | undefined | null) {
 }
 
 function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: string; contactTags: any[]; allTags: any[]; onChanged: () => void }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -73,7 +74,7 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: 
       </div>
       {open && typeof window !== 'undefined' && (
         <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow)', padding: '6px', minWidth: '160px' }}>
-          {allTags.length === 0 ? <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
+          {allTags.length === 0 ? <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '6px 8px', margin: 0 }}>{t('contacts.noTagsCreated')}</p>
             : allTags.map((tag: any) => {
               const active = activeIds.has(tag.id)
               return (
@@ -332,6 +333,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 }
 
 export default function ContactsPage() {
+  const t = useT()
   const { user } = useAuthStore()
   const tenantId = user?.tenantId || ''
   const [search, setSearch] = useState('')
@@ -405,9 +407,9 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>CRM de Contatos</h1>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>{t('contacts.title')}</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>
-            {meta?.total ? `${meta.total.toLocaleString()} contatos` : '0 contatos'}
+            {meta?.total ? `${meta.total.toLocaleString()} ${t('contacts.count')}` : `0 ${t('contacts.count')}`}
             {customFields.length > 0 && ` · ${customFields.length} campo${customFields.length > 1 ? 's' : ''} personalizado${customFields.length > 1 ? 's' : ''}`}
           </p>
         </div>
@@ -415,37 +417,37 @@ export default function ContactsPage() {
           {selected.size > 0 && (
             <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Trash2 size={13} /> Excluir {selected.size}
+              <Trash2 size={13} /> {t('common.delete')} {selected.size}
             </button>
           )}
           {meta?.total > 0 && (
             <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Excluir todos
+              {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} {t('contacts.deleteAll')}
             </button>
           )}
           <button onClick={handleExport} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
-            <Download size={13} /> CSV
+            <Download size={13} /> {t('contacts.csv')}
           </button>
           <button onClick={handleExportExcel} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
-            <FileSpreadsheet size={13} /> Excel
+            <FileSpreadsheet size={13} /> {t('contacts.excel')}
           </button>
           <button onClick={() => setShowImport(true)} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Upload size={13} /> Importar
+            <Upload size={13} /> {t('contacts.import')}
           </button>
           <button onClick={() => setShowCustomFields(true)}
             style={{ padding: '8px 12px', background: customFields.length > 0 ? '#faf5ff' : 'var(--bg-card)', border: `1px solid ${customFields.length > 0 ? '#a855f7' : 'var(--border)'}`, borderRadius: '8px', color: customFields.length > 0 ? '#7c3aed' : '#52525b', fontSize: '13px', fontWeight: customFields.length > 0 ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Settings2 size={13} /> Campos {customFields.length > 0 && `(${customFields.length})`}
+            <Settings2 size={13} /> {t('contacts.fields')} {customFields.length > 0 && `(${customFields.length})`}
           </button>
           <button onClick={() => setShowTags(!showTags)}
             style={{ padding: '8px 12px', background: showTags ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showTags ? '#22c55e' : 'var(--border)'}`, borderRadius: '8px', color: showTags ? '#16a34a' : '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Tag size={13} /> Tags {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
+            <Tag size={13} /> {t('contacts.tags')} {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
           </button>
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 3px rgba(34,197,94,0.3)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
-            <Plus size={13} /> Novo contato
+            <Plus size={13} /> {t('contacts.newContact').replace('+ ', '')}
           </button>
         </div>
       </div>
@@ -454,28 +456,28 @@ export default function ContactsPage() {
       {showTags && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', margin: 0 }}>Gerenciar tags</h3>
+            <h3 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', margin: 0 }}>{t('contacts.manageTags')}</h3>
             <button onClick={() => setShowTags(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', color: 'var(--text-muted)', padding: '5px', display: 'flex' }}><X size={15} /></button>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '180px' }}>
-              <label style={lbl}>Nome da tag</label>
+              <label style={lbl}>{t('contacts.tagName')}</label>
               <input style={inp} placeholder="Ex: Lead quente, Cliente VIP..." value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newTagName) createTagMutation.mutate() }}
                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                 onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
             </div>
             <div>
-              <label style={lbl}>Cor</label>
+              <label style={lbl}>{t('contacts.color')}</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '220px' }}>
                 {TAG_COLORS.map(c => <div key={c} onClick={() => setNewTagColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? 'var(--text)' : 'transparent'}`, transition: 'border 0.1s' }} />)}
               </div>
             </div>
             <button onClick={() => createTagMutation.mutate()} disabled={!newTagName || createTagMutation.isPending}
               style={{ padding: '9px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newTagName ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-              {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Criar tag
+              {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} {t('contacts.createTag')}
             </button>
           </div>
-          {(tags as any[]).length === 0 ? <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Nenhuma tag criada ainda.</p> : (
+          {(tags as any[]).length === 0 ? <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('contacts.noTags')}</p> : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {(tags as any[]).map((tag: any) => (
                 <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
@@ -498,7 +500,7 @@ export default function ContactsPage() {
       {showCreate && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', margin: 0 }}>Novo contato</h3>
+            <h3 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', margin: 0 }}>{t('contacts.newContactTitle')}</h3>
             <button onClick={() => setShowCreate(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', color: 'var(--text-muted)', padding: '5px', display: 'flex' }}><X size={15} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -516,9 +518,9 @@ export default function ContactsPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!form.phone || createMutation.isPending}
               style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.phone ? 0.5 : 1 }}>
-              {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />} Criar contato
+              {createMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />} {t('contacts.createContact')}
             </button>
-            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
+            <button onClick={() => setShowCreate(false)} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -526,7 +528,7 @@ export default function ContactsPage() {
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-        <input style={{ ...inp, paddingLeft: '36px' }} placeholder="Buscar por nome ou número..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+        <input style={{ ...inp, paddingLeft: '36px' }} placeholder={t('contacts.search')} value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
           onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
           onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
       </div>
@@ -540,7 +542,7 @@ export default function ContactsPage() {
             <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
               <User size={22} color="var(--text-faintest)" />
             </div>
-            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>Nenhum contato encontrado</p>
+            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>{t('contacts.noContacts')}</p>
           </div>
         ) : (
           <>
@@ -605,7 +607,7 @@ export default function ContactsPage() {
 
       {meta && meta.total > 20 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} de {meta.total.toLocaleString()} contatos</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{((page - 1) * 20) + 1}–{Math.min(page * 20, meta.total)} / {meta.total.toLocaleString()} {t('contacts.count')}</span>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{ padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? 'var(--text-faintest)' : '#52525b', display: 'flex', alignItems: 'center' }}><ChevronLeft size={14} /></button>
             <span style={{ padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', color: '#52525b' }}>{page} / {totalPages}</span>

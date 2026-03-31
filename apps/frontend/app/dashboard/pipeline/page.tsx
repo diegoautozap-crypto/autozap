@@ -10,6 +10,7 @@ import {
   GripVertical, X, Check, Pencil, DollarSign, AlertTriangle,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useT } from '@/lib/i18n'
 import Pusher from 'pusher-js'
 
 const DEFAULT_COLUMNS = [
@@ -144,6 +145,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
   columns: any[]; pipelineId: string | null
   onClose: () => void; onSaved: () => void; board: Record<string, any[]> | undefined
 }) {
+  const t = useT()
   const [localCols, setLocalCols] = useState(columns.map(c => ({ ...c })))
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -211,8 +213,8 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
       <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '460px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid var(--border)' }}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Gerenciar Colunas</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>Arraste para reordenar, clique no nome para renomear</p>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('pipeline.manageColumns')}</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>{t('pipeline.manageColumnsSubtitle')}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex' }}><X size={18} /></button>
         </div>
@@ -244,8 +246,8 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
                     <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>⚠️ Esta coluna tem {cardCount} conversa{cardCount !== 1 ? 's' : ''}</p>
                     <p style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', lineHeight: '1.4' }}>Ao excluir, essas conversas ficam invisíveis no pipeline.</p>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => setPendingDeleteId(null)} style={{ flex: 1, padding: '6px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
-                      <button onClick={() => confirmRemoveColumn(col.id)} style={{ flex: 1, padding: '6px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Excluir mesmo assim</button>
+                      <button onClick={() => setPendingDeleteId(null)} style={{ flex: 1, padding: '6px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#52525b', cursor: 'pointer' }}>{t('common.cancel')}</button>
+                      <button onClick={() => confirmRemoveColumn(col.id)} style={{ flex: 1, padding: '6px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>{t('common.delete')}</button>
                     </div>
                   </div>
                 )}
@@ -263,10 +265,10 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
           </div>
         </div>
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>{t('common.cancel')}</button>
           <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
             {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-            Salvar
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -275,6 +277,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
 }
 
 export default function PipelinePage() {
+  const t = useT()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
@@ -481,13 +484,13 @@ export default function PipelinePage() {
       <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}>
         <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Pipeline</h1>
+            <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('pipeline.title')}</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
-              <p style={{ color: 'var(--text-faint)', fontSize: '13px' }}>{totalConvs} conversas</p>
+              <p style={{ color: 'var(--text-faint)', fontSize: '13px' }}>{totalConvs} {t('pipeline.conversations')}</p>
               {totalValue > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-faintest)' }} />
-                  <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(totalValue)} em negociação</p>
+                  <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(totalValue)} {t('pipeline.inNegotiation')}</p>
                 </div>
               )}
             </div>
@@ -495,25 +498,25 @@ export default function PipelinePage() {
           <div className="mobile-header-actions mobile-wrap" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
               <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
-                <option value="all">Todos os canais</option>
+                <option value="all">{t('pipeline.allChannels')}</option>
                 {(channels as any[]).map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             )}
             {(campaigns as any[]).length > 0 && (
               <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
-                <option value="all">Todas as campanhas</option>
+                <option value="all">{t('pipeline.allCampaigns')}</option>
                 {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
             <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
-              <Settings2 size={13} /> Colunas
+              <Settings2 size={13} /> {t('pipeline.columns')}
             </button>
             <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
-              <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> Atualizar
+              <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> {t('pipeline.refresh')}
             </button>
             <button onClick={async () => {
               if (!board) { toast.error('Nenhum dado'); return }
@@ -539,7 +542,7 @@ export default function PipelinePage() {
             }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
-              <DollarSign size={13} /> Exportar Excel
+              <DollarSign size={13} /> {t('pipeline.exportExcel')}
             </button>
           </div>
         </div>
@@ -547,7 +550,7 @@ export default function PipelinePage() {
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => { setSelectedPipelineId(null); setLocalStages(null); localBoardRef.current = null }}
             style={{ padding: '5px 14px', borderRadius: '99px', fontSize: '13px', fontWeight: selectedPipelineId === null ? 700 : 500, cursor: 'pointer', border: 'none', background: selectedPipelineId === null ? 'var(--text)' : 'var(--bg)', color: selectedPipelineId === null ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}>
-            Principal
+            {t('pipeline.main')}
           </button>
           {(pipelines as any[]).map((p: any) => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '99px', background: selectedPipelineId === p.id ? 'var(--text)' : 'var(--bg)', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -581,7 +584,7 @@ export default function PipelinePage() {
             <button onClick={() => setShowNewPipeline(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'none', border: '1.5px dashed var(--border)', fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
-              <Plus size={12} /> Nova pipeline
+              <Plus size={12} /> {t('pipeline.newPipeline').replace('+ ', '')}
             </button>
           )}
         </div>
@@ -629,7 +632,7 @@ export default function PipelinePage() {
                     {cards.length === 0 ? (
                       <div style={{ padding: '24px 10px', textAlign: 'center' }}>
                         <MessageSquare size={18} color="var(--text-faintest)" style={{ margin: '0 auto 6px' }} />
-                        <p style={{ fontSize: '12px', color: 'var(--text-faintest)' }}>Sem conversas</p>
+                        <p style={{ fontSize: '12px', color: 'var(--text-faintest)' }}>{t('pipeline.noConversations')}</p>
                       </div>
                     ) : cards.map((conv: any) => {
                       const name = conv.contacts?.name || conv.contacts?.phone || '??'
