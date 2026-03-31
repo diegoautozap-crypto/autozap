@@ -270,7 +270,7 @@ export class AutomationService {
         tenant_id: ctx.tenantId, contact_id: ctx.contactId,
         conversation_id: ctx.conversationId, status, detail,
       })
-    } catch { }
+    } catch (err) { logger.warn('Failed to log automation', { automationId, err }) }
   }
 }
 

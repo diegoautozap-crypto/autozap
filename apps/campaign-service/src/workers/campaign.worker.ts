@@ -185,8 +185,9 @@ async function sendViaFetch(
       body,
     })
     if (response.status === 429) {
+      if (attempt >= 5) return { ok: false, error: 'Rate limit exceeded after 5 retries' }
       logger.warn('Gupshup 429 rate limit hit', { phone, attempt })
-      await sleep(1000)
+      await sleep(1000 * (attempt + 1))
       return sendViaFetch(parsed, phone, message, attempt + 1)
     }
     const data = await response.json() as any
@@ -217,7 +218,7 @@ async function processContact(
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
-      console.error('SEND FAILED:', contact.phone, 'error:', result.error, 'url:', parsed.url, 'apiKey:', parsed.apiKey ? parsed.apiKey.slice(0, 8) + '...' : 'EMPTY', 'body:', parsed.bodyTemplate?.slice(0, 300))
+      logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed.url })
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
@@ -227,7 +228,7 @@ async function processContact(
       id: messageDbId, message_uuid: messageUuid, tenant_id: tenantId, channel_id: channelId,
       direction: 'outbound', content_type: 'text', body: bodyForDb || '(template)',
       status: 'sent', sent_at: new Date(), campaign_id: campaignId, external_id: result.messageId,
-    }, { onConflict: 'external_id' })
+    })
 
     if (upsertError) {
       await campaignService.markContactFailed(contact.id, `DB error: ${upsertError.message}`)

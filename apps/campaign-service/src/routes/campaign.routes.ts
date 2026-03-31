@@ -176,10 +176,10 @@ router.post('/campaigns', async (req, res, next) => {
       rest.copies = rest.copies.map((c: string) => replacePlaceholders(c))
     }
 
-    console.log('CURL AFTER REPLACE:', curlTemplate?.slice(0, 300))
+    logger.debug('Curl after replace', { curl: curlTemplate?.slice(0, 200) })
     const campaign = await campaignService.createCampaign({ tenantId: req.auth.tid, createdBy: req.auth.sub, channelId, curlTemplate, ...rest })
     res.status(201).json(ok(campaign))
-  } catch (err: any) { console.error('CREATE CAMPAIGN ERROR:', err?.message || err); next(err) }
+  } catch (err: any) { logger.error('Create campaign error', { error: err?.message }); next(err) }
 })
 
 router.get('/campaigns/:id', async (req, res, next) => {
@@ -254,7 +254,7 @@ router.post('/campaigns/:id/start', async (req, res, next) => {
     }
     await campaignService.startCampaign(req.params.id, req.auth.tid)
     res.json(ok({ message: 'Campaign started', campaignId: req.params.id }))
-  } catch (err: any) { console.error('START CAMPAIGN ERROR:', err?.message || err, err?.stack); next(err) }
+  } catch (err: any) { logger.error('Start campaign error', { error: err?.message, campaignId: req.params.id }); next(err) }
 })
 
 router.post('/campaigns/:id/pause', async (req, res, next) => {

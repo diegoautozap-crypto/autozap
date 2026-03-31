@@ -8,6 +8,7 @@ import type {
   MessageStatus,
   ContentType,
 } from './IChannelAdapter'
+import { logger } from '../lib/logger'
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1'
 
@@ -47,7 +48,7 @@ export class GupshupAdapter implements IChannelAdapter {
       message = { type: 'image', originalUrl: mediaUrl, previewUrl: mediaUrl, caption: body || '' }
     } else if (contentType === 'audio') {
       const proxyUrl = `${CHANNEL_SERVICE_PUBLIC_URL}/audio-proxy?url=${encodeURIComponent(mediaUrl || '')}`
-      console.log('[GupshupAdapter] audio proxy URL:', proxyUrl)
+      logger.debug('[GupshupAdapter] audio proxy URL:', proxyUrl)
       message = { type: 'audio', url: proxyUrl }
     } else if (contentType === 'video') {
       message = { type: 'video', url: mediaUrl, caption: body || '' }
@@ -65,7 +66,7 @@ export class GupshupAdapter implements IChannelAdapter {
       message: JSON.stringify(message),
     })
 
-    console.log('[GupshupAdapter] final payload:', JSON.stringify(message))
+    logger.debug('[GupshupAdapter] final payload:', JSON.stringify(message))
 
     const response = await fetch(`${GUPSHUP_API_URL}/msg`, {
       method: 'POST',
@@ -77,7 +78,7 @@ export class GupshupAdapter implements IChannelAdapter {
     })
 
     const data = await response.json() as any
-    console.log('[GupshupAdapter] send response:', JSON.stringify(data).slice(0, 500))
+    logger.debug('[GupshupAdapter] send response:', JSON.stringify(data).slice(0, 500))
 
     if (!response.ok || data.status === 'error') {
       const errMsg = data.message || `HTTP ${response.status}`
@@ -161,7 +162,7 @@ export class GupshupAdapter implements IChannelAdapter {
   parseStatusUpdate(rawPayload: unknown): MessageStatusUpdate | null {
     const payload = rawPayload as any
 
-    console.log('[GupshupAdapter] parseStatusUpdate payload:', JSON.stringify(payload).slice(0, 300))
+    logger.debug('[GupshupAdapter] parseStatusUpdate payload:', JSON.stringify(payload).slice(0, 300))
 
     // Meta (v3) format
     if (payload?.object === 'whatsapp_business_account') {
@@ -186,7 +187,7 @@ export class GupshupAdapter implements IChannelAdapter {
         const errorCode    = statusObj.errors?.[0]?.code
         const errorMessage = statusObj.errors?.[0]?.message || undefined
 
-        console.log('[GupshupAdapter] status update v3:', statusObj.id, '->', status)
+        logger.debug('[GupshupAdapter] status update v3:', statusObj.id, '->', status)
 
         return {
           externalId:   statusObj.gs_id || statusObj.id,

@@ -1,6 +1,6 @@
 import { db } from '../lib/db'
 import { campaignService } from '../services/campaign.service'
-import { campaignQueue } from './campaign.worker'
+import { logger } from '../lib/logger'
 
 // Verifica a cada 60 segundos se tem campanha agendada para disparar
 export function startSchedulerWorker() {
@@ -8,10 +8,9 @@ export function startSchedulerWorker() {
     try {
       const now = new Date().toISOString()
 
-      // Busca campanhas com scheduled_at <= agora e status = 'scheduled'
       const { data: campaigns } = await db
         .from('campaigns')
-        .select('id, tenant_id, channel_id, batch_size, messages_per_min')
+        .select('id, tenant_id')
         .eq('status', 'scheduled')
         .lte('scheduled_at', now)
 
@@ -19,26 +18,19 @@ export function startSchedulerWorker() {
 
       for (const campaign of campaigns) {
         try {
-          const started = await campaignService.startCampaign(campaign.id, campaign.tenant_id)
-          await campaignQueue.add('run', {
-            campaignId: started.id,
-            tenantId: campaign.tenant_id,
-            channelId: campaign.channel_id,
-            batchSize: campaign.batch_size,
-            messagesPerMin: campaign.messages_per_min,
-          })
-          console.log(`[Scheduler] Campanha ${campaign.id} disparada automaticamente`)
-        } catch (err) {
-          console.error(`[Scheduler] Erro ao disparar campanha ${campaign.id}:`, err)
+          // startCampaign já enfileira no tenant queue
+          await campaignService.startCampaign(campaign.id, campaign.tenant_id)
+          logger.info('[Scheduler] Campanha disparada', { campaignId: campaign.id })
+        } catch (err: any) {
+          logger.error('[Scheduler] Erro ao disparar campanha', { campaignId: campaign.id, error: err?.message })
         }
       }
-    } catch (err) {
-      console.error('[Scheduler] Erro no worker:', err)
+    } catch (err: any) {
+      logger.error('[Scheduler] Erro no worker', { error: err?.message })
     }
   }
 
-  // Executa imediatamente e depois a cada 60s
   check()
   setInterval(check, 60 * 1000)
-  console.log('[Scheduler] Worker de agendamento iniciado')
+  logger.info('[Scheduler] Worker de agendamento iniciado')
 }

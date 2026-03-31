@@ -285,6 +285,7 @@ export class ContactService {
       .select('phone, name, email, company, status, origin, created_at')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
+      .limit(50000)
 
     const rows = data || []
     const header = 'phone,name,email,company,status,origin,created_at'
