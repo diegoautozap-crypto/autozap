@@ -521,7 +521,15 @@ export default function InboxPage() {
       {/* ── Coluna esquerda ── */}
       <div style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f4f4f5', flexShrink: 0 }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', marginBottom: '10px', letterSpacing: '-0.02em' }}>Inbox</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', margin: 0 }}>Inbox</h2>
+            <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }} title="Selecionar conversas"
+              style={{ width: '28px', height: '28px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: bulkMode ? '#22c55e' : 'transparent', color: bulkMode ? '#fff' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
+              onMouseEnter={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5' }}
+              onMouseLeave={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+              <CheckCheck size={15} />
+            </button>
+          </div>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
             <input style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const }} placeholder="Buscar contato..." value={search} onChange={e => setSearch(e.target.value)}
@@ -550,12 +558,6 @@ export default function InboxPage() {
               </button>
             )
           })}
-          <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }} title="Selecionar conversas"
-            style={{ width: '28px', height: '28px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: bulkMode ? '#22c55e' : 'transparent', color: bulkMode ? '#fff' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
-            onMouseEnter={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5' }}
-            onMouseLeave={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-            <CheckCheck size={14} />
-          </button>
         </div>
         {/* Barra de ações em massa */}
         {bulkMode && (
