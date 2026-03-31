@@ -217,7 +217,7 @@ async function processContact(
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
-      logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed.url, hasBody: !!parsed.bodyTemplate })
+      console.error('SEND FAILED:', contact.phone, 'error:', result.error, 'url:', parsed.url, 'body:', parsed.bodyTemplate?.slice(0, 200))
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
