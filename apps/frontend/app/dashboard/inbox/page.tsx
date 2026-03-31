@@ -628,6 +628,21 @@ export default function InboxPage() {
                 <button onClick={() => setShowProfile(p => !p)} style={{ padding: '5px 10px', background: showProfile ? '#f0fdf4' : '#fafafa', border: `1px solid ${showProfile ? '#bbf7d0' : '#e4e4e7'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showProfile ? '#16a34a' : '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <User size={13} /> Perfil
                 </button>
+                <button onClick={async () => {
+                  if (!messages || messages.length === 0) { toast.error('Nenhuma mensagem'); return }
+                  const rows = messages.map((m: any) => ({
+                    data: m.sent_at || m.created_at ? new Date(m.sent_at || m.created_at).toLocaleString('pt-BR') : '',
+                    direcao: m.direction === 'inbound' ? 'Recebida' : 'Enviada',
+                    tipo: m.content_type || 'text',
+                    mensagem: m.body || '',
+                    status: m.status || '',
+                  }))
+                  const { exportToExcel } = await import('@/lib/export')
+                  exportToExcel(rows, `conversa_${contactName.replace(/\s+/g, '_')}`, 'Mensagens')
+                  toast.success(`${rows.length} mensagens exportadas!`)
+                }} style={{ padding: '5px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                  <FileText size={13} /> Exportar
+                </button>
               </div>
             </div>
 

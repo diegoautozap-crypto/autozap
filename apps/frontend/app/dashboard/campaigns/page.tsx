@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi, contactApi } from '@/lib/api'
 import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
@@ -404,6 +404,24 @@ export default function CampaignsPage() {
                       <Play size={13} fill="#fff" /> {selectedCamp.status === 'scheduled' ? 'Disparar agora' : 'Disparar'}
                     </button>
                   )}
+                  <button onClick={async () => {
+                    try {
+                      toast.info('Exportando...')
+                      const { data: result } = await campaignApi.get(`/campaigns/${selectedCamp.id}/contacts`)
+                      const rows = (result.data || []).map((c: any) => ({
+                        telefone: c.phone || '', nome: c.name || '', status: c.status || '',
+                        erro: c.error_message || '', enviado_em: c.sent_at ? new Date(c.sent_at).toLocaleString('pt-BR') : '',
+                      }))
+                      if (rows.length === 0) { toast.error('Nenhum contato'); return }
+                      const { exportToExcel } = await import('@/lib/export')
+                      exportToExcel(rows, `campanha_${selectedCamp.name.replace(/\s+/g, '_')}`, 'Contatos')
+                      toast.success(`${rows.length} contatos exportados!`)
+                    } catch { toast.error('Erro ao exportar') }
+                  }}
+                    style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#52525b', fontWeight: 500 }}>
+                    <Download size={13} /> Exportar resultados (Excel)
+                  </button>
+
                   {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => { if (window.confirm(`Deletar "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}

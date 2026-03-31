@@ -504,6 +504,31 @@ export default function PipelinePage() {
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}>
               <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> Atualizar
             </button>
+            <button onClick={async () => {
+              if (!board) { toast.error('Nenhum dado'); return }
+              const rows: any[] = []
+              for (const [stage, convs] of Object.entries(board as Record<string, any[]>)) {
+                const colLabel = columns.find(c => c.key === stage)?.label || stage
+                for (const conv of convs) {
+                  rows.push({
+                    etapa: colLabel,
+                    contato: conv.contacts?.name || conv.contacts?.phone || '',
+                    telefone: conv.contacts?.phone || '',
+                    ultima_mensagem: conv.last_message || '',
+                    ultima_interacao: conv.last_message_at ? new Date(conv.last_message_at).toLocaleString('pt-BR') : '',
+                    status: conv.status || '',
+                  })
+                }
+              }
+              if (rows.length === 0) { toast.error('Pipeline vazio'); return }
+              const { exportToExcel } = await import('@/lib/export')
+              exportToExcel(rows, 'pipeline_funil', 'Pipeline')
+              toast.success(`${rows.length} registros exportados!`)
+            }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}>
+              <DollarSign size={13} /> Exportar Excel
+            </button>
           </div>
         </div>
 

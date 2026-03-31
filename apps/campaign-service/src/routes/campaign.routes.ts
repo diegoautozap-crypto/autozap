@@ -196,6 +196,18 @@ router.get('/campaigns/:id/progress', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Listar contatos da campanha (para exportação)
+router.get('/campaigns/:id/contacts', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('campaign_contacts')
+      .select('phone, name, status, error_message, sent_at, variables')
+      .eq('campaign_id', req.params.id).eq('tenant_id', req.auth.tid)
+      .order('sent_at', { ascending: false })
+    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
 router.post('/campaigns/:id/contacts/import', validate(importContactsSchema), async (req, res, next) => {
   try {
     const count = await campaignService.importContactsFromCSV(req.params.id, req.auth.tid, req.body.rows)
