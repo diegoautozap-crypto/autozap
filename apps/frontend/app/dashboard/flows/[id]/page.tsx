@@ -75,7 +75,7 @@ export default function FlowEditorPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
-  const tenantId = (user as any)?.tenantId || (user as any)?.tid || process.env.NEXT_PUBLIC_TENANT_ID || ''
+  const tenantId = user?.tenantId || ''
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])

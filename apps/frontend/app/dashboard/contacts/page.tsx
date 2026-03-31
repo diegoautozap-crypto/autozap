@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID!
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -90,7 +90,7 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: 
   )
 }
 
-function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void; onSaved: () => void; tenantId: string }) {
   const [fields, setFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -99,25 +99,25 @@ function CustomFieldsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   const [newField, setNewField] = useState({ label: '', type: 'text' as CustomFieldType, options: '', required: false })
 
   useEffect(() => { loadFields() }, [])
-  const loadFields = async () => { setLoading(true); const { data, error } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true }); if (!error && data) setFields(data); setLoading(false) }
+  const loadFields = async () => { setLoading(true); const { data, error } = await supabase.from('custom_fields').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }); if (!error && data) setFields(data); setLoading(false) }
   const handleAddField = async () => {
     if (!newField.label.trim()) return; setSaving(true)
     const name = newField.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     const options = newField.type === 'select' ? newField.options.split(',').map(o => o.trim()).filter(Boolean) : []
-    const { error } = await supabase.from('custom_fields').insert({ tenant_id: TENANT_ID, name, label: newField.label.trim(), type: newField.type, options, required: newField.required, sort_order: fields.length })
+    const { error } = await supabase.from('custom_fields').insert({ tenant_id: tenantId, name, label: newField.label.trim(), type: newField.type, options, required: newField.required, sort_order: fields.length })
     if (error) toast.error('Erro: ' + error.message)
     else { toast.success('Campo criado!'); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
     setSaving(false)
   }
   const handleDeleteField = async (id: string, label: string) => {
     if (!confirm(`Excluir o campo "${label}"?`)) return; setDeleting(id)
-    const { error } = await supabase.from('custom_fields').delete().eq('id', id)
+    const { error } = await supabase.from('custom_fields').delete().eq('id', id).eq('tenant_id', tenantId)
     if (error) toast.error('Erro ao excluir campo'); else { toast.success('Campo excluído!'); await loadFields(); onSaved() }
     setDeleting(null)
   }
   const handleDragStart = (index: number) => setDragging(index)
   const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); if (dragging === null || dragging === index) return; const r = [...fields]; const [m] = r.splice(dragging, 1); r.splice(index, 0, m); setFields(r); setDragging(index) }
-  const handleDragEnd = async () => { setDragging(null); await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id))); onSaved() }
+  const handleDragEnd = async () => { setDragging(null); await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id).eq('tenant_id', tenantId))); onSaved() }
   const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = { text: 'Texto', number: 'Número', date: 'Data', select: 'Seleção' }
   const FIELD_TYPE_COLORS: Record<CustomFieldType, { bg: string; color: string }> = { text: { bg: '#eff6ff', color: '#2563eb' }, number: { bg: '#f0fdf4', color: '#16a34a' }, date: { bg: '#fef3c7', color: '#d97706' }, select: { bg: '#faf5ff', color: '#7c3aed' } }
 
@@ -303,6 +303,8 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 }
 
 export default function ContactsPage() {
+  const { user } = useAuthStore()
+  const tenantId = user?.tenantId || ''
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
@@ -319,7 +321,7 @@ export default function ContactsPage() {
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const queryClient = useQueryClient()
 
-  const loadCustomFields = async () => { const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', TENANT_ID).order('sort_order', { ascending: true }); if (data) setCustomFields(data) }
+  const loadCustomFields = async () => { const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }); if (data) setCustomFields(data) }
   useEffect(() => { loadCustomFields() }, [])
 
   const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
@@ -369,7 +371,7 @@ export default function ContactsPage() {
   return (
     <div style={{ padding: '28px 32px', maxWidth: '1400px', background: '#f4f4f5', minHeight: '100%' }}>
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
-      {showCustomFields && <CustomFieldsModal onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
+      {showCustomFields && <CustomFieldsModal tenantId={tenantId} onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
