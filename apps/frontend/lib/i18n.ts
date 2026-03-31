@@ -466,6 +466,12 @@ const translations: Record<string, Record<string, string>> = {
     'automations.errorDelete': 'Erro ao excluir',
     'automations.errorReorder': 'Erro ao salvar nova ordem.',
     'automations.confirmDelete': 'Excluir',
+    'automations.if': 'Se:',
+    'automations.then': 'Então:',
+    'automations.keywordPrefix': 'Palavra-chave:',
+    'automations.sendPrefix': 'Enviar:',
+    'automations.moveTo': 'Mover para:',
+    'automations.addTagPrefix': 'Adicionar tag:',
 
     // Common
     'common.save': 'Salvar',
@@ -934,6 +940,12 @@ const translations: Record<string, Record<string, string>> = {
     'automations.errorDelete': 'Error deleting',
     'automations.errorReorder': 'Error saving new order.',
     'automations.confirmDelete': 'Delete',
+    'automations.if': 'If:',
+    'automations.then': 'Then:',
+    'automations.keywordPrefix': 'Keyword:',
+    'automations.sendPrefix': 'Send:',
+    'automations.moveTo': 'Move to:',
+    'automations.addTagPrefix': 'Add tag:',
 
     'common.save': 'Save',
     'common.cancel': 'Cancel',
@@ -1099,6 +1111,12 @@ const translations: Record<string, Record<string, string>> = {
     'automations.errorDelete': 'Error al eliminar',
     'automations.errorReorder': 'Error al guardar nuevo orden.',
     'automations.confirmDelete': 'Eliminar',
+    'automations.if': 'Si:',
+    'automations.then': 'Entonces:',
+    'automations.keywordPrefix': 'Palabra clave:',
+    'automations.sendPrefix': 'Enviar:',
+    'automations.moveTo': 'Mover a:',
+    'automations.addTagPrefix': 'Agregar etiqueta:',
 
     'common.save': 'Guardar',
     'common.cancel': 'Cancelar',

@@ -164,38 +164,38 @@ export default function CampaignsPage() {
       if (contactMode === 'segment' && hasSegmentFilter) {
         toast.info(t('campaigns.toast.loadingSegment'))
         const { data: filterResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-filter`, buildFilter())
-        toast.info(`${filterResult?.data?.imported || 0} contatos carregados`)
+        toast.info(`${filterResult?.data?.imported || 0} ${t('campaigns.toast.contactsLoaded')}`)
       } else {
         const rows = contactsText.split('\n').filter(Boolean).map(line => {
           const parts = line.split(','); const phone = parts[0]?.trim().replace(/\D/g, '')
           return { phone, name: parts.slice(1).join(',').trim() || phone, message: parts.slice(1).join(',').trim() || '' }
         }).filter(r => r.phone && r.phone.length >= 8)
         if (rows.length > 0) {
-          toast.info(`Importando ${rows.length} contatos...`)
+          toast.info(`${t('campaigns.toast.importing')} ${rows.length} ${t('campaigns.toast.contacts')}...`)
           await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
         }
       }
 
       if (scheduleMode === 'now') {
-        toast.info('Iniciando disparo...')
+        toast.info(t('campaigns.toast.starting'))
         await campaignApi.post(`/campaigns/${campId}/start`)
       }
       return campData.data
     },
     onSuccess: camp => {
-      toast.success(scheduleMode === 'scheduled' ? 'Agendada!' : 'Campanha criada e iniciada!')
+      toast.success(scheduleMode === 'scheduled' ? t('campaigns.toast.scheduled') : t('campaigns.toast.createdAndStarted'))
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setShowModal(false); setSelectedCamp(camp); resetModal()
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('campaigns.toast.error')),
   })
 
-  const startMutation  = useMutation({ mutationFn: async (id: string) => { await campaignApi.post(`/campaigns/${id}/start`) }, onSuccess: () => { toast.success('Iniciada!'); queryClient.invalidateQueries({ queryKey: ['campaigns'] }) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro') })
-  const pauseMutation  = useMutation({ mutationFn: async (id: string) => { await campaignApi.post(`/campaigns/${id}/pause`) }, onSuccess: () => { toast.success('Pausada'); queryClient.invalidateQueries({ queryKey: ['campaigns'] }) } })
+  const startMutation  = useMutation({ mutationFn: async (id: string) => { await campaignApi.post(`/campaigns/${id}/start`) }, onSuccess: () => { toast.success(t('campaigns.toast.started')); queryClient.invalidateQueries({ queryKey: ['campaigns'] }) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('campaigns.toast.error')) })
+  const pauseMutation  = useMutation({ mutationFn: async (id: string) => { await campaignApi.post(`/campaigns/${id}/pause`) }, onSuccess: () => { toast.success(t('campaigns.toast.paused')); queryClient.invalidateQueries({ queryKey: ['campaigns'] }) } })
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await campaignApi.delete(`/campaigns/${id}`) },
-    onSuccess: () => { toast.success('Deletada!'); queryClient.invalidateQueries({ queryKey: ['campaigns'] }); setSelectedCamp(null) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro'),
+    onSuccess: () => { toast.success(t('campaigns.toast.deleted')); queryClient.invalidateQueries({ queryKey: ['campaigns'] }); setSelectedCamp(null) },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('campaigns.toast.error')),
   })
 
   const prog         = progress || selectedCamp
@@ -414,24 +414,24 @@ export default function CampaignsPage() {
                   )}
                   <button onClick={async () => {
                     try {
-                      toast.info('Exportando...')
+                      toast.info(t('campaigns.toast.exporting'))
                       const { data: result } = await campaignApi.get(`/campaigns/${selectedCamp.id}/contacts`)
                       const rows = (result.data || []).map((c: any) => ({
                         telefone: c.phone || '', nome: c.name || '', status: c.status || '',
                         erro: c.error_message || '', enviado_em: c.sent_at ? new Date(c.sent_at).toLocaleString('pt-BR') : '',
                       }))
-                      if (rows.length === 0) { toast.error('Nenhum contato'); return }
+                      if (rows.length === 0) { toast.error(t('campaigns.toast.noContacts')); return }
                       const { exportToExcel } = await import('@/lib/export')
                       exportToExcel(rows, `campanha_${selectedCamp.name.replace(/\s+/g, '_')}`, 'Contatos')
-                      toast.success(`${rows.length} contatos exportados!`)
-                    } catch { toast.error('Erro ao exportar') }
+                      toast.success(`${rows.length} ${t('campaigns.toast.contactsExported')}`)
+                    } catch { toast.error(t('campaigns.toast.exportError')) }
                   }}
                     style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 500 }}>
                     <Download size={13} /> {t('campaigns.exportResults')}
                   </button>
 
                   {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
-                    <button onClick={() => { if (window.confirm(`Deletar "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
+                    <button onClick={() => { if (window.confirm(`${t('campaigns.deleteCampaign')} "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}
                       style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f87171', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)'}
@@ -531,7 +531,7 @@ export default function CampaignsPage() {
                           </span>
                           {selectedTemplates.length > 0 && (
                             <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
-                              <Shuffle size={11} /> {selectedTemplates.length} selecionado{selectedTemplates.length > 1 ? 's' : ''}
+                              <Shuffle size={11} /> {selectedTemplates.length} {t('campaigns.selected')}
                             </span>
                           )}
                         </div>

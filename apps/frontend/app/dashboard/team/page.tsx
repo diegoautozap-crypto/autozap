@@ -185,10 +185,10 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
           {/* Canais */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📡 Canais permitidos</p>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '10px' }}>Sem seleção = acesso a todos os canais</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📡 {t('team.allowedChannels')}</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '10px' }}>{t('team.noChannelSelected')}</p>
             {channels.length === 0 ? (
-              <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Nenhum canal cadastrado</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('team.noChannels')}</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {channels.map((ch: any) => {
@@ -209,7 +209,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
           {/* Conversas */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>💬 Acesso a conversas</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>💬 {t('team.conversationAccess')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {CONVERSATION_ACCESS_OPTIONS.map(opt => {
                 const isSelected = effectivePerms.conversation_access === opt.value
@@ -226,7 +226,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
           {/* Campanhas */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📦 Acesso a campanhas</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📦 {t('team.campaignAccess')}</p>
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {CAMPAIGN_ACCESS_OPTIONS.map(opt => {
                 const isSelected = effectivePerms.campaign_access === opt.value
@@ -246,10 +246,10 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
               <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
                 style={{ padding: '10px 24px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {saveMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
-                Salvar permissões
+                {t('team.savePermissions')}
               </button>
               <button onClick={() => setPerms(null)} style={{ padding: '10px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', color: '#52525b' }}>
-                Cancelar
+                {t('common.cancel')}
               </button>
             </div>
           )}
@@ -260,6 +260,8 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 }
 
 export default function TeamPage() {
+  const t = useT()
+  const ROLES = getRoles(t)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'agent' })
@@ -319,9 +321,9 @@ export default function TeamPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Equipe</h1>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('team.title')}</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginTop: '3px' }}>
-            {members.length} {members.length === 1 ? 'membro' : 'membros'} na equipe
+            {members.length} {members.length === 1 ? t('team.member') : t('team.members')}
           </p>
         </div>
         {canManage && (
@@ -329,7 +331,7 @@ export default function TeamPage() {
             style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
-            <Plus size={14} /> Adicionar membro
+            <Plus size={14} /> {t('team.addMember')}
           </button>
         )}
       </div>
@@ -354,23 +356,23 @@ export default function TeamPage() {
       {showForm && canManage && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Adicionar membro</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{t('team.addMember')}</h3>
             <button onClick={() => setShowForm(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-muted)' }}><X size={16} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
             <div>
-              <label style={labelStyle}>Nome completo *</label>
+              <label style={labelStyle}>{t('team.fullName')}</label>
               <input style={inputStyle} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                 onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
             </div>
             <div>
-              <label style={labelStyle}>Email *</label>
+              <label style={labelStyle}>{t('team.email')}</label>
               <input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                 onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
             </div>
           </div>
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle}>Tipo de acesso</label>
+            <label style={labelStyle}>{t('team.accessType')}</label>
             <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               {ROLES.map(r => {
                 const Icon = r.icon
@@ -388,15 +390,15 @@ export default function TeamPage() {
             </div>
           </div>
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#15803d' }}>
-            📧 Email com login e senha temporária será enviado. Você pode ajustar as permissões individuais depois.
+            📧 {t('team.emailNotice')}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => inviteMutation.mutate()} disabled={!form.name || !form.email || inviteMutation.isPending}
               style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (!form.name || !form.email) ? 0.5 : 1 }}>
               {inviteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              Adicionar e enviar email
+              {t('team.addAndSend')}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
+            <button onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -409,13 +411,13 @@ export default function TeamPage() {
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
             <Users size={22} color="var(--text-faintest)" />
           </div>
-          <p style={{ color: 'var(--text-faint)', fontSize: '14px', fontWeight: 500 }}>Nenhum membro na equipe ainda</p>
-          <p style={{ color: 'var(--text-faintest)', fontSize: '13px', marginTop: '4px' }}>Adicione membros para começar</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', fontWeight: 500 }}>{t('team.noMembers')}</p>
+          <p style={{ color: 'var(--text-faintest)', fontSize: '13px', marginTop: '4px' }}>{t('team.addToStart')}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {members.map((m: any) => {
-            const roleInfo = getRoleInfo(m.role)
+            const roleInfo = getRoleInfo(m.role, t)
             const RoleIcon = roleInfo.icon
             const av = getAvatarColor(m.name)
             const isEditing = editingId === m.id
@@ -446,11 +448,11 @@ export default function TeamPage() {
                         <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: roleInfo.bg, color: roleInfo.color, border: `1px solid ${roleInfo.border}`, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <RoleIcon size={10} /> {roleInfo.label}
                         </span>
-                        {!m.is_active && <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: 'var(--bg)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>Inativo</span>}
+                        {!m.is_active && <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: 'var(--bg)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{t('team.inactive')}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{m.email}</span>
-                        {m.last_login_at && <span style={{ fontSize: '11px', color: 'var(--text-faintest)' }}>Último acesso: {new Date(m.last_login_at).toLocaleDateString('pt-BR')}</span>}
+                        {m.last_login_at && <span style={{ fontSize: '11px', color: 'var(--text-faintest)' }}>{t('team.lastAccess')}: {new Date(m.last_login_at).toLocaleDateString('pt-BR')}</span>}
                       </div>
                     </>
                   )}
@@ -462,7 +464,7 @@ export default function TeamPage() {
                       <>
                         <button onClick={() => updateMutation.mutate({ id: m.id, data: editForm })} disabled={updateMutation.isPending}
                           style={{ padding: '6px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {updateMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Salvar
+                          {updateMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} {t('common.save')}
                         </button>
                         <button onClick={() => setEditingId(null)} style={{ padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b', display: 'flex' }}><X size={12} /></button>
                       </>
@@ -490,14 +492,14 @@ export default function TeamPage() {
                           <Pencil size={14} />
                         </button>
                         {/* Reset senha */}
-                        <button onClick={() => { if (confirm(`Redefinir senha de ${m.name}?`)) resetPasswordMutation.mutate(m.id) }} title="Redefinir senha"
+                        <button onClick={() => { if (confirm(`${t('team.confirmReset')} ${m.name}?`)) resetPasswordMutation.mutate(m.id) }} title={t('team.confirmReset')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fffbeb'; (e.currentTarget as HTMLButtonElement).style.color = '#d97706' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                           <RotateCcw size={14} />
                         </button>
                         {/* Remover */}
-                        <button onClick={() => { if (confirm(`Remover ${m.name}?`)) deleteMutation.mutate(m.id) }} title="Remover"
+                        <button onClick={() => { if (confirm(`${t('team.confirmRemove')} ${m.name}?`)) deleteMutation.mutate(m.id) }} title={t('common.delete')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>

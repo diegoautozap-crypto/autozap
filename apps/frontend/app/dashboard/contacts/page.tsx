@@ -299,7 +299,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </>)}
           {step === 'preview' && importTags.length > 0 && (
             <div style={{ marginTop: '14px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aplicar tag automaticamente (opcional)</p>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('contacts.applyTag')}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {importTags.map((tag: any) => {
                   const sel = importTagId === tag.id
@@ -316,13 +316,13 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           )}
         </div>
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--divider)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>← Trocar arquivo</button>}
-          <button onClick={onClose} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Cancelar</button>
+          {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>{t('contacts.changeFile')}</button>}
+          <button onClick={onClose} style={{ padding: '8px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>{t('common.cancel')}</button>
           {step === 'preview' && validRows.length > 0 && (
             <button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}
               style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {importMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
-              {importMutation.isPending ? 'Importando...' : `Importar ${validRows.length}`}
+              {importMutation.isPending ? t('contacts.importing') : `${t('contacts.import')} ${validRows.length}`}
             </button>
           )}
         </div>

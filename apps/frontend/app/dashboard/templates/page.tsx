@@ -19,9 +19,9 @@ const labelStyle: React.CSSProperties = {
 }
 
 const CATEGORIES = [
-  { value: 'marketing', label: 'Marketing', color: '#16a34a', bg: '#f0fdf4' },
-  { value: 'utility', label: 'Utilidade', color: '#2563eb', bg: '#eff6ff' },
-  { value: 'authentication', label: 'Autenticação', color: '#7c3aed', bg: '#f5f3ff' },
+  { value: 'marketing', labelKey: 'Marketing', color: '#16a34a', bg: '#f0fdf4' },
+  { value: 'utility', labelKey: 'templates.categoryUtility', color: '#2563eb', bg: '#eff6ff' },
+  { value: 'authentication', labelKey: 'templates.categoryAuth', color: '#7c3aed', bg: '#f5f3ff' },
 ]
 
 const emptyForm = { name: '', templateId: '', body: '', category: 'marketing', variables: '' }
@@ -80,22 +80,22 @@ export default function TemplatesPage() {
       })
     },
     onSuccess: () => {
-      toast.success('Template atualizado!')
+      toast.success(t('templates.successUpdated'))
       queryClient.invalidateQueries({ queryKey: ['templates'] })
       setShowForm(false)
       setEditingId(null)
       setForm(emptyForm)
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('templates.errorUpdate')),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await campaignApi.delete(`/templates/${id}`) },
     onSuccess: () => {
-      toast.success('Template removido!')
+      toast.success(t('templates.successDeleted'))
       queryClient.invalidateQueries({ queryKey: ['templates'] })
     },
-    onError: () => toast.error('Erro ao remover template'),
+    onError: () => toast.error(t('templates.errorDelete')),
   })
 
   const openEdit = (t: any) => {
@@ -117,7 +117,7 @@ export default function TemplatesPage() {
   }
 
   const handleSubmit = () => {
-    if (!selectedChannel && !editingId) { toast.error('Selecione um canal'); return }
+    if (!selectedChannel && !editingId) { toast.error(t('templates.selectChannelError')); return }
     if (editingId) editMutation.mutate()
     else createMutation.mutate()
   }
@@ -130,25 +130,25 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Templates</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '3px' }}>Gerencie seus templates aprovados do WhatsApp</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('nav.templates')}</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '3px' }}>{t('templates.subtitle')}</p>
         </div>
         <button
           className="mobile-header-actions"
           onClick={() => { closeForm(); setShowForm(true) }}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={14} /> Novo template
+          <Plus size={14} /> {t('templates.new')}
         </button>
       </div>
 
       {/* Info box */}
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px' }}>
-        <p style={{ fontSize: '13px', fontWeight: 600, color: '#1d4ed8', marginBottom: '6px' }}>📋 Como cadastrar um template</p>
+        <p style={{ fontSize: '13px', fontWeight: 600, color: '#1d4ed8', marginBottom: '6px' }}>📋 {t('templates.howTo')}</p>
         <ol style={{ fontSize: '13px', color: '#374151', lineHeight: 1.8, paddingLeft: '18px', margin: 0 }}>
-          <li>Crie e aprove o template em <a href="https://app.gupshup.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>app.gupshup.io</a> → Modelos</li>
-          <li>Copie o <strong>ID do template</strong> (UUID) no painel do Gupshup</li>
-          <li>Cadastre aqui com o nome, corpo da mensagem e variáveis (ex: nome, cidade)</li>
-          <li>Pronto — na criação de campanha basta selecionar o template</li>
+          <li>{t('templates.howToStep1')} <a href="https://app.gupshup.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>app.gupshup.io</a> {t('templates.howToStep1Suffix')}</li>
+          <li>{t('templates.howToStep2')}</li>
+          <li>{t('templates.howToStep3')}</li>
+          <li>{t('templates.howToStep4')}</li>
         </ol>
       </div>
 
@@ -159,7 +159,7 @@ export default function TemplatesPage() {
             value={selectedChannel}
             onChange={e => setSelectedChannel(e.target.value)}
             style={{ ...inputStyle, width: '280px' }}>
-            <option value="">Todos os canais</option>
+            <option value="">{t('templates.allChannels')}</option>
             {channels?.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
           </select>
         </div>
@@ -170,7 +170,7 @@ export default function TemplatesPage() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
             <h3 style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)' }}>
-              {editingId ? '✏️ Editar template' : 'Novo template'}
+              {editingId ? `✏️ ${t('templates.editTemplate')}` : t('templates.new')}
             </h3>
             <button onClick={closeForm} style={{ background: 'var(--bg)', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}>
               <X size={16} />
@@ -179,9 +179,9 @@ export default function TemplatesPage() {
 
           {!editingId && (
             <div style={{ marginBottom: '14px' }}>
-              <label style={labelStyle}>Canal *</label>
+              <label style={labelStyle}>{t('templates.channel')} *</label>
               <select style={{ ...inputStyle, appearance: 'none' } as any} value={selectedChannel} onChange={e => setSelectedChannel(e.target.value)}>
-                <option value="">Selecionar canal...</option>
+                <option value="">{t('templates.selectChannel')}</option>
                 {channels?.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             </div>
@@ -189,40 +189,40 @@ export default function TemplatesPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             <div>
-              <label style={labelStyle}>Nome do template *</label>
+              <label style={labelStyle}>{t('templates.templateName')} *</label>
               <input style={inputStyle} placeholder="Ex: Boas-vindas clientes" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label style={labelStyle}>ID do template (Gupshup) *</label>
+              <label style={labelStyle}>{t('templates.templateId')} *</label>
               <input style={inputStyle} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })} />
             </div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Categoria</label>
+            <label style={labelStyle}>{t('templates.category')}</label>
             <div style={{ display: 'flex', gap: '8px' }}>
               {CATEGORIES.map(c => (
                 <button key={c.value} onClick={() => setForm({ ...form, category: c.value })}
                   style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${form.category === c.value ? c.color : 'var(--border)'}`, background: form.category === c.value ? c.bg : 'var(--bg-card)', color: form.category === c.value ? c.color : 'var(--text-muted)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                  {c.label}
+                  {t(c.labelKey)}
                 </button>
               ))}
             </div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Corpo da mensagem *</label>
+            <label style={labelStyle}>{t('templates.messageBody')} *</label>
             <textarea
               style={{ ...inputStyle, minHeight: '100px', resize: 'vertical', lineHeight: 1.6 } as any}
               placeholder="Olá {{1}}, temos uma oferta especial para você em {{2}}!"
               value={form.body}
               onChange={e => setForm({ ...form, body: e.target.value })}
             />
-            <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Use {'{{1}}'}, {'{{2}}'}, etc. para marcar as variáveis</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>{t('templates.variablesHint')}</p>
           </div>
 
           <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Nomes das variáveis (separados por vírgula)</label>
+            <label style={labelStyle}>{t('templates.variableNames')}</label>
             <input
               style={inputStyle}
               placeholder="Ex: nome, cidade, desconto"
@@ -230,7 +230,7 @@ export default function TemplatesPage() {
               onChange={e => setForm({ ...form, variables: e.target.value })}
             />
             <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>
-              Esses nomes ajudam a identificar o que colocar em cada coluna do CSV
+              {t('templates.variablesHelp')}
             </p>
           </div>
 
@@ -240,10 +240,10 @@ export default function TemplatesPage() {
               disabled={isPending || !canSave}
               style={{ padding: '9px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !canSave ? 0.5 : 1 }}>
               {isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              {editingId ? 'Salvar alterações' : 'Criar template'}
+              {editingId ? t('templates.saveChanges') : t('templates.createTemplate')}
             </button>
             <button onClick={closeForm} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
-              Cancelar
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -257,45 +257,45 @@ export default function TemplatesPage() {
       ) : templates?.length === 0 ? (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
           <FileText size={32} color="var(--border)" style={{ margin: '0 auto 12px' }} />
-          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '14px' }}>Nenhum template cadastrado ainda</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '14px' }}>{t('templates.noTemplates')}</p>
           <button onClick={() => setShowForm(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            + Novo template
+            + {t('templates.new')}
           </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {templates?.map((t: any) => {
-            const cat = CATEGORIES.find(c => c.value === t.category) || CATEGORIES[0]
-            const channelName = channels?.find((c: any) => c.id === t.channel_id)?.name
-            const isExpanded = expandedId === t.id
+          {templates?.map((tpl: any) => {
+            const cat = CATEGORIES.find(c => c.value === tpl.category) || CATEGORIES[0]
+            const channelName = channels?.find((c: any) => c.id === tpl.channel_id)?.name
+            const isExpanded = expandedId === tpl.id
             return (
-              <div key={t.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+              <div key={tpl.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer' }}
-                  onClick={() => setExpandedId(isExpanded ? null : t.id)}>
+                  onClick={() => setExpandedId(isExpanded ? null : tpl.id)}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: cat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <FileText size={16} color={cat.color} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', margin: 0 }}>{t.name}</p>
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: cat.color, background: cat.bg, padding: '1px 6px', borderRadius: '4px' }}>{cat.label}</span>
+                      <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', margin: 0 }}>{tpl.name}</p>
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: cat.color, background: cat.bg, padding: '1px 6px', borderRadius: '4px' }}>{t(cat.labelKey)}</span>
                       {channelName && <span style={{ fontSize: '10px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '1px 6px', borderRadius: '4px' }}>{channelName}</span>}
                     </div>
                     <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      ID: {t.template_id}
+                      ID: {tpl.template_id}
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button
-                      onClick={e => { e.stopPropagation(); openEdit(t) }}
+                      onClick={e => { e.stopPropagation(); openEdit(tpl) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Pencil size={14} />
                     </button>
                     <button
-                      onClick={e => { e.stopPropagation(); if (confirm('Remover template?')) deleteMutation.mutate(t.id) }}
+                      onClick={e => { e.stopPropagation(); if (confirm(t('templates.confirmDelete'))) deleteMutation.mutate(tpl.id) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
@@ -307,15 +307,15 @@ export default function TemplatesPage() {
                 {isExpanded && (
                   <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--divider)' }}>
                     <div style={{ paddingTop: '12px' }}>
-                      <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Mensagem</p>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{t('templates.messageLabel')}</p>
                       <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '12px 14px' }}>
-                        <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{t.body}</p>
+                        <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{tpl.body}</p>
                       </div>
-                      {t.variables?.length > 0 && (
+                      {tpl.variables?.length > 0 && (
                         <div style={{ marginTop: '12px' }}>
-                          <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Variáveis</p>
+                          <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{t('templates.variables')}</p>
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {t.variables.map((v: string, i: number) => (
+                            {tpl.variables.map((v: string, i: number) => (
                               <span key={i} style={{ fontSize: '12px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 10px', borderRadius: '4px', fontWeight: 500 }}>
                                 {`{{${i + 1}}}`} = {v}
                               </span>

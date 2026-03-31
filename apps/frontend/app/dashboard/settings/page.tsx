@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
 import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
+import { useT } from '@/lib/i18n'
 
 const PLAN_NAMES: Record<string, string> = {
   trial:      'Trial',
@@ -376,6 +377,7 @@ function WebhooksSection() {
 }
 
 export default function SettingsPage() {
+  const t = useT()
   const { user } = useAuthStore()
   const [subscribing, setSubscribing] = useState<string | null>(null)
   const [showCpfModal, setShowCpfModal] = useState<string | null>(null)
@@ -443,8 +445,8 @@ export default function SettingsPage() {
   return (
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '700px' }}>
       <div className="mobile-header">
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: '4px' }}>Plano e Configurações</h1>
-        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '28px' }}>Gerencie sua conta e uso do plano</p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: '4px' }}>{t('settings.titleFull')}</h1>
+        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '28px' }}>{t('settings.manageAccount')}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -456,10 +458,10 @@ export default function SettingsPage() {
               <AlertTriangle size={18} color="#ef4444" />
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 700, color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>Seu trial expirou</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>Escolha um plano abaixo para continuar usando o AutoZap.</p>
+              <p style={{ fontWeight: 700, color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>{t('settings.trialExpired')}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>{t('settings.trialExpiredDesc')}</p>
               <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}>
-                <Zap size={13} /> Ver planos
+                <Zap size={13} /> {t('settings.viewPlans')}
               </a>
             </div>
           </div>
@@ -470,12 +472,12 @@ export default function SettingsPage() {
           <div style={{ background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4', border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`, borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
-                {trialDaysLeft !== null && trialDaysLeft <= 2 ? `⚠️ Trial expira em ${trialDaysLeft} dia${trialDaysLeft !== 1 ? 's' : ''}!` : `🎉 Trial ativo — ${usage?.remaining ?? 0} mensagens restantes`}
+                {trialDaysLeft !== null && trialDaysLeft <= 2 ? `⚠️ ${t('settings.trialExpiresSoon')} ${trialDaysLeft} ${trialDaysLeft !== 1 ? t('settings.days') : t('settings.day')}!` : `🎉 ${t('settings.trialActive')} — ${usage?.remaining ?? 0} ${t('settings.messagesRemaining')}`}
               </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Escolha um plano para não perder o acesso</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('settings.choosePlanNotice')}</p>
             </div>
             <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
-              <Zap size={13} /> Fazer upgrade
+              <Zap size={13} /> {t('settings.upgrade')}
             </a>
           </div>
         )}
@@ -484,8 +486,8 @@ export default function SettingsPage() {
         {!isTrial && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ Plano {planName} ativo</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{subscription?.status === 'active' ? 'Assinatura recorrente ativa' : 'Aguardando confirmação de pagamento'}</p>
+              <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ {t('settings.plan')} {planName} {t('settings.planActive')}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{subscription?.status === 'active' ? t('settings.subscriptionActive') : t('settings.awaitingPayment')}</p>
             </div>
             <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 14px', borderRadius: '99px' }}>{getPlanPrice(planSlug)}/mês</span>
           </div>
@@ -493,14 +495,14 @@ export default function SettingsPage() {
 
         {/* Perfil */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Perfil</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>{t('settings.profile')}</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Email</span>
               <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{user?.email}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Plano atual</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('settings.currentPlan')}</span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: isTrial ? '#d97706' : '#16a34a', background: isTrial ? '#fffbeb' : '#f0fdf4', border: `1px solid ${isTrial ? '#fde68a' : '#bbf7d0'}`, padding: '2px 10px', borderRadius: '99px' }}>
                 {isTrial ? '🎯 Trial (7 dias)' : planName}
               </span>
@@ -510,17 +512,17 @@ export default function SettingsPage() {
 
         {/* Uso do mês */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Uso do mês</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>{t('settings.monthlyUsage')}</span>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Mensagens enviadas</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('settings.messagesSent')}</span>
             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{sent.toLocaleString()} / {limit === null ? '∞' : limit.toLocaleString()}</span>
           </div>
           <div style={{ height: '6px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: barColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% utilizado</span>
-            {limit !== null && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{Math.max(0, limit - sent).toLocaleString()} restantes</span>}
+            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% {t('settings.used')}</span>
+            {limit !== null && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{Math.max(0, limit - sent).toLocaleString()} {t('settings.remaining')}</span>}
           </div>
         </div>
 
@@ -533,7 +535,7 @@ export default function SettingsPage() {
         {/* Planos */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
-            {isTrial ? '🚀 Escolha seu plano' : 'Planos disponíveis'}
+            {isTrial ? `🚀 ${t('settings.choosePlan')}` : t('settings.availablePlans')}
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map((slug) => {
@@ -544,8 +546,8 @@ export default function SettingsPage() {
                   style={{ border: isActive ? '2px solid #22c55e' : isPopular ? '2px solid #7c3aed' : '1px solid var(--border)', borderRadius: '12px', padding: '18px', background: isActive ? '#f0fdf4' : 'var(--bg-card)', position: 'relative', transition: 'box-shadow 0.15s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'}>
-                  {isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#16a34a', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '1px 8px', borderRadius: '99px' }}>Atual</span>}
-                  {isPopular && !isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '1px 8px', borderRadius: '99px' }}>Popular</span>}
+                  {isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#16a34a', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '1px 8px', borderRadius: '99px' }}>{t('settings.current')}</span>}
+                  {isPopular && !isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '1px 8px', borderRadius: '99px' }}>{t('settings.popular')}</span>}
                   <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text)', marginBottom: '2px', letterSpacing: '-0.01em' }}>{PLAN_NAMES[slug]}</p>
                   <p style={{ color: 'var(--text-faint)', fontSize: '12px', marginBottom: '10px' }}>{PLAN_MSGS[slug]}</p>
                   <p style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text)', marginBottom: '12px', letterSpacing: '-0.02em' }}>
@@ -564,16 +566,16 @@ export default function SettingsPage() {
                       style={{ width: '100%', padding: '8px', background: isPopular ? '#7c3aed' : '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.1s' }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'}
                       onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}>
-                      Assinar {PLAN_NAMES[slug]}
+                      {t('settings.subscribe')} {PLAN_NAMES[slug]}
                     </button>
                   )}
-                  {isActive && !isTrial && <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '6px 0' }}>✓ Plano ativo</div>}
+                  {isActive && !isTrial && <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '6px 0' }}>✓ {t('settings.activePlan')}</div>}
                 </div>
               )
             })}
           </div>
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '12px', marginTop: '14px' }}>
-            Pagamento seguro via PIX ou cartão de crédito • Cancele quando quiser
+            {t('settings.paymentSecure')}
           </p>
         </div>
       </div>
@@ -584,11 +586,11 @@ export default function SettingsPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowCpfModal(null) }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '28px', width: '380px', margin: '0 16px', border: '1px solid var(--border)', boxShadow: '0 24px 60px rgba(0,0,0,.12)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Assinar {PLAN_NAMES[showCpfModal]}</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('settings.subscribe')} {PLAN_NAMES[showCpfModal]}</h3>
               <button onClick={() => setShowCpfModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex' }}><X size={18} /></button>
             </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>Informe seu CPF ou CNPJ para criar a assinatura.</p>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>CPF ou CNPJ</label>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>{t('settings.cpfCnpjNotice')}</p>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>{t('settings.cpfCnpj')}</label>
             <input
               type="text"
               placeholder="000.000.000-00 ou 00.000.000/0000-00"
@@ -603,10 +605,10 @@ export default function SettingsPage() {
               style={{ width: '100%', padding: '11px', background: subscribing ? 'var(--border)' : '#22c55e', color: subscribing ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: subscribing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.1s' }}
               onMouseEnter={e => { if (!subscribing) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
               onMouseLeave={e => { if (!subscribing) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
-              {subscribing ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando link...</> : 'Gerar link de pagamento'}
+              {subscribing ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {t('settings.generatingLink')}</> : t('settings.generateLink')}
             </button>
             <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-faint)', marginTop: '12px' }}>
-              Você será redirecionado para pagar via PIX ou cartão
+              {t('settings.redirectNotice')}
             </p>
           </div>
         </div>

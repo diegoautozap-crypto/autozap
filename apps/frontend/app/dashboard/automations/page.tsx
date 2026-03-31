@@ -17,18 +17,19 @@ import {
   Zap, Plus, Pencil, Trash2, X, Check, Loader2,
   ToggleLeft, ToggleRight, GripVertical, Tag, ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 
 const TRIGGER_TYPES = [
-  { value: 'keyword', label: 'Palavra-chave', desc: 'Mensagem contém uma palavra específica' },
-  { value: 'first_message', label: 'Primeira mensagem', desc: 'Primeiro contato do cliente' },
-  { value: 'outside_hours', label: 'Fora do horário', desc: 'Mensagem fora do expediente' },
+  { value: 'keyword', labelKey: 'automations.triggerKeyword', descKey: 'automations.triggerKeywordDesc' },
+  { value: 'first_message', labelKey: 'automations.triggerFirstMessage', descKey: 'automations.triggerFirstMessageDesc' },
+  { value: 'outside_hours', labelKey: 'automations.triggerOutsideHours', descKey: 'automations.triggerOutsideHoursDesc' },
 ]
 
 const ACTION_TYPES = [
-  { value: 'send_message', label: 'Enviar mensagem' },
-  { value: 'assign_agent', label: 'Atribuir agente' },
-  { value: 'move_pipeline', label: 'Mover no funil' },
-  { value: 'add_tag', label: 'Adicionar tag' },
+  { value: 'send_message', labelKey: 'automations.actionSendMessage' },
+  { value: 'assign_agent', labelKey: 'automations.actionAssignAgent' },
+  { value: 'move_pipeline', labelKey: 'automations.actionMovePipeline' },
+  { value: 'add_tag', labelKey: 'automations.actionAddTag' },
 ]
 
 const PIPELINE_STAGES = [
@@ -71,6 +72,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
   onChange: (a: any) => void; onRemove: () => void
   onMoveUp: () => void; onMoveDown: () => void
 }) {
+  const t = useT()
   return (
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -84,7 +86,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
           style={{ ...inputStyle, flex: 1, background: '#fff' }}
           value={action.type}
           onChange={e => onChange({ ...action, type: e.target.value, value: { message: '', delay: 0, stage: 'lead', tagId: '' } })}>
-          {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+          {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{t(a.labelKey)}</option>)}
         </select>
 
         {/* Delay desta ação */}
@@ -125,7 +127,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
       {/* Campos específicos por tipo */}
       {action.type === 'send_message' && (
         <div>
-          <label style={labelStyle}>Mensagem</label>
+          <label style={labelStyle}>{t('automations.messageLabel')}</label>
           <textarea
             style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' as any }}
             placeholder="Olá! Recebemos sua mensagem. Use {{phone}} para o número do contato."
@@ -137,20 +139,20 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
 
       {action.type === 'assign_agent' && (
         <div>
-          <label style={labelStyle}>Mensagem para o cliente (opcional)</label>
+          <label style={labelStyle}>{t('automations.assignAgentMessage')}</label>
           <textarea
             style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as any }}
             placeholder="Aguarde, um atendente irá te responder em breve."
             value={action.value?.message || ''}
             onChange={e => onChange({ ...action, value: { ...action.value, message: e.target.value } })}
           />
-          <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>O bot será pausado automaticamente ao atribuir agente.</p>
+          <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{t('automations.assignAgentNote')}</p>
         </div>
       )}
 
       {action.type === 'move_pipeline' && (
         <div>
-          <label style={labelStyle}>Etapa do funil</label>
+          <label style={labelStyle}>{t('automations.pipelineStage')}</label>
           <select
             style={{ ...inputStyle, background: '#fff' }}
             value={action.value?.stage || 'lead'}
@@ -162,9 +164,9 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
 
       {action.type === 'add_tag' && (
         <div>
-          <label style={labelStyle}>Tag a adicionar</label>
+          <label style={labelStyle}>{t('automations.tagToAdd')}</label>
           {tags.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#9ca3af' }}>Nenhuma tag cadastrada. Crie tags na página de Contatos.</p>
+            <p style={{ fontSize: '13px', color: '#9ca3af' }}>{t('automations.noTags')}</p>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {tags.map((tag: any) => (
@@ -196,6 +198,7 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
   onToggle: () => void; onEdit: () => void; onDelete: () => void
   isDimmed: boolean; tags: any[]
 }) {
+  const t = useT()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: automation.id })
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform), transition,
@@ -214,21 +217,21 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
     : []
 
   const triggerLabel = (a: any) => {
-    if (a.trigger_type === 'keyword') return `Palavra-chave: ${(a.trigger_value?.keywords || []).join(', ')}`
-    if (a.trigger_type === 'first_message') return 'Primeira mensagem'
-    if (a.trigger_type === 'outside_hours') return `Fora do horário (${a.trigger_value?.start}h–${a.trigger_value?.end}h)`
+    if (a.trigger_type === 'keyword') return `${t('automations.keywordPrefix')} ${(a.trigger_value?.keywords || []).join(', ')}`
+    if (a.trigger_type === 'first_message') return t('automations.triggerFirstMessage')
+    if (a.trigger_type === 'outside_hours') return `${t('automations.triggerOutsideHours')} (${a.trigger_value?.start}h–${a.trigger_value?.end}h)`
     return a.trigger_type
   }
 
   const actionLabel = (action: any) => {
     const type = action.type || action.action_type
     const value = action.value || action.action_value || {}
-    if (type === 'send_message') return `Enviar: "${(value.message || '').slice(0, 35)}${(value.message || '').length > 35 ? '...' : ''}"`
-    if (type === 'move_pipeline') return `Mover para: ${value.stage}`
-    if (type === 'assign_agent') return 'Atribuir agente'
+    if (type === 'send_message') return `${t('automations.sendPrefix')} "${(value.message || '').slice(0, 35)}${(value.message || '').length > 35 ? '...' : ''}"`
+    if (type === 'move_pipeline') return `${t('automations.moveTo')} ${value.stage}`
+    if (type === 'assign_agent') return t('automations.actionAssignAgent')
     if (type === 'add_tag') {
-      const tag = tags.find((t: any) => t.id === value.tagId)
-      return tag ? `Adicionar tag: ${tag.name}` : 'Adicionar tag'
+      const tag = tags.find((tg: any) => tg.id === value.tagId)
+      return tag ? `${t('automations.addTagPrefix')} ${tag.name}` : t('automations.actionAddTag')
     }
     return type
   }
@@ -252,20 +255,20 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{automation.name}</span>
           <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '99px', background: automation.is_active ? '#dcfce7' : '#f3f4f6', color: automation.is_active ? '#15803d' : '#9ca3af' }}>
-            {automation.is_active ? 'Ativa' : 'Pausada'}
+            {automation.is_active ? t('automations.active') : t('automations.paused')}
           </span>
           {actions.length > 1 && (
             <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '99px', background: '#eff6ff', color: '#2563eb' }}>
-              {actions.length} ações
+              {actions.length} {t('automations.actionsCount')}
             </span>
           )}
         </div>
         <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: actions.length > 1 ? '4px' : '0' }}>
-          <span style={{ color: '#374151', fontWeight: 500 }}>Se: </span>{triggerLabel(automation)}
+          <span style={{ color: '#374151', fontWeight: 500 }}>{t('automations.if')} </span>{triggerLabel(automation)}
         </p>
         {actions.length === 1 ? (
           <p style={{ fontSize: '12px', color: '#6b7280' }}>
-            <span style={{ color: '#374151', fontWeight: 500 }}>Então: </span>{actionLabel(actions[0])}
+            <span style={{ color: '#374151', fontWeight: 500 }}>{t('automations.then')} </span>{actionLabel(actions[0])}
           </p>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
@@ -302,6 +305,7 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
 }
 
 export default function AutomationsPage() {
+  const t = useT()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm())
@@ -351,12 +355,12 @@ export default function AutomationsPage() {
       else await messageApi.post('/automations', payload)
     },
     onSuccess: () => {
-      toast.success(editingId ? 'Automação atualizada!' : 'Automação criada!')
+      toast.success(editingId ? t('automations.successUpdated') : t('automations.successCreated'))
       setLocalList(null)
       queryClient.invalidateQueries({ queryKey: ['automations'] })
       setShowForm(false); setEditingId(null); setForm(emptyForm())
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao salvar'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('automations.errorSave')),
   })
 
   const toggleMutation = useMutation({
@@ -364,13 +368,13 @@ export default function AutomationsPage() {
       await messageApi.patch(`/automations/${id}`, { is_active: !isActive })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automations'] }),
-    onError: () => toast.error('Erro ao atualizar'),
+    onError: () => toast.error(t('automations.errorUpdate')),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await messageApi.delete(`/automations/${id}`) },
-    onSuccess: () => { toast.success('Automação excluída!'); setLocalList(null); queryClient.invalidateQueries({ queryKey: ['automations'] }) },
-    onError: () => toast.error('Erro ao excluir'),
+    onSuccess: () => { toast.success(t('automations.successDeleted')); setLocalList(null); queryClient.invalidateQueries({ queryKey: ['automations'] }) },
+    onError: () => toast.error(t('automations.errorDelete')),
   })
 
   const reorderMutation = useMutation({
@@ -378,7 +382,7 @@ export default function AutomationsPage() {
       await messageApi.patch('/automations/reorder', { order })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automations'] }),
-    onError: () => { setLocalList(null); toast.error('Erro ao salvar nova ordem.') },
+    onError: () => { setLocalList(null); toast.error(t('automations.errorReorder')) },
   })
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -440,19 +444,19 @@ export default function AutomationsPage() {
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Automações</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Respostas automáticas baseadas em gatilhos</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>{t('automations.title')}</h1>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>{t('automations.subtitle')}</p>
         </div>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()) }}
           style={{ padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={14} /> Nova automação
+          <Plus size={14} /> {t('automations.new')}
         </button>
       </div>
 
       {showForm && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', marginBottom: '20px', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>{editingId ? 'Editar automação' : 'Nova automação'}</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>{editingId ? t('automations.edit') : t('automations.new')}</h3>
             <button onClick={() => { setShowForm(false); setEditingId(null) }}
               style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '5px', display: 'flex' }}>
               <X size={16} color="#6b7280" />
@@ -461,13 +465,13 @@ export default function AutomationsPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
             <div>
-              <label style={labelStyle}>Nome da automação *</label>
+              <label style={labelStyle}>{t('automations.name')} *</label>
               <input style={inputStyle} placeholder="Ex: Resposta fora do horário" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label style={labelStyle}>Canal (opcional)</label>
+              <label style={labelStyle}>{t('automations.channelOptional')}</label>
               <select style={{ ...inputStyle, background: '#f9fafb' }} value={form.channelId} onChange={e => setForm({ ...form, channelId: e.target.value })}>
-                <option value="">Todos os canais</option>
+                <option value="">{t('automations.allChannels')}</option>
                 {(channels || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -475,28 +479,28 @@ export default function AutomationsPage() {
 
           {/* Gatilho */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '14px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>🎯 Gatilho — quando disparar</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>🎯 {t('automations.trigger')}</p>
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
-              {TRIGGER_TYPES.map(t => (
-                <div key={t.value} onClick={() => setForm({ ...form, trigger_type: t.value })}
-                  style={{ border: `2px solid ${form.trigger_type === t.value ? '#16a34a' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', background: form.trigger_type === t.value ? '#f0fdf4' : '#fff' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: form.trigger_type === t.value ? '#15803d' : '#111827', marginBottom: '3px' }}>{t.label}</p>
-                  <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>{t.desc}</p>
+              {TRIGGER_TYPES.map(tr => (
+                <div key={tr.value} onClick={() => setForm({ ...form, trigger_type: tr.value })}
+                  style={{ border: `2px solid ${form.trigger_type === tr.value ? '#16a34a' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', background: form.trigger_type === tr.value ? '#f0fdf4' : '#fff' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: form.trigger_type === tr.value ? '#15803d' : '#111827', marginBottom: '3px' }}>{t(tr.labelKey)}</p>
+                  <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>{t(tr.descKey)}</p>
                 </div>
               ))}
             </div>
 
             {form.trigger_type === 'keyword' && (
               <div>
-                <label style={labelStyle}>Palavras-chave (separadas por vírgula)</label>
+                <label style={labelStyle}>{t('automations.keywordsLabel')}</label>
                 <input style={inputStyle} placeholder="preço, valor, quanto custa" value={form.trigger_value.keywords}
                   onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, keywords: e.target.value } })} />
               </div>
             )}
             {form.trigger_type === 'first_message' && (
               <div>
-                <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
-                <input style={inputStyle} placeholder="deixe vazio para qualquer mensagem"
+                <label style={labelStyle}>{t('automations.filterByKeyword')}</label>
+                <input style={inputStyle} placeholder={t('automations.filterByKeywordPlaceholder')}
                   value={form.trigger_value.keywords}
                   onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, keywords: e.target.value } })} />
               </div>
@@ -504,12 +508,12 @@ export default function AutomationsPage() {
             {form.trigger_type === 'outside_hours' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={labelStyle}>Início do expediente (hora)</label>
+                  <label style={labelStyle}>{t('automations.startHour')}</label>
                   <input type="number" min="0" max="23" style={inputStyle} value={form.trigger_value.start}
                     onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, start: Number(e.target.value) } })} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Fim do expediente (hora)</label>
+                  <label style={labelStyle}>{t('automations.endHour')}</label>
                   <input type="number" min="0" max="23" style={inputStyle} value={form.trigger_value.end}
                     onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, end: Number(e.target.value) } })} />
                 </div>
@@ -521,18 +525,18 @@ export default function AutomationsPage() {
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                ⚡ Ações — o que fazer ({form.actions.length})
+                ⚡ {t('automations.actions')} ({form.actions.length})
               </p>
               <button
                 onClick={() => setForm({ ...form, actions: [...form.actions, emptyAction()] })}
                 style={{ padding: '5px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Plus size={12} /> Adicionar ação
+                <Plus size={12} /> {t('automations.addAction')}
               </button>
             </div>
 
             {form.actions.length > 1 && (
               <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '10px' }}>
-                As ações são executadas em sequência de cima para baixo. Use o delay para aguardar entre elas.
+                {t('automations.actionsSequence')}
               </p>
             )}
 
@@ -553,15 +557,15 @@ export default function AutomationsPage() {
 
           {/* Cooldown */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⏱ Frequência — quantas vezes disparar</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>⏱ {t('automations.frequency')}</p>
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
               {[
-                { label: 'Sempre', desc: 'Toda vez que a condição for atendida', value: null },
-                { label: '24 horas', desc: 'Máx 1x por dia por contato', value: 1440 },
-                { label: '7 dias', desc: 'Máx 1x por semana por contato', value: 10080 },
-                { label: '15 dias', desc: 'Máx 1x a cada 15 dias', value: 21600 },
-                { label: '30 dias', desc: 'Máx 1x por mês por contato', value: 43200 },
-                { label: 'Nunca mais', desc: 'Dispara apenas 1 vez por contato', value: 0 },
+                { label: t('automations.freqAlways'), desc: t('automations.freqAlwaysDesc'), value: null },
+                { label: t('automations.freq24h'), desc: t('automations.freq24hDesc'), value: 1440 },
+                { label: t('automations.freq7d'), desc: t('automations.freq7dDesc'), value: 10080 },
+                { label: t('automations.freq15d'), desc: t('automations.freq15dDesc'), value: 21600 },
+                { label: t('automations.freq30d'), desc: t('automations.freq30dDesc'), value: 43200 },
+                { label: t('automations.freqNever'), desc: t('automations.freqNeverDesc'), value: 0 },
               ].map(opt => (
                 <div key={String(opt.value)} onClick={() => setForm({ ...form, cooldown_minutes: opt.value })}
                   style={{ border: `2px solid ${form.cooldown_minutes === opt.value ? '#16a34a' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', background: form.cooldown_minutes === opt.value ? '#f0fdf4' : '#fff' }}>
@@ -576,11 +580,11 @@ export default function AutomationsPage() {
             <button onClick={() => saveMutation.mutate()} disabled={!isFormValid || saveMutation.isPending}
               style={{ padding: '10px 24px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !isFormValid ? 0.5 : 1 }}>
               {saveMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
-              {editingId ? 'Salvar alterações' : 'Criar automação'}
+              {editingId ? t('automations.saveChanges') : t('automations.createAutomation')}
             </button>
             <button onClick={() => { setShowForm(false); setEditingId(null) }}
               style={{ padding: '10px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', color: '#374151' }}>
-              Cancelar
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -593,14 +597,14 @@ export default function AutomationsPage() {
       ) : !displayList.length ? (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '80px', textAlign: 'center' }}>
           <Zap size={36} color="#d1d5db" style={{ margin: '0 auto 12px' }} />
-          <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>Nenhuma automação criada</p>
-          <p style={{ color: '#d1d5db', fontSize: '12px' }}>Crie sua primeira automação para responder mensagens automaticamente</p>
+          <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>{t('automations.noAutomations')}</p>
+          <p style={{ color: '#d1d5db', fontSize: '12px' }}>{t('automations.noAutomationsDesc')}</p>
         </div>
       ) : (
         <>
           {displayList.length > 1 && (
             <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <GripVertical size={12} /> Arraste para definir a ordem de execução.
+              <GripVertical size={12} /> {t('automations.dragToReorder')}
             </p>
           )}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -612,7 +616,7 @@ export default function AutomationsPage() {
                     isDimmed={reorderMutation.isPending} tags={tags}
                     onToggle={() => toggleMutation.mutate({ id: a.id, isActive: a.is_active })}
                     onEdit={() => startEdit(a)}
-                    onDelete={() => { if (confirm(`Excluir "${a.name}"?`)) deleteMutation.mutate(a.id) }}
+                    onDelete={() => { if (confirm(`${t('automations.confirmDelete')} "${a.name}"?`)) deleteMutation.mutate(a.id) }}
                   />
                 ))}
               </div>
