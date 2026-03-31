@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText,
   User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot,
-  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch,
+  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft,
 } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
@@ -229,6 +229,13 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
 
 export default function InboxPage() {
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
+  const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check(); window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   const [search, setSearch] = useState('')
   const [chatSearch, setChatSearch] = useState('')
   const [showChatSearch, setShowChatSearch] = useState(false)
@@ -507,7 +514,7 @@ export default function InboxPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, notes])
 
   const handleSelectConv = async (convId: string) => {
-    setSelectedConvId(convId); setPendingFile(null); setShowQuickReplies(false); setSendChannelId(null); setShowChatSearch(false); setChatSearch('')
+    setSelectedConvId(convId); setMobileShowChat(true); setPendingFile(null); setShowQuickReplies(false); setSendChannelId(null); setShowChatSearch(false); setChatSearch('')
     await conversationApi.post(`/conversations/${convId}/read`)
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
@@ -523,10 +530,10 @@ export default function InboxPage() {
   const btnStyle: React.CSSProperties = { width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, background: '#fafafa', border: '1px solid #e4e4e7', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', transition: 'all 0.1s' }
 
   return (
-    <div className="inbox-layout mobile-page" style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
+    <div className="inbox-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden', background: '#f4f4f5', ...(isMobile ? { flexDirection: 'column', paddingTop: '48px' } : {}) }}>
 
       {/* ── Coluna esquerda ── */}
-      <div className="inbox-list" style={{ width: '300px', flexShrink: 0, background: '#fff', borderRight: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="inbox-list" style={{ width: isMobile ? '100%' : '300px', flexShrink: 0, background: '#fff', borderRight: isMobile ? 'none' : '1px solid #e4e4e7', display: isMobile && mobileShowChat ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #f4f4f5', flexShrink: 0 }}>
           <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', margin: 0 }}>Inbox</h2>
@@ -642,7 +649,7 @@ export default function InboxPage() {
       </div>
 
       {/* ── Centro — chat ── */}
-      <div className="inbox-chat" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div className="inbox-chat" style={{ flex: 1, display: isMobile && !mobileShowChat ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', width: isMobile ? '100%' : undefined }}>
         {!selectedConvId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: '#f4f4f5' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#fff', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}><MessageSquare size={24} color="#d4d4d8" /></div>
@@ -652,6 +659,7 @@ export default function InboxPage() {
           <>
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {isMobile && <button onClick={() => setMobileShowChat(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: '#71717a' }}><ChevronLeft size={20} /></button>}
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{getInitials(contactName)}</div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -844,7 +852,7 @@ export default function InboxPage() {
       </div>
 
       {/* ── Direita — perfil ── */}
-      {selectedConvId && showProfile && (
+      {selectedConvId && showProfile && !isMobile && (
         <div className="inbox-profile" style={{ width: '248px', flexShrink: 0, background: '#fff', borderLeft: '1px solid #e4e4e7', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f4f4f5', textAlign: 'center', flexShrink: 0 }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: avatarColor.bg, color: avatarColor.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, margin: '0 auto 10px' }}>{getInitials(contactName)}</div>

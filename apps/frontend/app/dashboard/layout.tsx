@@ -34,17 +34,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Só monta aqui — depois que hydrated=true e isAuthenticated=true */}
       <NotificationsProvider />
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />
         <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </main>
-      <style>{`
-        @media (max-width: 768px) {
-          main { padding-top: 48px !important; }
-        }
-      `}</style>
     </div>
   )
 }

@@ -56,8 +56,10 @@ body {
 /* ─── Mobile responsivo (< 768px) ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Espaço pro hamburger em todas as páginas */
+  div.mobile-page,
   .mobile-page {
     padding: 56px 12px 12px !important;
+    overflow-x: hidden !important;
   }
 
   /* Headers: título + botões em coluna */
