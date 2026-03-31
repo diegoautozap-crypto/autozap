@@ -127,10 +127,13 @@ export function ConditionPanel({ d, nodeId, inputStyle, onUpdate }: {
                       style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
                       {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                     </select>
-                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
+                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (<>
                       <input value={rule.value} onChange={e => updateRule(branch.id, rule.id, { value: e.target.value })}
-                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="valor..." />
-                    )}
+                        style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="1, conhecer, crm" />
+                      {['contains', 'not_contains', 'equals', 'not_equals'].includes(rule.operator) && (
+                        <p style={{ fontSize: '10px', color: '#a1a1aa', margin: '2px 0 0 0' }}>Separe por vírgula para aceitar várias palavras</p>
+                      )}
+                    </>)}
                   </div>
                 </div>
               ))}

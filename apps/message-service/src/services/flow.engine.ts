@@ -764,20 +764,12 @@ export class FlowEngine {
   private evaluateLoopCondition(data: FlowNodeData, ctx: FlowContext, variables: Record<string, string>): boolean {
     const field = data?.conditionField || 'variable'
     const operator = data?.conditionOperator || 'is_empty'
-    const value = (data?.conditionValue || '').toLowerCase()
+    const value = data?.conditionValue || ''
     let fv = ''
-    if (field === 'message') fv = (ctx.messageBody || '').toLowerCase()
-    else if (field === 'variable') fv = (variables[data?.conditionFieldName || ''] || '').toLowerCase()
-    else if (field === 'phone') fv = (ctx.phone || '').toLowerCase()
-    switch (operator) {
-      case 'contains': return fv.includes(value)
-      case 'not_contains': return !fv.includes(value)
-      case 'equals': return fv === value
-      case 'not_equals': return fv !== value
-      case 'is_empty': return fv === ''
-      case 'is_not_empty': return fv !== ''
-      default: return fv.includes(value)
-    }
+    if (field === 'message') fv = ctx.messageBody || ''
+    else if (field === 'variable') fv = variables[data?.conditionFieldName || ''] || ''
+    else if (field === 'phone') fv = ctx.phone || ''
+    return this.matchOperator(fv, operator, value)
   }
 
   private evaluateBranch(branch: ConditionBranch, ctx: FlowContext, variables: Record<string, string>): boolean {
@@ -787,6 +779,24 @@ export class FlowEngine {
     return rules.every(rule => this.evaluateRule(rule, ctx, variables))
   }
 
+  private matchOperator(fv: string, operator: string, rawVal: string): boolean {
+    fv = fv.toLowerCase()
+    // Suporta múltiplos valores separados por vírgula (ex: "1, conhecer, crm")
+    const values = rawVal.toLowerCase().split(',').map(v => v.trim()).filter(Boolean)
+    const val = values[0] || ''
+    switch (operator) {
+      case 'contains':     return values.length > 1 ? values.some(v => fv.includes(v)) : fv.includes(val)
+      case 'not_contains': return values.length > 1 ? values.every(v => !fv.includes(v)) : !fv.includes(val)
+      case 'equals':       return values.length > 1 ? values.some(v => fv === v) : fv === val
+      case 'not_equals':   return values.length > 1 ? values.every(v => fv !== v) : fv !== val
+      case 'starts_with':  return values.length > 1 ? values.some(v => fv.startsWith(v)) : fv.startsWith(val)
+      case 'ends_with':    return values.length > 1 ? values.some(v => fv.endsWith(v)) : fv.endsWith(val)
+      case 'is_empty':     return fv === ''
+      case 'is_not_empty': return fv !== ''
+      default:             return values.length > 1 ? values.some(v => fv.includes(v)) : fv.includes(val)
+    }
+  }
+
   private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, string>): boolean {
     let fv = ''
     if (rule.field === 'message') fv = ctx.messageBody || ''
@@ -794,19 +804,7 @@ export class FlowEngine {
     else if (rule.field === 'phone') fv = ctx.phone || ''
     else if (rule.field === 'webhook_status') fv = variables['webhook_status'] || ''
     else fv = ctx.messageBody || ''
-    const val = (rule.value || '').toLowerCase()
-    fv = fv.toLowerCase()
-    switch (rule.operator) {
-      case 'contains': return fv.includes(val)
-      case 'not_contains': return !fv.includes(val)
-      case 'equals': return fv === val
-      case 'not_equals': return fv !== val
-      case 'starts_with': return fv.startsWith(val)
-      case 'ends_with': return fv.endsWith(val)
-      case 'is_empty': return fv === ''
-      case 'is_not_empty': return fv !== ''
-      default: return fv.includes(val)
-    }
+    return this.matchOperator(fv, rule.operator, rule.value || '')
   }
 
   private evaluateCondition(data: FlowNodeData, ctx: FlowContext, variables: Record<string, string>): boolean {
@@ -816,19 +814,7 @@ export class FlowEngine {
     else if (conditionType === 'variable') fv = variables[field] || ''
     else if (conditionType === 'phone') fv = ctx.phone || ''
     else fv = ctx.messageBody || ''
-    const val = (value || '').toLowerCase()
-    fv = fv.toLowerCase()
-    switch (operator) {
-      case 'contains': return fv.includes(val)
-      case 'not_contains': return !fv.includes(val)
-      case 'equals': return fv === val
-      case 'not_equals': return fv !== val
-      case 'starts_with': return fv.startsWith(val)
-      case 'ends_with': return fv.endsWith(val)
-      case 'is_empty': return fv === ''
-      case 'is_not_empty': return fv !== ''
-      default: return fv.includes(val)
-    }
+    return this.matchOperator(fv, operator || 'contains', value || '')
   }
 
   private interpolate(template: string, ctx: FlowContext, variables: Record<string, string> = {}): string {
