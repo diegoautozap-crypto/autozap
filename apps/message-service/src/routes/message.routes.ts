@@ -3,8 +3,9 @@ import { z } from 'zod'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
-import { ok, generateId } from '@autozap/utils'
+import { ok, generateId, normalizeBRPhone } from '@autozap/utils'
 import { db } from '../lib/db'
+import { ensureContact, ensureConversation } from '../services/contact.helper'
 
 const router = Router()
 
@@ -167,43 +168,10 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
 
     if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado para este tenant' }); return }
 
-    let normalizedPhone = phone.replace(/^\+/, '')
-    if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
-      normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
-    }
+    const normalizedPhone = normalizeBRPhone(phone)
 
-    const { data: existingContact } = await db
-      .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', normalizedPhone).maybeSingle()
-
-    let contactId: string
-    if (existingContact) {
-      contactId = existingContact.id
-      await db.from('contacts').update({ name, email: email || undefined, origin: source, last_interaction_at: new Date() }).eq('id', contactId)
-    } else {
-      const { data: newContact, error: contactError } = await db
-        .from('contacts')
-        .insert({ id: generateId(), tenant_id: tenantId, phone: normalizedPhone, name, email: email || null, origin: source, status: 'active', last_interaction_at: new Date() })
-        .select('id').single()
-      if (contactError || !newContact) { res.status(500).json({ error: 'Erro ao criar contato' }); return }
-      contactId = newContact.id
-    }
-
-    const { data: existingConv } = await db
-      .from('conversations').select('id').eq('tenant_id', tenantId).eq('contact_id', contactId)
-      .eq('channel_id', channel.id).in('status', ['open', 'waiting'])
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-    let conversationId: string
-    if (existingConv) {
-      conversationId = existingConv.id
-    } else {
-      const { data: newConv, error: convError } = await db
-        .from('conversations')
-        .insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channel.id, channel_type: channel.type, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message: message || `Lead via ${source}`, last_message_at: new Date() })
-        .select('id').single()
-      if (convError || !newConv) { res.status(500).json({ error: 'Erro ao criar conversa' }); return }
-      conversationId = newConv.id
-    }
+    const { contactId } = await ensureContact({ tenantId, phone: normalizedPhone, name, email, origin: source })
+    const { conversationId } = await ensureConversation({ tenantId, contactId, channelId: channel.id, channelType: channel.type, lastMessage: message || `Lead via ${source}` })
 
     const noteBody = [`📋 Lead recebido via ${source}`, name ? `👤 Nome: ${name}` : null, email ? `📧 Email: ${email}` : null, message ? `💬 Mensagem: ${message}` : null, `📱 Telefone: ${normalizedPhone}`].filter(Boolean).join('\n')
     await db.from('conversation_notes').insert({ conversation_id: conversationId, tenant_id: tenantId, body: noteBody })
@@ -279,46 +247,11 @@ router.post('/webhook/flow/:flowId/:token',
     if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado para este tenant' }); return }
 
     // Normaliza telefone — se não veio telefone, usa um placeholder temporário
-    let normalizedPhone = phone ? phone.replace(/^\+/, '') : ''
-    if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
-      normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
-    }
-    // Se não tem telefone, usa webhook_temp_ + timestamp para criar contato temporário
+    const normalizedPhone = phone ? normalizeBRPhone(phone) : ''
     const tempPhone = normalizedPhone || `webhook_temp_${Date.now()}`
 
-    const { data: existingContact } = await db
-      .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', tempPhone).maybeSingle()
-
-    let contactId: string
-    if (existingContact) {
-      contactId = existingContact.id
-      await db.from('contacts').update({ name: name || undefined, email: email || undefined, last_interaction_at: new Date() }).eq('id', contactId)
-    } else {
-      const { data: newContact, error: contactError } = await db
-        .from('contacts')
-        .insert({ id: generateId(), tenant_id: tenantId, phone: tempPhone, name: name || tempPhone, email: email || null, origin: source, status: 'active', last_interaction_at: new Date() })
-        .select('id').single()
-      if (contactError || !newContact) { res.status(500).json({ error: 'Erro ao criar contato' }); return }
-      contactId = newContact.id
-    }
-    normalizedPhone = tempPhone
-
-    const { data: existingConv } = await db
-      .from('conversations').select('id').eq('tenant_id', tenantId).eq('contact_id', contactId)
-      .eq('channel_id', channel.id).in('status', ['open', 'waiting'])
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-    let conversationId: string
-    if (existingConv) {
-      conversationId = existingConv.id
-    } else {
-      const { data: newConv, error: convError } = await db
-        .from('conversations')
-        .insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channel.id, channel_type: channel.type, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message: messageBody, last_message_at: new Date() })
-        .select('id').single()
-      if (convError || !newConv) { res.status(500).json({ error: 'Erro ao criar conversa' }); return }
-      conversationId = newConv.id
-    }
+    const { contactId } = await ensureContact({ tenantId, phone: tempPhone, name, email, origin: source })
+    const { conversationId, isNew: isNewConv } = await ensureConversation({ tenantId, contactId, channelId: channel.id, channelType: channel.type, lastMessage: messageBody })
 
     // Dispara o flow com todos os dados brutos como variáveis
     const { flowEngine } = await import('../services/flow.engine')
@@ -327,13 +260,13 @@ router.post('/webhook/flow/:flowId/:token',
       channelId: channel.id,
       contactId,
       conversationId,
-      phone: normalizedPhone,
+      phone: tempPhone,
       messageBody,
-      isFirstMessage: !existingConv,
+      isFirstMessage: isNewConv,
       webhookData: body,
     })
 
-    res.json({ success: true, contact_id: contactId, conversation_id: conversationId, phone: normalizedPhone, name })
+    res.json({ success: true, contact_id: contactId, conversation_id: conversationId, phone: tempPhone, name })
   } catch (err) { next(err) }
 })
 

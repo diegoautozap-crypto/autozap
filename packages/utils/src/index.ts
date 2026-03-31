@@ -144,3 +144,12 @@ export function normalizePhone(phone: string): string {
   if (!cleaned.startsWith('+')) return `+${cleaned}`
   return cleaned
 }
+
+export function normalizeBRPhone(phone: string): string {
+  // Remove tudo que não é dígito, adiciona 9° dígito em celulares BR se necessário
+  let normalized = phone.replace(/\D/g, '').replace(/^\+/, '')
+  if (normalized.startsWith('55') && normalized.length === 12) {
+    normalized = normalized.slice(0, 4) + '9' + normalized.slice(4)
+  }
+  return normalized
+}

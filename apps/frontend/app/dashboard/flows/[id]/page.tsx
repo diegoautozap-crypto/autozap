@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import { Save, ArrowLeft, Loader2, Workflow } from 'lucide-react'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
-import { NODE_COLORS, NODE_ICONS, defaultBranch } from './components/constants'
+import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
 
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
@@ -69,18 +69,6 @@ const ACTION_NODES = [
   { type: 'loop',           label: 'Loop' },
   { type: 'end',            label: 'Finalizar flow' },
 ]
-
-const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
-  send_image:    { type: 'send_message', subtype: 'image' },
-  send_video:    { type: 'send_message', subtype: 'video' },
-  send_audio:    { type: 'send_message', subtype: 'audio' },
-  send_document: { type: 'send_message', subtype: 'document' },
-  add_tag:       { type: 'tag_contact',  subtype: 'add' },
-  remove_tag:    { type: 'tag_contact',  subtype: 'remove' },
-  loop_repeat:   { type: 'loop',         subtype: 'repeat' },
-  loop_retry:    { type: 'loop',         subtype: 'retry' },
-  loop_while:    { type: 'loop',         subtype: 'while' },
-}
 
 export default function FlowEditorPage() {
   const { id } = useParams()

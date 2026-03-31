@@ -1,6 +1,6 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
-import { generateId } from '@autozap/utils'
+import { generateId, normalizeBRPhone } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
@@ -578,11 +578,7 @@ export class FlowEngine {
           if (!phone && !name) break
 
           // Normaliza telefone
-          let normalizedPhone = phone.replace(/^\+/, '')
-          if (normalizedPhone.startsWith('55') && normalizedPhone.length === 12) {
-            normalizedPhone = normalizedPhone.slice(0, 4) + '9' + normalizedPhone.slice(4)
-          }
-          const finalPhone = normalizedPhone || `webhook_${Date.now()}`
+          const finalPhone = phone ? normalizeBRPhone(phone) : `webhook_${Date.now()}`
 
           // Cria ou atualiza contato
           const { data: existingContact } = await db
@@ -664,11 +660,7 @@ export class FlowEngine {
           if (phoneVar) {
             const newPhone = this.interpolate(phoneVar.from, ctx, variables).replace(/\D/g, '')
             if (newPhone && newPhone !== ctx.phone) {
-              let normalized = newPhone.replace(/^\+/, '')
-              if (normalized.startsWith('55') && normalized.length === 12) {
-                normalized = normalized.slice(0, 4) + '9' + normalized.slice(4)
-              }
-              // Atualiza telefone do contato
+              const normalized = normalizeBRPhone(newPhone)
               await db.from('contacts').update({ phone: normalized }).eq('id', ctx.contactId)
               ctx.phone = normalized
             }
