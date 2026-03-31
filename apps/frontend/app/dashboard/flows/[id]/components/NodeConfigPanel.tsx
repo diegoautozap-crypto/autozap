@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { Node } from '@xyflow/react'
 import { X, Copy, RefreshCw, Loader2, Plus, Play } from 'lucide-react'
 import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
-import { messageApi } from '@/lib/api'
+import { messageApi, contactApi } from '@/lib/api'
 import { toast } from 'sonner'
 
 const supabase = createClient(
@@ -622,19 +622,48 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <SubtypeSelector options={TAG_SUBTYPES} />
           <div>
             <label style={labelStyle}>{(d.subtype || 'add') === 'add' ? 'Tag para adicionar' : 'Tag para remover'}</label>
-            {tags.length === 0
-              ? <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada.</p>
-              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {tags.map((tag: any) => (
-                    <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${d.tagId === tag.id ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: d.tagId === tag.id ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500 }}>
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                      <span style={{ color: d.tagId === tag.id ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
-                    </div>
-                  ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {tags.map((tag: any) => (
+                <div key={tag.id} onClick={() => onUpdate(node.id, { tagId: tag.id, tagName: tag.name })}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${d.tagId === tag.id ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: d.tagId === tag.id ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500 }}>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                  <span style={{ color: d.tagId === tag.id ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
                 </div>
-            }
+              ))}
+            </div>
           </div>
+          {(d.subtype || 'add') === 'add' && (() => {
+            const [newTagName, setNewTagName] = useState('')
+            const [creating, setCreating] = useState(false)
+            const queryClient = useQueryClient()
+            const createTag = async () => {
+              if (!newTagName.trim()) return
+              setCreating(true)
+              try {
+                const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' })
+                const tag = data.data
+                onUpdate(node.id, { tagId: tag.id, tagName: tag.name })
+                queryClient.invalidateQueries({ queryKey: ['tags'] })
+                setNewTagName('')
+                toast.success(`Tag "${tag.name}" criada!`)
+              } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
+              finally { setCreating(false) }
+            }
+            return (
+              <div style={{ marginTop: '8px' }}>
+                <label style={labelStyle}>Criar nova tag</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '12px' }} placeholder="Nome da tag..." value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createTag() } }}
+                    onFocus={focusInput} onBlur={blurInput} />
+                  <button onClick={createTag} disabled={creating || !newTagName.trim()}
+                    style={{ padding: '6px 12px', background: newTagName.trim() ? '#22c55e' : '#e4e4e7', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: newTagName.trim() ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+                    {creating ? '...' : '+ Criar'}
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
         </>)}
 
         {d.type === 'update_contact' && (<>
