@@ -230,8 +230,8 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
 export default function InboxPage() {
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [searchMode, setSearchMode] = useState<'contact' | 'message'>('contact')
-  const [msgSearchResults, setMsgSearchResults] = useState<any[] | null>(null)
+  const [chatSearch, setChatSearch] = useState('')
+  const [showChatSearch, setShowChatSearch] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [sendChannelId, setSendChannelId] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
@@ -502,7 +502,7 @@ export default function InboxPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, notes])
 
   const handleSelectConv = async (convId: string) => {
-    setSelectedConvId(convId); setPendingFile(null); setShowQuickReplies(false); setSendChannelId(null)
+    setSelectedConvId(convId); setPendingFile(null); setShowQuickReplies(false); setSendChannelId(null); setShowChatSearch(false); setChatSearch('')
     await conversationApi.post(`/conversations/${convId}/read`)
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
@@ -534,29 +534,9 @@ export default function InboxPage() {
           </div>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
-            <input style={{ width: '100%', padding: '7px 10px 7px 30px', paddingRight: '70px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const }}
-              placeholder={searchMode === 'contact' ? 'Buscar contato...' : 'Buscar mensagem...'}
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value)
-                if (searchMode === 'message') {
-                  const q = e.target.value.trim()
-                  if (q.length < 2) { setMsgSearchResults(null); return }
-                  const timeout = setTimeout(async () => {
-                    try {
-                      const { data } = await conversationApi.get(`/messages/search?q=${encodeURIComponent(q)}`)
-                      setMsgSearchResults(data.data || [])
-                    } catch { setMsgSearchResults([]) }
-                  }, 400)
-                  return () => clearTimeout(timeout)
-                } else { setMsgSearchResults(null) }
-              }}
+            <input style={{ width: '100%', padding: '7px 10px 7px 30px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const }} placeholder="Buscar contato..." value={search} onChange={e => setSearch(e.target.value)}
               onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
               onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }} />
-            <button onClick={() => { setSearchMode(p => p === 'contact' ? 'message' : 'contact'); setSearch(''); setMsgSearchResults(null) }}
-              style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', padding: '2px 6px', borderRadius: '5px', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 600, background: searchMode === 'message' ? '#7c3aed' : '#f4f4f5', color: searchMode === 'message' ? '#fff' : '#71717a' }}>
-              {searchMode === 'message' ? 'MSG' : 'MSG'}
-            </button>
           </div>
         </div>
         {visibleChannels.length > 1 && (
@@ -614,33 +594,6 @@ export default function InboxPage() {
           </div>
         )}
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
-          {/* Resultados de busca de mensagens */}
-          {searchMode === 'message' && msgSearchResults && msgSearchResults.length > 0 && (
-            <div style={{ borderBottom: '2px solid #ede9fe' }}>
-              <p style={{ padding: '6px 14px', fontSize: '10px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0, background: '#faf5ff' }}>
-                {msgSearchResults.length} mensagem{msgSearchResults.length > 1 ? 'ns' : ''} encontrada{msgSearchResults.length > 1 ? 's' : ''}
-              </p>
-              {msgSearchResults.map((r: any) => (
-                <div key={r.messageId} onClick={() => { handleSelectConv(r.conversationId); setSearchMode('contact'); setSearch(''); setMsgSearchResults(null) }}
-                  style={{ padding: '8px 14px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', transition: 'background 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#faf5ff'}
-                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#18181b' }}>{r.contactName}</span>
-                    <span style={{ fontSize: '10px', color: '#a1a1aa' }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('pt-BR') : ''}</span>
-                  </div>
-                  <p style={{ fontSize: '11px', color: '#71717a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {r.direction === 'inbound' ? '← ' : '→ '}{r.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-          {searchMode === 'message' && search.length >= 2 && msgSearchResults?.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center' }}>
-              <p style={{ color: '#a1a1aa', fontSize: '13px' }}>Nenhuma mensagem encontrada</p>
-            </div>
-          )}
           {loadingConvs && convPage === 1
             ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
             : conversations.length === 0
@@ -721,6 +674,10 @@ export default function InboxPage() {
                   ? <button onClick={closeConv} style={{ padding: '5px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>Fechar</button>
                   : <button onClick={openConv} style={{ padding: '5px 12px', background: '#22c55e', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Reabrir</button>
                 }
+                <button onClick={() => { setShowChatSearch(p => !p); setChatSearch('') }}
+                  style={{ padding: '5px 10px', background: showChatSearch ? '#f0f9ff' : '#fafafa', border: `1px solid ${showChatSearch ? '#bae6fd' : '#e4e4e7'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showChatSearch ? '#0369a1' : '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                  <Search size={13} />
+                </button>
                 <button onClick={() => setShowProfile(p => !p)} style={{ padding: '5px 10px', background: showProfile ? '#f0fdf4' : '#fafafa', border: `1px solid ${showProfile ? '#bbf7d0' : '#e4e4e7'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showProfile ? '#16a34a' : '#52525b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <User size={13} /> Perfil
                 </button>
@@ -749,6 +706,24 @@ export default function InboxPage() {
               </div>
             )}
 
+            {showChatSearch && (
+              <div style={{ padding: '6px 16px', background: '#f0f9ff', borderBottom: '1px solid #bae6fd', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <Search size={13} color="#0369a1" />
+                <input value={chatSearch} onChange={e => setChatSearch(e.target.value)} autoFocus
+                  placeholder="Buscar nesta conversa..."
+                  style={{ flex: 1, padding: '5px 8px', background: '#fff', border: '1px solid #bae6fd', borderRadius: '6px', fontSize: '12px', outline: 'none', color: '#18181b' }} />
+                {chatSearch && (
+                  <span style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, flexShrink: 0 }}>
+                    {messages?.filter((m: any) => m.body?.toLowerCase().includes(chatSearch.toLowerCase())).length || 0} resultados
+                  </span>
+                )}
+                <button onClick={() => { setShowChatSearch(false); setChatSearch('') }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717a', padding: '2px', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#f4f4f5' }}>
               {loadingMessages
                 ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
@@ -757,9 +732,12 @@ export default function InboxPage() {
                 : messages?.map((msg: any) => {
                   const isOut = msg.direction === 'outbound'
                   const isMedia = msg.content_type !== 'text'
+                  const matchesSearch = chatSearch && msg.body?.toLowerCase().includes(chatSearch.toLowerCase())
+                  // Se busca ativa, escurece mensagens que não batem
+                  const dimmed = chatSearch && !matchesSearch
                   return (
-                    <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#22c55e' : '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.06)' }}>
+                    <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                      <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#22c55e' : '#fff', boxShadow: matchesSearch ? '0 0 0 2px #2563eb' : '0 1px 2px rgba(0,0,0,.06)' }}>
                         <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : '#a1a1aa' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
