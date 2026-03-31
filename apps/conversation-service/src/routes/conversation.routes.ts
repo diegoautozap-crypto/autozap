@@ -440,6 +440,85 @@ router.post('/conversations/:id/read', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Tarefas / Follow-ups ─────────────────────────────────────────────────────
+
+router.get('/tasks', async (req, res, next) => {
+  try {
+    const { status, conversationId } = req.query as any
+    let query = db.from('tasks')
+      .select('*, conversations(id, contacts(id, name, phone))')
+      .eq('tenant_id', req.auth.tid)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (status && status !== 'all') query = query.eq('status', status)
+    if (conversationId) query = query.eq('conversation_id', conversationId)
+    const { data, error } = await query
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.get('/tasks/summary', async (req, res, next) => {
+  try {
+    const { data: pending } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).eq('status', 'pending')
+    const { data: overdue } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).eq('status', 'pending').lte('due_date', new Date().toISOString())
+    const { data: today } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).eq('status', 'pending').gte('due_date', new Date(new Date().setHours(0,0,0,0)).toISOString()).lte('due_date', new Date(new Date().setHours(23,59,59,999)).toISOString())
+    res.json(ok({ pending: (pending as any)?.length ?? 0, overdue: (overdue as any)?.length ?? 0, today: (today as any)?.length ?? 0 }))
+  } catch (err) { next(err) }
+})
+
+router.post('/tasks', async (req, res, next) => {
+  try {
+    const { title, description, dueDate, conversationId, contactId, assignedTo, priority } = req.body
+    if (!title) { res.status(400).json({ error: 'title required' }); return }
+    // Valida conversa pertence ao tenant
+    if (conversationId) {
+      const { data: conv } = await db.from('conversations').select('id').eq('id', conversationId).eq('tenant_id', req.auth.tid).single()
+      if (!conv) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
+    }
+    const { data, error } = await db.from('tasks').insert({
+      tenant_id: req.auth.tid,
+      conversation_id: conversationId || null,
+      contact_id: contactId || null,
+      assigned_to: assignedTo || req.auth.sub,
+      created_by: req.auth.sub,
+      title,
+      description: description || null,
+      due_date: dueDate || null,
+      priority: priority || 'medium',
+      status: 'pending',
+    }).select().single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/tasks/:id', async (req, res, next) => {
+  try {
+    const update: any = { updated_at: new Date() }
+    if (req.body.title !== undefined) update.title = req.body.title
+    if (req.body.description !== undefined) update.description = req.body.description
+    if (req.body.dueDate !== undefined) update.due_date = req.body.dueDate
+    if (req.body.assignedTo !== undefined) update.assigned_to = req.body.assignedTo
+    if (req.body.priority !== undefined) update.priority = req.body.priority
+    if (req.body.status !== undefined) {
+      update.status = req.body.status
+      if (req.body.status === 'completed') update.completed_at = new Date()
+    }
+    const { data, error } = await db.from('tasks').update(update).eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
+    if (error || !data) { res.status(404).json({ error: 'Tarefa não encontrada' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/tasks/:id', async (req, res, next) => {
+  try {
+    await db.from('tasks').delete().eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+    res.json(ok({ message: 'Tarefa excluída' }))
+  } catch (err) { next(err) }
+})
+
 // ─── Ações em massa ───────────────────────────────────────────────────────────
 
 router.post('/conversations/bulk/read', async (req, res, next) => {

@@ -35,5 +35,31 @@ ON flow_logs(flow_id, conversation_id, status);
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_pending
 ON campaign_contacts(campaign_id, status) WHERE status = 'pending';
 
+-- Tabela de tarefas/follow-ups
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  due_date TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'pending',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant ON tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_conversation ON tasks(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(tenant_id, status, due_date);
+
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON tasks TO service_role USING (true) WITH CHECK (true);
+
 -- Reload schema cache do PostgREST
 NOTIFY pgrst, 'reload schema';

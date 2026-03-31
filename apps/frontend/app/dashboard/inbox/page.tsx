@@ -354,6 +354,11 @@ export default function InboxPage() {
     queryFn: async () => { const { data } = await conversationApi.get(`/conversations/${selectedConvId}/notes`); return data.data || [] },
     enabled: !!selectedConvId,
   })
+  const { data: convTasks = [] } = useQuery({
+    queryKey: ['tasks', selectedConvId],
+    queryFn: async () => { const { data } = await conversationApi.get(`/tasks?conversationId=${selectedConvId}`); return data.data || [] },
+    enabled: !!selectedConvId,
+  })
   const saveNoteMutation = useMutation({
     mutationFn: async () => { await conversationApi.post(`/conversations/${selectedConvId}/notes`, { body: noteText }) },
     onSuccess: () => { toast.success('Nota salva!'); setNoteText(''); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) },
@@ -933,6 +938,46 @@ export default function InboxPage() {
                       </div>
                     ))}
                   </div>
+              }
+            </div>
+
+            {/* Tarefas */}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f4f4f5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={13} color="#2563eb" /><p style={{ fontSize: '10px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Tarefas</p></div>
+                <button onClick={async () => {
+                  const title = prompt('Título da tarefa:')
+                  if (!title) return
+                  const dueDate = prompt('Data de vencimento (dd/mm/aaaa):')
+                  let due = null
+                  if (dueDate) { const [d, m, y] = dueDate.split('/'); due = new Date(Number(y), Number(m) - 1, Number(d), 23, 59).toISOString() }
+                  try {
+                    await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
+                    toast.success('Tarefa criada!'); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                  } catch { toast.error('Erro ao criar tarefa') }
+                }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>+ Criar</button>
+              </div>
+              {convTasks.length === 0
+                  ? <p style={{ fontSize: '12px', color: '#d4d4d8', textAlign: 'center', padding: '4px 0' }}>Nenhuma tarefa</p>
+                  : <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {convTasks.map((t: any) => {
+                        const isOverdue = t.due_date && new Date(t.due_date) < new Date() && t.status === 'pending'
+                        return (
+                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: isOverdue ? '#fef2f2' : '#f0f9ff', border: `1px solid ${isOverdue ? '#fecaca' : '#bae6fd'}`, borderRadius: '7px' }}>
+                            <button onClick={async () => {
+                              await conversationApi.patch(`/tasks/${t.id}`, { status: t.status === 'pending' ? 'completed' : 'pending' })
+                              queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                            }} style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${t.status === 'completed' ? '#22c55e' : isOverdue ? '#ef4444' : '#93c5fd'}`, background: t.status === 'completed' ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 }}>
+                              {t.status === 'completed' && <Check size={10} color="#fff" strokeWidth={3} />}
+                            </button>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: '11px', fontWeight: 600, color: t.status === 'completed' ? '#a1a1aa' : '#18181b', margin: 0, textDecoration: t.status === 'completed' ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
+                              {t.due_date && <p style={{ fontSize: '10px', color: isOverdue ? '#dc2626' : '#71717a', margin: 0 }}>{isOverdue ? '⚠ ' : ''}{new Date(t.due_date).toLocaleDateString('pt-BR')}</p>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
               }
             </div>
 
