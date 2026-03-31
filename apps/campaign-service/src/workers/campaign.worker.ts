@@ -92,7 +92,7 @@ export interface CampaignJob {
 }
 
 export function getTenantCampaignQueue(tenantId: string): Queue<CampaignJob> {
-  return new Queue<CampaignJob>(`campaign_queue:tenant-${tenantId}`, {
+  return new Queue<CampaignJob>(`campaign_queue_tenant_${tenantId}`, {
     connection,
     defaultJobOptions: { attempts: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
   })
@@ -107,7 +107,7 @@ const activeWorkers = new Map<string, Worker<CampaignJob>>()
 
 function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
   if (activeWorkers.has(tenantId)) return activeWorkers.get(tenantId)!
-  const queueName = `campaign_queue:tenant-${tenantId}`
+  const queueName = `campaign_queue_tenant_${tenantId}`
   const worker = new Worker<CampaignJob>(queueName, processCampaignJob, { connection, concurrency: 1 })
   worker.on('failed', (job, err) => logger.error('Campaign job failed', { tenantId, jobId: job?.id, error: err.message }))
   logger.info('Campaign worker created for tenant', { tenantId, queueName })

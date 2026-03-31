@@ -192,7 +192,7 @@ export class CampaignService {
 
     logger.info('Campaign enqueued', {
       campaignId, tenantId,
-      queueName: `campaign_queue:tenant-${tenantId}`,
+      queueName: `campaign_queue_tenant_${tenantId}`,
       copies: ((campaign as any).copies || []).length,
       extraChannels: ((campaign as any).extra_channel_ids || []).length,
     })
