@@ -235,6 +235,8 @@ export default function InboxPage() {
   const [noteText, setNoteText] = useState('')
   const [inputMode, setInputMode] = useState<'message' | 'note'>('message')
   const [statusFilter, setStatusFilter] = useState('open')
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
+  const [bulkMode, setBulkMode] = useState(false)
   const [channelFilter, setChannelFilter] = useState('all')
   const [showProfile, setShowProfile] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -549,6 +551,32 @@ export default function InboxPage() {
             )
           })}
         </div>
+        {/* Barra de ações em massa */}
+        <div style={{ padding: '4px 8px', borderBottom: '1px solid #f4f4f5', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }}
+            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: `1px solid ${bulkMode ? '#bbf7d0' : '#e4e4e7'}`, background: bulkMode ? '#f0fdf4' : '#fafafa', color: bulkMode ? '#16a34a' : '#71717a', cursor: 'pointer' }}>
+            {bulkMode ? '✓ Seleção ativa' : 'Selecionar'}
+          </button>
+          {bulkMode && bulkSelected.size > 0 && (<>
+            <span style={{ fontSize: '11px', color: '#71717a' }}>{bulkSelected.size} selecionada{bulkSelected.size > 1 ? 's' : ''}</span>
+            <button onClick={async () => {
+              await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
+              toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+            }} style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #bae6fd', background: '#f0f9ff', color: '#0369a1', cursor: 'pointer' }}>
+              Lidas
+            </button>
+            <button onClick={async () => {
+              await conversationApi.post('/conversations/bulk/close', { ids: Array.from(bulkSelected) })
+              toast.success(`${bulkSelected.size} fechadas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
+            }} style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: 'pointer' }}>
+              Fechar
+            </button>
+            <button onClick={() => { const all = conversations.map((c: any) => c.id); setBulkSelected(new Set(all)) }}
+              style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #e4e4e7', background: '#fafafa', color: '#71717a', cursor: 'pointer', marginLeft: 'auto' }}>
+              Todas
+            </button>
+          </>)}
+        </div>
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
           {loadingConvs && convPage === 1
             ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
@@ -562,10 +590,15 @@ export default function InboxPage() {
               const convChannelName = channels?.find((ch: any) => ch.id === conv.channel_id)?.name
               const convBotActive = conv.bot_active !== false
               return (
-                <div key={conv.id} onClick={() => handleSelectConv(conv.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', background: isSel ? '#f0fdf4' : 'transparent', borderLeft: `3px solid ${isSel ? '#22c55e' : 'transparent'}`, transition: 'background 0.1s' }}
-                  onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-                  onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
+                <div key={conv.id} onClick={() => bulkMode ? setBulkSelected(prev => { const next = new Set(prev); next.has(conv.id) ? next.delete(conv.id) : next.add(conv.id); return next }) : handleSelectConv(conv.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', background: bulkSelected.has(conv.id) ? '#eff6ff' : isSel ? '#f0fdf4' : 'transparent', borderLeft: `3px solid ${isSel && !bulkMode ? '#22c55e' : 'transparent'}`, transition: 'background 0.1s' }}
+                  onMouseEnter={e => { if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
+                  onMouseLeave={e => { if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
+                  {bulkMode && (
+                    <div style={{ width: '18px', height: '18px', borderRadius: '4px', border: `2px solid ${bulkSelected.has(conv.id) ? '#22c55e' : '#d4d4d8'}`, background: bulkSelected.has(conv.id) ? '#22c55e' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.1s' }}>
+                      {bulkSelected.has(conv.id) && <Check size={11} color="#fff" strokeWidth={3} />}
+                    </div>
+                  )}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>{getInitials(name)}</div>
                     {!convBotActive && <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '14px', height: '14px', borderRadius: '50%', background: '#f97316', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Bot pausado"><UserCheck size={8} color="#fff" /></div>}
