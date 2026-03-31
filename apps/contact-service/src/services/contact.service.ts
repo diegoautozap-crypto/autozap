@@ -113,7 +113,8 @@ export class ContactService {
     if (origin) query = query.eq('origin', origin)
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+      const s = search.replace(/[%_'"\\,()]/g, '').trim()
+      if (s) query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`)
     }
 
     if (tagId) {

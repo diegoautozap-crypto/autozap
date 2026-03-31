@@ -24,7 +24,11 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     const { mediaId } = req.params
     const { channelId } = req.query as any
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
-    const { data: channel } = await db.from('channels').select('credentials, type').eq('id', channelId).single()
+    // Busca canal — aceita com ou sem auth (mídia precisa ser acessível pelo browser)
+    // Mas restringe por tenant se autenticado
+    let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId)
+    if ((req as any).auth?.tid) channelQuery = channelQuery.eq('tenant_id', (req as any).auth.tid)
+    const { data: channel } = await channelQuery.single()
     if (!channel) { res.status(404).json({ error: 'Channel not found' }); return }
     const credentials = decryptCredentials(channel.credentials)
     const apiKey = credentials?.apiKey
@@ -49,7 +53,7 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     if (contentLength) res.setHeader('Content-Length', contentLength)
     res.setHeader('Cache-Control', 'public, max-age=86400')
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*')
     const buffer = await mediaResponse.arrayBuffer()
     res.send(Buffer.from(buffer))
   } catch (err) { next(err) }
@@ -227,6 +231,9 @@ router.get('/conversations/:id/notes', async (req, res, next) => {
 
 router.post('/conversations/:id/notes', validate(noteSchema), async (req, res, next) => {
   try {
+    // Valida que a conversa pertence ao tenant
+    const { data: conv } = await db.from('conversations').select('id').eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+    if (!conv) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
     const { body: noteBody } = req.body
     const { data, error } = await db
       .from('conversation_notes')

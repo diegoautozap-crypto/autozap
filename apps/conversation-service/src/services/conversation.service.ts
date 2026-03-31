@@ -80,6 +80,12 @@ export class ConversationService {
   }
 
   async assignConversation(conversationId: string, tenantId: string, userId: string | null) {
+    // Valida que o usuário pertence ao tenant
+    if (userId) {
+      const { data: user } = await db.from('users').select('id').eq('id', userId).eq('tenant_id', tenantId).single()
+      if (!user) throw new NotFoundError('User')
+    }
+
     const { data, error } = await db
       .from('conversations')
       .update({ assigned_to: userId })
@@ -93,6 +99,12 @@ export class ConversationService {
   }
 
   async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage, pipelineId?: string) {
+    // Valida que o pipeline pertence ao tenant
+    if (pipelineId) {
+      const { data: pipe } = await db.from('pipelines').select('id').eq('id', pipelineId).eq('tenant_id', tenantId).single()
+      if (!pipe) throw new NotFoundError('Pipeline')
+    }
+
     const update: any = { pipeline_stage: stage }
     if (pipelineId !== undefined) update.pipeline_id = pipelineId || null
 
@@ -196,6 +208,10 @@ export class ConversationService {
   }
 
   async searchConversations(tenantId: string, search: string) {
+    // Sanitiza a busca removendo caracteres que podem manipular a query
+    const sanitized = search.replace(/[%_'"\\,()]/g, '').trim()
+    if (!sanitized) return []
+
     const { data } = await db
       .from('conversations')
       .select(`
@@ -203,7 +219,7 @@ export class ConversationService {
         contacts(id, name, phone)
       `)
       .eq('tenant_id', tenantId)
-      .or(`last_message.ilike.%${search}%`)
+      .ilike('last_message', `%${sanitized}%`)
       .limit(20)
 
     return data || []
