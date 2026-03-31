@@ -220,7 +220,7 @@ router.post('/campaigns/:id/start', async (req, res, next) => {
     }
     await campaignService.startCampaign(req.params.id, req.auth.tid)
     res.json(ok({ message: 'Campaign started', campaignId: req.params.id }))
-  } catch (err: any) { logger.error('START CAMPAIGN ERROR', { error: err.message, stack: err.stack, campaignId: req.params.id }); next(err) }
+  } catch (err: any) { console.error('START CAMPAIGN ERROR:', err?.message || err, err?.stack); next(err) }
 })
 
 router.post('/campaigns/:id/pause', async (req, res, next) => {
