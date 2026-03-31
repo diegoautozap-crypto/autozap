@@ -217,6 +217,19 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
       )}
+
+      {data._execCount > 0 && (
+        <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '3px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '99px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+            ✓ {data._execCount}
+          </span>
+          {data._errorCount > 0 && (
+            <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+              ✗ {data._errorCount}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

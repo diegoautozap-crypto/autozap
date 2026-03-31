@@ -20,11 +20,19 @@ import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './compo
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
   const [hovered, setHovered] = useState(false)
+  const count = data?._count
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
       <path d={edgePath} style={{ stroke: 'transparent', strokeWidth: 20, fill: 'none', cursor: 'pointer' }}
         onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} />
+      {count > 0 && !hovered && (
+        <foreignObject width={80} height={20} x={labelX - 40} y={labelY - 10} style={{ overflow: 'visible', pointerEvents: 'none' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '99px', padding: '1px 6px', textAlign: 'center', whiteSpace: 'nowrap', width: 'fit-content', margin: '0 auto' }}>
+            {count} item{count !== 1 ? 's' : ''}
+          </div>
+        </foreignObject>
+      )}
       {hovered && (
         <foreignObject width={28} height={28} x={labelX - 14} y={labelY - 14}
           style={{ overflow: 'visible', pointerEvents: 'all' }}
@@ -176,7 +184,7 @@ export default function FlowEditorPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       await messageApi.put(`/flows/${id}/graph`, {
-        nodes: nodes.map(n => ({ id: n.id, type: (n.data as any).type, position_x: n.position.x, position_y: n.position.y, data: { ...(n.data as any) } })),
+        nodes: nodes.map(n => { const { _execCount, _errorCount, ...cleanData } = (n.data as any); return { id: n.id, type: cleanData.type, position_x: n.position.x, position_y: n.position.y, data: cleanData } }),
         edges: edges.map(e => ({ id: e.id, source_node: e.source, target_node: e.target, source_handle: e.sourceHandle || 'success' })),
       })
       if (flowName) await messageApi.patch(`/flows/${id}`, { name: flowName })
@@ -184,6 +192,28 @@ export default function FlowEditorPage() {
     onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
     onError: () => toast.error('Erro ao salvar'),
   })
+
+  // Injeta contadores do analytics nos nós e edges
+  useEffect(() => {
+    if (!analytics?.nodeStats) {
+      // Limpa contadores quando analytics desativa
+      if (!showAnalytics) {
+        setNodes(nds => nds.map(n => { const d = { ...(n.data as any) }; delete d._execCount; delete d._errorCount; return { ...n, data: d } }))
+        setEdges(eds => eds.map(e => ({ ...e, data: { ...(e.data || {}), _count: undefined } })))
+      }
+      return
+    }
+    const stats = analytics.nodeStats as Record<string, { success: number; error: number; total: number }>
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      data: { ...(n.data as any), _execCount: stats[n.id]?.success || 0, _errorCount: stats[n.id]?.error || 0 },
+    })))
+    // Contagem nas edges = total do nó de origem (quantos passaram)
+    setEdges(eds => eds.map(e => ({
+      ...e,
+      data: { ...(e.data || {}), _count: stats[e.source]?.total || 0 },
+    })))
+  }, [analytics?.nodeStats, showAnalytics])
 
   const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
