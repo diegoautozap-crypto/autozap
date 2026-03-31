@@ -7,7 +7,7 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare,
 } from 'lucide-react'
 
 const ALL_NAV = [
@@ -18,6 +18,7 @@ const ALL_NAV = [
   { href: '/dashboard/inbox',     label: 'Inbox',      icon: MessageSquare },
   { href: '/dashboard/pipeline',  label: 'Pipeline',   icon: Kanban },
   { href: '/dashboard/flows',     label: 'Flows',      icon: Workflow },
+  { href: '/dashboard/tasks',     label: 'Tarefas',    icon: CheckSquare },
   { href: '/dashboard/channels',  label: 'Canais',     icon: Radio },
   { href: '/dashboard/team',      label: 'Equipe',     icon: UserCog },
   { href: '/dashboard/errors',    label: 'Erros',      icon: AlertCircle },

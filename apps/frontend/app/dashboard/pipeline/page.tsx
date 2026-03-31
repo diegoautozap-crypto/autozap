@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Loader2, MessageSquare, RefreshCw, Settings2, Plus, Trash2,
-  GripVertical, X, Check, Pencil, DollarSign,
+  GripVertical, X, Check, Pencil, DollarSign, AlertTriangle,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Pusher from 'pusher-js'
@@ -349,6 +349,17 @@ export default function PipelinePage() {
     placeholderData: (prev) => prev,
   })
 
+  // Tarefas pendentes para indicar no card
+  const { data: pendingTasks = [] } = useQuery({
+    queryKey: ['pipeline-tasks'],
+    queryFn: async () => { const { data } = await conversationApi.get('/tasks?status=pending'); return data.data || [] },
+    staleTime: 15000, refetchInterval: 30000,
+  })
+  const tasksByConv = (pendingTasks as any[]).reduce((acc: Record<string, any[]>, t: any) => {
+    if (t.conversation_id) { acc[t.conversation_id] = acc[t.conversation_id] || []; acc[t.conversation_id].push(t) }
+    return acc
+  }, {} as Record<string, any[]>)
+
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
@@ -635,6 +646,26 @@ export default function PipelinePage() {
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
                           {conv.last_message && <p style={{ fontSize: '11px', color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
+
+                          {/* ── Tarefas pendentes ── */}
+                          {tasksByConv[conv.id] && (() => {
+                            const tasks = tasksByConv[conv.id]
+                            const overdue = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < new Date())
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                {overdue.length > 0 && (
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '1px 6px', borderRadius: '99px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <AlertTriangle size={9} /> {overdue.length} atrasada{overdue.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {tasks.length > overdue.length && (
+                                  <span style={{ fontSize: '10px', fontWeight: 600, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '99px' }}>
+                                    {tasks.length - overdue.length} tarefa{tasks.length - overdue.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })()}
 
                           {/* ── Valor do negócio ── */}
                           <DealValueEditor

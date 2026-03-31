@@ -1,0 +1,533 @@
+'use client'
+
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { conversationApi } from '@/lib/api'
+import { toast } from 'sonner'
+import {
+  CheckSquare, Plus, Trash2, Loader2, Calendar, AlertTriangle,
+  User, Clock, X, Flag,
+} from 'lucide-react'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Task {
+  id: string
+  tenant_id: string
+  conversation_id: string | null
+  contact_id: string | null
+  assigned_to: string | null
+  created_by: string | null
+  title: string
+  description: string | null
+  due_date: string | null
+  status: 'pending' | 'completed'
+  priority: 'low' | 'medium' | 'high'
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+  conversations?: { id: string; contacts: { id: string; name: string; phone: string } } | null
+}
+
+interface TaskSummary {
+  pending: number
+  overdue: number
+  today: number
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false
+  const due = new Date(dueDate)
+  const now = new Date()
+  due.setHours(23, 59, 59, 999)
+  return due < now
+}
+
+function isToday(dueDate: string | null): boolean {
+  if (!dueDate) return false
+  const due = new Date(dueDate)
+  const now = new Date()
+  return due.getFullYear() === now.getFullYear() &&
+    due.getMonth() === now.getMonth() &&
+    due.getDate() === now.getDate()
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function dueDateColor(dueDate: string | null, status: string): string {
+  if (status === 'completed') return '#a1a1aa'
+  if (!dueDate) return '#a1a1aa'
+  if (isOverdue(dueDate)) return '#ef4444'
+  if (isToday(dueDate)) return '#f59e0b'
+  return '#a1a1aa'
+}
+
+function priorityConfig(p: string): { label: string; bg: string; color: string } {
+  if (p === 'high') return { label: 'Alta', bg: '#fef2f2', color: '#dc2626' }
+  if (p === 'medium') return { label: 'Média', bg: '#fffbeb', color: '#d97706' }
+  return { label: 'Baixa', bg: '#f4f4f5', color: '#71717a' }
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px',
+  background: '#fafafa', border: '1px solid #e4e4e7',
+  borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b',
+  transition: 'border-color 0.15s, background 0.15s',
+}
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle, cursor: 'pointer', appearance: 'auto' as any,
+}
+
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+type FilterTab = 'all' | 'pending' | 'overdue' | 'today' | 'completed'
+
+const filterTabs: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'Todas' },
+  { key: 'pending', label: 'Pendentes' },
+  { key: 'overdue', label: 'Atrasadas' },
+  { key: 'today', label: 'Hoje' },
+  { key: 'completed', label: 'Concluídas' },
+]
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function TasksPage() {
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<FilterTab>('all')
+  const [showModal, setShowModal] = useState(false)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+
+  // New task form
+  const [newTitle, setNewTitle] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
+  const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium')
+
+  // ── Queries ──────────────────────────────────────────────────────────────
+
+  const apiStatus = activeTab === 'completed' ? 'completed' : activeTab === 'all' ? 'all' : 'pending'
+
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({
+    queryKey: ['tasks', apiStatus],
+    queryFn: async () => {
+      const { data } = await conversationApi.get(`/tasks?status=${apiStatus}`)
+      return data.data || []
+    },
+  })
+
+  const { data: summary } = useQuery<TaskSummary>({
+    queryKey: ['tasks-summary'],
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/tasks/summary')
+      return data.data || { pending: 0, overdue: 0, today: 0 }
+    },
+  })
+
+  // ── Client-side filtering ────────────────────────────────────────────────
+
+  const filteredTasks = tasks.filter((t) => {
+    if (activeTab === 'all') return true
+    if (activeTab === 'pending') return t.status === 'pending'
+    if (activeTab === 'completed') return t.status === 'completed'
+    if (activeTab === 'overdue') return t.status === 'pending' && isOverdue(t.due_date)
+    if (activeTab === 'today') return t.status === 'pending' && isToday(t.due_date)
+    return true
+  })
+
+  // ── Mutations ────────────────────────────────────────────────────────────
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const newStatus = status === 'pending' ? 'completed' : 'pending'
+      await conversationApi.patch(`/tasks/${id}`, { status: newStatus })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+    },
+    onError: () => toast.error('Erro ao atualizar tarefa'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await conversationApi.delete(`/tasks/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+      toast.success('Tarefa removida')
+    },
+    onError: () => toast.error('Erro ao remover tarefa'),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = { title: newTitle, priority: newPriority }
+      if (newDescription.trim()) body.description = newDescription
+      if (newDueDate) body.dueDate = new Date(newDueDate + 'T23:59:00').toISOString()
+      await conversationApi.post('/tasks', body)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+      toast.success('Tarefa criada!')
+      setShowModal(false)
+      setNewTitle('')
+      setNewDescription('')
+      setNewDueDate('')
+      setNewPriority('medium')
+    },
+    onError: () => toast.error('Erro ao criar tarefa'),
+  })
+
+  // ── Tab counts ───────────────────────────────────────────────────────────
+
+  function tabCount(key: FilterTab): number | undefined {
+    if (!summary) return undefined
+    if (key === 'all') return (summary.pending || 0) + (tasks.filter(t => t.status === 'completed').length || 0)
+    if (key === 'pending') return summary.pending
+    if (key === 'overdue') return summary.overdue
+    if (key === 'today') return summary.today
+    return undefined
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ padding: '28px 32px', maxWidth: '960px', margin: '0 auto' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckSquare size={20} color="#22c55e" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', margin: 0 }}>Tarefas</h1>
+            <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>
+              Gerencie todas as tarefas da equipe
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '9px 18px', borderRadius: '10px',
+            background: '#22c55e', color: '#fff',
+            border: 'none', fontSize: '14px', fontWeight: 600,
+            cursor: 'pointer', transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#16a34a')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#22c55e')}
+        >
+          <Plus size={16} /> Nova tarefa
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{
+        display: 'flex', gap: '4px', marginBottom: '20px',
+        background: '#f4f4f5', borderRadius: '10px', padding: '4px',
+      }}>
+        {filterTabs.map(tab => {
+          const active = activeTab === tab.key
+          const count = tabCount(tab.key)
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: '8px',
+                border: 'none', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s',
+                background: active ? '#fff' : 'transparent',
+                color: active ? '#18181b' : '#71717a',
+                boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              {tab.label}
+              {count !== undefined && (
+                <span style={{
+                  marginLeft: '6px', fontSize: '11px', fontWeight: 700,
+                  padding: '1px 6px', borderRadius: '10px',
+                  background: active ? '#f0fdf4' : '#e4e4e7',
+                  color: active ? '#22c55e' : '#71717a',
+                }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Task list */}
+      <div style={{
+        background: '#fff', borderRadius: '14px',
+        border: '1px solid #e4e4e7', overflow: 'hidden',
+      }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '60px 0', color: '#a1a1aa' }}>
+            <Loader2 size={20} className="animate-spin" /> Carregando tarefas...
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          /* Empty state */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: '#a1a1aa' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+              <CheckSquare size={26} color="#d4d4d8" />
+            </div>
+            <p style={{ fontSize: '15px', fontWeight: 600, color: '#71717a', margin: '0 0 4px' }}>
+              {activeTab === 'completed' ? 'Nenhuma tarefa concluída' :
+               activeTab === 'overdue' ? 'Nenhuma tarefa atrasada' :
+               activeTab === 'today' ? 'Nenhuma tarefa para hoje' :
+               'Nenhuma tarefa encontrada'}
+            </p>
+            <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>
+              {activeTab === 'overdue' ? 'Tudo em dia!' : 'Crie uma nova tarefa para comecar.'}
+            </p>
+          </div>
+        ) : (
+          filteredTasks.map((task, idx) => {
+            const completed = task.status === 'completed'
+            const overdue = !completed && isOverdue(task.due_date)
+            const todayTask = !completed && isToday(task.due_date)
+            const prio = priorityConfig(task.priority)
+            const contactName = task.conversations?.contacts?.name || null
+            const hovered = hoveredId === task.id
+
+            return (
+              <div
+                key={task.id}
+                onMouseEnter={() => setHoveredId(task.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 20px',
+                  borderBottom: idx < filteredTasks.length - 1 ? '1px solid #f4f4f5' : 'none',
+                  background: hovered ? '#fafafa' : completed ? '#fafafa' : overdue ? '#fffbfb' : '#fff',
+                  transition: 'background 0.1s',
+                }}
+              >
+                {/* Checkbox */}
+                <button
+                  onClick={() => toggleMutation.mutate({ id: task.id, status: task.status })}
+                  style={{
+                    width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
+                    border: `2px solid ${completed ? '#22c55e' : overdue ? '#ef4444' : '#d4d4d8'}`,
+                    background: completed ? '#22c55e' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', padding: 0, transition: 'all 0.15s',
+                  }}
+                >
+                  {completed && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: '14px', fontWeight: 500, color: completed ? '#a1a1aa' : '#18181b',
+                      textDecoration: completed ? 'line-through' : 'none',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      maxWidth: '400px',
+                    }}>
+                      {task.title}
+                    </span>
+
+                    {/* Priority badge */}
+                    <span style={{
+                      fontSize: '11px', fontWeight: 600, padding: '2px 8px',
+                      borderRadius: '6px', background: prio.bg, color: prio.color,
+                    }}>
+                      {prio.label}
+                    </span>
+
+                    {/* Overdue badge */}
+                    {overdue && (
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: '3px',
+                        fontSize: '11px', fontWeight: 600, padding: '2px 8px',
+                        borderRadius: '6px', background: '#fef2f2', color: '#dc2626',
+                      }}>
+                        <AlertTriangle size={11} /> Atrasada
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Meta row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px' }}>
+                    {contactName && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#71717a' }}>
+                        <User size={12} /> {contactName}
+                      </span>
+                    )}
+                    {task.due_date && (
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        fontSize: '12px', color: dueDateColor(task.due_date, task.status),
+                        fontWeight: (overdue || todayTask) ? 600 : 400,
+                      }}>
+                        <Calendar size={12} />
+                        {todayTask ? 'Hoje' : formatDate(task.due_date)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Delete button (on hover) */}
+                <button
+                  onClick={() => {
+                    if (confirm('Remover esta tarefa?')) deleteMutation.mutate(task.id)
+                  }}
+                  style={{
+                    padding: '6px', borderRadius: '6px', border: 'none',
+                    background: hovered ? '#fef2f2' : 'transparent',
+                    color: hovered ? '#ef4444' : 'transparent',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* ── New Task Modal ──────────────────────────────────────────────────── */}
+      {showModal && (
+        <div
+          onClick={() => setShowModal(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: '16px', padding: '28px',
+              width: '460px', maxWidth: '95vw',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            }}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', margin: 0 }}>Nova tarefa</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{ padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px', color: '#71717a' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Title */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
+                Titulo *
+              </label>
+              <input
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="Ex: Retornar ligacao do cliente"
+                style={inputStyle}
+                autoFocus
+              />
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
+                Descricao
+              </label>
+              <textarea
+                value={newDescription}
+                onChange={e => setNewDescription(e.target.value)}
+                placeholder="Detalhes adicionais (opcional)"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Due date + priority row */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '22px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
+                  Data limite
+                </label>
+                <input
+                  type="date"
+                  value={newDueDate}
+                  onChange={e => setNewDueDate(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
+                  Prioridade
+                </label>
+                <select
+                  value={newPriority}
+                  onChange={e => setNewPriority(e.target.value as any)}
+                  style={selectStyle}
+                >
+                  <option value="low">Baixa</option>
+                  <option value="medium">Media</option>
+                  <option value="high">Alta</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  padding: '9px 18px', borderRadius: '10px',
+                  background: '#f4f4f5', color: '#52525b',
+                  border: 'none', fontSize: '14px', fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={!newTitle.trim() || createMutation.isPending}
+                onClick={() => createMutation.mutate()}
+                style={{
+                  padding: '9px 24px', borderRadius: '10px',
+                  background: !newTitle.trim() ? '#d4d4d8' : '#22c55e',
+                  color: '#fff', border: 'none', fontSize: '14px', fontWeight: 600,
+                  cursor: !newTitle.trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  transition: 'background 0.15s', opacity: createMutation.isPending ? 0.7 : 1,
+                }}
+              >
+                {createMutation.isPending && <Loader2 size={14} className="animate-spin" />}
+                Criar tarefa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
