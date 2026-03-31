@@ -7,9 +7,8 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon, Moon, Sun, Globe,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon,
 } from 'lucide-react'
-import { useThemeStore } from '@/lib/theme'
 import { useI18nStore, useT, LOCALES } from '@/lib/i18n'
 
 const ALL_NAV = [
@@ -71,7 +70,6 @@ export function Sidebar() {
   const { logout, user, updateUser } = useAuthStore()
   const roleFromStore = (user as any)?.role || 'agent'
   const t = useT()
-  const { theme, toggle: toggleTheme } = useThemeStore()
   const { locale, setLocale } = useI18nStore()
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
@@ -220,17 +218,10 @@ export function Sidebar() {
 
       {isAdmin && <UsageBar />}
 
-      {/* Tema + Idioma */}
-      <div style={{ padding: '4px 8px', display: 'flex', gap: '4px' }}>
-        <button onClick={toggleTheme}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '7px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 500, transition: 'all 0.12s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}>
-          {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
-          {theme === 'dark' ? t('settings.themeLight') : t('settings.themeDark')}
-        </button>
+      {/* Idioma */}
+      <div style={{ padding: '4px 8px' }}>
         <select value={locale} onChange={e => setLocale(e.target.value as any)}
-          style={{ flex: 1, padding: '7px 4px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 500, outline: 'none', appearance: 'none', textAlign: 'center' }}>
+          style={{ width: '100%', padding: '7px 4px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 500, outline: 'none', appearance: 'none', textAlign: 'center' }}>
           {LOCALES.map(l => <option key={l.code} value={l.code} style={{ background: '#161b27', color: '#fff' }}>{l.label}</option>)}
         </select>
       </div>
