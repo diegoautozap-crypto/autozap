@@ -473,6 +473,40 @@ router.post('/conversations/bulk/assign', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Busca global de mensagens ────────────────────────────────────────────────
+router.get('/messages/search', async (req, res, next) => {
+  try {
+    const q = ((req.query.q as string) || '').replace(/[%_'"\\,()]/g, '').trim()
+    if (!q || q.length < 2) { res.json(ok([])); return }
+
+    const { data } = await db
+      .from('messages')
+      .select('id, body, direction, content_type, created_at, conversation_id, conversations(id, contacts(id, name, phone))')
+      .eq('tenant_id', req.auth.tid)
+      .ilike('body', `%${q}%`)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    // Agrupa por conversa para evitar duplicatas
+    const seen = new Set<string>()
+    const results = (data || []).filter((m: any) => {
+      if (seen.has(m.conversation_id)) return false
+      seen.add(m.conversation_id)
+      return true
+    }).map((m: any) => ({
+      messageId: m.id,
+      conversationId: m.conversation_id,
+      body: m.body,
+      direction: m.direction,
+      createdAt: m.created_at,
+      contactName: m.conversations?.contacts?.name || m.conversations?.contacts?.phone || '',
+      contactPhone: m.conversations?.contacts?.phone || '',
+    }))
+
+    res.json(ok(results))
+  } catch (err) { next(err) }
+})
+
 router.get('/conversations/:id/messages', async (req, res, next) => {
   try {
     const { cursor, limit } = req.query as any
