@@ -40,14 +40,14 @@ app.use((req: any, res: any, next: any) => {
 
   if (encoding === 'gzip') {
     zlib.gunzip(raw, (err, result) => {
-      if (err) { req.body = {}; return next() }
+      if (err) { logger.warn('gzip decompression failed', { err: err.message }); req.body = {}; return next() }
       delete req.headers['content-encoding']
       parseJson(result.toString('utf8'))
       next()
     })
   } else if (encoding === 'deflate') {
     zlib.inflate(raw, (err, result) => {
-      if (err) { req.body = {}; return next() }
+      if (err) { logger.warn('deflate decompression failed', { err: err.message }); req.body = {}; return next() }
       delete req.headers['content-encoding']
       parseJson(result.toString('utf8'))
       next()

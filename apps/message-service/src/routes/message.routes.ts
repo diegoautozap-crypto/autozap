@@ -181,41 +181,8 @@ router.post('/webhook/lead/:token', async (req, res, next) => {
 })
 
 // ─── Webhook de entrada para flows (com mapeamento de campos) ─────────────────
-router.post('/webhook/flow/:flowId/:token',
-  // Aceita body raw (gzip, deflate, json) — necessário para Make/Zapier
-  (req: any, res: any, next: any) => {
-    // Se já tem body parseado (ex: curl), passa direto
-    if (req.body && Object.keys(req.body).length > 0) return next()
-    
-    const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => chunks.push(chunk))
-    req.on('end', async () => {
-      try {
-        const raw = Buffer.concat(chunks)
-        const encoding = req.headers['content-encoding']
-        let text: string
-        
-        if (encoding === 'gzip') {
-          const zlib = await import('zlib')
-          text = await new Promise((resolve, reject) => {
-            zlib.gunzip(raw, (err, result) => err ? reject(err) : resolve(result.toString('utf8')))
-          })
-        } else if (encoding === 'deflate') {
-          const zlib = await import('zlib')
-          text = await new Promise((resolve, reject) => {
-            zlib.inflate(raw, (err, result) => err ? reject(err) : resolve(result.toString('utf8')))
-          })
-        } else {
-          text = raw.toString('utf8')
-        }
-        
-        try { req.body = JSON.parse(text) } catch { req.body = {} }
-        next()
-      } catch { req.body = {}; next() }
-    })
-    req.on('error', () => { req.body = {}; next() })
-  },
-  async (req, res, next) => {
+// Gzip/deflate já é descomprimido pelo middleware global em index.ts
+router.post('/webhook/flow/:flowId/:token', async (req, res, next) => {
   try {
     // Busca o flow e seu mapeamento de campos configurado
     const { data: flow, error } = await db
