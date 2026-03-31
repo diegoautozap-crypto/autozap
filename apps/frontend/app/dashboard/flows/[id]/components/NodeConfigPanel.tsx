@@ -61,6 +61,11 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 }) {
   const d = node.data as any
   const color = NODE_COLORS[d.type] || '#6b7280'
+  const queryClient = useQueryClient()
+  const [newTagName, setNewTagName] = useState('')
+  const [creatingTag, setCreatingTag] = useState(false)
+  const [manualRunning, setManualRunning] = useState(false)
+  const [manualResult, setManualResult] = useState<{ queued: number } | null>(null)
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px',
@@ -237,12 +242,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         </>)}
 
         {/* ── Trigger Manual ──────────────────────────────────────────────── */}
-        {d.type === 'trigger_manual' && (() => {
-          const [runTagIds, setRunTagIds] = useState<string[]>(d.tagIds || [])
-          const [running, setRunning] = useState(false)
-          const [result, setResult] = useState<{ queued: number } | null>(null)
-          const flowId = d.flowId || node.id.split('_')[0]
-          return (
+        {d.type === 'trigger_manual' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>
                 Selecione as tags e clique em <strong>Executar</strong> para disparar o flow para todos os contatos dessas tags.
@@ -254,9 +254,9 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {tags.map((tag: any) => {
-                      const sel = runTagIds.includes(tag.id)
+                      const sel = (d.tagIds || []).includes(tag.id)
                       return (
-                        <div key={tag.id} onClick={() => { const next = sel ? runTagIds.filter((id: string) => id !== tag.id) : [...runTagIds, tag.id]; setRunTagIds(next); onUpdate(node.id, { tagIds: next }) }}
+                        <div key={tag.id} onClick={() => { const next = sel ? (d.tagIds || []).filter((id: string) => id !== tag.id) : [...(d.tagIds || []), tag.id]; onUpdate(node.id, { tagIds: next }) }}
                           style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#7c3aed') : '#e4e4e7'}`, background: sel ? `${tag.color || '#7c3aed'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
                           <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
                           <span style={{ color: sel ? (tag.color || '#7c3aed') : '#18181b' }}>{tag.name}</span>
@@ -266,24 +266,23 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   </div>
                 )}
               </div>
-              <button disabled={running || runTagIds.length === 0} onClick={async () => {
-                setRunning(true); setResult(null)
+              <button disabled={manualRunning || (d.tagIds || []).length === 0} onClick={async () => {
+                setManualRunning(true); setManualResult(null)
                 try {
-                  const { data } = await messageApi.post(`/flows/${d.flowId}/run`, { tagIds: runTagIds })
-                  setResult(data.data)
+                  const { data } = await messageApi.post(`/flows/${d.flowId}/run`, { tagIds: d.tagIds })
+                  setManualResult(data.data)
                   toast.success(`${data.data.queued} contatos enfileirados!`)
                 } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao executar') }
-                finally { setRunning(false) }
+                finally { setManualRunning(false) }
               }}
-                style={{ width: '100%', padding: '10px', background: running || runTagIds.length === 0 ? '#e4e4e7' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: running || runTagIds.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                {running ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Executando...</> : <><Play size={14} /> Executar agora</>}
+                style={{ width: '100%', padding: '10px', background: manualRunning || (d.tagIds || []).length === 0 ? '#e4e4e7' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: manualRunning || (d.tagIds || []).length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                {manualRunning ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Executando...</> : <><Play size={14} /> Executar agora</>}
               </button>
-              {result && (
-                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {result.queued} contatos enfileirados para execução</p>
+              {manualResult && (
+                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {manualResult.queued} contatos enfileirados para execução</p>
               )}
             </div>
-          )
-        })()}
+        )}
 
         {/* ── Trigger Webhook ─────────────────────────────────────────────── */}
         {d.type === 'trigger_webhook' && (
@@ -632,38 +631,30 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               ))}
             </div>
           </div>
-          {(d.subtype || 'add') === 'add' && (() => {
-            const [newTagName, setNewTagName] = useState('')
-            const [creating, setCreating] = useState(false)
-            const queryClient = useQueryClient()
-            const createTag = async () => {
-              if (!newTagName.trim()) return
-              setCreating(true)
-              try {
-                const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' })
-                const tag = data.data
-                onUpdate(node.id, { tagId: tag.id, tagName: tag.name })
-                queryClient.invalidateQueries({ queryKey: ['tags'] })
-                setNewTagName('')
-                toast.success(`Tag "${tag.name}" criada!`)
-              } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
-              finally { setCreating(false) }
-            }
-            return (
-              <div style={{ marginTop: '8px' }}>
-                <label style={labelStyle}>Criar nova tag</label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '12px' }} placeholder="Nome da tag..." value={newTagName} onChange={e => setNewTagName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createTag() } }}
-                    onFocus={focusInput} onBlur={blurInput} />
-                  <button onClick={createTag} disabled={creating || !newTagName.trim()}
-                    style={{ padding: '6px 12px', background: newTagName.trim() ? '#22c55e' : '#e4e4e7', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: newTagName.trim() ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
-                    {creating ? '...' : '+ Criar'}
-                  </button>
-                </div>
+          {(d.subtype || 'add') === 'add' && (
+            <div style={{ marginTop: '8px' }}>
+              <label style={labelStyle}>Criar nova tag</label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '12px' }} placeholder="Nome da tag..." value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (async () => {
+                    if (!newTagName.trim()) return; setCreatingTag(true)
+                    try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" criada!`) }
+                    catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
+                    finally { setCreatingTag(false) }
+                  })() } }}
+                  onFocus={focusInput} onBlur={blurInput} />
+                <button disabled={creatingTag || !newTagName.trim()} onClick={async () => {
+                  if (!newTagName.trim()) return; setCreatingTag(true)
+                  try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" criada!`) }
+                  catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
+                  finally { setCreatingTag(false) }
+                }}
+                  style={{ padding: '6px 12px', background: newTagName.trim() ? '#22c55e' : '#e4e4e7', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: newTagName.trim() ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
+                  {creatingTag ? '...' : '+ Criar'}
+                </button>
               </div>
-            )
-          })()}
+            </div>
+          )}
         </>)}
 
         {d.type === 'update_contact' && (<>
