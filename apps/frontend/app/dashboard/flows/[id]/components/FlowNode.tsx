@@ -51,10 +51,12 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
     if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
     if (data.type === 'wait') {
-      if (data.days) return `Aguardar ${data.days} dia${data.days > 1 ? 's' : ''}`
-      if (data.hours) return `Aguardar ${data.hours}h`
-      if (data.minutes) return `Aguardar ${data.minutes} min`
-      return `Aguardar ${data.seconds ?? 0}s`
+      const parts: string[] = []
+      if (data.days) parts.push(`${data.days}d`)
+      if (data.hours) parts.push(`${data.hours}h`)
+      if (data.minutes) parts.push(`${data.minutes}min`)
+      if (data.seconds) parts.push(`${data.seconds}s`)
+      return parts.length > 0 ? `Aguardar ${parts.join(' ')}` : 'Aguardar 0s'
     }
     if (data.type === 'tag_contact') return data.tagName || 'Tag não selecionada'
     if (data.type === 'update_contact') {

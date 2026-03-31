@@ -547,14 +547,26 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1' }}>
             Acima de 5 minutos o flow pausa e retoma automaticamente via fila.
           </div>
-          <div><label style={labelStyle}>Segundos</label><input type="number" min="0" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value), minutes: 0, hours: 0, days: 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Minutos</label><input type="number" min="0" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value), seconds: 0, hours: 0, days: 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Horas</label><input type="number" min="0" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value), seconds: 0, minutes: 0, days: 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Dias</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value), seconds: 0, minutes: 0, hours: 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <p style={{ fontSize: '11px', color: '#a1a1aa' }}>
-            Total: {((d.days||0)*24*60 + (d.hours||0)*60 + (d.minutes||0) + Math.ceil((d.seconds||0)/60))} minuto(s)
-            {((d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)) > 300 ? ' — agendado via fila ✓' : ' — espera síncrona'}
-          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div><label style={labelStyle}>Dias</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>Horas</label><input type="number" min="0" max="23" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>Minutos</label><input type="number" min="0" max="59" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>Segundos</label><input type="number" min="0" max="59" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+          </div>
+          {(() => {
+            const total = (d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)
+            const parts: string[] = []
+            if (d.days) parts.push(`${d.days}d`)
+            if (d.hours) parts.push(`${d.hours}h`)
+            if (d.minutes) parts.push(`${d.minutes}min`)
+            if (d.seconds) parts.push(`${d.seconds}s`)
+            return (
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>
+                Total: {parts.join(' ') || '0s'}
+                {total > 300 ? ' — agendado via fila ✓' : total > 0 ? ' — espera síncrona' : ''}
+              </p>
+            )
+          })()}
         </>)}
 
         {d.type === 'tag_contact' && (<>
