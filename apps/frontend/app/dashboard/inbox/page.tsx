@@ -537,7 +537,7 @@ export default function InboxPage() {
             </select>
           </div>
         )}
-        <div style={{ padding: '6px 8px', borderBottom: '1px solid #f4f4f5', display: 'flex', gap: '3px', flexShrink: 0 }}>
+        <div style={{ padding: '6px 8px', borderBottom: '1px solid #f4f4f5', display: 'flex', gap: '3px', flexShrink: 0, alignItems: 'center' }}>
           {statusFilters.map(f => {
             const count = statusCounts?.[f.key as keyof typeof statusCounts]
             const isActive = statusFilter === f.key
@@ -550,33 +550,44 @@ export default function InboxPage() {
               </button>
             )
           })}
+          <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }} title="Selecionar conversas"
+            style={{ width: '28px', height: '28px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: bulkMode ? '#22c55e' : 'transparent', color: bulkMode ? '#fff' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
+            onMouseEnter={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5' }}
+            onMouseLeave={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+            <CheckCheck size={14} />
         </div>
         {/* Barra de ações em massa */}
-        <div style={{ padding: '4px 8px', borderBottom: '1px solid #f4f4f5', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }}
-            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: `1px solid ${bulkMode ? '#bbf7d0' : '#e4e4e7'}`, background: bulkMode ? '#f0fdf4' : '#fafafa', color: bulkMode ? '#16a34a' : '#71717a', cursor: 'pointer' }}>
-            {bulkMode ? '✓ Seleção ativa' : 'Selecionar'}
-          </button>
-          {bulkMode && bulkSelected.size > 0 && (<>
-            <span style={{ fontSize: '11px', color: '#71717a' }}>{bulkSelected.size} selecionada{bulkSelected.size > 1 ? 's' : ''}</span>
-            <button onClick={async () => {
-              await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
-              toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-            }} style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #bae6fd', background: '#f0f9ff', color: '#0369a1', cursor: 'pointer' }}>
-              Lidas
-            </button>
-            <button onClick={async () => {
-              await conversationApi.post('/conversations/bulk/close', { ids: Array.from(bulkSelected) })
-              toast.success(`${bulkSelected.size} fechadas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
-            }} style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: 'pointer' }}>
-              Fechar
-            </button>
-            <button onClick={() => { const all = conversations.map((c: any) => c.id); setBulkSelected(new Set(all)) }}
-              style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #e4e4e7', background: '#fafafa', color: '#71717a', cursor: 'pointer', marginLeft: 'auto' }}>
-              Todas
-            </button>
-          </>)}
-        </div>
+        {bulkMode && (
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid #e0f2fe', background: '#f0f9ff', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1' }}>
+              {bulkSelected.size > 0 ? `${bulkSelected.size} selecionada${bulkSelected.size > 1 ? 's' : ''}` : 'Selecione conversas'}
+            </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px' }}>
+              <button onClick={() => { const all = conversations.map((c: any) => c.id); setBulkSelected(prev => prev.size === all.length ? new Set() : new Set(all)) }}
+                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: '#fff', color: '#0369a1', cursor: 'pointer' }}>
+                {bulkSelected.size === conversations.length ? 'Nenhuma' : 'Todas'}
+              </button>
+              {bulkSelected.size > 0 && (<>
+                <button onClick={async () => {
+                  await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
+                  toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+                }} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: '#fff', color: '#0369a1', cursor: 'pointer' }}>
+                  <Check size={11} /> Lidas
+                </button>
+                <button onClick={async () => {
+                  await conversationApi.post('/conversations/bulk/close', { ids: Array.from(bulkSelected) })
+                  toast.success(`${bulkSelected.size} fechadas`); setBulkSelected(new Set()); setBulkMode(false); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
+                }} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', cursor: 'pointer' }}>
+                  Fechar
+                </button>
+              </>)}
+              <button onClick={() => { setBulkMode(false); setBulkSelected(new Set()) }}
+                style={{ padding: '4px 6px', borderRadius: '6px', border: '1px solid #bae6fd', background: '#fff', color: '#71717a', cursor: 'pointer', display: 'flex' }}>
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        )}
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
           {loadingConvs && convPage === 1
             ? <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
