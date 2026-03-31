@@ -125,13 +125,15 @@ export class CampaignService {
     if (!contacts || contacts.length === 0) return 0
 
     const rows: CampaignContact[] = contacts
-      .filter(c => c.phone && c.phone.length >= 8)
+      .filter(c => c.phone && c.phone.length >= 8 && !c.phone.startsWith('webhook_temp_'))
       .map(c => ({
         phone: c.phone,
         name: c.name || c.phone,
         contactId: c.id,
         variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone },
       }))
+
+    if (rows.length === 0) return 0
 
     return this.addContacts(campaignId, tenantId, rows)
   }

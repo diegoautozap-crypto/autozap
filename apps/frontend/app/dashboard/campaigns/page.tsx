@@ -121,18 +121,30 @@ export default function CampaignsPage() {
         payload.copies       = validCurlCopies
       }
       if (scheduleMode === 'scheduled' && scheduledAt) payload.scheduledAt = new Date(scheduledAt).toISOString()
+
+      toast.info('Criando campanha...')
       const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
+
       if (contactMode === 'tag' && selectedTagIds.length > 0) {
-        await campaignApi.post(`/campaigns/${campId}/contacts/by-tag`, { tagIds: selectedTagIds })
+        toast.info('Carregando contatos por tag...')
+        const { data: tagResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-tag`, { tagIds: selectedTagIds })
+        toast.info(`${tagResult?.data?.imported || 0} contatos carregados`)
       } else {
         const rows = contactsText.split('\n').filter(Boolean).map(line => {
           const parts = line.split(','); const phone = parts[0]?.trim().replace(/\D/g, '')
           return { phone, name: parts.slice(1).join(',').trim() || phone, message: parts.slice(1).join(',').trim() || '' }
         }).filter(r => r.phone && r.phone.length >= 8)
-        if (rows.length > 0) await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
+        if (rows.length > 0) {
+          toast.info(`Importando ${rows.length} contatos...`)
+          await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
+        }
       }
-      if (scheduleMode === 'now') await campaignApi.post(`/campaigns/${campId}/start`)
+
+      if (scheduleMode === 'now') {
+        toast.info('Iniciando disparo...')
+        await campaignApi.post(`/campaigns/${campId}/start`)
+      }
       return campData.data
     },
     onSuccess: camp => {
