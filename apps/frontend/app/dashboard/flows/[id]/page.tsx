@@ -85,6 +85,8 @@ export default function FlowEditorPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [initialized, setInitialized] = useState(false)
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
+  const [doneNodes, setDoneNodes] = useState<Record<string, 'success' | 'error'>>({})
 
   useEffect(() => {
     try {
@@ -92,6 +94,30 @@ export default function FlowEditorPage() {
       if (saved) setCopiedNodes(JSON.parse(saved))
     } catch { }
   }, [])
+
+  // Pusher — execution animation
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
+    if (!key || !tenantId) return
+    const Pusher = require('pusher-js')
+    const pusher = new Pusher(key, { cluster })
+    const channel = pusher.subscribe(`tenant-${tenantId}`)
+
+    channel.bind('flow.node.start', (data: any) => {
+      if (data.flowId !== id) return
+      setActiveNodeId(data.nodeId)
+    })
+    channel.bind('flow.node.done', (data: any) => {
+      if (data.flowId !== id) return
+      setDoneNodes(prev => ({ ...prev, [data.nodeId]: data.status }))
+      setTimeout(() => setActiveNodeId(null), 300)
+      // Limpa badge depois de 8s
+      setTimeout(() => setDoneNodes(prev => { const next = { ...prev }; delete next[data.nodeId]; return next }), 8000)
+    })
+
+    return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`) }
+  }, [tenantId, id])
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -349,6 +375,12 @@ export default function FlowEditorPage() {
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
             selectionOnDrag
+            nodeClassName={(node) => {
+              if (activeNodeId === node.id) return 'flow-node-active'
+              if (doneNodes[node.id] === 'success') return 'flow-node-success'
+              if (doneNodes[node.id] === 'error') return 'flow-node-error'
+              return ''
+            }}
             defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
@@ -386,7 +418,13 @@ export default function FlowEditorPage() {
           />
         )}
       </div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes flowPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 50% { box-shadow: 0 0 0 8px rgba(34,197,94,0); } }
+        .flow-node-active > div { border-color: #22c55e !important; animation: flowPulse 0.8s ease-in-out infinite; }
+        .flow-node-success > div { border-color: #22c55e !important; box-shadow: 0 0 0 3px rgba(34,197,94,0.15); transition: all 0.3s; }
+        .flow-node-error > div { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); transition: all 0.3s; }
+      `}</style>
     </div>
   )
 }

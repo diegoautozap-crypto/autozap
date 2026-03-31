@@ -358,6 +358,7 @@ export class FlowEngine {
 
     try {
       logger.info('Executing flow node', { nodeId: node.id, type, flowId })
+      emitPusher(ctx.tenantId, 'flow.node.start', { flowId, nodeId: node.id, type })
 
       switch (type) {
 
@@ -763,12 +764,14 @@ export class FlowEngine {
       }
 
       await this.logNode(flowId, node.id, ctx, 'success', `Nó ${type} executado`)
+      emitPusher(ctx.tenantId, 'flow.node.done', { flowId, nodeId: node.id, type, status: 'success' })
       return { success: true }
 
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error('Flow node error', { nodeId: node.id, type, err: message })
       await this.logNode(flowId, node.id, ctx, 'error', message)
+      emitPusher(ctx.tenantId, 'flow.node.done', { flowId, nodeId: node.id, type, status: 'error' })
       return { success: false }
     }
   }
