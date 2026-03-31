@@ -126,7 +126,7 @@ interface ParsedCurl { apiKey: string; bodyTemplate: string; url: string }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
-  const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
+  const apiKey = curlStr.match(/apikey[:\s]+([^\s"'\\]+)/i)?.[1] || ''
   const urlMatch = curlStr.match(/https?:\/\/[^\s"']+/)
   const url = urlMatch ? urlMatch[0].replace(/["']$/, '') : 'https://api.gupshup.io/wa/api/v1/template/msg'
   let bodyTemplate = ''
@@ -217,7 +217,7 @@ async function processContact(
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
-      console.error('SEND FAILED:', contact.phone, 'error:', result.error, 'url:', parsed.url, 'body:', parsed.bodyTemplate?.slice(0, 200))
+      console.error('SEND FAILED:', contact.phone, 'error:', result.error, 'url:', parsed.url, 'apiKey:', parsed.apiKey ? parsed.apiKey.slice(0, 8) + '...' : 'EMPTY', 'body:', parsed.bodyTemplate?.slice(0, 300))
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
