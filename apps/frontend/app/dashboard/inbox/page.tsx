@@ -227,6 +227,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
 }
 
 export default function InboxPage() {
+  const t = useT()
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [mobileShowChat, setMobileShowChat] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
