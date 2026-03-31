@@ -44,7 +44,7 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'text') {
       message = { type: 'text', text: body }
     } else if (contentType === 'image') {
-      message = { type: 'image', originalUrl: mediaUrl, caption: body || '' }
+      message = { type: 'image', originalUrl: mediaUrl, previewUrl: mediaUrl, caption: body || '' }
     } else if (contentType === 'audio') {
       const proxyUrl = `${CHANNEL_SERVICE_PUBLIC_URL}/audio-proxy?url=${encodeURIComponent(mediaUrl || '')}`
       console.log('[GupshupAdapter] audio proxy URL:', proxyUrl)
