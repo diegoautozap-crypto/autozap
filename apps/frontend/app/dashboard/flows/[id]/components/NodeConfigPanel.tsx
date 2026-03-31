@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { Node } from '@xyflow/react'
-import { X, Copy, RefreshCw, Loader2 } from 'lucide-react'
+import { X, Copy, RefreshCw, Loader2, Plus } from 'lucide-react'
 import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
 import { messageApi } from '@/lib/api'
@@ -566,9 +566,46 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         </>)}
 
         {d.type === 'update_contact' && (<>
-          <div><label style={labelStyle}>Campo para atualizar</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.field || 'name'} onChange={e => onUpdate(node.id, { field: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="name">Nome</option><option value="phone">Telefone</option><option value="custom">Campo personalizado</option></select></div>
-          {d.field === 'custom' && <div><label style={labelStyle}>Nome do campo</label><input style={inputStyle} placeholder="cargo, empresa..." value={d.customField || ''} onChange={e => onUpdate(node.id, { customField: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
-          <div><label style={labelStyle}>Novo valor</label><input style={inputStyle} placeholder="{{nome}} ou texto fixo" value={d.value || ''} onChange={e => onUpdate(node.id, { value: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          {(() => {
+            // Migra formato antigo (field/value único) para novo (updateFields array)
+            const fields: { field: string; customField?: string; value: string }[] = d.updateFields ||
+              (d.field ? [{ field: d.field, customField: d.customField, value: d.value || '' }] : [{ field: 'name', value: '' }])
+            const setFields = (f: typeof fields) => onUpdate(node.id, { updateFields: f, field: undefined, customField: undefined, value: undefined })
+            const updateField = (i: number, ch: Partial<typeof fields[0]>) => setFields(fields.map((f, j) => j === i ? { ...f, ...ch } : f))
+            const removeField = (i: number) => setFields(fields.filter((_, j) => j !== i))
+            const addField = () => setFields([...fields, { field: 'custom', customField: '', value: '' }])
+            return (<>
+              {fields.map((f, i) => (
+                <div key={i} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <select style={{ ...inputStyle, flex: 1, padding: '5px 8px', fontSize: '12px' }} value={f.field} onChange={e => updateField(i, { field: e.target.value, customField: '' })} onFocus={focusInput} onBlur={blurInput}>
+                      <option value="name">Nome</option>
+                      <option value="phone">Telefone</option>
+                      <option value="email">Email</option>
+                      <option value="custom">Campo personalizado</option>
+                    </select>
+                    {fields.length > 1 && (
+                      <button onClick={() => removeField(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}>
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {f.field === 'custom' && (
+                    <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="Nome do campo (ex: cargo, empresa)" value={f.customField || ''} onChange={e => updateField(i, { customField: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                  )}
+                  <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="{{variavel}} ou texto fixo" value={f.value} onChange={e => updateField(i, { value: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                </div>
+              ))}
+              <button onClick={addField}
+                style={{ width: '100%', padding: '7px', background: 'transparent', border: '1.5px dashed #e4e4e7', borderRadius: '8px', color: '#71717a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'border-color 0.15s, color 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}>
+                <Plus size={13} /> Adicionar campo
+              </button>
+            </>)
+          })()}
         </>)}
 
         {d.type === 'move_pipeline' && (<>

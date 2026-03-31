@@ -57,7 +57,12 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       return `Aguardar ${data.seconds ?? 0}s`
     }
     if (data.type === 'tag_contact') return data.tagName || 'Tag não selecionada'
-    if (data.type === 'update_contact') return data.field ? `Atualizar ${data.field}` : 'Campo não definido'
+    if (data.type === 'update_contact') {
+      const uf = data.updateFields || (data.field ? [data] : [])
+      if (uf.length === 0) return 'Campo não definido'
+      const labels = uf.map((f: any) => f.field === 'custom' ? (f.customField || 'custom') : f.field).filter(Boolean)
+      return labels.length > 2 ? `${labels.slice(0, 2).join(', ')} +${labels.length - 2}` : labels.join(', ') || 'Campo não definido'
+    }
     if (data.type === 'move_pipeline') return data.stageLabel || data.stage || 'Etapa não definida'
     if (data.type === 'assign_agent') return 'Transferir para atendente'
     if (data.type === 'go_to') return 'Ir para outro flow'

@@ -82,6 +82,7 @@ interface FlowNodeData {
   end?: number
   fields?: { label: string; variable: string; contactField: string }[]
   mappings?: { from: string; to: string }[]
+  updateFields?: { field: string; customField?: string; value: string }[]
 }
 
 interface FlowNodeRow {
@@ -705,15 +706,25 @@ export class FlowEngine {
         }
 
         case 'update_contact': {
-          const updateData: Record<string, string | Record<string, string>> = {}
-          if (data?.field === 'name' && data?.value) { updateData.name = this.interpolate(data.value, ctx, variables) }
-          else if (data?.field === 'phone' && data?.value) { updateData.phone = this.interpolate(data.value, ctx, variables) }
-          else if (data?.field === 'custom' && data?.customField && data?.value) {
-            const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
-            const metadata: Record<string, string> = contact?.metadata || {}
-            metadata[data.customField] = this.interpolate(data.value, ctx, variables)
-            updateData.metadata = metadata
+          // Suporta formato novo (updateFields array) e legado (field/value único)
+          const fields: { field: string; customField?: string; value: string }[] = data?.updateFields ||
+            (data?.field ? [{ field: data.field, customField: data.customField, value: data.value || '' }] : [])
+          if (fields.length === 0) break
+
+          const updateData: Record<string, unknown> = {}
+          const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
+          const metadata: Record<string, string> = contact?.metadata || {}
+          let metadataChanged = false
+
+          for (const f of fields) {
+            const val = this.interpolate(f.value || '', ctx, variables)
+            if (!val) continue
+            if (f.field === 'name') updateData.name = val
+            else if (f.field === 'phone') updateData.phone = val
+            else if (f.field === 'email') updateData.email = val
+            else if (f.field === 'custom' && f.customField) { metadata[f.customField] = val; metadataChanged = true }
           }
+          if (metadataChanged) updateData.metadata = metadata
           if (Object.keys(updateData).length > 0) await db.from('contacts').update(updateData).eq('id', ctx.contactId)
           break
         }
