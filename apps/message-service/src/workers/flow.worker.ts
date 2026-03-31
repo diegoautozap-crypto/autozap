@@ -43,6 +43,66 @@ export const flowResumeQueue = new Queue<FlowResumeJob>('flow_resume_queue', {
   },
 })
 
+export interface ManualFlowJob {
+  flowId: string
+  tenantId: string
+  channelId: string
+  contactId: string
+  phone: string
+  contactName: string
+}
+
+export const manualFlowQueue = new Queue<ManualFlowJob>('manual_flow_queue', {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 3000 },
+    removeOnComplete: { count: 5000 },
+    removeOnFail: { count: 2000 },
+  },
+})
+
+export function startManualFlowWorker(): Worker {
+  const worker = new Worker<ManualFlowJob>(
+    'manual_flow_queue',
+    async (job) => {
+      const { flowId, tenantId, channelId, contactId, phone, contactName } = job.data
+      logger.info('Manual flow execution', { flowId, contactId, phone })
+
+      const { data: flow } = await db.from('flows').select('*').eq('id', flowId).eq('tenant_id', tenantId).single()
+      if (!flow || !flow.is_active) return
+
+      // Busca ou cria conversa para o contato
+      const { data: existingConv } = await db.from('conversations').select('id')
+        .eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId)
+        .in('status', ['open', 'waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+      let conversationId: string
+      if (existingConv) {
+        conversationId = existingConv.id
+      } else {
+        const { generateId } = await import('@autozap/utils')
+        const { data: channel } = await db.from('channels').select('type').eq('id', channelId).single()
+        const { data: newConv } = await db.from('conversations')
+          .insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channel?.type || 'whatsapp', status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 0, last_message: `Flow manual: ${contactName}`, last_message_at: new Date() })
+          .select('id').single()
+        if (!newConv) return
+        conversationId = newConv.id
+      }
+
+      await flowEngine.processWebhookFlow(flowId, {
+        tenantId, channelId, contactId, conversationId, phone,
+        messageBody: '', isFirstMessage: false,
+      })
+    },
+    { connection, concurrency: 5 }
+  )
+
+  worker.on('failed', (job, err) => logger.error('Manual flow job failed', { jobId: job?.id, error: err.message }))
+  logger.info('Manual flow worker started')
+  return worker
+}
+
 export function startFlowResumeWorker(): Worker {
   const worker = new Worker<FlowResumeJob>(
     'flow_resume_queue',

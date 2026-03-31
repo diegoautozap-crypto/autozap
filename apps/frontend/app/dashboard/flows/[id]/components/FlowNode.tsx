@@ -35,6 +35,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
     if (data.type === 'trigger_first_message') return 'Primeira mensagem do contato'
     if (data.type === 'trigger_any_reply') return 'Qualquer mensagem recebida'
     if (data.type === 'trigger_outside_hours') return `${data.start ?? 9}h – ${data.end ?? 18}h`
+    if (data.type === 'trigger_manual') return `${(data.tagIds || []).length} tag${(data.tagIds || []).length !== 1 ? 's' : ''} selecionada${(data.tagIds || []).length !== 1 ? 's' : ''}`
     if (data.type === 'send_message') {
       const sub = data.subtype || 'text'
       if (sub === 'text') return (data.message || '').slice(0, 50) || 'Sem mensagem'

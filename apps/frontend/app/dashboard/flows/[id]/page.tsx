@@ -50,6 +50,7 @@ const TRIGGER_NODES = [
   { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
   { type: 'trigger_outside_hours', label: 'Fora do horário' },
   { type: 'trigger_webhook',       label: 'Webhook de entrada' },
+  { type: 'trigger_manual',        label: 'Execução manual' },
 ]
 
 const ACTION_NODES = [
@@ -123,7 +124,7 @@ export default function FlowEditorPage() {
           type: nodeType,
           ...n.data,
           ...(nodeSubtype ? { subtype: nodeSubtype } : {}),
-          ...(nodeType === 'trigger_webhook' ? { flowId: id } : {}),
+          ...(['trigger_webhook', 'trigger_manual'].includes(nodeType) ? { flowId: id } : {}),
         },
       }
     }))
@@ -171,7 +172,7 @@ export default function FlowEditorPage() {
       position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
       data: {
         type,
-        ...(type === 'trigger_webhook' ? { flowId: id } : {}),
+        ...(['trigger_webhook', 'trigger_manual'].includes(type) ? { flowId: id } : {}),
         ...(type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}),
       },
     }])

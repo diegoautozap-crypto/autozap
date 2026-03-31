@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { Node } from '@xyflow/react'
-import { X, Copy, RefreshCw, Loader2, Plus } from 'lucide-react'
+import { X, Copy, RefreshCw, Loader2, Plus, Play } from 'lucide-react'
 import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
 import { messageApi } from '@/lib/api'
@@ -235,6 +235,55 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <div><label style={labelStyle}>Início do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>Fim do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
+
+        {/* ── Trigger Manual ──────────────────────────────────────────────── */}
+        {d.type === 'trigger_manual' && (() => {
+          const [runTagIds, setRunTagIds] = useState<string[]>(d.tagIds || [])
+          const [running, setRunning] = useState(false)
+          const [result, setResult] = useState<{ queued: number } | null>(null)
+          const flowId = d.flowId || node.id.split('_')[0]
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>
+                Selecione as tags e clique em <strong>Executar</strong> para disparar o flow para todos os contatos dessas tags.
+              </div>
+              <div>
+                <label style={labelStyle}>Tags dos destinatários</label>
+                {tags.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {tags.map((tag: any) => {
+                      const sel = runTagIds.includes(tag.id)
+                      return (
+                        <div key={tag.id} onClick={() => { const next = sel ? runTagIds.filter((id: string) => id !== tag.id) : [...runTagIds, tag.id]; setRunTagIds(next); onUpdate(node.id, { tagIds: next }) }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#7c3aed') : '#e4e4e7'}`, background: sel ? `${tag.color || '#7c3aed'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
+                          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                          <span style={{ color: sel ? (tag.color || '#7c3aed') : '#18181b' }}>{tag.name}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              <button disabled={running || runTagIds.length === 0} onClick={async () => {
+                setRunning(true); setResult(null)
+                try {
+                  const { data } = await messageApi.post(`/flows/${d.flowId}/run`, { tagIds: runTagIds })
+                  setResult(data.data)
+                  toast.success(`${data.data.queued} contatos enfileirados!`)
+                } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao executar') }
+                finally { setRunning(false) }
+              }}
+                style={{ width: '100%', padding: '10px', background: running || runTagIds.length === 0 ? '#e4e4e7' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: running || runTagIds.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                {running ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Executando...</> : <><Play size={14} /> Executar agora</>}
+              </button>
+              {result && (
+                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {result.queued} contatos enfileirados para execução</p>
+              )}
+            </div>
+          )
+        })()}
 
         {/* ── Trigger Webhook ─────────────────────────────────────────────── */}
         {d.type === 'trigger_webhook' && (

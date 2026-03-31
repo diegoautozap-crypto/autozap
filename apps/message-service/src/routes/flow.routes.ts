@@ -206,6 +206,60 @@ router.delete('/flows/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// POST /flows/:id/run — executa flow manualmente para contatos de tags específicas
+router.post('/flows/:id/run', async (req, res, next) => {
+  try {
+    const { tagIds } = req.body
+    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
+      throw new AppError('VALIDATION', 'tagIds é obrigatório', 400)
+    }
+
+    const { data: flow } = await db.from('flows').select('*').eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+    if (!flow) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
+    if (!flow.is_active) throw new AppError('INVALID_STATUS', 'Flow está pausado', 400)
+
+    // Busca contatos com as tags selecionadas
+    const { data: contactTagRows } = await db.from('contact_tags').select('contact_id').in('tag_id', tagIds)
+    if (!contactTagRows || contactTagRows.length === 0) { res.json(ok({ queued: 0 })); return }
+
+    const uniqueIds = [...new Set(contactTagRows.map(r => r.contact_id))]
+    const { data: contacts } = await db.from('contacts').select('id, phone, name')
+      .eq('tenant_id', req.auth.tid).eq('status', 'active').in('id', uniqueIds)
+    if (!contacts || contacts.length === 0) { res.json(ok({ queued: 0 })); return }
+
+    // Busca canal do tenant
+    const channelId = flow.channel_id
+    let channel: { id: string; type: string } | null = null
+    if (channelId) {
+      const { data: ch } = await db.from('channels').select('id, type').eq('id', channelId).eq('tenant_id', req.auth.tid).single()
+      channel = ch
+    }
+    if (!channel) {
+      const { data: ch } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).eq('status', 'active').limit(1).single()
+      channel = ch
+    }
+    if (!channel) throw new AppError('NOT_FOUND', 'Nenhum canal ativo encontrado', 400)
+
+    // Enfileira execução para cada contato via BullMQ
+    const { manualFlowQueue } = await import('../workers/flow.worker')
+    let queued = 0
+    for (const contact of contacts) {
+      if (!contact.phone || contact.phone.length < 8) continue
+      await manualFlowQueue.add('manual-run', {
+        flowId: flow.id,
+        tenantId: req.auth.tid,
+        channelId: channel.id,
+        contactId: contact.id,
+        phone: contact.phone,
+        contactName: contact.name || contact.phone,
+      }, { delay: queued * 200 }) // 200ms entre cada para não sobrecarregar
+      queued++
+    }
+
+    res.json(ok({ queued, total: contacts.length }))
+  } catch (err) { next(err) }
+})
+
 // GET /flows/:id/logs
 router.get('/flows/:id/logs', async (req, res, next) => {
   try {

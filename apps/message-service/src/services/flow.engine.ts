@@ -296,7 +296,8 @@ export class FlowEngine {
       }
       case 'trigger_any_reply': return true
       case 'trigger_webhook':
-        // Sempre verdadeiro — disparado diretamente via processWebhookFlow
+      case 'trigger_manual':
+        // Sempre verdadeiro — disparado diretamente via processWebhookFlow ou execução manual
         return true
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9

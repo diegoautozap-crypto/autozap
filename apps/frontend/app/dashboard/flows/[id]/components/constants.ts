@@ -1,7 +1,7 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, AlignLeft, Link,
+  RefreshCw, AlignLeft, Link, Play,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -10,6 +10,7 @@ export const NODE_COLORS: Record<string, string> = {
   trigger_any_reply:     '#16a34a',
   trigger_outside_hours: '#16a34a',
   trigger_webhook:       '#0891b2',
+  trigger_manual:        '#7c3aed',
   map_fields:            '#7c3aed',
   create_contact:        '#16a34a',
   send_message:          '#2563eb',
@@ -33,6 +34,7 @@ export const NODE_ICONS: Record<string, any> = {
   trigger_any_reply:     Reply,
   trigger_outside_hours: Clock,
   trigger_webhook:       Link,
+  trigger_manual:        Play,
   map_fields:            GitBranch,
   create_contact:        UserCheck,
   send_message:          MessageSquare,
@@ -56,6 +58,7 @@ export const NODE_LABELS: Record<string, string> = {
   trigger_any_reply:     'Qualquer resposta',
   trigger_outside_hours: 'Fora do horário',
   trigger_webhook:       'Webhook de entrada',
+  trigger_manual:        'Execução manual',
   send_message:          'Enviar mensagem',
   input:                 'Aguardar resposta',
   condition:             'Condição',
