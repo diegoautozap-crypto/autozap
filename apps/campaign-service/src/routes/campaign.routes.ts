@@ -173,7 +173,7 @@ router.post('/campaigns', async (req, res, next) => {
 
     const campaign = await campaignService.createCampaign({ tenantId: req.auth.tid, createdBy: req.auth.sub, channelId, curlTemplate, ...rest })
     res.status(201).json(ok(campaign))
-  } catch (err) { next(err) }
+  } catch (err: any) { console.error('CREATE CAMPAIGN ERROR:', err?.message || err); next(err) }
 })
 
 router.get('/campaigns/:id', async (req, res, next) => {
