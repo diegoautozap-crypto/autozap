@@ -105,7 +105,7 @@ export const campaignQueue = new Queue<CampaignJob>('campaign_queue', {
 
 const activeWorkers = new Map<string, Worker<CampaignJob>>()
 
-function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
+export function ensureTenantWorker(tenantId: string): Worker<CampaignJob> {
   if (activeWorkers.has(tenantId)) return activeWorkers.get(tenantId)!
   const queueName = `campaign_queue_tenant_${tenantId}`
   const worker = new Worker<CampaignJob>(queueName, processCampaignJob, { connection, concurrency: 1 })

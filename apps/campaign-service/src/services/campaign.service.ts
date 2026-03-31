@@ -3,7 +3,7 @@ import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
 import { sendCampaignCompletedEmail } from '../lib/email'
-import { getTenantCampaignQueue } from '../workers/campaign.worker'
+import { getTenantCampaignQueue, ensureTenantWorker } from '../workers/campaign.worker'
 
 export interface CreateCampaignInput {
   tenantId: string
@@ -177,7 +177,8 @@ export class CampaignService {
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
-    // ✅ Enfileira na fila isolada do tenant com copies e canais extras
+    // ✅ Garante que o worker do tenant está ativo antes de enfileirar
+    ensureTenantWorker(tenantId)
     const tenantQueue = getTenantCampaignQueue(tenantId)
     await tenantQueue.add(`campaign-${campaignId}`, {
       campaignId,
