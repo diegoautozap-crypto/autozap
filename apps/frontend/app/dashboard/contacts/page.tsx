@@ -194,11 +194,17 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const [error, setError] = useState('')
   const [step, setStep] = useState<'upload' | 'preview'>('upload')
   const [isDragging, setIsDragging] = useState(false)
+  const [importTagId, setImportTagId] = useState<string>('')
+
+  const { data: importTags = [] } = useQuery({
+    queryKey: ['tags-import'],
+    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
+  })
 
   const importMutation = useMutation({
     mutationFn: async () => {
       const payload = rows.map(r => ({ phone: String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, ''), name: r.nome || r.name || r.Name || r.Nome || '', email: r.email || r.Email || '', company: r.empresa || r.company || r.Company || r.Empresa || '' })).filter(r => r.phone.length >= 8)
-      const { data } = await contactApi.post('/contacts/import', { rows: payload }); return data
+      const { data } = await contactApi.post('/contacts/import', { rows: payload, tagId: importTagId || undefined }); return data
     },
     onSuccess: (data) => { toast.success(`${data?.data?.imported || rows.length} contatos importados!`); onSuccess(); onClose() },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
@@ -285,6 +291,23 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               </div>
             </div>
           </>)}
+          {step === 'preview' && importTags.length > 0 && (
+            <div style={{ marginTop: '14px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aplicar tag automaticamente (opcional)</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {importTags.map((tag: any) => {
+                  const sel = importTagId === tag.id
+                  return (
+                    <div key={tag.id} onClick={() => setImportTagId(sel ? '' : tag.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                      <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
         <div style={{ padding: '14px 24px', borderTop: '1px solid #f4f4f5', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           {step === 'preview' && <button onClick={() => { setStep('upload'); setRows([]) }} style={{ padding: '8px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>← Trocar arquivo</button>}

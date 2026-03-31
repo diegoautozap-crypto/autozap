@@ -230,15 +230,16 @@ export class ContactService {
 
   // ── Import CSV ────────────────────────────────────────────────────────────
 
-  async importContacts(tenantId: string, rows: any[]): Promise<{ created: number; skipped: number; errors: number }> {
-    let created = 0
+  async importContacts(tenantId: string, rows: any[], tagId?: string): Promise<{ imported: number; skipped: number; errors: number }> {
+    let imported = 0
     let skipped = 0
     let errors = 0
+    const createdIds: string[] = []
 
     for (const row of rows) {
       try {
         if (!row.phone) { errors++; continue }
-        await this.createContact({
+        const contact = await this.createContact({
           tenantId,
           phone: row.phone,
           name: row.name,
@@ -246,15 +247,33 @@ export class ContactService {
           company: row.company,
           origin: 'csv_import',
         })
-        created++
+        createdIds.push(contact.id)
+        imported++
       } catch (err: any) {
-        if (err.code === 'CONFLICT') skipped++
+        if (err.code === 'CONFLICT') {
+          skipped++
+          // Se tem tag, busca o contato existente para aplicar a tag também
+          if (tagId) {
+            const phone = normalizePhone(row.phone)
+            const { data: existing } = await db.from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
+            if (existing) createdIds.push(existing.id)
+          }
+        }
         else errors++
       }
     }
 
-    logger.info('CSV import completed', { tenantId, created, skipped, errors })
-    return { created, skipped, errors }
+    // Aplica tag a todos os contatos importados (novos + existentes)
+    if (tagId && createdIds.length > 0) {
+      const tagRows = createdIds.map(contactId => ({ contact_id: contactId, tag_id: tagId }))
+      const chunkSize = 500
+      for (let i = 0; i < tagRows.length; i += chunkSize) {
+        await db.from('contact_tags').upsert(tagRows.slice(i, i + chunkSize), { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
+      }
+    }
+
+    logger.info('CSV import completed', { tenantId, imported, skipped, errors, tagId })
+    return { imported, skipped, errors }
   }
 
   // ── Export CSV ────────────────────────────────────────────────────────────

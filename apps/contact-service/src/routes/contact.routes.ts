@@ -149,9 +149,9 @@ router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next)
 
 router.post('/contacts/import', async (req, res, next) => {
   try {
-    const { rows } = req.body
+    const { rows, tagId } = req.body
     if (!Array.isArray(rows)) throw new Error('rows must be an array')
-    const result = await contactService.importContacts(req.auth.tid, rows)
+    const result = await contactService.importContacts(req.auth.tid, rows, tagId)
     res.json(ok(result))
   } catch (err) { next(err) }
 })
