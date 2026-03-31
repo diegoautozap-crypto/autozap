@@ -106,7 +106,22 @@ export function startInboxWorker(): Worker<InboxJob> {
 
     await db.from('conversations').update({ last_message: body, last_message_at: new Date() }).eq('id', resolvedConversationId)
 
-    // Tag automática por campanha removida — tags são gerenciadas manualmente
+    // Adiciona tag automática com o nome da campanha
+    if (campaignId) {
+      const { data: campaign } = await db
+        .from('campaigns')
+        .select('name')
+        .eq('id', campaignId)
+        .single()
+
+      if (campaign?.name) {
+        const tagId = await getOrCreateCampaignTag(tenantId, campaignId, campaign.name)
+        if (tagId) {
+          await addTagToContact(resolvedContactId, tagId)
+          logger.info('InboxWorker: campaign tag added', { contactId: resolvedContactId, tagId, campaignName: campaign.name })
+        }
+      }
+    }
 
     logger.info('InboxWorker: completed', { phone: cleanPhone, contactId: resolvedContactId, conversationId: resolvedConversationId, campaignId })
   },
