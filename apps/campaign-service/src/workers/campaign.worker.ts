@@ -122,11 +122,13 @@ async function checkPlanLimit(tenantId: string): Promise<boolean> {
   } catch { return true }
 }
 
-interface ParsedCurl { apiKey: string; bodyTemplate: string }
+interface ParsedCurl { apiKey: string; bodyTemplate: string; url: string }
 
 function parseCurlTemplate(curlTemplate: string): ParsedCurl {
   const curlStr = curlTemplate.split('\n').map(l => l.trimEnd().replace(/\\$/, '')).join(' ').trim()
   const apiKey = curlStr.match(/apikey:\s*([^\s"'\\]+)/)?.[1] || ''
+  const urlMatch = curlStr.match(/https?:\/\/[^\s"']+/)
+  const url = urlMatch ? urlMatch[0].replace(/["']$/, '') : 'https://api.gupshup.io/wa/api/v1/template/msg'
   let bodyTemplate = ''
   const singleQ = curlStr.match(/-d\s+'([^']+)'/)
   const doubleQ = curlStr.match(/-d\s+"((?:[^"\\]|\\.)*)"/)
@@ -159,7 +161,7 @@ function parseCurlTemplate(curlTemplate: string): ParsedCurl {
     .replace(/\{\{phone\}\}/gi, '__PHONE__')
     .replace(/\{\{numero\}\}/gi, '__PHONE__')
     .replace(/\{\{telefone\}\}/gi, '__PHONE__')
-  return { apiKey, bodyTemplate }
+  return { apiKey, bodyTemplate, url }
 }
 
 async function sendViaFetch(
@@ -177,7 +179,7 @@ async function sendViaFetch(
         } catch (e) { logger.warn('Failed to replace template params', { error: (e as any).message }) }
       }
     }
-    const response = await fetch('https://api.gupshup.io/wa/api/v1/template/msg', {
+    const response = await fetch(parsed.url, {
       method: 'POST',
       headers: { 'apikey': parsed.apiKey, 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
       body,
@@ -215,6 +217,7 @@ async function processContact(
     const result = await sendViaFetch(parsed, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
+      logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed.url, hasBody: !!parsed.bodyTemplate })
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
