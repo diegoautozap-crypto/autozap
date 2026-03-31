@@ -78,7 +78,7 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
         onClick={e => e.stopPropagation()}
         onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
         draggable={false}>
-        <span style={{ fontSize: '11px', color: '#a1a1aa' }}>R$</span>
+        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>R$</span>
         <input
           autoFocus
           value={inputVal}
@@ -86,7 +86,7 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
           onBlur={() => commit()}
           onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
           placeholder="0"
-          style={{ width: '80px', fontSize: '12px', fontWeight: 600, border: 'none', borderBottom: '1.5px solid #22c55e', outline: 'none', background: 'transparent', color: '#18181b', padding: '1px 0' }}
+          style={{ width: '80px', fontSize: '12px', fontWeight: 600, border: 'none', borderBottom: '1.5px solid #22c55e', outline: 'none', background: 'transparent', color: 'var(--text)', padding: '1px 0' }}
         />
       </div>
     )
@@ -102,7 +102,7 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
       {value ? (
         <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(value)}</span>
       ) : (
-        <span style={{ fontSize: '11px', color: '#d4d4d8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-faintest)', display: 'flex', alignItems: 'center', gap: '3px' }}>
           <DollarSign size={10} /> valor
         </span>
       )}
@@ -128,11 +128,11 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
   const [open, setOpen] = useState(false)
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{ width: '22px', height: '22px', borderRadius: '50%', background: value, border: '2px solid #fff', boxShadow: '0 0 0 1px #e4e4e7', cursor: 'pointer', flexShrink: 0 }} />
+      <button onClick={() => setOpen(o => !o)} style={{ width: '22px', height: '22px', borderRadius: '50%', background: value, border: '2px solid var(--bg-card)', boxShadow: '0 0 0 1px var(--border)', cursor: 'pointer', flexShrink: 0 }} />
       {open && (
-        <div style={{ position: 'absolute', top: '28px', left: 0, zIndex: 50, background: '#fff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.1)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+        <div style={{ position: 'absolute', top: '28px', left: 0, zIndex: 50, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.1)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
           {COLOR_PRESETS.map(c => (
-            <button key={c} onClick={() => { onChange(c); setOpen(false) }} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: c === value ? '2px solid #18181b' : '2px solid transparent', cursor: 'pointer' }} />
+            <button key={c} onClick={() => { onChange(c); setOpen(false) }} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: c === value ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer' }} />
           ))}
         </div>
       )}
@@ -208,13 +208,13 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: '#fff', borderRadius: '14px', width: '460px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid #e4e4e7' }}>
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '460px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid var(--border)' }}>
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Gerenciar Colunas</h2>
-            <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '2px' }}>Arraste para reordenar, clique no nome para renomear</p>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Gerenciar Colunas</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>Arraste para reordenar, clique no nome para renomear</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', padding: '4px', display: 'flex' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {localCols.map((col, i) => {
@@ -223,19 +223,19 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
             return (
               <div key={col.id} style={{ marginBottom: '6px' }}>
                 <div draggable={!isPendingDelete} onDragStart={() => handleDragStart(i)} onDragEnter={() => handleDragEnter(i)} onDragEnd={handleDragEnd} onDragOver={e => e.preventDefault()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: isPendingDelete ? '8px 8px 0 0' : '8px', background: isPendingDelete ? '#fff5f5' : '#fafafa', border: `1px solid ${isPendingDelete ? '#fecaca' : '#f4f4f5'}`, cursor: 'grab' }}>
-                  <GripVertical size={14} color="#d4d4d8" style={{ flexShrink: 0 }} />
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: isPendingDelete ? '8px 8px 0 0' : '8px', background: isPendingDelete ? '#fff5f5' : 'var(--bg-input)', border: `1px solid ${isPendingDelete ? '#fecaca' : 'var(--bg)'}`, cursor: 'grab' }}>
+                  <GripVertical size={14} color="var(--text-faintest)" style={{ flexShrink: 0 }} />
                   <ColorPicker value={col.color} onChange={c => updateColor(col.id, c)} />
                   {editingId === col.id ? (
                     <input autoFocus value={editLabel} onChange={e => setEditLabel(e.target.value)} onBlur={() => commitEdit(col.id)} onKeyDown={e => { if (e.key === 'Enter') commitEdit(col.id); if (e.key === 'Escape') setEditingId(null) }}
-                      style={{ flex: 1, border: 'none', borderBottom: '1.5px solid #22c55e', background: 'transparent', fontSize: '13px', fontWeight: 600, color: '#18181b', outline: 'none', padding: '1px 0' }} />
+                      style={{ flex: 1, border: 'none', borderBottom: '1.5px solid #22c55e', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text)', outline: 'none', padding: '1px 0' }} />
                   ) : (
-                    <span onClick={() => !isPendingDelete && startEdit(col)} style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: isPendingDelete ? '#ef4444' : '#18181b', cursor: 'text' }}>{col.label}</span>
+                    <span onClick={() => !isPendingDelete && startEdit(col)} style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: isPendingDelete ? '#ef4444' : 'var(--text)', cursor: 'text' }}>{col.label}</span>
                   )}
-                  {cardCount > 0 && !isPendingDelete && <span style={{ fontSize: '11px', color: '#a1a1aa', marginRight: '2px' }}>{cardCount} conv.</span>}
-                  <button onClick={() => tryRemoveColumn(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPendingDelete ? '#ef4444' : '#d4d4d8', padding: '2px', borderRadius: '4px', display: 'flex' }}
+                  {cardCount > 0 && !isPendingDelete && <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginRight: '2px' }}>{cardCount} conv.</span>}
+                  <button onClick={() => tryRemoveColumn(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPendingDelete ? '#ef4444' : 'var(--text-faintest)', padding: '2px', borderRadius: '4px', display: 'flex' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = isPendingDelete ? '#ef4444' : '#d4d4d8'}>
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = isPendingDelete ? '#ef4444' : 'var(--text-faintest)'}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -244,7 +244,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
                     <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>⚠️ Esta coluna tem {cardCount} conversa{cardCount !== 1 ? 's' : ''}</p>
                     <p style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', lineHeight: '1.4' }}>Ao excluir, essas conversas ficam invisíveis no pipeline.</p>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => setPendingDeleteId(null)} style={{ flex: 1, padding: '6px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
+                      <button onClick={() => setPendingDeleteId(null)} style={{ flex: 1, padding: '6px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
                       <button onClick={() => confirmRemoveColumn(col.id)} style={{ flex: 1, padding: '6px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Excluir mesmo assim</button>
                     </div>
                   </div>
@@ -252,18 +252,18 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
               </div>
             )
           })}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 10px', marginTop: '4px', borderRadius: '8px', border: '1.5px dashed #e4e4e7', background: '#fafafa' }}>
-            <GripVertical size={14} color="#e4e4e7" style={{ flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 10px', marginTop: '4px', borderRadius: '8px', border: '1.5px dashed var(--border)', background: 'var(--bg-input)' }}>
+            <GripVertical size={14} color="var(--border)" style={{ flexShrink: 0 }} />
             <ColorPicker value={newColor} onChange={setNewColor} />
             <input placeholder="Nome da nova coluna…" value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addColumn() }}
-              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', color: '#18181b', outline: 'none' }} />
+              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', color: 'var(--text)', outline: 'none' }} />
             <button onClick={addColumn} style={{ background: '#22c55e', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', padding: '4px 10px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Plus size={12} /> Add
             </button>
           </div>
         </div>
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #f4f4f5', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>Cancelar</button>
           <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
             {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
             Salvar
@@ -476,17 +476,17 @@ export default function PipelinePage() {
   }
 
   return (
-    <div className="mobile-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#f4f4f5' }}>
+    <div className="mobile-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
 
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid #e4e4e7', background: '#fff', flexShrink: 0 }}>
+      <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}>
         <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Pipeline</h1>
+            <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Pipeline</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
-              <p style={{ color: '#a1a1aa', fontSize: '13px' }}>{totalConvs} conversas</p>
+              <p style={{ color: 'var(--text-faint)', fontSize: '13px' }}>{totalConvs} conversas</p>
               {totalValue > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#d4d4d8' }} />
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-faintest)' }} />
                   <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(totalValue)} em negociação</p>
                 </div>
               )}
@@ -494,25 +494,25 @@ export default function PipelinePage() {
           </div>
           <div className="mobile-header-actions mobile-wrap" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(channels as any[]).length > 1 && (
-              <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+              <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todos os canais</option>
                 {(channels as any[]).map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
             )}
             {(campaigns as any[]).length > 0 && (
-              <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+              <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">Todas as campanhas</option>
                 {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
-            <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
+            <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
               <Settings2 size={13} /> Colunas
             </button>
-            <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}>
+            <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
               <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> Atualizar
             </button>
             <button onClick={async () => {
@@ -536,9 +536,9 @@ export default function PipelinePage() {
               const { exportToExcel } = await import('@/lib/export')
               exportToExcel(rows, 'pipeline_funil', 'Pipeline')
               toast.success(`${rows.length} registros exportados!`)
-            }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}>
+            }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
               <DollarSign size={13} /> Exportar Excel
             </button>
           </div>
@@ -546,11 +546,11 @@ export default function PipelinePage() {
 
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => { setSelectedPipelineId(null); setLocalStages(null); localBoardRef.current = null }}
-            style={{ padding: '5px 14px', borderRadius: '99px', fontSize: '13px', fontWeight: selectedPipelineId === null ? 700 : 500, cursor: 'pointer', border: 'none', background: selectedPipelineId === null ? '#18181b' : '#f4f4f5', color: selectedPipelineId === null ? '#fff' : '#71717a', transition: 'all 0.15s' }}>
+            style={{ padding: '5px 14px', borderRadius: '99px', fontSize: '13px', fontWeight: selectedPipelineId === null ? 700 : 500, cursor: 'pointer', border: 'none', background: selectedPipelineId === null ? 'var(--text)' : 'var(--bg)', color: selectedPipelineId === null ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}>
             Principal
           </button>
           {(pipelines as any[]).map((p: any) => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '99px', background: selectedPipelineId === p.id ? '#18181b' : '#f4f4f5', cursor: 'pointer', transition: 'all 0.15s' }}
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '99px', background: selectedPipelineId === p.id ? 'var(--text)' : 'var(--bg)', cursor: 'pointer', transition: 'all 0.15s' }}
               onClick={() => { setSelectedPipelineId(p.id); setLocalStages(null); localBoardRef.current = null }}>
               {editingPipelineId === p.id ? (
                 <input autoFocus value={editingPipelineName} onChange={e => setEditingPipelineName(e.target.value)}
@@ -559,12 +559,12 @@ export default function PipelinePage() {
                   onClick={e => e.stopPropagation()}
                   style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 700, color: '#fff', outline: 'none', width: '100px' }} />
               ) : (
-                <span style={{ fontSize: '13px', fontWeight: selectedPipelineId === p.id ? 700 : 500, color: selectedPipelineId === p.id ? '#fff' : '#71717a' }}>{p.name}</span>
+                <span style={{ fontSize: '13px', fontWeight: selectedPipelineId === p.id ? 700 : 500, color: selectedPipelineId === p.id ? '#fff' : 'var(--text-muted)' }}>{p.name}</span>
               )}
               {selectedPipelineId === p.id && !editingPipelineId && (
                 <>
-                  <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}><Pencil size={11} /></button>
-                  <button onClick={e => { e.stopPropagation(); if (confirm(`Remover pipeline "${p.name}"?`)) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}><X size={11} /></button>
+                  <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><Pencil size={11} /></button>
+                  <button onClick={e => { e.stopPropagation(); if (confirm(`Remover pipeline "${p.name}"?`)) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><X size={11} /></button>
                 </>
               )}
             </div>
@@ -573,14 +573,14 @@ export default function PipelinePage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
               <input autoFocus placeholder="Nome da pipeline…" value={newPipelineName} onChange={e => setNewPipelineName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()); if (e.key === 'Escape') { setShowNewPipeline(false); setNewPipelineName('') } }}
-                style={{ border: 'none', background: 'transparent', fontSize: '13px', color: '#18181b', outline: 'none', width: '130px' }} />
+                style={{ border: 'none', background: 'transparent', fontSize: '13px', color: 'var(--text)', outline: 'none', width: '130px' }} />
               <button onClick={() => { if (newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()) }} style={{ background: '#22c55e', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><Check size={10} color="#fff" strokeWidth={3} /></button>
-              <button onClick={() => { setShowNewPipeline(false); setNewPipelineName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: '#a1a1aa', display: 'flex' }}><X size={12} /></button>
+              <button onClick={() => { setShowNewPipeline(false); setNewPipelineName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }}><X size={12} /></button>
             </div>
           ) : (
-            <button onClick={() => setShowNewPipeline(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'none', border: '1.5px dashed #e4e4e7', fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', transition: 'all 0.15s' }}
+            <button onClick={() => setShowNewPipeline(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'none', border: '1.5px dashed var(--border)', fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
               <Plus size={12} /> Nova pipeline
             </button>
           )}
@@ -589,7 +589,7 @@ export default function PipelinePage() {
 
       {(isLoading || colsLoading) ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
+          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} />
         </div>
       ) : (
         <div className="pipeline-board" ref={boardScrollRef} onMouseDown={handleBoardMouseDown}
@@ -605,7 +605,7 @@ export default function PipelinePage() {
                   onDragOver={e => { if (draggingColKey) handleColDragOver(e, stage.key); else handleDragOver(e, stage.key) }}
                   onDrop={e => { if (draggingColKey) handleColDrop(e, stage.key); else handleDrop(e, stage.key) }}
                   onDragLeave={() => { setOverStage(null); setOverColKey(null) }}
-                  style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: isOver ? stage.bg : '#fff', border: `1px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : '#e4e4e7'}`, borderRadius: '12px', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s, opacity 0.15s', opacity: draggingColKey === stage.key ? 0.4 : 1, boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+                  style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: isOver ? stage.bg : 'var(--bg-card)', border: `1px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s, opacity 0.15s', opacity: draggingColKey === stage.key ? 0.4 : 1, boxShadow: 'var(--shadow)' }}>
 
                   {/* ── Header da coluna com total monetário ── */}
                   <div data-col-header draggable onDragStart={e => handleColDragStart(e, stage.key)} onDragEnd={handleColDragEnd}
@@ -628,8 +628,8 @@ export default function PipelinePage() {
                   <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {cards.length === 0 ? (
                       <div style={{ padding: '24px 10px', textAlign: 'center' }}>
-                        <MessageSquare size={18} color="#d4d4d8" style={{ margin: '0 auto 6px' }} />
-                        <p style={{ fontSize: '12px', color: '#d4d4d8' }}>Sem conversas</p>
+                        <MessageSquare size={18} color="var(--text-faintest)" style={{ margin: '0 auto 6px' }} />
+                        <p style={{ fontSize: '12px', color: 'var(--text-faintest)' }}>Sem conversas</p>
                       </div>
                     ) : cards.map((conv: any) => {
                       const name = conv.contacts?.name || conv.contacts?.phone || '??'
@@ -638,15 +638,15 @@ export default function PipelinePage() {
                       const currentValue = dealValues[conv.id] !== undefined ? dealValues[conv.id] : conv.deal_value
                       return (
                         <div key={conv.id} draggable data-card onDragStart={e => handleDragStart(e, conv.id)} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
-                          style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : '0 1px 2px rgba(0,0,0,.04)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : 'var(--shadow)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
                           onMouseEnter={e => { if (!isDragging) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(0,0,0,.04)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
+                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#18181b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
-                          {conv.last_message && <p style={{ fontSize: '11px', color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
+                          {conv.last_message && <p style={{ fontSize: '11px', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
 
                           {/* ── Tarefas pendentes ── */}
                           {tasksByConv[conv.id] && (() => {
@@ -691,10 +691,10 @@ export default function PipelinePage() {
             })}
             {stages.length === 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                <div style={{ textAlign: 'center', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '40px 48px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-                  <Settings2 size={28} color="#d4d4d8" style={{ margin: '0 auto 12px' }} />
-                  <p style={{ fontSize: '14px', color: '#71717a', fontWeight: 500, marginBottom: '4px' }}>Nenhuma coluna configurada</p>
-                  <p style={{ fontSize: '13px', color: '#a1a1aa', marginBottom: '16px' }}>Crie colunas para organizar suas conversas</p>
+                <div style={{ textAlign: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '40px 48px', boxShadow: 'var(--shadow)' }}>
+                  <Settings2 size={28} color="var(--text-faintest)" style={{ margin: '0 auto 12px' }} />
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '4px' }}>Nenhuma coluna configurada</p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-faint)', marginBottom: '16px' }}>Crie colunas para organizar suas conversas</p>
                   <button onClick={() => setShowManage(true)} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Criar colunas</button>
                 </div>
               </div>

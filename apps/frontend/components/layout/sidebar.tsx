@@ -7,22 +7,24 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon,
+  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon, Moon, Sun, Globe,
 } from 'lucide-react'
+import { useThemeStore } from '@/lib/theme'
+import { useI18nStore, useT, LOCALES } from '@/lib/i18n'
 
 const ALL_NAV = [
-  { href: '/dashboard',           label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },
-  { href: '/dashboard/templates', label: 'Templates',  icon: FileText },
-  { href: '/dashboard/contacts',  label: 'CRM',        icon: Users },
-  { href: '/dashboard/inbox',     label: 'Inbox',      icon: MessageSquare },
-  { href: '/dashboard/pipeline',  label: 'Pipeline',   icon: Kanban },
-  { href: '/dashboard/flows',     label: 'Flows',      icon: Workflow },
-  { href: '/dashboard/tasks',     label: 'Tarefas',    icon: CheckSquare },
-  { href: '/dashboard/channels',  label: 'Canais',     icon: Radio },
-  { href: '/dashboard/team',      label: 'Equipe',     icon: UserCog },
-  { href: '/dashboard/errors',    label: 'Erros',      icon: AlertCircle },
-  { href: '/dashboard/settings',  label: 'Plano',      icon: Settings },
+  { href: '/dashboard',           labelKey: 'nav.dashboard',  icon: LayoutDashboard },
+  { href: '/dashboard/campaigns', labelKey: 'nav.campaigns',  icon: Megaphone },
+  { href: '/dashboard/templates', labelKey: 'nav.templates',  icon: FileText },
+  { href: '/dashboard/contacts',  labelKey: 'nav.contacts',   icon: Users },
+  { href: '/dashboard/inbox',     labelKey: 'nav.inbox',      icon: MessageSquare },
+  { href: '/dashboard/pipeline',  labelKey: 'nav.pipeline',   icon: Kanban },
+  { href: '/dashboard/flows',     labelKey: 'nav.flows',      icon: Workflow },
+  { href: '/dashboard/tasks',     labelKey: 'nav.tasks',      icon: CheckSquare },
+  { href: '/dashboard/channels',  labelKey: 'nav.channels',   icon: Radio },
+  { href: '/dashboard/team',      labelKey: 'nav.team',       icon: UserCog },
+  { href: '/dashboard/errors',    labelKey: 'nav.errors',     icon: AlertCircle },
+  { href: '/dashboard/settings',  labelKey: 'nav.settings',   icon: Settings },
 ]
 
 const ADMIN_PAGES = ALL_NAV.map(n => n.href)
@@ -68,6 +70,9 @@ export function Sidebar() {
   const router   = useRouter()
   const { logout, user, updateUser } = useAuthStore()
   const roleFromStore = (user as any)?.role || 'agent'
+  const t = useT()
+  const { theme, toggle: toggleTheme } = useThemeStore()
+  const { locale, setLocale } = useI18nStore()
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
   const [currentRole, setCurrentRole]   = useState<string>(roleFromStore)
@@ -166,7 +171,8 @@ export function Sidebar() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {nav.map(({ href, label, icon: Icon }) => {
+            {nav.map(({ href, labelKey, icon: Icon }) => {
+              const label = t(labelKey)
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               const isError  = href === '/dashboard/errors'
 
@@ -214,6 +220,21 @@ export function Sidebar() {
 
       {isAdmin && <UsageBar />}
 
+      {/* Tema + Idioma */}
+      <div style={{ padding: '4px 8px', display: 'flex', gap: '4px' }}>
+        <button onClick={toggleTheme}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '7px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 500, transition: 'all 0.12s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}>
+          {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+          {theme === 'dark' ? t('settings.themeLight') : t('settings.themeDark')}
+        </button>
+        <select value={locale} onChange={e => setLocale(e.target.value as any)}
+          style={{ flex: 1, padding: '7px 4px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 500, outline: 'none', appearance: 'none', textAlign: 'center' }}>
+          {LOCALES.map(l => <option key={l.code} value={l.code} style={{ background: '#161b27', color: '#fff' }}>{l.label}</option>)}
+        </select>
+      </div>
+
       {/* Logout */}
       <div style={{ padding: '8px 8px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <button
@@ -239,7 +260,7 @@ export function Sidebar() {
           }}
         >
           <LogOut size={15} strokeWidth={1.8} />
-          <span>Sair</span>
+          <span>{t('nav.logout')}</span>
         </button>
       </div>
 

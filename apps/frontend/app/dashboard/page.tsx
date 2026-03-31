@@ -39,19 +39,19 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
   const pct = Math.round((completedCount / steps.length) * 100)
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: 'var(--shadow)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Zap size={15} color="#22c55e" fill="#22c55e" />
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.01em' }}>Configure o AutoZap</h3>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Configure o AutoZap</h3>
             <span style={{ fontSize: '11px', fontWeight: 600, background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: '99px', border: '1px solid #bbf7d0' }}>{completedCount}/{steps.length} concluídos</span>
           </div>
-          <p style={{ fontSize: '13px', color: '#a1a1aa' }}>Siga os passos abaixo para começar a disparar campanhas</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Siga os passos abaixo para começar a disparar campanhas</p>
         </div>
         <span style={{ fontSize: '13px', fontWeight: 700, color: '#22c55e' }}>{pct}%</span>
       </div>
-      <div style={{ height: '4px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden', marginBottom: '20px' }}>
+      <div style={{ height: '4px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden', marginBottom: '20px' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: '#22c55e', borderRadius: '99px', transition: 'width 0.4s ease' }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
@@ -59,17 +59,17 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
           const Icon = step.icon
           const isNext = !step.done && steps.slice(0, idx).every(s => s.done)
           return (
-            <div key={step.id} style={{ border: `1px solid ${step.done ? '#bbf7d0' : isNext ? '#22c55e' : '#e4e4e7'}`, borderRadius: '10px', padding: '14px', background: step.done ? '#f0fdf4' : '#fff', opacity: !step.done && !isNext ? 0.55 : 1 }}>
+            <div key={step.id} style={{ border: `1px solid ${step.done ? '#bbf7d0' : isNext ? '#22c55e' : 'var(--border)'}`, borderRadius: '10px', padding: '14px', background: step.done ? '#f0fdf4' : 'var(--bg-card)', opacity: !step.done && !isNext ? 0.55 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: step.done ? '#dcfce7' : isNext ? '#f0fdf4' : '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {step.done ? <Check size={15} color="#22c55e" /> : <Icon size={15} color={isNext ? '#22c55e' : '#a1a1aa'} />}
+                <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: step.done ? '#dcfce7' : isNext ? '#f0fdf4' : 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {step.done ? <Check size={15} color="#22c55e" /> : <Icon size={15} color={isNext ? '#22c55e' : 'var(--text-faint)'} />}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: step.done ? '#15803d' : '#18181b', margin: '0 0 2px', letterSpacing: '-0.01em' }}>{step.label}</p>
-                  <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '0 0 10px', lineHeight: 1.5 }}>{step.desc}</p>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: step.done ? '#15803d' : 'var(--text)', margin: '0 0 2px', letterSpacing: '-0.01em' }}>{step.label}</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '0 0 10px', lineHeight: 1.5 }}>{step.desc}</p>
                   {!step.done && (
                     <button onClick={() => router.push(step.href)} disabled={!isNext}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '5px 10px', background: isNext ? '#22c55e' : '#f4f4f5', color: isNext ? '#fff' : '#a1a1aa', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: isNext ? 'pointer' : 'not-allowed' }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '5px 10px', background: isNext ? '#22c55e' : 'var(--bg)', color: isNext ? '#fff' : 'var(--text-faint)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: isNext ? 'pointer' : 'not-allowed' }}>
                       {step.btnLabel} {isNext && <ChevronRight size={12} />}
                     </button>
                   )}
@@ -86,33 +86,33 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
 function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }: any) {
   return (
     <div onClick={onClick}
-      style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--shadow)' }}
       onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = '0 4px 16px rgba(0,0,0,.08)'; el.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = '0 1px 3px rgba(0,0,0,.04)'; el.style.transform = 'translateY(0)' }}>
+      onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'var(--shadow)'; el.style.transform = 'translateY(0)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
         <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={17} color={color} strokeWidth={2} />
         </div>
-        <ArrowUpRight size={13} color="#d4d4d8" />
+        <ArrowUpRight size={13} color="var(--text-faintest)" />
       </div>
-      <div style={{ fontSize: '26px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '4px' }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
-      <div style={{ fontSize: '13px', color: '#52525b', fontWeight: 500, marginBottom: '2px' }}>{label}</div>
-      <div style={{ fontSize: '12px', color: '#a1a1aa' }}>{sub}</div>
+      <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '4px' }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
+      <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '2px' }}>{label}</div>
+      <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{sub}</div>
     </div>
   )
 }
 
 function StatCard({ label, value, icon: Icon, color, bg, onClick }: any) {
   return (
-    <div onClick={onClick} style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,.04)', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s' }}
+    <div onClick={onClick} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s' }}
       onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.04)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
       <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <Icon size={18} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>{value}</div>
-        <div style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '1px' }}>{label}</div>
+        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '1px' }}>{label}</div>
       </div>
     </div>
   )
@@ -171,8 +171,8 @@ export default function DashboardPage() {
 
       {/* Saudação */}
       <div className="mobile-header" style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
-        <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
+        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
       </div>
 
       <OnboardingBanner channels={channels || []} templates={templates || []} campaigns={campaigns || []} />
@@ -197,11 +197,11 @@ export default function DashboardPage() {
 
       {/* Seletor de atendente (só owner/admin) */}
       {(role === 'owner' || role === 'admin') && (
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <UserCheck size={15} color="#a1a1aa" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#52525b' }}>Ver desempenho de:</span>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: 'var(--shadow)' }}>
+          <UserCheck size={15} color="var(--text-faint)" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>Ver desempenho de:</span>
           <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
-            style={{ padding: '6px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#18181b', outline: 'none', cursor: 'pointer', minWidth: '200px' }}>
+            style={{ padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer', minWidth: '200px' }}>
             <option value="">Toda a equipe</option>
             {(teamMembers || []).map((m: any) => (
               <option key={m.id} value={m.id}>{m.name || m.email}</option>
@@ -209,9 +209,9 @@ export default function DashboardPage() {
           </select>
           {selectedAgent && (
             <button onClick={() => setSelectedAgent('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#18181b'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa'}>
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}>
               <X size={13} /> Limpar
             </button>
           )}
@@ -237,19 +237,19 @@ export default function DashboardPage() {
       {/* Gráfico + Conversas por atendente */}
       <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '14px', marginBottom: '20px' }}>
         {/* Gráfico de barras */}
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#18181b', margin: 0, letterSpacing: '-0.01em' }}>Mensagens enviadas</h3>
-              <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '2px 0 0' }}>Últimos 30 dias</p>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Mensagens enviadas</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos 30 dias</p>
             </div>
-            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: '#a1a1aa' }}>
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: 'var(--text-faint)' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> Enviadas
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '140px', paddingBottom: '24px', position: 'relative' }}>
             {[0.25, 0.5, 0.75, 1].map(p => (
-              <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 116}px`, borderTop: '1px dashed #f4f4f5', zIndex: 0 }} />
+              <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 116}px`, borderTop: '1px dashed var(--divider)', zIndex: 0 }} />
             ))}
             {days.map((day, i) => {
               const sent = byDay[day]?.sent || 0
@@ -259,22 +259,22 @@ export default function DashboardPage() {
                     style={{ width: '100%', maxWidth: '18px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#22c55e', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#16a34a'}
                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#22c55e'} />
-                  {i % 5 === 0 && <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: '#d4d4d8', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>}
+                  {i % 5 === 0 && <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: 'var(--text-faintest)', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>}
                 </div>
               )
             })}
           </div>
-          {totalSent === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: '#a1a1aa', fontSize: '13px' }}>Nenhuma mensagem enviada nos últimos 30 dias</div>}
+          {totalSent === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Nenhuma mensagem enviada nos últimos 30 dias</div>}
         </div>
 
         {/* Conversas por atendente */}
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
           <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#18181b', margin: 0, letterSpacing: '-0.01em' }}>Por atendente</h3>
-            <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '2px 0 0' }}>Conversas abertas atribuídas</p>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Por atendente</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Conversas abertas atribuídas</p>
           </div>
           {byAgent.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: '#a1a1aa', fontSize: '13px' }}>Nenhuma conversa atribuída</div>
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Nenhuma conversa atribuída</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {byAgent.map((agent, i) => {
@@ -285,10 +285,10 @@ export default function DashboardPage() {
                 return (
                   <div key={agent.name}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '13px', color: '#52525b', fontWeight: 500 }}>{agent.name}</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>{agent.name}</span>
                       <span style={{ fontSize: '13px', fontWeight: 700, color }}>{agent.count}</span>
                     </div>
-                    <div style={{ height: '5px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ height: '5px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
                     </div>
                   </div>
@@ -300,10 +300,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Acesso rápido */}
-      <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
           <TrendingUp size={14} color="#22c55e" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#52525b' }}>Acesso rápido</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>Acesso rápido</span>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
@@ -313,9 +313,9 @@ export default function DashboardPage() {
             { label: 'Ver plano',         href: '/dashboard/settings',  primary: false, roles: ['owner', 'admin'] },
           ].filter(item => item.roles.includes(role)).map(({ label, href, primary }) => (
             <button key={href} onClick={() => router.push(href)}
-              style={{ padding: '8px 16px', background: primary ? '#22c55e' : '#fafafa', border: primary ? 'none' : '1px solid #e4e4e7', borderRadius: '8px', color: primary ? '#fff' : '#52525b', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.1s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#16a34a' : '#f4f4f5' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#22c55e' : '#fafafa' }}>
+              style={{ padding: '8px 16px', background: primary ? '#22c55e' : 'var(--bg-input)', border: primary ? 'none' : '1px solid var(--border)', borderRadius: '8px', color: primary ? '#fff' : 'var(--text-muted)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.1s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#16a34a' : 'var(--bg)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = primary ? '#22c55e' : 'var(--bg-input)' }}>
               {label}
             </button>
           ))}

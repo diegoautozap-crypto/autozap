@@ -2,36 +2,67 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg:            #f6f8fa;
-  --bg-secondary:  #ffffff;
+  --bg:            #f4f4f5;
   --bg-card:       #ffffff;
-  --bg-card-hover: #f9fafb;
+  --bg-card-hover: #fafafa;
+  --bg-input:      #fafafa;
 
-  --sidebar-bg:          #ffffff;
-  --sidebar-hover:       #f3f4f6;
-  --sidebar-active:      #16a34a;
-  --sidebar-text:        #6b7280;
-  --sidebar-text-active: #111827;
+  --sidebar-bg:    #161b27;
 
-  --content-bg:  #f6f8fa;
-  --card-bg:     #ffffff;
-  --card-border: #e5e7eb;
+  --text:          #18181b;
+  --text-muted:    #71717a;
+  --text-faint:    #a1a1aa;
+  --text-faintest: #d4d4d8;
 
-  --text:       #111827;
-  --text-muted: #6b7280;
-  --text-faint: #9ca3af;
+  --accent:        #22c55e;
+  --accent-hover:  #16a34a;
+  --accent-light:  #f0fdf4;
+  --accent-fg:     #ffffff;
 
-  --accent:       #16a34a;
-  --accent-light: #dcfce7;
-  --accent-hover: #15803d;
-  --accent-fg:    #ffffff;
+  --border:        #e4e4e7;
+  --divider:       #f4f4f5;
+  --radius:        8px;
+  --shadow:        0 1px 3px rgba(0,0,0,.06);
+  --shadow-md:     0 4px 12px rgba(0,0,0,.08);
 
-  --border:   #e5e7eb;
-  --input-bg: #ffffff;
-  --radius:   8px;
-  --shadow:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md:0 4px 16px rgba(0,0,0,.08);
-  --shadow-lg:0 8px 32px rgba(0,0,0,.10);
+  --danger:        #ef4444;
+  --danger-bg:     #fef2f2;
+  --warning:       #d97706;
+  --warning-bg:    #fffbeb;
+  --info:          #2563eb;
+  --info-bg:       #eff6ff;
+}
+
+html.dark {
+  --bg:            #09090b;
+  --bg-card:       #18181b;
+  --bg-card-hover: #27272a;
+  --bg-input:      #27272a;
+
+  --sidebar-bg:    #09090b;
+
+  --text:          #fafafa;
+  --text-muted:    #a1a1aa;
+  --text-faint:    #71717a;
+  --text-faintest: #52525b;
+
+  --accent:        #22c55e;
+  --accent-hover:  #16a34a;
+  --accent-light:  #052e16;
+  --accent-fg:     #ffffff;
+
+  --border:        #27272a;
+  --divider:       #1e1e22;
+  --radius:        8px;
+  --shadow:        0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:     0 4px 12px rgba(0,0,0,.4);
+
+  --danger:        #f87171;
+  --danger-bg:     #450a0a;
+  --warning:       #fbbf24;
+  --warning-bg:    #451a03;
+  --info:          #60a5fa;
+  --info-bg:       #172554;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

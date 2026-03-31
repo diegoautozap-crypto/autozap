@@ -8,12 +8,12 @@ import { Plus, X, Check, Loader2, Pencil, Trash2, FileText, ChevronDown } from '
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fff', border: '1px solid #e5e7eb',
-  borderRadius: '6px', fontSize: '14px', outline: 'none', color: '#111827',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: '6px', fontSize: '14px', outline: 'none', color: 'var(--text)',
 }
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '12px', fontWeight: 600,
-  color: '#6b7280', marginBottom: '5px',
+  color: 'var(--text-muted)', marginBottom: '5px',
   textTransform: 'uppercase', letterSpacing: '0.04em',
 }
 
@@ -128,8 +128,8 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>Templates</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '3px' }}>Gerencie seus templates aprovados do WhatsApp</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Templates</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '3px' }}>Gerencie seus templates aprovados do WhatsApp</p>
         </div>
         <button
           className="mobile-header-actions"
@@ -165,12 +165,12 @@ export default function TemplatesPage() {
 
       {/* Form criar/editar */}
       {showForm && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <h3 style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)' }}>
               {editingId ? '✏️ Editar template' : 'Novo template'}
             </h3>
-            <button onClick={closeForm} style={{ background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', padding: '4px', display: 'flex' }}>
+            <button onClick={closeForm} style={{ background: 'var(--bg)', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}>
               <X size={16} />
             </button>
           </div>
@@ -201,7 +201,7 @@ export default function TemplatesPage() {
             <div style={{ display: 'flex', gap: '8px' }}>
               {CATEGORIES.map(c => (
                 <button key={c.value} onClick={() => setForm({ ...form, category: c.value })}
-                  style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${form.category === c.value ? c.color : '#e5e7eb'}`, background: form.category === c.value ? c.bg : '#fff', color: form.category === c.value ? c.color : '#6b7280', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  style={{ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${form.category === c.value ? c.color : 'var(--border)'}`, background: form.category === c.value ? c.bg : 'var(--bg-card)', color: form.category === c.value ? c.color : 'var(--text-muted)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                   {c.label}
                 </button>
               ))}
@@ -216,7 +216,7 @@ export default function TemplatesPage() {
               value={form.body}
               onChange={e => setForm({ ...form, body: e.target.value })}
             />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Use {'{{1}}'}, {'{{2}}'}, etc. para marcar as variáveis</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Use {'{{1}}'}, {'{{2}}'}, etc. para marcar as variáveis</p>
           </div>
 
           <div style={{ marginBottom: '18px' }}>
@@ -227,7 +227,7 @@ export default function TemplatesPage() {
               value={form.variables}
               onChange={e => setForm({ ...form, variables: e.target.value })}
             />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>
               Esses nomes ajudam a identificar o que colocar em cada coluna do CSV
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function TemplatesPage() {
               {isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               {editingId ? 'Salvar alterações' : 'Criar template'}
             </button>
-            <button onClick={closeForm} style={{ padding: '9px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+            <button onClick={closeForm} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
               Cancelar
             </button>
           </div>
@@ -250,12 +250,12 @@ export default function TemplatesPage() {
       {/* Lista de templates */}
       {isLoading ? (
         <div style={{ padding: '60px', textAlign: 'center' }}>
-          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d1d5db' }} />
+          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} />
         </div>
       ) : templates?.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
-          <FileText size={32} color="#e5e7eb" style={{ margin: '0 auto 12px' }} />
-          <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '14px' }}>Nenhum template cadastrado ainda</p>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
+          <FileText size={32} color="var(--border)" style={{ margin: '0 auto 12px' }} />
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '14px' }}>Nenhum template cadastrado ainda</p>
           <button onClick={() => setShowForm(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Novo template
           </button>
@@ -267,7 +267,7 @@ export default function TemplatesPage() {
             const channelName = channels?.find((c: any) => c.id === t.channel_id)?.name
             const isExpanded = expandedId === t.id
             return (
-              <div key={t.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+              <div key={t.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer' }}
                   onClick={() => setExpandedId(isExpanded ? null : t.id)}>
@@ -276,42 +276,42 @@ export default function TemplatesPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <p style={{ fontWeight: 600, fontSize: '14px', color: '#111827', margin: 0 }}>{t.name}</p>
+                      <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', margin: 0 }}>{t.name}</p>
                       <span style={{ fontSize: '10px', fontWeight: 600, color: cat.color, background: cat.bg, padding: '1px 6px', borderRadius: '4px' }}>{cat.label}</span>
-                      {channelName && <span style={{ fontSize: '10px', color: '#9ca3af', background: '#f3f4f6', padding: '1px 6px', borderRadius: '4px' }}>{channelName}</span>}
+                      {channelName && <span style={{ fontSize: '10px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '1px 6px', borderRadius: '4px' }}>{channelName}</span>}
                     </div>
-                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       ID: {t.template_id}
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button
                       onClick={e => { e.stopPropagation(); openEdit(t) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={e => { e.stopPropagation(); if (confirm('Remover template?')) deleteMutation.mutate(t.id) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', borderRadius: '4px' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Trash2 size={14} />
                     </button>
-                    <ChevronDown size={14} color="#9ca3af" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                    <ChevronDown size={14} color="var(--text-faint)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                   </div>
                 </div>
                 {isExpanded && (
-                  <div style={{ padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' }}>
+                  <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--divider)' }}>
                     <div style={{ paddingTop: '12px' }}>
-                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Mensagem</p>
-                      <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '12px 14px' }}>
-                        <p style={{ fontSize: '13px', color: '#111827', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{t.body}</p>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Mensagem</p>
+                      <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '12px 14px' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{t.body}</p>
                       </div>
                       {t.variables?.length > 0 && (
                         <div style={{ marginTop: '12px' }}>
-                          <p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Variáveis</p>
+                          <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Variáveis</p>
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             {t.variables.map((v: string, i: number) => (
                               <span key={i} style={{ fontSize: '12px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 10px', borderRadius: '4px', fontWeight: 500 }}>

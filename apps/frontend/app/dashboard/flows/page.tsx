@@ -133,8 +133,8 @@ const COOLDOWN_OPTIONS = [
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fafafa', border: '1px solid #e4e4e7',
-  borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b',
+  background: 'var(--bg-input)', border: '1px solid var(--border)',
+  borderRadius: '8px', fontSize: '14px', outline: 'none', color: 'var(--text)',
   transition: 'border-color 0.15s, background 0.15s',
 }
 
@@ -148,13 +148,13 @@ function CooldownSelector({ value, onChange }: { value: string; onChange: (v: st
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {COOLDOWN_OPTIONS.map(opt => (
         <div key={opt.value} onClick={() => onChange(opt.value)}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${value === opt.value ? '#22c55e' : '#e4e4e7'}`, background: value === opt.value ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
-          <div style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === opt.value ? '#22c55e' : '#d4d4d8'}`, background: value === opt.value ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${value === opt.value ? '#22c55e' : 'var(--border)'}`, background: value === opt.value ? '#f0fdf4' : 'var(--bg-input)', transition: 'all 0.1s' }}>
+          <div style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === opt.value ? '#22c55e' : 'var(--text-faintest)'}`, background: value === opt.value ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {value === opt.value && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />}
           </div>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: value === opt.value ? '#15803d' : '#18181b' }}>{opt.label}</div>
-            <div style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '1px' }}>{opt.desc}</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: value === opt.value ? '#15803d' : 'var(--text)' }}>{opt.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '1px' }}>{opt.desc}</div>
           </div>
         </div>
       ))}
@@ -236,8 +236,8 @@ export default function FlowsPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>Flows</h1>
-          <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Flows</h1>
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>Automações visuais com múltiplos passos</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => setShowTemplates(true)}
@@ -255,14 +255,14 @@ export default function FlowsPage() {
 
       {/* Form novo flow */}
       {showNew && (
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#18181b', marginBottom: '14px', letterSpacing: '-0.01em' }}>Novo flow</h3>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '14px', letterSpacing: '-0.01em' }}>Novo flow</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div>
               <label style={labelStyle}>Nome *</label>
               <input style={inputStyle} placeholder="Ex: Boas-vindas com qualificação" value={newName} onChange={e => setNewName(e.target.value)} autoFocus
-                onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
-                onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }} />
+                onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
             </div>
             <div>
               <label style={labelStyle}>Canal (opcional)</label>
@@ -285,7 +285,7 @@ export default function FlowsPage() {
               Criar e abrir editor
             </button>
             <button onClick={() => { setShowNew(false); setNewName('') }}
-              style={{ padding: '9px 16px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
+              style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
               Cancelar
             </button>
           </div>
@@ -296,20 +296,20 @@ export default function FlowsPage() {
       {editingFlow && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setEditingFlow(null)}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px', width: '480px', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid #e4e4e7', maxHeight: '90vh', overflowY: 'auto' }}
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '480px', boxShadow: '0 24px 60px rgba(0,0,0,.12)', border: '1px solid var(--border)', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.01em' }}>Editar flow</h3>
-              <button onClick={() => setEditingFlow(null)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
-                <X size={15} color="#71717a" />
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Editar flow</h3>
+              <button onClick={() => setEditingFlow(null)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+                <X size={15} color="var(--text-muted)" />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
               <div>
                 <label style={labelStyle}>Nome *</label>
                 <input style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                  onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }} />
+                  onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
               </div>
               <div>
                 <label style={labelStyle}>Canal</label>
@@ -332,7 +332,7 @@ export default function FlowsPage() {
                 Salvar
               </button>
               <button onClick={() => setEditingFlow(null)}
-                style={{ padding: '10px 16px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
+                style={{ padding: '10px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>
                 Cancelar
               </button>
             </div>
@@ -346,12 +346,12 @@ export default function FlowsPage() {
           <ListSkeleton rows={5} />
         </div>
       ) : flows.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '80px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-            <Workflow size={24} color="#d4d4d8" />
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '80px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+            <Workflow size={24} color="var(--text-faintest)" />
           </div>
-          <p style={{ color: '#71717a', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>Nenhum flow criado</p>
-          <p style={{ color: '#a1a1aa', fontSize: '13px', marginBottom: '20px' }}>Crie seu primeiro flow para montar automações visuais com múltiplos passos</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>Nenhum flow criado</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginBottom: '20px' }}>Crie seu primeiro flow para montar automações visuais com múltiplos passos</p>
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             Criar primeiro flow
@@ -361,47 +361,47 @@ export default function FlowsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {flows.map((f: any) => (
             <div key={f.id}
-              style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}
               onClick={() => router.push(`/dashboard/flows/${f.id}`)}
               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.04)' }}>
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.04)' }}>
 
-              <div style={{ width: '38px', height: '38px', borderRadius: '9px', background: f.is_active ? '#f0fdf4' : '#f4f4f5', border: `1px solid ${f.is_active ? '#bbf7d0' : '#e4e4e7'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Workflow size={16} color={f.is_active ? '#22c55e' : '#d4d4d8'} />
+              <div style={{ width: '38px', height: '38px', borderRadius: '9px', background: f.is_active ? '#f0fdf4' : 'var(--bg)', border: `1px solid ${f.is_active ? '#bbf7d0' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Workflow size={16} color={f.is_active ? '#22c55e' : 'var(--text-faintest)'} />
               </div>
 
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                  <span style={{ fontWeight: 600, fontSize: '14px', color: '#18181b', letterSpacing: '-0.01em' }}>{f.name}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: f.is_active ? '#dcfce7' : '#f4f4f5', color: f.is_active ? '#15803d' : '#a1a1aa', border: `1px solid ${f.is_active ? '#bbf7d0' : '#e4e4e7'}` }}>
+                  <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', letterSpacing: '-0.01em' }}>{f.name}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: f.is_active ? '#dcfce7' : 'var(--bg)', color: f.is_active ? '#15803d' : 'var(--text-faint)', border: `1px solid ${f.is_active ? '#bbf7d0' : 'var(--border)'}` }}>
                     {f.is_active ? 'Ativo' : 'Pausado'}
                   </span>
                 </div>
-                <p style={{ fontSize: '12px', color: '#a1a1aa' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
                   {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : 'Todos os canais'} · {cooldownLabel(f.cooldown_type || '24h')}
                 </p>
               </div>
 
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                 <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })} title={f.is_active ? 'Pausar' : 'Ativar'}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: f.is_active ? '#22c55e' : '#d4d4d8', borderRadius: '6px' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: f.is_active ? '#22c55e' : 'var(--text-faintest)', borderRadius: '6px' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
                   onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
                   {f.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                 </button>
                 <button onClick={e => openEdit(f, e)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#a1a1aa', borderRadius: '6px' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#18181b' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Pencil size={14} />
                 </button>
                 <button onClick={() => { if (confirm(`Excluir "${f.name}"?`)) deleteMutation.mutate(f.id) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: '#a1a1aa', borderRadius: '6px' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Trash2 size={14} />
                 </button>
-                <ChevronRight size={15} color="#d4d4d8" />
+                <ChevronRight size={15} color="var(--text-faintest)" />
               </div>
             </div>
           ))}
@@ -411,13 +411,13 @@ export default function FlowsPage() {
       {/* Modal de templates */}
       {showTemplates && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#18181b', margin: 0 }}>Templates de Flow</h3>
-                <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '3px' }}>Escolha um template pronto e personalize</p>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Templates de Flow</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '3px' }}>Escolha um template pronto e personalize</p>
               </div>
-              <button onClick={() => setShowTemplates(false)} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}><X size={15} color="#71717a" /></button>
+              <button onClick={() => setShowTemplates(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}><X size={15} color="var(--text-muted)" /></button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
               {['Simples', 'Intermediário', 'Avançado'].map(cat => {
@@ -425,12 +425,12 @@ export default function FlowsPage() {
                 if (templates.length === 0) return null
                 return (
                   <div key={cat} style={{ marginBottom: '20px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{cat}</p>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{cat}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {templates.map(t => (
-                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '1px solid #e4e4e7', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.1s' }}
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.1s' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#7c3aed'; (e.currentTarget as HTMLDivElement).style.background = '#faf5ff' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                           onClick={async () => {
                             setCreatingTemplate(true)
                             try {
@@ -452,11 +452,11 @@ export default function FlowsPage() {
                             {t.name.split(' ')[0]}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#18181b' }}>{t.name.split(' ').slice(1).join(' ')}</div>
-                            <div style={{ fontSize: '12px', color: '#71717a', marginTop: '2px' }}>{t.desc}</div>
-                            <div style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '3px' }}>{t.nodes.length} nós · {t.edges.length} conexões</div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{t.name.split(' ').slice(1).join(' ')}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{t.desc}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '3px' }}>{t.nodes.length} nós · {t.edges.length} conexões</div>
                           </div>
-                          {creatingTemplate ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#7c3aed' }} /> : <ChevronRight size={16} color="#d4d4d8" />}
+                          {creatingTemplate ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#7c3aed' }} /> : <ChevronRight size={16} color="var(--text-faintest)" />}
                         </div>
                       ))}
                     </div>

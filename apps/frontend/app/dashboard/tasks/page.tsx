@@ -61,25 +61,25 @@ function formatDate(dateStr: string | null): string {
 }
 
 function dueDateColor(dueDate: string | null, status: string): string {
-  if (status === 'completed') return '#a1a1aa'
-  if (!dueDate) return '#a1a1aa'
+  if (status === 'completed') return 'var(--text-faint)'
+  if (!dueDate) return 'var(--text-faint)'
   if (isOverdue(dueDate)) return '#ef4444'
   if (isToday(dueDate)) return '#f59e0b'
-  return '#a1a1aa'
+  return 'var(--text-faint)'
 }
 
 function priorityConfig(p: string): { label: string; bg: string; color: string } {
   if (p === 'high') return { label: 'Alta', bg: '#fef2f2', color: '#dc2626' }
   if (p === 'medium') return { label: 'Média', bg: '#fffbeb', color: '#d97706' }
-  return { label: 'Baixa', bg: '#f4f4f5', color: '#71717a' }
+  return { label: 'Baixa', bg: 'var(--bg)', color: 'var(--text-muted)' }
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fafafa', border: '1px solid #e4e4e7',
-  borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b',
+  background: 'var(--bg-input)', border: '1px solid var(--border)',
+  borderRadius: '8px', fontSize: '14px', outline: 'none', color: 'var(--text)',
   transition: 'border-color 0.15s, background 0.15s',
 }
 
@@ -213,8 +213,8 @@ export default function TasksPage() {
             <CheckSquare size={20} color="#22c55e" />
           </div>
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', margin: 0 }}>Tarefas</h1>
-            <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Tarefas</h1>
+            <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
               Gerencie todas as tarefas da equipe
             </p>
           </div>
@@ -239,7 +239,7 @@ export default function TasksPage() {
       {/* Filter tabs */}
       <div style={{
         display: 'flex', gap: '4px', marginBottom: '20px',
-        background: '#f4f4f5', borderRadius: '10px', padding: '4px',
+        background: 'var(--bg)', borderRadius: '10px', padding: '4px',
       }}>
         {filterTabs.map(tab => {
           const active = activeTab === tab.key
@@ -252,8 +252,8 @@ export default function TasksPage() {
                 flex: 1, padding: '8px 12px', borderRadius: '8px',
                 border: 'none', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s',
-                background: active ? '#fff' : 'transparent',
-                color: active ? '#18181b' : '#71717a',
+                background: active ? 'var(--bg-card)' : 'transparent',
+                color: active ? 'var(--text)' : 'var(--text-muted)',
                 boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
               }}
             >
@@ -262,8 +262,8 @@ export default function TasksPage() {
                 <span style={{
                   marginLeft: '6px', fontSize: '11px', fontWeight: 700,
                   padding: '1px 6px', borderRadius: '10px',
-                  background: active ? '#f0fdf4' : '#e4e4e7',
-                  color: active ? '#22c55e' : '#71717a',
+                  background: active ? '#f0fdf4' : 'var(--border)',
+                  color: active ? '#22c55e' : 'var(--text-muted)',
                 }}>
                   {count}
                 </span>
@@ -275,26 +275,26 @@ export default function TasksPage() {
 
       {/* Task list */}
       <div style={{
-        background: '#fff', borderRadius: '14px',
-        border: '1px solid #e4e4e7', overflow: 'hidden',
+        background: 'var(--bg-card)', borderRadius: '14px',
+        border: '1px solid var(--border)', overflow: 'hidden',
       }}>
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '60px 0', color: '#a1a1aa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '60px 0', color: 'var(--text-faint)' }}>
             <Loader2 size={20} className="animate-spin" /> Carregando tarefas...
           </div>
         ) : filteredTasks.length === 0 ? (
           /* Empty state */
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: '#a1a1aa' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-              <CheckSquare size={26} color="#d4d4d8" />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text-faint)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+              <CheckSquare size={26} color="var(--text-faintest)" />
             </div>
-            <p style={{ fontSize: '15px', fontWeight: 600, color: '#71717a', margin: '0 0 4px' }}>
+            <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-muted)', margin: '0 0 4px' }}>
               {activeTab === 'completed' ? 'Nenhuma tarefa concluída' :
                activeTab === 'overdue' ? 'Nenhuma tarefa atrasada' :
                activeTab === 'today' ? 'Nenhuma tarefa para hoje' :
                'Nenhuma tarefa encontrada'}
             </p>
-            <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
               {activeTab === 'overdue' ? 'Tudo em dia!' : 'Crie uma nova tarefa para comecar.'}
             </p>
           </div>
@@ -315,8 +315,8 @@ export default function TasksPage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 20px',
-                  borderBottom: idx < filteredTasks.length - 1 ? '1px solid #f4f4f5' : 'none',
-                  background: hovered ? '#fafafa' : completed ? '#fafafa' : overdue ? '#fffbfb' : '#fff',
+                  borderBottom: idx < filteredTasks.length - 1 ? '1px solid var(--divider)' : 'none',
+                  background: hovered ? 'var(--bg-card-hover)' : completed ? 'var(--bg-input)' : overdue ? '#fffbfb' : 'var(--bg-card)',
                   transition: 'background 0.1s',
                 }}
               >
@@ -325,7 +325,7 @@ export default function TasksPage() {
                   onClick={() => toggleMutation.mutate({ id: task.id, status: task.status })}
                   style={{
                     width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
-                    border: `2px solid ${completed ? '#22c55e' : overdue ? '#ef4444' : '#d4d4d8'}`,
+                    border: `2px solid ${completed ? '#22c55e' : overdue ? '#ef4444' : 'var(--text-faintest)'}`,
                     background: completed ? '#22c55e' : 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', padding: 0, transition: 'all 0.15s',
@@ -342,7 +342,7 @@ export default function TasksPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{
-                      fontSize: '14px', fontWeight: 500, color: completed ? '#a1a1aa' : '#18181b',
+                      fontSize: '14px', fontWeight: 500, color: completed ? 'var(--text-faint)' : 'var(--text)',
                       textDecoration: completed ? 'line-through' : 'none',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       maxWidth: '400px',
@@ -373,7 +373,7 @@ export default function TasksPage() {
                   {/* Meta row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px' }}>
                     {contactName && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#71717a' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
                         <User size={12} /> {contactName}
                       </span>
                     )}
@@ -425,17 +425,17 @@ export default function TasksPage() {
             className="mobile-modal"
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#fff', borderRadius: '16px', padding: '28px',
+              background: 'var(--bg-card)', borderRadius: '16px', padding: '28px',
               width: '460px', maxWidth: '95vw',
               boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
             }}
           >
             {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', margin: 0 }}>Nova tarefa</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Nova tarefa</h2>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px', color: '#71717a' }}
+                style={{ padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px', color: 'var(--text-muted)' }}
               >
                 <X size={18} />
               </button>
@@ -504,7 +504,7 @@ export default function TasksPage() {
                 onClick={() => setShowModal(false)}
                 style={{
                   padding: '9px 18px', borderRadius: '10px',
-                  background: '#f4f4f5', color: '#52525b',
+                  background: 'var(--bg)', color: '#52525b',
                   border: 'none', fontSize: '14px', fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -516,7 +516,7 @@ export default function TasksPage() {
                 onClick={() => createMutation.mutate()}
                 style={{
                   padding: '9px 24px', borderRadius: '10px',
-                  background: !newTitle.trim() ? '#d4d4d8' : '#22c55e',
+                  background: !newTitle.trim() ? 'var(--text-faintest)' : '#22c55e',
                   color: '#fff', border: 'none', fontSize: '14px', fontWeight: 600,
                   cursor: !newTitle.trim() ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', gap: '6px',

@@ -10,14 +10,14 @@ const WEBHOOK_BASE = process.env.NEXT_PUBLIC_CHANNEL_SERVICE_URL || ''
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fff', border: '1px solid #e4e4e7',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: '8px', fontSize: '13.5px', outline: 'none',
-  color: '#18181b', fontFamily: 'inherit', transition: 'all 0.15s',
+  color: 'var(--text)', fontFamily: 'inherit', transition: 'all 0.15s',
 }
 
 const lbl: React.CSSProperties = {
   display: 'block', fontSize: '12px', fontWeight: 600,
-  color: '#71717a', marginBottom: '5px', letterSpacing: '0.01em',
+  color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '0.01em',
 }
 
 const CHANNEL_LIMITS: Record<string, number> = {
@@ -74,24 +74,24 @@ export default function ChannelsPage() {
   const isPending = createMutation.isPending || editMutation.isPending
 
   const focusInp = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = '#22c55e'; e.target.style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }
-  const blurInp  = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = '#e4e4e7'; e.target.style.boxShadow = 'none' }
+  const blurInp  = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none' }
 
   return (
-    <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '860px', background: '#f4f4f5', minHeight: '100%' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '860px', background: 'var(--bg)', minHeight: '100%' }}>
 
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>Canais</h1>
-          <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>Configure seus números do WhatsApp via Gupshup</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>Canais</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>Configure seus números do WhatsApp via Gupshup</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : '#fff', border: `1px solid ${atLimit ? '#fecaca' : '#e4e4e7'}`, padding: '4px 12px', borderRadius: '99px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : 'var(--bg-card)', border: `1px solid ${atLimit ? '#fecaca' : 'var(--border)'}`, padding: '4px 12px', borderRadius: '99px' }}>
             {channelCount}/{channelLimit} canal{channelLimit > 1 ? 'is' : ''}
           </div>
           <button
             onClick={() => { if (atLimit) { toast.error(`Seu plano permite ${channelLimit} canal${channelLimit > 1 ? 'is' : ''}. Faça upgrade.`); return }; closeForm(); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: atLimit ? '#e4e4e7' : '#22c55e', color: atLimit ? '#a1a1aa' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
+            style={{ padding: '8px 16px', background: atLimit ? 'var(--border)' : '#22c55e', color: atLimit ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
             onMouseEnter={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
             <Plus size={14} /> Novo canal
@@ -113,15 +113,15 @@ export default function ChannelsPage() {
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontWeight: 700, fontSize: '14.5px', color: '#18181b', margin: 0 }}>{editingId ? 'Editar canal' : 'Novo canal Gupshup'}</h3>
-              <p style={{ fontSize: '12px', color: '#71717a', marginTop: '3px' }}>{editingId ? 'Atualize as credenciais do canal' : 'Preencha as credenciais do Gupshup'}</p>
+              <h3 style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text)', margin: 0 }}>{editingId ? 'Editar canal' : 'Novo canal Gupshup'}</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{editingId ? 'Atualize as credenciais do canal' : 'Preencha as credenciais do Gupshup'}</p>
             </div>
-            <button onClick={closeForm} style={{ background: '#f4f4f5', border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#71717a', padding: '7px', display: 'flex' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#e4e4e7' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5' }}>
+            <button onClick={closeForm} style={{ background: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)', padding: '7px', display: 'flex' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--border)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)' }}>
               <X size={15} />
             </button>
           </div>
@@ -140,9 +140,9 @@ export default function ChannelsPage() {
             ))}
           </div>
 
-          <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#fafafa', borderRadius: '9px', border: '1px solid #f4f4f5' }}>
-            <label style={lbl}>Token do Meta <span style={{ color: '#a1a1aa', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>(opcional)</span></label>
-            <p style={{ fontSize: '12px', color: '#71717a', marginBottom: '8px', lineHeight: 1.5 }}>Meta Business Manager → WhatsApp → API Setup → System User Token — necessário para visualizar mídias recebidas</p>
+          <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+            <label style={lbl}>Token do Meta <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>(opcional)</span></label>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>Meta Business Manager → WhatsApp → API Setup → System User Token — necessário para visualizar mídias recebidas</p>
             <input style={inp} type="password" placeholder={editingId ? 'Deixe em branco para manter o atual' : 'EAAxxxxxxx...'} value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
           </div>
 
@@ -152,21 +152,21 @@ export default function ChannelsPage() {
               {isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               {editingId ? 'Salvar alterações' : 'Criar canal'}
             </button>
-            <button onClick={closeForm} style={{ padding: '9px 16px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>Cancelar</button>
+            <button onClick={closeForm} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Lista */}
       {isLoading ? (
-        <div style={{ padding: '80px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} /></div>
+        <div style={{ padding: '80px', textAlign: 'center' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
       ) : channels?.length === 0 ? (
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '72px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: '#f4f4f5', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-            <Radio size={24} color="#d4d4d8" />
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '72px', textAlign: 'center', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+            <Radio size={24} color="var(--text-faintest)" />
           </div>
-          <p style={{ color: '#18181b', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhum canal configurado</p>
-          <p style={{ color: '#71717a', fontSize: '13px', margin: '0 0 18px' }}>Conecte seu número do WhatsApp para começar</p>
+          <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhum canal configurado</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 18px' }}>Conecte seu número do WhatsApp para começar</p>
           <button onClick={() => setShowForm(true)} style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Novo canal</button>
         </div>
       ) : (
@@ -175,7 +175,7 @@ export default function ChannelsPage() {
             const webhookUrl = `${WEBHOOK_BASE}/webhook/gupshup/${ch.webhookApiKey}`
             const isVisible  = showApiKey[ch.id]
             return (
-              <div key={ch.id} style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)', transition: 'box-shadow 0.15s' }}
+              <div key={ch.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))', transition: 'box-shadow 0.15s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,.07)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.04)' }}>
 
@@ -186,8 +186,8 @@ export default function ChannelsPage() {
                       <Radio size={17} color="#16a34a" />
                     </div>
                     <div>
-                      <p style={{ fontWeight: 600, fontSize: '14px', color: '#18181b', margin: '0 0 2px', letterSpacing: '-0.01em' }}>{ch.name}</p>
-                      <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0, fontFamily: 'ui-monospace, monospace' }}>{ch.phoneNumber || ch.phone_number || ''}</p>
+                      <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', margin: '0 0 2px', letterSpacing: '-0.01em' }}>{ch.name}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, fontFamily: 'ui-monospace, monospace' }}>{ch.phoneNumber || ch.phone_number || ''}</p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -196,32 +196,32 @@ export default function ChannelsPage() {
                       Ativo
                     </div>
                     <button onClick={() => openEdit(ch)} title="Editar canal"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Pencil size={13} />
                     </button>
                     <button onClick={() => { if (confirm('Remover canal?')) deleteMutation.mutate(ch.id) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
 
-                <div style={{ height: '1px', background: '#f4f4f5', marginBottom: '14px' }} />
+                <div style={{ height: '1px', background: 'var(--bg)', marginBottom: '14px' }} />
 
                 {/* API Key */}
                 <div style={{ marginBottom: '12px' }}>
                   <label style={lbl}>API Key</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly type={isVisible ? 'text' : 'password'} value={ch.webhookApiKey || ''}
-                      style={{ ...inp, flex: 1, background: '#fafafa', color: '#52525b', fontSize: '12.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
+                      style={{ ...inp, flex: 1, background: 'var(--bg-input)', color: '#52525b', fontSize: '12.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
                     <button onClick={() => toggleApiKey(ch.id)}
-                      style={{ padding: '9px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#a1a1aa', transition: 'all 0.12s' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+                      style={{ padding: '9px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: 'var(--text-faint)', transition: 'all 0.12s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                       {isVisible ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
                   </div>
@@ -232,17 +232,17 @@ export default function ChannelsPage() {
                   <label style={lbl}>URL do Webhook — cole no Gupshup</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly value={webhookUrl}
-                      style={{ ...inp, flex: 1, background: '#fafafa', color: '#52525b', fontSize: '11.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
+                      style={{ ...inp, flex: 1, background: 'var(--bg-input)', color: '#52525b', fontSize: '11.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
                     <button onClick={() => copyWebhook(ch.id, ch.webhookApiKey)} title="Copiar"
-                      style={{ padding: '9px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#a1a1aa', transition: 'all 0.12s' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'; (e.currentTarget as HTMLButtonElement).style.color = '#a1a1aa' }}>
+                      style={{ padding: '9px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: 'var(--text-faint)', transition: 'all 0.12s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                       <Copy size={13} />
                     </button>
                     <a href="https://app.gupshup.io" target="_blank" rel="noopener noreferrer" title="Abrir Gupshup"
-                      style={{ padding: '9px 10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: '#a1a1aa', textDecoration: 'none', transition: 'all 0.12s' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f4f4f5'; (e.currentTarget as HTMLAnchorElement).style.color = '#52525b' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#fafafa'; (e.currentTarget as HTMLAnchorElement).style.color = '#a1a1aa' }}>
+                      style={{ padding: '9px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: 'var(--text-faint)', textDecoration: 'none', transition: 'all 0.12s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLAnchorElement).style.color = '#52525b' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-faint)' }}>
                       <ExternalLink size={13} />
                     </a>
                   </div>

@@ -90,15 +90,15 @@ function InboundWebhookSection() {
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
       <div style={{ marginBottom: '16px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhook de Entrada — Captura de Leads</span>
-        <p style={{ fontSize: '12px', color: '#71717a' }}>Receba leads de formulários da Meta, Zapier, Make ou qualquer sistema externo direto no CRM</p>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhook de Entrada — Captura de Leads</span>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Receba leads de formulários da Meta, Zapier, Make ou qualquer sistema externo direto no CRM</p>
       </div>
 
       {!token ? (
-        <div style={{ textAlign: 'center', padding: '20px', background: '#fafafa', borderRadius: '9px', border: '1px solid #f4f4f5' }}>
-          <p style={{ fontSize: '13px', color: '#71717a', marginBottom: '12px' }}>Gere sua URL única para receber leads externos</p>
+        <div style={{ textAlign: 'center', padding: '20px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Gere sua URL única para receber leads externos</p>
           <button onClick={handleGenerate} disabled={generating}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>
             {generating ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
@@ -107,19 +107,19 @@ function InboundWebhookSection() {
         </div>
       ) : (
         <div>
-          <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <code style={{ flex: 1, fontSize: '11px', color: '#18181b', wordBreak: 'break-all' as const }}>
+          <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <code style={{ flex: 1, fontSize: '11px', color: 'var(--text)', wordBreak: 'break-all' as const }}>
               {showToken ? webhookUrl : webhookUrl?.replace(/\/[^/]+$/, '/••••••••••••')}
             </code>
-            <button onClick={() => setShowToken(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}>
+            <button onClick={() => setShowToken(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0 }}>
               {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
-            <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}>
+            <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0 }}>
               <Copy size={14} />
             </button>
           </div>
 
-          <div style={{ fontSize: '12px', color: '#71717a', marginBottom: '12px', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.6 }}>
             <p style={{ fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>Campos aceitos no POST:</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
               {[
@@ -130,15 +130,15 @@ function InboundWebhookSection() {
                 ['message / mensagem', 'Mensagem inicial'],
               ].map(([field, desc]) => (
                 <div key={field} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                  <code style={{ fontSize: '10px', background: '#f4f4f5', padding: '1px 5px', borderRadius: '4px', color: '#18181b', flexShrink: 0 }}>{field}</code>
-                  <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{desc}</span>
+                  <code style={{ fontSize: '10px', background: 'var(--bg)', padding: '1px 5px', borderRadius: '4px', color: 'var(--text)', flexShrink: 0 }}>{field}</code>
+                  <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{desc}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <details>
-            <summary style={{ fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', userSelect: 'none' as const }}>Ver exemplo de payload</summary>
+            <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' as const }}>Ver exemplo de payload</summary>
             <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto' as const, lineHeight: 1.5 }}>{JSON.stringify({
               phone_number: '5511999999999',
               full_name: 'João Silva',
@@ -222,11 +222,11 @@ function WebhooksSection() {
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhooks & Integrações</span>
-          <p style={{ fontSize: '12px', color: '#71717a' }}>Envie eventos para Zapier, n8n, Make ou qualquer URL</p>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhooks & Integrações</span>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Envie eventos para Zapier, n8n, Make ou qualquer URL</p>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
@@ -238,22 +238,22 @@ function WebhooksSection() {
 
       {/* Formulário de criação */}
       {showForm && (
-        <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '18px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '18px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>URL do webhook *</label>
             <input
               placeholder="https://hooks.zapier.com/hooks/catch/..."
               value={url}
               onChange={e => setUrl(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', background: '#fff', boxSizing: 'border-box' as const }}
+              style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
               onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'}
+              onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
             />
           </div>
 
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>
-              Secret (opcional) <span style={{ fontWeight: 400, color: '#a1a1aa' }}>— para verificar autenticidade</span>
+              Secret (opcional) <span style={{ fontWeight: 400, color: 'var(--text-faint)' }}>— para verificar autenticidade</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -261,11 +261,11 @@ function WebhooksSection() {
                 placeholder="Deixe em branco para não usar"
                 value={secret}
                 onChange={e => setSecret(e.target.value)}
-                style={{ width: '100%', padding: '9px 36px 9px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', outline: 'none', color: '#18181b', background: '#fff', boxSizing: 'border-box' as const }}
+                style={{ width: '100%', padding: '9px 36px 9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
                 onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
-                onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'}
+                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
               />
-              <button onClick={() => setShowSecret(s => !s)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex' }}>
+              <button onClick={() => setShowSecret(s => !s)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex' }}>
                 {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
@@ -275,11 +275,11 @@ function WebhooksSection() {
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Eventos *</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {WEBHOOK_EVENTS.map(ev => (
-                <label key={ev.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '7px', border: `1px solid ${selectedEvents.includes(ev.key) ? '#bbf7d0' : '#f4f4f5'}`, background: selectedEvents.includes(ev.key) ? '#f0fdf4' : '#fff', cursor: 'pointer' }}>
+                <label key={ev.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '7px', border: `1px solid ${selectedEvents.includes(ev.key) ? '#bbf7d0' : 'var(--divider)'}`, background: selectedEvents.includes(ev.key) ? '#f0fdf4' : 'var(--bg-card)', cursor: 'pointer' }}>
                   <input type="checkbox" checked={selectedEvents.includes(ev.key)} onChange={() => toggleEvent(ev.key)} style={{ width: '14px', height: '14px', accentColor: '#22c55e', cursor: 'pointer' }} />
                   <div>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#18181b', display: 'block' }}>{ev.label}</span>
-                    <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{ev.desc}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', display: 'block' }}>{ev.label}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{ev.desc}</span>
                   </div>
                 </label>
               ))}
@@ -288,7 +288,7 @@ function WebhooksSection() {
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowForm(false); setUrl(''); setSecret(''); setSelectedEvents(['message.received']) }}
-              style={{ padding: '8px 16px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>
+              style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>
               Cancelar
             </button>
             <button onClick={handleSave} disabled={saving}
@@ -303,10 +303,10 @@ function WebhooksSection() {
       {/* Lista de webhooks */}
       {isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-          <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#d4d4d8' }} />
+          <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} />
         </div>
       ) : webhooks.length === 0 && !showForm ? (
-        <div style={{ textAlign: 'center', padding: '24px', color: '#a1a1aa' }}>
+        <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-faint)' }}>
           <Webhook size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
           <p style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>Nenhum webhook configurado</p>
           <p style={{ fontSize: '12px' }}>Adicione um para integrar com Zapier, n8n, Make e outros</p>
@@ -314,12 +314,12 @@ function WebhooksSection() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(webhooks as any[]).map((wh: any) => (
-            <div key={wh.id} style={{ border: '1px solid #e4e4e7', borderRadius: '9px', padding: '12px 14px', background: wh.active ? '#fff' : '#fafafa', opacity: wh.active ? 1 : 0.6 }}>
+            <div key={wh.id} style={{ border: '1px solid var(--border)', borderRadius: '9px', padding: '12px 14px', background: wh.active ? 'var(--bg-card)' : 'var(--bg-input)', opacity: wh.active ? 1 : 0.6 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: wh.active ? '#22c55e' : '#d4d4d8', flexShrink: 0 }} />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#18181b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wh.url}</span>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: wh.active ? '#22c55e' : 'var(--text-faintest)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wh.url}</span>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {(wh.events || []).map((ev: string) => (
@@ -332,7 +332,7 @@ function WebhooksSection() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   <button onClick={() => handleTest(wh.id)} disabled={testingId === wh.id}
                     title="Enviar evento de teste"
-                    style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', border: '1px solid #e4e4e7', borderRadius: '6px', background: '#fafafa', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input)', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {testingId === wh.id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={11} />}
                     Testar
                   </button>
@@ -356,7 +356,7 @@ function WebhooksSection() {
 
       {/* Exemplo de payload */}
       <details style={{ marginTop: '14px' }}>
-        <summary style={{ fontSize: '12px', color: '#a1a1aa', cursor: 'pointer', userSelect: 'none' }}>Ver exemplo de payload</summary>
+        <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' }}>Ver exemplo de payload</summary>
         <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto', lineHeight: 1.5 }}>{JSON.stringify({
           event: 'message.received',
           timestamp: '2026-03-30T14:00:00.000Z',
@@ -443,8 +443,8 @@ export default function SettingsPage() {
   return (
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '700px' }}>
       <div className="mobile-header">
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', marginBottom: '4px' }}>Plano e Configurações</h1>
-        <p style={{ color: '#a1a1aa', fontSize: '14px', marginBottom: '28px' }}>Gerencie sua conta e uso do plano</p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: '4px' }}>Plano e Configurações</h1>
+        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '28px' }}>Gerencie sua conta e uso do plano</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -457,7 +457,7 @@ export default function SettingsPage() {
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ fontWeight: 700, color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>Seu trial expirou</p>
-              <p style={{ color: '#71717a', fontSize: '13px', marginBottom: '14px' }}>Escolha um plano abaixo para continuar usando o AutoZap.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>Escolha um plano abaixo para continuar usando o AutoZap.</p>
               <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}>
                 <Zap size={13} /> Ver planos
               </a>
@@ -469,10 +469,10 @@ export default function SettingsPage() {
         {isTrial && !trialExpired && (
           <div style={{ background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4', border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`, borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <p style={{ fontWeight: 600, color: '#18181b', fontSize: '14px', marginBottom: '2px' }}>
+              <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
                 {trialDaysLeft !== null && trialDaysLeft <= 2 ? `⚠️ Trial expira em ${trialDaysLeft} dia${trialDaysLeft !== 1 ? 's' : ''}!` : `🎉 Trial ativo — ${usage?.remaining ?? 0} mensagens restantes`}
               </p>
-              <p style={{ color: '#71717a', fontSize: '13px' }}>Escolha um plano para não perder o acesso</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Escolha um plano para não perder o acesso</p>
             </div>
             <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
               <Zap size={13} /> Fazer upgrade
@@ -485,22 +485,22 @@ export default function SettingsPage() {
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ Plano {planName} ativo</p>
-              <p style={{ color: '#71717a', fontSize: '13px' }}>{subscription?.status === 'active' ? 'Assinatura recorrente ativa' : 'Aguardando confirmação de pagamento'}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{subscription?.status === 'active' ? 'Assinatura recorrente ativa' : 'Aguardando confirmação de pagamento'}</p>
             </div>
             <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 14px', borderRadius: '99px' }}>{getPlanPrice(planSlug)}/mês</span>
           </div>
         )}
 
         {/* Perfil */}
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Perfil</span>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Perfil</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: '#71717a' }}>Email</span>
-              <span style={{ fontSize: '13px', fontWeight: 500, color: '#18181b' }}>{user?.email}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Email</span>
+              <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{user?.email}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: '#71717a' }}>Plano atual</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Plano atual</span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: isTrial ? '#d97706' : '#16a34a', background: isTrial ? '#fffbeb' : '#f0fdf4', border: `1px solid ${isTrial ? '#fde68a' : '#bbf7d0'}`, padding: '2px 10px', borderRadius: '99px' }}>
                 {isTrial ? '🎯 Trial (7 dias)' : planName}
               </span>
@@ -509,18 +509,18 @@ export default function SettingsPage() {
         </div>
 
         {/* Uso do mês */}
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Uso do mês</span>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>Uso do mês</span>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '13px', color: '#71717a' }}>Mensagens enviadas</span>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#18181b' }}>{sent.toLocaleString()} / {limit === null ? '∞' : limit.toLocaleString()}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Mensagens enviadas</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{sent.toLocaleString()} / {limit === null ? '∞' : limit.toLocaleString()}</span>
           </div>
-          <div style={{ height: '6px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden' }}>
+          <div style={{ height: '6px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: barColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : '#a1a1aa', fontWeight: isWarning ? 600 : 400 }}>{pct}% utilizado</span>
-            {limit !== null && <span style={{ fontSize: '12px', color: '#a1a1aa' }}>{Math.max(0, limit - sent).toLocaleString()} restantes</span>}
+            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% utilizado</span>
+            {limit !== null && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{Math.max(0, limit - sent).toLocaleString()} restantes</span>}
           </div>
         </div>
 
@@ -531,8 +531,8 @@ export default function SettingsPage() {
         <WebhooksSection />
 
         {/* Planos */}
-        <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }} id="planos">
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
             {isTrial ? '🚀 Escolha seu plano' : 'Planos disponíveis'}
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -541,15 +541,15 @@ export default function SettingsPage() {
               const isPopular = slug === 'pro'
               return (
                 <div key={slug}
-                  style={{ border: isActive ? '2px solid #22c55e' : isPopular ? '2px solid #7c3aed' : '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', background: isActive ? '#f0fdf4' : '#fff', position: 'relative', transition: 'box-shadow 0.15s' }}
+                  style={{ border: isActive ? '2px solid #22c55e' : isPopular ? '2px solid #7c3aed' : '1px solid var(--border)', borderRadius: '12px', padding: '18px', background: isActive ? '#f0fdf4' : 'var(--bg-card)', position: 'relative', transition: 'box-shadow 0.15s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'}>
                   {isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#16a34a', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '1px 8px', borderRadius: '99px' }}>Atual</span>}
                   {isPopular && !isActive && <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '1px 8px', borderRadius: '99px' }}>Popular</span>}
-                  <p style={{ fontWeight: 700, fontSize: '15px', color: '#18181b', marginBottom: '2px', letterSpacing: '-0.01em' }}>{PLAN_NAMES[slug]}</p>
-                  <p style={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '10px' }}>{PLAN_MSGS[slug]}</p>
-                  <p style={{ fontWeight: 800, fontSize: '18px', color: '#18181b', marginBottom: '12px', letterSpacing: '-0.02em' }}>
-                    {getPlanPrice(slug)}<span style={{ fontSize: '12px', fontWeight: 400, color: '#a1a1aa' }}>/mês</span>
+                  <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text)', marginBottom: '2px', letterSpacing: '-0.01em' }}>{PLAN_NAMES[slug]}</p>
+                  <p style={{ color: 'var(--text-faint)', fontSize: '12px', marginBottom: '10px' }}>{PLAN_MSGS[slug]}</p>
+                  <p style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text)', marginBottom: '12px', letterSpacing: '-0.02em' }}>
+                    {getPlanPrice(slug)}<span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-faint)' }}>/mês</span>
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
                     {PLAN_FEATURES[slug]?.map(f => (
@@ -572,7 +572,7 @@ export default function SettingsPage() {
               )
             })}
           </div>
-          <p style={{ textAlign: 'center', color: '#a1a1aa', fontSize: '12px', marginTop: '14px' }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '12px', marginTop: '14px' }}>
             Pagamento seguro via PIX ou cartão de crédito • Cancele quando quiser
           </p>
         </div>
@@ -582,12 +582,12 @@ export default function SettingsPage() {
       {showCpfModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
           onClick={e => { if (e.target === e.currentTarget) setShowCpfModal(null) }}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '380px', margin: '0 16px', border: '1px solid #e4e4e7', boxShadow: '0 24px 60px rgba(0,0,0,.12)' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '28px', width: '380px', margin: '0 16px', border: '1px solid var(--border)', boxShadow: '0 24px 60px rgba(0,0,0,.12)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', margin: 0, letterSpacing: '-0.01em' }}>Assinar {PLAN_NAMES[showCpfModal]}</h3>
-              <button onClick={() => setShowCpfModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', padding: '4px', display: 'flex' }}><X size={18} /></button>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Assinar {PLAN_NAMES[showCpfModal]}</h3>
+              <button onClick={() => setShowCpfModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex' }}><X size={18} /></button>
             </div>
-            <p style={{ fontSize: '13px', color: '#71717a', marginBottom: '16px' }}>Informe seu CPF ou CNPJ para criar a assinatura.</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>Informe seu CPF ou CNPJ para criar a assinatura.</p>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>CPF ou CNPJ</label>
             <input
               type="text"
@@ -595,17 +595,17 @@ export default function SettingsPage() {
               value={cpfCnpj}
               onChange={e => setCpfCnpj(formatCpfCnpj(e.target.value))}
               maxLength={18}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#18181b', boxSizing: 'border-box' as const, marginBottom: '16px', background: '#fafafa', transition: 'border-color 0.15s' }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = '#fff' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.background = '#fafafa' }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none', color: 'var(--text)', boxSizing: 'border-box' as const, marginBottom: '16px', background: 'var(--bg-input)', transition: 'border-color 0.15s' }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }}
             />
             <button onClick={() => handleSubscribe(showCpfModal)} disabled={!!subscribing}
-              style={{ width: '100%', padding: '11px', background: subscribing ? '#e4e4e7' : '#22c55e', color: subscribing ? '#a1a1aa' : '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: subscribing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.1s' }}
+              style={{ width: '100%', padding: '11px', background: subscribing ? 'var(--border)' : '#22c55e', color: subscribing ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: subscribing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.1s' }}
               onMouseEnter={e => { if (!subscribing) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
               onMouseLeave={e => { if (!subscribing) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
               {subscribing ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando link...</> : 'Gerar link de pagamento'}
             </button>
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#a1a1aa', marginTop: '12px' }}>
+            <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-faint)', marginTop: '12px' }}>
               Você será redirecionado para pagar via PIX ou cartão
             </p>
           </div>

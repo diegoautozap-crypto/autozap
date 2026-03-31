@@ -11,7 +11,7 @@ import { ListSkeleton } from '@/components/ui/skeleton'
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
   completed: { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Concluída', bar: '#22c55e' },
-  draft:     { color: '#71717a', bg: '#fafafa',  dot: '#d4d4d8', label: 'Rascunho',  bar: '#d4d4d8' },
+  draft:     { color: 'var(--text-muted)', bg: 'var(--bg-input)',  dot: 'var(--text-faintest)', label: 'Rascunho',  bar: 'var(--text-faintest)' },
   paused:    { color: '#d97706', bg: '#fffbeb',  dot: '#f59e0b', label: 'Pausada',   bar: '#f59e0b' },
   failed:    { color: '#dc2626', bg: '#fef2f2',  dot: '#ef4444', label: 'Falhou',    bar: '#ef4444' },
   scheduled: { color: '#7c3aed', bg: '#f5f3ff',  dot: '#8b5cf6', label: 'Agendada',  bar: '#8b5cf6' },
@@ -21,9 +21,9 @@ const PAGE_SIZE = 10
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
-  background: '#fff', border: '1px solid #e4e4e7',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: '8px', fontSize: '13.5px', outline: 'none',
-  color: '#18181b', fontFamily: 'inherit', transition: 'all 0.15s',
+  color: 'var(--text)', fontFamily: 'inherit', transition: 'all 0.15s',
 }
 
 function speedHint(messagesPerMin: number, contactsText: string, channelCount: number): string {
@@ -208,22 +208,22 @@ export default function CampaignsPage() {
   const minDateTime  = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)
 
   const Lbl = ({ children }: { children: React.ReactNode }) => (
-    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#71717a', marginBottom: '6px', letterSpacing: '0.01em' }}>{children}</label>
+    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.01em' }}>{children}</label>
   )
 
   return (
-    <div className="mobile-page" style={{ padding: '28px 32px', height: '100%', display: 'flex', flexDirection: 'column', background: '#f4f4f5' }}>
+    <div className="mobile-page" style={{ padding: '28px 32px', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
 
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.03em', margin: 0 }}>Campanhas</h1>
-          <p style={{ color: '#71717a', fontSize: '13.5px', marginTop: '4px' }}>Gerencie seus disparos em massa</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>Campanhas</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>Gerencie seus disparos em massa</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => refetch()} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
-            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#fafafa'}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fff'}>
+          <button onClick={() => refetch()} style={{ padding: '8px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> Atualizar
           </button>
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -238,19 +238,19 @@ export default function CampaignsPage() {
 
         {/* Tabela */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow)' }}>
             {isLoading ? (
               <div style={{ flex: 1, padding: '20px' }}>
                 <ListSkeleton rows={5} />
               </div>
             ) : campaigns?.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '60px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f4f4f5', border: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Megaphone size={22} color="#a1a1aa" />
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Megaphone size={22} color="var(--text-faint)" />
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#18181b', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhuma campanha ainda</p>
-                  <p style={{ color: '#71717a', fontSize: '13px', margin: 0 }}>Crie seu primeiro disparo em massa</p>
+                  <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhuma campanha ainda</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>Crie seu primeiro disparo em massa</p>
                 </div>
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   + Criar campanha
@@ -258,9 +258,9 @@ export default function CampaignsPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '11px 20px', background: '#fafafa', borderBottom: '1px solid #f4f4f5' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '11px 20px', background: 'var(--bg-input)', borderBottom: '1px solid var(--divider)' }}>
                   {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
-                    <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                    <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
                 </div>
                 {paginatedCampaigns.map((camp: any) => {
@@ -269,24 +269,24 @@ export default function CampaignsPage() {
                   const isSelected = selectedCamp?.id === camp.id
                   return (
                     <div key={camp.id} onClick={() => setSelectedCamp(camp)}
-                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '13px 20px', borderBottom: '1px solid #f4f4f5', cursor: 'pointer', background: isSelected ? '#f0fdf4' : '#fff', transition: 'background 0.1s', alignItems: 'center', borderLeft: `3px solid ${isSelected ? '#22c55e' : 'transparent'}` }}
-                      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}
-                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
+                      style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '13px 20px', borderBottom: '1px solid var(--divider)', cursor: 'pointer', background: isSelected ? '#f0fdf4' : 'var(--bg-card)', transition: 'background 0.1s', alignItems: 'center', borderLeft: `3px solid ${isSelected ? '#22c55e' : 'transparent'}` }}
+                      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-input)' }}
+                      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card)' }}>
                       <div>
-                        <div style={{ fontWeight: 500, color: '#18181b', fontSize: '13.5px', letterSpacing: '-0.01em', marginBottom: '2px' }}>{camp.name}</div>
+                        <div style={{ fontWeight: 500, color: 'var(--text)', fontSize: '13.5px', letterSpacing: '-0.01em', marginBottom: '2px' }}>{camp.name}</div>
                         {camp.scheduled_at && camp.status === 'scheduled' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#7c3aed', fontWeight: 500, marginTop: '2px' }}>
                             <Clock size={10} />{new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
-                        <div style={{ height: '3px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '80%' }}>
+                        <div style={{ height: '3px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '80%' }}>
                           <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
                         </div>
                       </div>
-                      <span style={{ color: '#71717a', fontSize: '13px' }}>{camp.total_contacts.toLocaleString()}</span>
-                      <span style={{ color: '#18181b', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{camp.total_contacts.toLocaleString()}</span>
+                      <span style={{ color: 'var(--text)', fontSize: '13px' }}>
                         {camp.sent_count.toLocaleString()}
-                        <span style={{ color: '#a1a1aa', fontSize: '11px', marginLeft: '4px' }}>({p}%)</span>
+                        <span style={{ color: 'var(--text-faint)', fontSize: '11px', marginLeft: '4px' }}>({p}%)</span>
                       </span>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', background: s.bg, borderRadius: '6px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
@@ -294,7 +294,7 @@ export default function CampaignsPage() {
                       </div>
                       <div onClick={e => e.stopPropagation()}>
                         {camp.status === 'running' ? (
-                          <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#71717a', fontWeight: 500 }}>
+                          <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontWeight: 500 }}>
                             <Pause size={10} /> Pausar
                           </button>
                         ) : ['draft', 'paused'].includes(camp.status) ? (
@@ -307,14 +307,14 @@ export default function CampaignsPage() {
                   )
                 })}
                 {totalPages > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #f4f4f5', marginTop: 'auto' }}>
-                    <span style={{ fontSize: '12px', color: '#a1a1aa' }}>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--divider)', marginTop: 'auto' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCampaigns)} de {totalCampaigns}</span>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '5px 8px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#d4d4d8' : '#52525b', display: 'flex' }}><ChevronLeft size={13} /></button>
+                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '5px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? 'var(--text-faintest)' : 'var(--text-muted)', display: 'flex' }}><ChevronLeft size={13} /></button>
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                        <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 9px', background: p === page ? '#22c55e' : '#fff', border: `1px solid ${p === page ? '#22c55e' : '#e4e4e7'}`, borderRadius: '6px', cursor: 'pointer', color: p === page ? '#fff' : '#52525b', fontSize: '12px', fontWeight: p === page ? 700 : 400, minWidth: '30px' }}>{p}</button>
+                        <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 9px', background: p === page ? '#22c55e' : 'var(--bg-card)', border: `1px solid ${p === page ? '#22c55e' : 'var(--border)'}`, borderRadius: '6px', cursor: 'pointer', color: p === page ? '#fff' : 'var(--text-muted)', fontSize: '12px', fontWeight: p === page ? 700 : 400, minWidth: '30px' }}>{p}</button>
                       ))}
-                      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '5px 8px', background: '#fff', border: '1px solid #e4e4e7', borderRadius: '6px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? '#d4d4d8' : '#52525b', display: 'flex' }}><ChevronRight size={13} /></button>
+                      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '5px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? 'var(--text-faintest)' : 'var(--text-muted)', display: 'flex' }}><ChevronRight size={13} /></button>
                     </div>
                   </div>
                 )}
@@ -424,7 +424,7 @@ export default function CampaignsPage() {
                       toast.success(`${rows.length} contatos exportados!`)
                     } catch { toast.error('Erro ao exportar') }
                   }}
-                    style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#52525b', fontWeight: 500 }}>
+                    style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 500 }}>
                     <Download size={13} /> Exportar resultados (Excel)
                   </button>
 
@@ -455,15 +455,15 @@ export default function CampaignsPage() {
       {/* Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em', margin: 0 }}>Nova Campanha</h2>
-                <p style={{ fontSize: '12.5px', color: '#71717a', marginTop: '3px' }}>Configure o disparo em massa</p>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', margin: 0 }}>Nova Campanha</h2>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '3px' }}>Configure o disparo em massa</p>
               </div>
-              <button onClick={() => { setShowModal(false); resetModal() }} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', color: '#71717a', padding: '6px', display: 'flex' }}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#e4e4e7'}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'}>
+              <button onClick={() => { setShowModal(false); resetModal() }} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px', display: 'flex' }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--border)'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}>
                 <X size={15} />
               </button>
             </div>
@@ -475,7 +475,7 @@ export default function CampaignsPage() {
                 <Lbl>Nome da campanha</Lbl>
                 <input style={inp} placeholder="Ex: Promoção Black Friday" value={campaignName} onChange={e => setCampaignName(e.target.value)}
                   onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
-                  onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
+                  onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
               </div>
 
               {/* Canais */}
@@ -486,11 +486,11 @@ export default function CampaignsPage() {
                     const sel = selectedChannels.includes(ch.id)
                     return (
                       <div key={ch.id} onClick={() => toggleChannel(ch.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : '#e4e4e7'}`, background: sel ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
-                        <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : '#d4d4d8'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : 'var(--border)'}`, background: sel ? '#f0fdf4' : 'var(--bg-input)', transition: 'all 0.1s' }}>
+                        <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : 'var(--text-faintest)'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: 500, color: sel ? '#15803d' : '#18181b' }}>{ch.name}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: sel ? '#15803d' : 'var(--text)' }}>{ch.name}</span>
                         {sel && <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>1.200/min</span>}
                       </div>
                     )
@@ -505,10 +505,10 @@ export default function CampaignsPage() {
 
               {/* Toggle Template / cURL */}
               <div>
-                <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '13px' }}>
+                <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '13px' }}>
                   {[{ v: true, label: 'Templates salvos' }, { v: false, label: 'cURL manual' }].map(opt => (
                     <button key={String(opt.v)} onClick={() => { setUseTemplate(opt.v); setSelectedTemplates([]); setCurlCopies(['']) }}
-                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate === opt.v ? '#fff' : 'transparent', color: useTemplate === opt.v ? '#18181b' : '#71717a', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate === opt.v ? 'var(--bg-card)' : 'transparent', color: useTemplate === opt.v ? 'var(--text)' : 'var(--text-muted)', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
                       {opt.label}
                     </button>
                   ))}
@@ -524,7 +524,7 @@ export default function CampaignsPage() {
                     ) : (
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
                             Templates — selecione um ou mais
                           </span>
                           {selectedTemplates.length > 0 && (
@@ -533,7 +533,7 @@ export default function CampaignsPage() {
                             </span>
                           )}
                         </div>
-                        <p style={{ fontSize: '11px', color: '#a1a1aa', margin: '0 0 8px' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: '0 0 8px' }}>
                           Selecione múltiplos para rotacionar aleatoriamente entre os contatos
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
@@ -541,38 +541,38 @@ export default function CampaignsPage() {
                             const sel = selectedTemplates.includes(t.id)
                             return (
                               <div key={t.id} onClick={() => toggleTemplate(t.id)}
-                                style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : '#e4e4e7'}`, background: sel ? '#f0fdf4' : '#fafafa', transition: 'all 0.1s' }}>
-                                <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : '#d4d4d8'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                                style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${sel ? '#22c55e' : 'var(--border)'}`, background: sel ? '#f0fdf4' : 'var(--bg-input)', transition: 'all 0.1s' }}>
+                                <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${sel ? '#22c55e' : 'var(--text-faintest)'}`, background: sel ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                                   {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: 600, color: sel ? '#15803d' : '#18181b' }}>{t.name}</span>
-                                    <span style={{ fontSize: '10px', background: sel ? '#dcfce7' : '#f4f4f5', color: sel ? '#15803d' : '#a1a1aa', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>{t.category}</span>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: sel ? '#15803d' : 'var(--text)' }}>{t.name}</span>
+                                    <span style={{ fontSize: '10px', background: sel ? '#dcfce7' : 'var(--bg)', color: sel ? '#15803d' : 'var(--text-faint)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>{t.category}</span>
                                   </div>
-                                  <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.body}</p>
+                                  <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.body}</p>
                                 </div>
                               </div>
                             )
                           })}
                         </div>
                         {selectedTemplates.length > 1 && (
-                          <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
+                          <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
                             🎲 Cada contato receberá um dos {selectedTemplates.length} templates aleatoriamente
                           </p>
                         )}
                       </div>
                     )
                   ) : (
-                    <div style={{ background: '#fafafa', borderRadius: '8px', padding: '14px 16px', textAlign: 'center', border: '1px solid #f4f4f5' }}>
-                      <p style={{ fontSize: '13px', color: '#a1a1aa', margin: 0 }}>Selecione um canal para ver os templates</p>
+                    <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '14px 16px', textAlign: 'center', border: '1px solid var(--divider)' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>Selecione um canal para ver os templates</p>
                     </div>
                   )
                 ) : (
                   // ── Modo cURL: múltiplas copies ──
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a' }}>cURLs do Gupshup — rotacionados aleatoriamente</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>cURLs do Gupshup — rotacionados aleatoriamente</span>
                       <button onClick={addCurlCopy} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px', color: '#16a34a', fontWeight: 600, cursor: 'pointer' }}>
                         <Plus size={11} /> Adicionar copy
                       </button>
@@ -581,12 +581,12 @@ export default function CampaignsPage() {
                       {curlCopies.map((copy, i) => (
                         <div key={i}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                            <Shuffle size={11} color="#a1a1aa" />
-                            <span style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 600 }}>Copy {i + 1}</span>
+                            <Shuffle size={11} color="var(--text-faint)" />
+                            <span style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: 600 }}>Copy {i + 1}</span>
                             {curlCopies.length > 1 && (
-                              <button onClick={() => removeCurlCopy(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#d4d4d8', padding: '2px', display: 'flex' }}
+                              <button onClick={() => removeCurlCopy(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '2px', display: 'flex' }}
                                 onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
-                                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#d4d4d8'}>
+                                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'}>
                                 <X size={12} />
                               </button>
                             )}
@@ -598,7 +598,7 @@ export default function CampaignsPage() {
                       ))}
                     </div>
                     {validCurlCopies.length > 1 && (
-                      <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
+                      <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
                         🎲 {validCurlCopies.length} copies — cada contato recebe uma aleatoriamente
                       </p>
                     )}
@@ -609,10 +609,10 @@ export default function CampaignsPage() {
               {/* Contatos */}
               <div>
                 <Lbl>Destinatários</Lbl>
-                <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '10px' }}>
                   {[{ v: 'segment', label: 'Segmento', Icon: Tag }, { v: 'manual', label: 'Lista manual', Icon: Upload }].map(({ v, label, Icon }) => (
                     <button key={v} onClick={() => setContactMode(v as any)}
-                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: contactMode === v ? '#fff' : 'transparent', color: contactMode === v ? '#18181b' : '#71717a', boxShadow: contactMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: contactMode === v ? 'var(--bg-card)' : 'transparent', color: contactMode === v ? 'var(--text)' : 'var(--text-muted)', boxShadow: contactMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
                       <Icon size={13} /> {label}
                     </button>
                   ))}
@@ -623,18 +623,18 @@ export default function CampaignsPage() {
 
                     {/* Passo 1: Selecione as tags */}
                     <div>
-                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#18181b', marginBottom: '8px' }}>Selecione as tags dos contatos</p>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>Selecione as tags dos contatos</p>
                       {tags.length === 0 ? (
-                        <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada. Crie na página de Contatos.</p>
+                        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Nenhuma tag cadastrada. Crie na página de Contatos.</p>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {tags.map((tag: any) => {
                             const sel = selectedTagIds.includes(tag.id)
                             return (
                               <div key={tag.id} onClick={() => { setSelectedTagIds(prev => sel ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPreviewCount(null) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 11px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 11px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : 'var(--border)'}`, background: sel ? `${tag.color || '#22c55e'}12` : 'var(--bg-card)', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
                                 <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
-                                <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
+                                <span style={{ color: sel ? (tag.color || '#22c55e') : 'var(--text)' }}>{tag.name}</span>
                               </div>
                             )
                           })}
@@ -643,18 +643,18 @@ export default function CampaignsPage() {
                     </div>
 
                     {/* Passo 2: Refinar (opcional, colapsável) */}
-                    <details style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '10px', padding: '0' }}>
-                      <summary style={{ padding: '10px 14px', fontSize: '12px', fontWeight: 600, color: '#71717a', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <details style={{ background: 'var(--bg-input)', border: '1px solid var(--divider)', borderRadius: '10px', padding: '0' }}>
+                      <summary style={{ padding: '10px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Plus size={12} /> Refinar segmento (opcional)
                       </summary>
                       <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                           <div>
-                            <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Inativos há quantos dias?</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Inativos há quantos dias?</p>
                             <input type="number" min="0" style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segNoInteraction || ''} placeholder="Ex: 30" onChange={e => { setSegNoInteraction(Number(e.target.value) || 0); setPreviewCount(null) }} />
                           </div>
                           <div>
-                            <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Como o contato chegou?</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Como o contato chegou?</p>
                             <select style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segOrigin} onChange={e => { setSegOrigin(e.target.value); setPreviewCount(null) }}>
                               <option value="">Qualquer origem</option>
                               <option value="manual">Cadastro manual</option>
@@ -665,7 +665,7 @@ export default function CampaignsPage() {
                           </div>
                         </div>
                         <div>
-                          <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Filtrar por campo personalizado</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Filtrar por campo personalizado</p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                             <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Nome do campo" value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
                             <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Valor" value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
@@ -676,7 +676,7 @@ export default function CampaignsPage() {
 
                     {/* Preview */}
                     <button onClick={loadPreview} disabled={!hasSegmentFilter || loadingPreview}
-                      style={{ width: '100%', padding: '9px', background: previewCount !== null ? '#f0fdf4' : hasSegmentFilter ? '#f0f9ff' : '#fafafa', border: `1px solid ${previewCount !== null ? '#bbf7d0' : hasSegmentFilter ? '#bae6fd' : '#e4e4e7'}`, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: previewCount !== null ? '#15803d' : hasSegmentFilter ? '#0369a1' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      style={{ width: '100%', padding: '9px', background: previewCount !== null ? '#f0fdf4' : hasSegmentFilter ? '#f0f9ff' : 'var(--bg-input)', border: `1px solid ${previewCount !== null ? '#bbf7d0' : hasSegmentFilter ? '#bae6fd' : 'var(--border)'}`, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: previewCount !== null ? '#15803d' : hasSegmentFilter ? '#0369a1' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                       {loadingPreview ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : previewCount !== null ? <CheckCheck size={13} /> : <Search size={13} />}
                       {previewCount !== null ? `${previewCount} contatos encontrados` : 'Ver quantos contatos serão enviados'}
                     </button>
@@ -684,11 +684,11 @@ export default function CampaignsPage() {
                 ) : (
                   <>
                     <div onClick={() => fileRef.current?.click()}
-                      style={{ border: '2px dashed #e4e4e7', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa', transition: 'all 0.15s' }}
+                      style={{ border: '2px dashed var(--border)', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: 'var(--bg-input)', transition: 'all 0.15s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}>
-                      <Upload size={14} color="#a1a1aa" style={{ margin: '0 auto 5px' }} />
-                      <p style={{ fontSize: '13px', color: '#71717a', margin: 0 }}>Upload <strong style={{ color: '#18181b' }}>.csv</strong></p>
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-input)' }}>
+                      <Upload size={14} color="var(--text-faint)" style={{ margin: '0 auto 5px' }} />
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>Upload <strong style={{ color: 'var(--text)' }}>.csv</strong></p>
                     </div>
                     <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
                     <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
@@ -714,10 +714,10 @@ export default function CampaignsPage() {
                       if (!isNaN(val)) setMessagesPerMin(Math.min(1200, Math.max(1, val)))
                     }}
                     onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
-                    onBlur={e => { (e.target as HTMLInputElement).style.borderColor = '#e4e4e7'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
-                  <span style={{ fontSize: '13px', color: '#71717a' }}>msg/min por canal</span>
+                    onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>msg/min por canal</span>
                 </div>
-                <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
                   {speedHint(messagesPerMin, contactsText, selectedChannels.length)}
                 </p>
               </div>
@@ -725,10 +725,10 @@ export default function CampaignsPage() {
               {/* Quando disparar */}
               <div>
                 <Lbl>Quando disparar?</Lbl>
-                <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '12px' }}>
                   {[{ v: 'now', label: 'Disparar agora', Icon: Send }, { v: 'scheduled', label: 'Agendar', Icon: Calendar }].map(({ v, label, Icon }) => (
                     <button key={v} onClick={() => setScheduleMode(v as any)}
-                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: scheduleMode === v ? '#fff' : 'transparent', color: scheduleMode === v ? '#18181b' : '#71717a', boxShadow: scheduleMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: scheduleMode === v ? 'var(--bg-card)' : 'transparent', color: scheduleMode === v ? 'var(--text)' : 'var(--text-muted)', boxShadow: scheduleMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                       <Icon size={12} /> {label}
                     </button>
                   ))}
@@ -756,7 +756,7 @@ export default function CampaignsPage() {
                     { v: 'monthly', label: 'Mensalmente' },
                   ].map(({ v, label }) => (
                     <button key={v} onClick={() => setRecurrence(v as any)}
-                      style={{ padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: `1.5px solid ${recurrence === v ? '#7c3aed' : '#e4e4e7'}`, background: recurrence === v ? '#f5f3ff' : '#fff', color: recurrence === v ? '#7c3aed' : '#71717a', cursor: 'pointer', transition: 'all 0.1s' }}>
+                      style={{ padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: `1.5px solid ${recurrence === v ? '#7c3aed' : 'var(--border)'}`, background: recurrence === v ? '#f5f3ff' : 'var(--bg-card)', color: recurrence === v ? '#7c3aed' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.1s' }}>
                       {label}
                     </button>
                   ))}
@@ -770,12 +770,12 @@ export default function CampaignsPage() {
               </div>
             </div>
 
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #f4f4f5', display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <button onClick={() => { setShowModal(false); resetModal() }} style={{ flex: 1, padding: '10px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13.5px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--divider)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button onClick={() => { setShowModal(false); resetModal() }} style={{ flex: 1, padding: '10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13.5px', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 500 }}>
                 Cancelar
               </button>
               <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !isValid}
-                style={{ flex: 1, padding: '10px', background: !isValid || createMutation.isPending ? '#d4d4d8' : scheduleMode === 'scheduled' ? '#7c3aed' : '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, cursor: !isValid || createMutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.12s' }}>
+                style={{ flex: 1, padding: '10px', background: !isValid || createMutation.isPending ? 'var(--text-faintest)' : scheduleMode === 'scheduled' ? '#7c3aed' : '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, cursor: !isValid || createMutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.12s' }}>
                 {createMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : scheduleMode === 'scheduled' ? <Calendar size={14} /> : <Send size={14} />}
                 {scheduleMode === 'scheduled' ? 'Agendar' : 'Criar e disparar'}
               </button>
