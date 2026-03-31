@@ -17,7 +17,90 @@ interface FlowContext {
   phone: string
   messageBody: string
   isFirstMessage: boolean
-  webhookData?: Record<string, any>  // dados brutos do formulário externo
+  webhookData?: Record<string, string>
+}
+
+interface FlowRow {
+  id: string
+  tenant_id: string
+  channel_id: string | null
+  is_active: boolean
+  cooldown_type?: 'always' | '24h' | 'once'
+  sort_order: number
+  created_at: string
+}
+
+interface FlowNodeData {
+  keywords?: string[]
+  matchType?: 'equals' | 'contains'
+  message?: string
+  delay?: number
+  mediaUrl?: string
+  caption?: string
+  filename?: string
+  question?: string
+  saveAs?: string
+  url?: string
+  method?: string
+  body?: string
+  saveResponseAs?: string
+  responseField?: string
+  branches?: ConditionBranch[]
+  conditionType?: string
+  field?: string
+  operator?: string
+  value?: string
+  tagId?: string
+  customField?: string
+  stage?: string
+  pipelineId?: string
+  targetFlowId?: string
+  times?: number
+  maxRetries?: number
+  maxIterations?: number
+  conditionField?: string
+  conditionOperator?: string
+  conditionValue?: string
+  conditionFieldName?: string
+  apiKey?: string
+  mode?: 'respond' | 'classify' | 'extract' | 'summarize'
+  userMessage?: string
+  historyMessages?: number
+  systemPrompt?: string
+  classifyOptions?: string
+  extractField?: string
+  model?: string
+  maxTokens?: number
+  temperature?: number
+  seconds?: number
+  minutes?: number
+  hours?: number
+  days?: number | number[]
+  start?: number
+  end?: number
+  fields?: { label: string; variable: string; contactField: string }[]
+  mappings?: { from: string; to: string }[]
+}
+
+interface FlowNodeRow {
+  id: string
+  flow_id: string
+  type: string
+  data: FlowNodeData
+}
+
+interface FlowEdgeRow {
+  source_node: string
+  source_handle: string | null
+  target_node: string
+}
+
+interface NodeResult {
+  success: boolean
+  paused?: boolean
+  ended?: boolean
+  delayed?: boolean
+  nextHandle?: string
 }
 
 interface ConditionRule {
@@ -87,7 +170,7 @@ export class FlowEngine {
 
       // Injeta os dados do webhook como variáveis disponíveis no flow
       // Ex: {{webhook_full_name}}, {{webhook_phone_number}}, {{webhook_email}}
-      const variables: Record<string, any> = {}
+      const variables: Record<string, string> = {}
       if (ctx.webhookData) {
         for (const [key, val] of Object.entries(ctx.webhookData)) {
           variables[`webhook_${key}`] = String(val ?? '')
@@ -101,7 +184,7 @@ export class FlowEngine {
     }
   }
 
-  async resumeFromNode(nodeId: string, ctx: FlowContext, flow: any, variables: Record<string, any>, loopCounters: Record<string, number>, edgeMap: Map<string, any[]>, nodeMap: Map<string, any>, stateId: string): Promise<void> {
+  async resumeFromNode(nodeId: string, ctx: FlowContext, flow: FlowRow, variables: Record<string, string>, loopCounters: Record<string, number>, edgeMap: Map<string, FlowEdgeRow[]>, nodeMap: Map<string, FlowNodeRow>, stateId: string): Promise<void> {
     let currentNode = nodeMap.get(nodeId) || null
     let stepCount = 0
     while (currentNode && stepCount < 100) {
@@ -132,15 +215,15 @@ export class FlowEngine {
 
     const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
-    const nodeMap = new Map((nodes || []).map((n: any) => [n.id, n]))
-    const edgeMap = new Map<string, any[]>()
-    for (const edge of (edges || [])) {
+    const nodeMap = new Map((nodes || []).map((n: FlowNodeRow) => [n.id, n]))
+    const edgeMap = new Map<string, FlowEdgeRow[]>()
+    for (const edge of (edges || []) as FlowEdgeRow[]) {
       const key = `${edge.source_node}:${edge.source_handle || 'success'}`
       if (!edgeMap.has(key)) edgeMap.set(key, [])
       edgeMap.get(key)!.push(edge)
     }
 
-    let currentNode: any = state.pending_condition_node_id
+    let currentNode: FlowNodeRow | null = state.pending_condition_node_id
       ? nodeMap.get(state.pending_condition_node_id) || null
       : this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
 
@@ -165,7 +248,7 @@ export class FlowEngine {
     return true
   }
 
-  private async isOnCooldown(flow: any, ctx: FlowContext): Promise<boolean> {
+  private async isOnCooldown(flow: FlowRow, ctx: FlowContext): Promise<boolean> {
     const cooldownType = flow.cooldown_type || '24h'
     if (cooldownType === 'always') return false
     const { data } = await db.from('flow_logs').select('created_at').eq('flow_id', flow.id).eq('conversation_id', ctx.conversationId).eq('status', 'flow_executed').order('created_at', { ascending: false }).limit(1)
@@ -176,15 +259,15 @@ export class FlowEngine {
     return false
   }
 
-  private async checkFlowTrigger(flow: any, ctx: FlowContext): Promise<boolean> {
+  private async checkFlowTrigger(flow: FlowRow, ctx: FlowContext): Promise<boolean> {
     const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     if (!nodes || nodes.length === 0) return false
-    const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
+    const triggerNode = (nodes as FlowNodeRow[]).find(n => n.type.startsWith('trigger_'))
     if (!triggerNode) return false
     return this.evaluateTrigger(triggerNode, ctx)
   }
 
-  private evaluateTrigger(node: any, ctx: FlowContext): boolean {
+  private evaluateTrigger(node: FlowNodeRow, ctx: FlowContext): boolean {
     const { type, data } = node
     switch (type) {
       case 'trigger_keyword': {
@@ -192,7 +275,7 @@ export class FlowEngine {
         if (keywords.length === 0) return false
         const body = (ctx.messageBody || '').toLowerCase().trim()
         const matchType = data?.matchType || 'contains'
-        return keywords.some((kw: string) => {
+        return keywords.some(kw => {
           const k = kw.toLowerCase().trim()
           return matchType === 'equals' ? body === k : body.includes(k)
         })
@@ -203,7 +286,7 @@ export class FlowEngine {
         if (keywords.length === 0) return true
         const body = (ctx.messageBody || '').toLowerCase().trim()
         const matchType = data?.matchType || 'contains'
-        return keywords.some((kw: string) => {
+        return keywords.some(kw => {
           const k = kw.toLowerCase().trim()
           return matchType === 'equals' ? body === k : body.includes(k)
         })
@@ -215,7 +298,7 @@ export class FlowEngine {
       case 'trigger_outside_hours': {
         const start = data?.start ?? 9
         const end = data?.end ?? 18
-        const days = data?.days ?? [1, 2, 3, 4, 5]
+        const days = (Array.isArray(data?.days) ? data.days : [1, 2, 3, 4, 5]) as number[]
         const now = new Date()
         return !days.includes(now.getDay()) || now.getHours() < start || now.getHours() >= end
       }
@@ -223,20 +306,20 @@ export class FlowEngine {
     }
   }
 
-  private async executeFlow(flow: any, ctx: FlowContext, variables: Record<string, any>): Promise<void> {
+  private async executeFlow(flow: FlowRow, ctx: FlowContext, variables: Record<string, string>): Promise<void> {
     const { data: nodes } = await db.from('flow_nodes').select('*').eq('flow_id', flow.id)
     const { data: edges } = await db.from('flow_edges').select('*').eq('flow_id', flow.id)
     if (!nodes || nodes.length === 0) return
 
-    const nodeMap = new Map(nodes.map((n: any) => [n.id, n]))
-    const edgeMap = new Map<string, any[]>()
-    for (const edge of (edges || [])) {
+    const nodeMap = new Map((nodes as FlowNodeRow[]).map(n => [n.id, n]))
+    const edgeMap = new Map<string, FlowEdgeRow[]>()
+    for (const edge of (edges || []) as FlowEdgeRow[]) {
       const key = `${edge.source_node}:${edge.source_handle || 'success'}`
       if (!edgeMap.has(key)) edgeMap.set(key, [])
       edgeMap.get(key)!.push(edge)
     }
 
-    const triggerNode = nodes.find((n: any) => n.type.startsWith('trigger_'))
+    const triggerNode = (nodes as FlowNodeRow[]).find(n => n.type.startsWith('trigger_'))
     if (!triggerNode) return
 
     let currentNode = this.getNextNode(triggerNode.id, 'success', edgeMap, nodeMap)
@@ -255,7 +338,7 @@ export class FlowEngine {
     logger.info('Flow executed', { flowId: flow.id, steps: stepCount })
   }
 
-  private getNextNode(nodeId: string, handle: string, edgeMap: Map<string, any[]>, nodeMap: Map<string, any>): any | null {
+  private getNextNode(nodeId: string, handle: string, edgeMap: Map<string, FlowEdgeRow[]>, nodeMap: Map<string, FlowNodeRow>): FlowNodeRow | null {
     const key = `${nodeId}:${handle}`
     const edges = edgeMap.get(key)
     if (!edges || edges.length === 0) return null
@@ -263,10 +346,10 @@ export class FlowEngine {
   }
 
   private async executeNode(
-    node: any, ctx: FlowContext, flowId: string,
-    variables: Record<string, any>, loopCounters: Record<string, number>,
-    edgeMap: Map<string, any[]>, nodeMap: Map<string, any>, stateId: string | null
-  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean; delayed?: boolean; nextHandle?: string }> {
+    node: FlowNodeRow, ctx: FlowContext, flowId: string,
+    variables: Record<string, string>, loopCounters: Record<string, number>,
+    edgeMap: Map<string, FlowEdgeRow[]>, nodeMap: Map<string, FlowNodeRow>, stateId: string | null
+  ): Promise<NodeResult> {
     const { type, data } = node
 
     try {
@@ -322,7 +405,7 @@ export class FlowEngine {
         }
 
         case 'wait': {
-          const totalMs = ((data?.seconds || 0) + (data?.minutes || 0) * 60 + (data?.hours || 0) * 3600 + (data?.days || 0) * 86400) * 1000
+          const totalMs = ((data?.seconds || 0) + (data?.minutes || 0) * 60 + (data?.hours || 0) * 3600 + (Number(data?.days) || 0) * 86400) * 1000
           if (totalMs <= 0) break
           if (totalMs <= 300_000) { await new Promise(r => setTimeout(r, totalMs)); break }
           const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
@@ -396,7 +479,7 @@ export class FlowEngine {
           if (maxHistory > 0) {
             const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
             const { data: history } = await db.from('messages').select('direction, body, content_type, created_at').eq('conversation_id', ctx.conversationId).eq('tenant_id', ctx.tenantId).in('content_type', ['text']).not('body', 'is', null).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }).limit(maxHistory)
-            historyMessages = (history || []).reverse().filter((m: any) => m.body?.trim()).map((m: any) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: m.body }))
+            historyMessages = (history || []).reverse().filter((m: { body?: string }) => m.body?.trim()).map((m: { direction: string; body: string }) => ({ role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.body }))
           }
           let messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
           if (aiMode === 'respond') {
@@ -432,7 +515,7 @@ export class FlowEngine {
           if (data?.saveResponseAs) {
             try {
               const json = JSON.parse(responseText)
-              if (data?.responseField) { const fieldValue = data.responseField.split('.').reduce((obj: any, key: string) => obj?.[key], json); variables[data.saveResponseAs] = String(fieldValue ?? responseText) }
+              if (data?.responseField) { const fieldValue = data.responseField.split('.').reduce((obj: Record<string, unknown>, key: string) => (obj?.[key] as Record<string, unknown>), json); variables[data.saveResponseAs] = String(fieldValue ?? responseText) }
               else { variables[data.saveResponseAs] = responseText }
             } catch { variables[data.saveResponseAs] = responseText }
           }
@@ -474,7 +557,7 @@ export class FlowEngine {
         case 'create_contact': {
           // Campos padrão configurados pelo usuário
           // fields: [{ label: 'Telefone', variable: '{{webhook_phone}}', contactField: 'phone' }, ...]
-          const fields: any[] = data?.fields || []
+          const fields = data?.fields || []
 
           const get = (variable: string) => this.interpolate(variable || '', ctx, variables).trim()
 
@@ -509,7 +592,7 @@ export class FlowEngine {
           if (existingContact) {
             contactId = existingContact.id
             const metadata = { ...(existingContact.metadata || {}), ...extraFields }
-            const update: any = { last_interaction_at: new Date(), metadata }
+            const update: Record<string, unknown> = { last_interaction_at: new Date(), metadata }
             if (name) update.name = name
             if (email) update.email = email
             await db.from('contacts').update(update).eq('id', contactId)
@@ -569,7 +652,7 @@ export class FlowEngine {
         case 'map_fields': {
           // Mapeia campos do webhook para variáveis com nomes limpos
           // mappings: [{ from: '{{webhook_phone}}', to: 'telefone' }, ...]
-          const mappings: any[] = data?.mappings || []
+          const mappings = data?.mappings || []
           for (const m of mappings) {
             if (!m.from || !m.to) continue
             const val = this.interpolate(m.from, ctx, variables)
@@ -577,7 +660,7 @@ export class FlowEngine {
           }
 
           // Se mapeou telefone, atualiza o contato
-          const phoneVar = mappings.find((m: any) => m.to === 'telefone' || m.to === 'phone')
+          const phoneVar = mappings.find(m => m.to === 'telefone' || m.to === 'phone')
           if (phoneVar) {
             const newPhone = this.interpolate(phoneVar.from, ctx, variables).replace(/\D/g, '')
             if (newPhone && newPhone !== ctx.phone) {
@@ -592,14 +675,14 @@ export class FlowEngine {
           }
 
           // Atualiza nome se mapeado
-          const nameVar = mappings.find((m: any) => m.to === 'nome' || m.to === 'name')
+          const nameVar = mappings.find(m => m.to === 'nome' || m.to === 'name')
           if (nameVar) {
             const newName = this.interpolate(nameVar.from, ctx, variables)
             if (newName) await db.from('contacts').update({ name: newName }).eq('id', ctx.contactId)
           }
 
           // Atualiza email se mapeado
-          const emailVar = mappings.find((m: any) => m.to === 'email')
+          const emailVar = mappings.find(m => m.to === 'email')
           if (emailVar) {
             const newEmail = this.interpolate(emailVar.from, ctx, variables)
             if (newEmail) await db.from('contacts').update({ email: newEmail }).eq('id', ctx.contactId)
@@ -621,12 +704,12 @@ export class FlowEngine {
         }
 
         case 'update_contact': {
-          const updateData: any = {}
+          const updateData: Record<string, string | Record<string, string>> = {}
           if (data?.field === 'name' && data?.value) { updateData.name = this.interpolate(data.value, ctx, variables) }
           else if (data?.field === 'phone' && data?.value) { updateData.phone = this.interpolate(data.value, ctx, variables) }
           else if (data?.field === 'custom' && data?.customField && data?.value) {
             const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
-            const metadata = contact?.metadata || {}
+            const metadata: Record<string, string> = contact?.metadata || {}
             metadata[data.customField] = this.interpolate(data.value, ctx, variables)
             updateData.metadata = metadata
           }
@@ -669,14 +752,15 @@ export class FlowEngine {
       await this.logNode(flowId, node.id, ctx, 'success', `Nó ${type} executado`)
       return { success: true }
 
-    } catch (err: any) {
-      logger.error('Flow node error', { nodeId: node.id, type, err: err.message })
-      await this.logNode(flowId, node.id, ctx, 'error', err.message)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error('Flow node error', { nodeId: node.id, type, err: message })
+      await this.logNode(flowId, node.id, ctx, 'error', message)
       return { success: false }
     }
   }
 
-  private evaluateLoopCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
+  private evaluateLoopCondition(data: FlowNodeData, ctx: FlowContext, variables: Record<string, string>): boolean {
     const field = data?.conditionField || 'variable'
     const operator = data?.conditionOperator || 'is_empty'
     const value = (data?.conditionValue || '').toLowerCase()
@@ -695,14 +779,14 @@ export class FlowEngine {
     }
   }
 
-  private evaluateBranch(branch: ConditionBranch, ctx: FlowContext, variables: Record<string, any>): boolean {
+  private evaluateBranch(branch: ConditionBranch, ctx: FlowContext, variables: Record<string, string>): boolean {
     const { logic, rules } = branch
     if (!rules || rules.length === 0) return false
     if (logic === 'OR') return rules.some(rule => this.evaluateRule(rule, ctx, variables))
     return rules.every(rule => this.evaluateRule(rule, ctx, variables))
   }
 
-  private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, any>): boolean {
+  private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, string>): boolean {
     let fv = ''
     if (rule.field === 'message') fv = ctx.messageBody || ''
     else if (rule.field === 'variable') fv = variables[rule.fieldName || rule.field] || ''
@@ -724,7 +808,7 @@ export class FlowEngine {
     }
   }
 
-  private evaluateCondition(data: any, ctx: FlowContext, variables: Record<string, any>): boolean {
+  private evaluateCondition(data: FlowNodeData, ctx: FlowContext, variables: Record<string, string>): boolean {
     const { conditionType, field, operator, value } = data || {}
     let fv = ''
     if (conditionType === 'message') fv = ctx.messageBody || ''
@@ -746,7 +830,7 @@ export class FlowEngine {
     }
   }
 
-  private interpolate(template: string, ctx: FlowContext, variables: Record<string, any> = {}): string {
+  private interpolate(template: string, ctx: FlowContext, variables: Record<string, string> = {}): string {
     let result = template
       .replace(/\{\{phone\}\}/gi, ctx.phone)
       .replace(/\{\{telefone\}\}/gi, ctx.phone)
