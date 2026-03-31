@@ -2,6 +2,7 @@ import { Worker, Queue } from 'bullmq'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
 import { flowEngine } from '../services/flow.engine'
+import { ensureConversation } from '../services/contact.helper'
 
 const REDIS_URL = process.env.REDIS_URL!
 
@@ -72,23 +73,13 @@ export function startManualFlowWorker(): Worker {
       const { data: flow } = await db.from('flows').select('*').eq('id', flowId).eq('tenant_id', tenantId).single()
       if (!flow || !flow.is_active) return
 
-      // Busca ou cria conversa para o contato
-      const { data: existingConv } = await db.from('conversations').select('id')
-        .eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId)
-        .in('status', ['open', 'waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-      let conversationId: string
-      if (existingConv) {
-        conversationId = existingConv.id
-      } else {
-        const { generateId } = await import('@autozap/utils')
-        const { data: channel } = await db.from('channels').select('type').eq('id', channelId).single()
-        const { data: newConv } = await db.from('conversations')
-          .insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channel?.type || 'whatsapp', status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 0, last_message: `Flow manual: ${contactName}`, last_message_at: new Date() })
-          .select('id').single()
-        if (!newConv) return
-        conversationId = newConv.id
-      }
+      // Busca ou cria conversa para o contato usando helper centralizado
+      const { data: channel } = await db.from('channels').select('type').eq('id', channelId).single()
+      const { conversationId } = await ensureConversation({
+        tenantId, contactId, channelId,
+        channelType: channel?.type || 'whatsapp',
+        lastMessage: `Flow manual: ${contactName}`,
+      })
 
       await flowEngine.processWebhookFlow(flowId, {
         tenantId, channelId, contactId, conversationId, phone,

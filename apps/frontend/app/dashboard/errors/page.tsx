@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw, AlertCircle, Trash2 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
+import { useT } from '@/lib/i18n'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +22,7 @@ const ERROR_LABELS: Record<string, string> = {
 }
 
 export default function ErrorDashboard() {
+  const t = useT()
   const [clearing, setClearing] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
@@ -56,7 +58,7 @@ export default function ErrorDashboard() {
   const lastError = errors[0]
 
   async function clearErrors() {
-    if (!confirm('Limpar todos os erros? Esta ação não pode ser desfeita.')) return
+    if (!confirm(t('errors.confirmClear'))) return
     setClearing(true)
     await supabase.from('message_errors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await refetch()
@@ -68,17 +70,17 @@ export default function ErrorDashboard() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Dashboard de Erros WhatsApp</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Visualização de erros do sistema de disparo</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('errors.dashboardTitle')}</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>{t('errors.viewSubtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => refetch()}
             style={{ padding: '8px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <RefreshCw size={13} /> Atualizar Dados
+            <RefreshCw size={13} /> {t('errors.refresh')}
           </button>
           <button onClick={clearErrors} disabled={clearing}
             style={{ padding: '8px 14px', background: '#ef4444', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: clearing ? 0.5 : 1 }}>
-            <Trash2 size={13} /> Limpar Erros
+            <Trash2 size={13} /> {t('errors.clear')}
           </button>
         </div>
       </div>
@@ -86,37 +88,37 @@ export default function ErrorDashboard() {
       {/* Cards de resumo */}
       <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>Total de Erros</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>{t('errors.totalErrors')}</p>
           <p style={{ fontSize: '32px', fontWeight: 700, color: '#2563eb', margin: 0 }}>{errors.length.toLocaleString()}</p>
-          {lastError && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Atualizado em: {new Date(lastError.created_at).toLocaleString('pt-BR')}</p>}
+          {lastError && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>{t('errors.updatedAt')} {new Date(lastError.created_at).toLocaleString('pt-BR')}</p>}
         </div>
 
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>Último Erro</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>{t('errors.lastError')}</p>
           <p style={{ fontSize: '32px', fontWeight: 700, color: '#2563eb', margin: 0 }}>{lastError?.error_code || '—'}</p>
-          {lastError && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Data do último erro</p>}
+          {lastError && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>{t('errors.lastErrorDate')}</p>}
         </div>
 
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>Número com Mais Erros</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 8px' }}>{t('errors.topPhone')}</p>
           <p style={{ fontSize: '24px', fontWeight: 700, color: '#2563eb', margin: 0 }}>{topPhone?.[0] || '—'}</p>
-          {topPhone && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>{topPhone[1]} registros</p>}
+          {topPhone && <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>{topPhone[1]} {t('errors.records')}</p>}
         </div>
       </div>
 
       {/* Resumo por código */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', margin: '0 0 16px' }}>Erros por código</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', margin: '0 0 16px' }}>{t('errors.byCode')}</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           {Object.entries(byCode).sort((a, b) => b[1] - a[1]).map(([code, count]) => (
             <div key={code} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626' }}>{code}</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ERROR_LABELS[code] || 'Erro desconhecido'}</span>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>{count} ocorrências</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ERROR_LABELS[code] || t('errors.unknownError')}</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>{count} {t('errors.occurrences')}</span>
             </div>
           ))}
           {Object.keys(byCode).length === 0 && (
-            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>Nenhum erro registrado</p>
+            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>{t('errors.noErrors')}</p>
           )}
         </div>
       </div>
@@ -124,20 +126,20 @@ export default function ErrorDashboard() {
       {/* Tabela de erros */}
       <div className="mobile-scroll-x" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--divider)' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Registros de Erro</h2>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>{t('errors.errorRecords')}</h2>
         </div>
 
         {isLoading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-faint)' }}>Carregando...</div>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-faint)' }}>{t('common.loading')}</div>
         ) : errors.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center' }}>
             <AlertCircle size={28} color="var(--border)" style={{ margin: '0 auto 8px' }} />
-            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>Nenhum erro registrado</p>
+            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>{t('errors.noErrors')}</p>
           </div>
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '100px 140px 1fr 200px 160px', gap: '8px', padding: '10px 20px', background: 'var(--bg-input)', borderBottom: '1px solid var(--divider)' }}>
-              {['Código', 'Número', 'Mensagem', 'Message ID', 'Data/Hora'].map(h => (
+              {[t('errors.code'), t('errors.number'), t('errors.message'), 'Message ID', t('errors.dateTime')].map(h => (
                 <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
               ))}
             </div>

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
+import { useT } from '@/lib/i18n'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
@@ -92,6 +93,7 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: 
 }
 
 function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void; onSaved: () => void; tenantId: string }) {
+  const t = useT()
   const [fields, setFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -126,31 +128,31 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
       <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Campos personalizados</h3><p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>Adicione campos extras aos seus contatos</p></div>
+          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('contacts.customFieldsTitle')}</h3><p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{t('contacts.customFieldsSubtitle')}</p></div>
           <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-muted)' }}><X size={15} /></button>
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
           <div style={{ background: 'var(--bg-input)', border: '1px solid var(--divider)', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Novo campo</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('contacts.newField')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px', marginBottom: '10px' }}>
-              <div><label style={lbl}>Nome do campo</label><input style={inp} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} /></div>
-              <div><label style={lbl}>Tipo</label><select style={{ ...inp, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}><option value="text">Texto</option><option value="number">Número</option><option value="date">Data</option><option value="select">Seleção</option></select></div>
+              <div><label style={lbl}>{t('contacts.fieldName')}</label><input style={inp} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} /></div>
+              <div><label style={lbl}>{t('contacts.fieldType')}</label><select style={{ ...inp, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}><option value="text">Texto</option><option value="number">Número</option><option value="date">Data</option><option value="select">Seleção</option></select></div>
             </div>
             {newField.type === 'select' && <div style={{ marginBottom: '10px' }}><label style={lbl}>Opções (separadas por vírgula)</label><input style={inp} placeholder="Ex: Ativo, Inativo, Pendente" value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} /></div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#52525b' }}>
-                <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} /> Campo obrigatório
+                <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} /> {t('contacts.requiredField')}
               </label>
               <button onClick={handleAddField} disabled={!newField.label.trim() || saving}
                 style={{ padding: '8px 16px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newField.label.trim() ? 0.5 : 1 }}>
-                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Adicionar
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} {t('contacts.addField')}
               </button>
             </div>
           </div>
           {loading ? <div style={{ textAlign: 'center', padding: '30px' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
-            : fields.length === 0 ? <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-faint)', fontSize: '14px' }}>Nenhum campo criado ainda.</div>
+            : fields.length === 0 ? <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-faint)', fontSize: '14px' }}>{t('contacts.noFields')}</div>
             : <div>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campos ativos ({fields.length})</p>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('contacts.activeFields')} ({fields.length})</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {fields.map((field, index) => {
                   const ts = FIELD_TYPE_COLORS[field.type]
@@ -179,11 +181,11 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
                   )
                 })}
               </div>
-              <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '10px' }}>Arraste para reordenar.</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '10px' }}>{t('contacts.dragToReorder')}</p>
             </div>}
         </div>
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 18px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Fechar</button>
+          <button onClick={onClose} style={{ padding: '8px 18px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>{t('contacts.close')}</button>
         </div>
       </div>
     </div>
@@ -191,6 +193,7 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
 }
 
 function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const t = useT()
   const [rows, setRows] = useState<any[]>([])
   const [error, setError] = useState('')
   const [step, setStep] = useState<'upload' | 'preview'>('upload')
@@ -237,7 +240,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
       <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Importar contatos</h3><p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>Suporte: .xlsx, .xls, .csv</p></div>
+          <div><h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('contacts.importTitle')}</h3><p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{t('contacts.importSupport')}</p></div>
           <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-muted)' }}><X size={15} /></button>
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
@@ -246,13 +249,13 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               onClick={() => document.getElementById('excel-input')?.click()}
               style={{ border: `2px dashed ${isDragging ? '#22c55e' : 'var(--border)'}`, borderRadius: '10px', padding: '40px 20px', textAlign: 'center', background: isDragging ? '#f0fdf4' : 'var(--bg-input)', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '16px' }}>
               <FileSpreadsheet size={36} color={isDragging ? '#22c55e' : 'var(--text-faintest)'} style={{ margin: '0 auto 12px' }} />
-              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{isDragging ? 'Solte aqui' : 'Arraste ou clique para selecionar'}</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{isDragging ? t('contacts.dropHere') : t('contacts.dragOrClick')}</p>
               <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>.xlsx, .xls ou .csv — até 10MB</p>
               <input id="excel-input" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
             </div>
             {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '14px' }}><AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} /><span style={{ fontSize: '13px', color: '#dc2626' }}>{error}</span></div>}
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Colunas reconhecidas</p>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('contacts.recognizedColumns')}</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {[['telefone / phone', 'obrigatório'],['nome / name','opcional'],['email','opcional'],['empresa / company','opcional']].map(([col, req]) => (
                   <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -267,11 +270,11 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{validRows.length}</div>
-                <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>contatos válidos</div>
+                <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>{t('contacts.validContacts')}</div>
               </div>
               <div style={{ background: invalidCount > 0 ? '#fef2f2' : 'var(--bg-input)', border: `1px solid ${invalidCount > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: '8px', padding: '12px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: invalidCount > 0 ? '#ef4444' : 'var(--text-faint)', lineHeight: 1 }}>{invalidCount}</div>
-                <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : 'var(--text-faint)', marginTop: '4px' }}>sem telefone</div>
+                <div style={{ fontSize: '12px', color: invalidCount > 0 ? '#dc2626' : 'var(--text-faint)', marginTop: '4px' }}>{t('contacts.noPhone')}</div>
               </div>
             </div>
             <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>

@@ -10,6 +10,7 @@ import {
   UserCheck, Eye, RotateCcw, ToggleLeft, ToggleRight, Settings,
   ChevronLeft,
 } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -22,10 +23,12 @@ const labelStyle: React.CSSProperties = {
   color: '#52525b', marginBottom: '5px', letterSpacing: '0.01em',
 }
 
-const ROLES = [
-  { value: 'supervisor', label: 'Supervisor', desc: 'Acesso configurável a páginas e canais', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: Eye },
-  { value: 'agent',      label: 'Atendente',  desc: 'Acesso configurável a páginas e canais', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: UserCheck },
-]
+function getRoles(t: (key: string) => string) {
+  return [
+    { value: 'supervisor', label: t('team.supervisor'), desc: t('team.supervisorDesc'), color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: Eye },
+    { value: 'agent',      label: t('team.agent'),      desc: t('team.agentDesc'),      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: UserCheck },
+  ]
+}
 
 const ALL_PAGES = [
   { href: '/dashboard',           label: 'Dashboard' },
@@ -38,19 +41,24 @@ const ALL_PAGES = [
   { href: '/dashboard/channels',  label: 'Canais' },
 ]
 
-const CAMPAIGN_ACCESS_OPTIONS = [
-  { value: 'none',   label: 'Sem acesso',  desc: 'Não vê campanhas' },
-  { value: 'view',   label: 'Visualizar',  desc: 'Só leitura' },
-  { value: 'create', label: 'Criar',       desc: 'Pode criar, não disparar' },
-  { value: 'manage', label: 'Gerenciar',   desc: 'Criar e disparar' },
-]
+function getCampaignAccessOptions(t: (key: string) => string) {
+  return [
+    { value: 'none',   label: t('team.campaignNone'),   desc: t('team.campaignNoneDesc') },
+    { value: 'view',   label: t('team.campaignView'),   desc: t('team.campaignViewDesc') },
+    { value: 'create', label: t('team.campaignCreate'), desc: t('team.campaignCreateDesc') },
+    { value: 'manage', label: t('team.campaignManage'), desc: t('team.campaignManageDesc') },
+  ]
+}
 
-const CONVERSATION_ACCESS_OPTIONS = [
-  { value: 'assigned', label: 'Atribuídas', desc: 'Só as conversas atribuídas a ele' },
-  { value: 'all',      label: 'Todas',      desc: 'Todas as conversas do canal' },
-]
+function getConversationAccessOptions(t: (key: string) => string) {
+  return [
+    { value: 'assigned', label: t('team.assigned'),          desc: t('team.assignedDesc') },
+    { value: 'all',      label: t('team.allConversations'),  desc: t('team.allConversationsDesc') },
+  ]
+}
 
-function getRoleInfo(role: string) {
+function getRoleInfo(role: string, t: (key: string) => string) {
+  const ROLES = getRoles(t)
   return ROLES.find(r => r.value === role) || { value: role, label: role === 'admin' ? 'Admin' : role === 'owner' ? 'Owner' : role, desc: '', color: 'var(--text-muted)', bg: 'var(--bg-input)', border: 'var(--border)', icon: Eye }
 }
 function getInitials(name: string) { return (name || '??').trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() }
@@ -64,6 +72,7 @@ function getAvatarColor(name: string) {
 }
 
 function PermissionsPanel({ member, onClose }: { member: any; onClose: () => void }) {
+  const t = useT()
   const queryClient = useQueryClient()
 
   const { data: channels = [] } = useQuery({
@@ -108,7 +117,10 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
     update('allowed_channels', next)
   }
 
-  const roleInfo = getRoleInfo(member.role)
+  const ROLES = getRoles(t)
+  const CAMPAIGN_ACCESS_OPTIONS = getCampaignAccessOptions(t)
+  const CONVERSATION_ACCESS_OPTIONS = getConversationAccessOptions(t)
+  const roleInfo = getRoleInfo(member.role, t)
   const RoleIcon = roleInfo.icon
   const hasChanges = perms !== null
   const av = getAvatarColor(member.name)
@@ -134,12 +146,12 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
         {hasChanges && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
             <button onClick={() => setPerms(null)} style={{ padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#52525b' }}>
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
               style={{ padding: '6px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               {saveMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />}
-              Salvar
+              {t('common.save')}
             </button>
           </div>
         )}
@@ -152,7 +164,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
 
           {/* Páginas */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📄 Páginas permitidas</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📄 {t('team.allowedPages')}</p>
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {ALL_PAGES.map(page => {
                 const isChecked = (effectivePerms.allowed_pages || []).includes(page.href)
@@ -164,7 +176,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
                       {isChecked && <Check size={9} color="#fff" strokeWidth={3} />}
                     </div>
                     <span style={{ fontSize: '12px', fontWeight: isChecked ? 600 : 400, color: isChecked ? '#15803d' : 'var(--text-muted)' }}>{page.label}</span>
-                    {isLocked && <span style={{ fontSize: '9px', color: 'var(--text-faint)' }}>fixo</span>}
+                    {isLocked && <span style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{t('team.fixed')}</span>}
                   </div>
                 )
               })}

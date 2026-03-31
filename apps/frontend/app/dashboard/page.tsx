@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { campaignApi, conversationApi, contactApi, tenantApi, channelApi, authApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
+import { useT } from '@/lib/i18n'
 import {
   Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp,
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
@@ -11,11 +12,11 @@ import {
 import { useAuthStore } from '@/store/auth.store'
 import { GridSkeleton } from '@/components/ui/skeleton'
 
-function getGreeting() {
+function getGreeting(t: (key: string) => string) {
   const h = new Date().getHours()
-  if (h < 12) return 'Bom dia'
-  if (h < 18) return 'Boa tarde'
-  return 'Boa noite'
+  if (h < 12) return t('dashboard.goodMorning')
+  if (h < 18) return t('dashboard.goodAfternoon')
+  return t('dashboard.goodEvening')
 }
 
 function formatResponseTime(minutes: number | null): string {
@@ -29,10 +30,11 @@ function formatResponseTime(minutes: number | null): string {
 
 function OnboardingBanner({ channels, templates, campaigns }: { channels: any[]; templates: any[]; campaigns: any[] }) {
   const router = useRouter()
+  const t = useT()
   const steps = [
-    { id: 'channel',  label: 'Conectar canal WhatsApp', desc: 'Configure seu número no Gupshup e cole o webhook', icon: Radio,    done: channels.length > 0,  href: '/dashboard/channels',  btnLabel: 'Configurar canal' },
-    { id: 'template', label: 'Cadastrar template',       desc: 'Adicione um template aprovado no Gupshup',        icon: FileText, done: templates.length > 0, href: '/dashboard/templates', btnLabel: 'Cadastrar template' },
-    { id: 'campaign', label: 'Criar sua primeira campanha', desc: 'Importe contatos e dispare sua primeira mensagem', icon: Megaphone, done: campaigns.length > 0, href: '/dashboard/campaigns', btnLabel: 'Criar campanha' },
+    { id: 'channel',  label: t('dashboard.onboarding.connectChannel'), desc: t('dashboard.onboarding.connectChannelDesc'), icon: Radio,    done: channels.length > 0,  href: '/dashboard/channels',  btnLabel: t('dashboard.onboarding.configureChannel') },
+    { id: 'template', label: t('dashboard.onboarding.registerTemplate'),       desc: t('dashboard.onboarding.registerTemplateDesc'),        icon: FileText, done: templates.length > 0, href: '/dashboard/templates', btnLabel: t('dashboard.onboarding.registerTemplate') },
+    { id: 'campaign', label: t('dashboard.onboarding.createFirstCampaign'), desc: t('dashboard.onboarding.createFirstCampaignDesc'), icon: Megaphone, done: campaigns.length > 0, href: '/dashboard/campaigns', btnLabel: t('dashboard.onboarding.createCampaign') },
   ]
   const completedCount = steps.filter(s => s.done).length
   if (completedCount === steps.length) return null
@@ -44,10 +46,10 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Zap size={15} color="#22c55e" fill="#22c55e" />
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Configure o AutoZap</h3>
-            <span style={{ fontSize: '11px', fontWeight: 600, background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: '99px', border: '1px solid #bbf7d0' }}>{completedCount}/{steps.length} concluídos</span>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{t('dashboard.onboarding.title')}</h3>
+            <span style={{ fontSize: '11px', fontWeight: 600, background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: '99px', border: '1px solid #bbf7d0' }}>{completedCount}/{steps.length} {t('dashboard.onboarding.completed')}</span>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Siga os passos abaixo para começar a disparar campanhas</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('dashboard.onboarding.subtitle')}</p>
         </div>
         <span style={{ fontSize: '13px', fontWeight: 700, color: '#22c55e' }}>{pct}%</span>
       </div>
@@ -120,6 +122,7 @@ function StatCard({ label, value, icon: Icon, color, bg, onClick }: any) {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const t = useT()
   const { user } = useAuthStore()
   const role = (user as any)?.role || 'agent'
 
@@ -160,10 +163,10 @@ export default function DashboardPage() {
   const maxVal = Math.max(...days.map(d => byDay[d]?.sent || 0), 1)
 
   const metricCards = [
-    { label: 'Campanhas',         value: campaigns?.length ?? 0,     sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} em andamento`, icon: Megaphone,    color: '#2563eb', bg: '#eff6ff', href: '/dashboard/campaigns' },
-    { label: 'Contatos',          value: contactsMeta?.total ?? 0,   sub: 'na sua base',                                                                         icon: Users,        color: '#7c3aed', bg: '#f5f3ff', href: '/dashboard/contacts' },
-    { label: 'Conversas abertas', value: conversations?.length ?? 0, sub: `${conversations?.filter((c: any) => c.unread_count > 0).length || 0} não lidas`,      icon: MessageSquare, color: '#22c55e', bg: '#f0fdf4', href: '/dashboard/inbox' },
-    { label: 'Mensagens este mês', value: usage?.sent ?? 0,          sub: `de ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} disponíveis`, icon: Send,        color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
+    { label: t('dashboard.campaigns'),         value: campaigns?.length ?? 0,     sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} ${t('dashboard.inProgress')}`, icon: Megaphone,    color: '#2563eb', bg: '#eff6ff', href: '/dashboard/campaigns' },
+    { label: t('dashboard.contacts'),          value: contactsMeta?.total ?? 0,   sub: t('dashboard.inYourBase'),                                                                         icon: Users,        color: '#7c3aed', bg: '#f5f3ff', href: '/dashboard/contacts' },
+    { label: t('dashboard.openConversations'), value: conversations?.length ?? 0, sub: `${conversations?.filter((c: any) => c.unread_count > 0).length || 0} ${t('dashboard.unread')}`,      icon: MessageSquare, color: '#22c55e', bg: '#f0fdf4', href: '/dashboard/inbox' },
+    { label: t('dashboard.messagesThisMonth'), value: usage?.sent ?? 0,          sub: `${t('dashboard.of')} ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} ${t('dashboard.available')}`, icon: Send,        color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
   ]
 
   return (
@@ -171,8 +174,8 @@ export default function DashboardPage() {
 
       {/* Saudação */}
       <div className="mobile-header" style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting()}! 👋</h1>
-        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>Aqui está o resumo da sua conta hoje.</p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting(t)}! 👋</h1>
+        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
       </div>
 
       <OnboardingBanner channels={channels || []} templates={templates || []} campaigns={campaigns || []} />
@@ -190,19 +193,19 @@ export default function DashboardPage() {
 
       {/* Taxa cards */}
       <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        <StatCard label="Enviadas (30 dias)" value={totalSent.toLocaleString()} icon={Send}       color="#2563eb" bg="#eff6ff" />
-        <StatCard label="Taxa de entrega"    value={`${deliveryRate}%`}          icon={CheckCheck} color="#22c55e" bg="#f0fdf4" />
-        <StatCard label="Taxa de leitura"    value={`${readRate}%`}              icon={Eye}        color="#7c3aed" bg="#f5f3ff" />
+        <StatCard label={t('dashboard.sent30days')} value={totalSent.toLocaleString()} icon={Send}       color="#2563eb" bg="#eff6ff" />
+        <StatCard label={t('dashboard.deliveryRate')}    value={`${deliveryRate}%`}          icon={CheckCheck} color="#22c55e" bg="#f0fdf4" />
+        <StatCard label={t('dashboard.readRate')}    value={`${readRate}%`}              icon={Eye}        color="#7c3aed" bg="#f5f3ff" />
       </div>
 
       {/* Seletor de atendente (só owner/admin) */}
       {(role === 'owner' || role === 'admin') && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: 'var(--shadow)' }}>
           <UserCheck size={15} color="var(--text-faint)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>Ver desempenho de:</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>{t('dashboard.viewPerformanceOf')}</span>
           <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
             style={{ padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer', minWidth: '200px' }}>
-            <option value="">Toda a equipe</option>
+            <option value="">{t('dashboard.wholeTeam')}</option>
             {(teamMembers || []).map((m: any) => (
               <option key={m.id} value={m.id}>{m.name || m.email}</option>
             ))}
@@ -212,7 +215,7 @@ export default function DashboardPage() {
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}>
-              <X size={13} /> Limpar
+              <X size={13} /> {t('dashboard.clear')}
             </button>
           )}
         </div>
@@ -221,17 +224,17 @@ export default function DashboardPage() {
       {/* Métricas do atendente selecionado */}
       {selectedAgent && (
         <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-          <StatCard label="Conversas abertas atribuídas"  value={agentConversations ?? '—'}              icon={MessageSquare} color="#22c55e" bg="#f0fdf4" />
-          <StatCard label="Conversas fechadas (7 dias)"   value={agentClosedLast7d ?? '—'}               icon={CheckCheck}    color="#2563eb" bg="#eff6ff" />
-          <StatCard label="Tempo médio de resposta (7d)"  value={formatResponseTime(avgResponseMinutes)} icon={Clock}         color="#ea580c" bg="#fff7ed" />
+          <StatCard label={t('dashboard.assignedOpenConvs')}  value={agentConversations ?? '—'}              icon={MessageSquare} color="#22c55e" bg="#f0fdf4" />
+          <StatCard label={t('dashboard.closedConvs7d')}   value={agentClosedLast7d ?? '—'}               icon={CheckCheck}    color="#2563eb" bg="#eff6ff" />
+          <StatCard label={t('dashboard.avgResponseTime7d')}  value={formatResponseTime(avgResponseMinutes)} icon={Clock}         color="#ea580c" bg="#fff7ed" />
         </div>
       )}
 
       {/* Métricas operacionais */}
       <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        <StatCard label="Tempo médio de resposta (7d)"       value={formatResponseTime(avgResponseMinutes)} icon={Clock}      color="#ea580c" bg="#fff7ed" />
-        <StatCard label="Flows disparados hoje"               value={activeFlowsToday}                       icon={Workflow}   color="#22c55e" bg="#f0fdf4" onClick={() => router.push('/dashboard/flows')} />
-        <StatCard label="Atendentes com conversas abertas"   value={byAgent.length}                          icon={UserCheck}  color="#2563eb" bg="#eff6ff" />
+        <StatCard label={t('dashboard.avgResponseTime7d')}       value={formatResponseTime(avgResponseMinutes)} icon={Clock}      color="#ea580c" bg="#fff7ed" />
+        <StatCard label={t('dashboard.flowsFiredToday')}               value={activeFlowsToday}                       icon={Workflow}   color="#22c55e" bg="#f0fdf4" onClick={() => router.push('/dashboard/flows')} />
+        <StatCard label={t('dashboard.agentsWithOpen')}   value={byAgent.length}                          icon={UserCheck}  color="#2563eb" bg="#eff6ff" />
       </div>
 
       {/* Gráfico + Conversas por atendente */}
@@ -240,11 +243,11 @@ export default function DashboardPage() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Mensagens enviadas</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos 30 dias</p>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.messagesSent')}</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{t('dashboard.last30days')}</p>
             </div>
             <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: 'var(--text-faint)' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> Enviadas
+              <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> {t('dashboard.sent')}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '140px', paddingBottom: '24px', position: 'relative' }}>
@@ -255,7 +258,7 @@ export default function DashboardPage() {
               const sent = byDay[day]?.sent || 0
               return (
                 <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                  <div title={`${day}: ${sent} enviadas`}
+                  <div title={`${day}: ${sent} ${t('dashboard.sent').toLowerCase()}`}
                     style={{ width: '100%', maxWidth: '18px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#22c55e', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#16a34a'}
                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#22c55e'} />
@@ -264,17 +267,17 @@ export default function DashboardPage() {
               )
             })}
           </div>
-          {totalSent === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Nenhuma mensagem enviada nos últimos 30 dias</div>}
+          {totalSent === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noMessagesSent30d')}</div>}
         </div>
 
         {/* Conversas por atendente */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
           <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Por atendente</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Conversas abertas atribuídas</p>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.byAgent')}</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{t('dashboard.assignedOpenConvs')}</p>
           </div>
           {byAgent.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Nenhuma conversa atribuída</div>
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noAssignedConvs')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {byAgent.map((agent, i) => {
@@ -303,14 +306,14 @@ export default function DashboardPage() {
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
           <TrendingUp size={14} color="#22c55e" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>Acesso rápido</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>{t('dashboard.quickAccess')}</span>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Nova campanha',     href: '/dashboard/campaigns', primary: true,  roles: ['owner', 'admin'] },
-            { label: 'Importar contatos', href: '/dashboard/contacts',  primary: false, roles: ['owner', 'admin', 'supervisor'] },
-            { label: 'Abrir inbox',       href: '/dashboard/inbox',     primary: false, roles: ['owner', 'admin', 'supervisor', 'agent'] },
-            { label: 'Ver plano',         href: '/dashboard/settings',  primary: false, roles: ['owner', 'admin'] },
+            { label: t('dashboard.newCampaign'),     href: '/dashboard/campaigns', primary: true,  roles: ['owner', 'admin'] },
+            { label: t('dashboard.importContacts'), href: '/dashboard/contacts',  primary: false, roles: ['owner', 'admin', 'supervisor'] },
+            { label: t('dashboard.openInbox'),       href: '/dashboard/inbox',     primary: false, roles: ['owner', 'admin', 'supervisor', 'agent'] },
+            { label: t('dashboard.viewPlan'),         href: '/dashboard/settings',  primary: false, roles: ['owner', 'admin'] },
           ].filter(item => item.roles.includes(role)).map(({ label, href, primary }) => (
             <button key={href} onClick={() => router.push(href)}
               style={{ padding: '8px 16px', background: primary ? '#22c55e' : 'var(--bg-input)', border: primary ? 'none' : '1px solid var(--border)', borderRadius: '8px', color: primary ? '#fff' : 'var(--text-muted)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.1s' }}

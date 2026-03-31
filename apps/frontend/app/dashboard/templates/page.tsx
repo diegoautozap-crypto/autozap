@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, X, Check, Loader2, Pencil, Trash2, FileText, ChevronDown } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -26,6 +27,7 @@ const CATEGORIES = [
 const emptyForm = { name: '', templateId: '', body: '', category: 'marketing', variables: '' }
 
 export default function TemplatesPage() {
+  const t = useT()
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -59,12 +61,12 @@ export default function TemplatesPage() {
       })
     },
     onSuccess: () => {
-      toast.success('Template criado!')
+      toast.success(t('templates.successCreated'))
       queryClient.invalidateQueries({ queryKey: ['templates'] })
       setShowForm(false)
       setForm(emptyForm)
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao criar template'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('templates.errorCreate')),
   })
 
   const editMutation = useMutation({

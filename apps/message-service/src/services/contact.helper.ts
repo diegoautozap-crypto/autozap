@@ -8,6 +8,7 @@ interface EnsureContactOpts {
   email?: string
   origin?: string
   metadata?: Record<string, string> | null
+  mergeMetadata?: boolean
 }
 
 interface EnsureConversationOpts {
@@ -47,10 +48,18 @@ export async function ensureContact(opts: EnsureContactOpts): Promise<{ contactI
 
   // Atualiza campos extras se contato já existia
   if (name || email || metadata) {
+    // Se mergeMetadata, lê o existente e faz merge
+    let finalMetadata = metadata
+    if (metadata && opts.mergeMetadata) {
+      const { data: existing } = await db.from('contacts').select('metadata').eq('id', upserted.id).single()
+      if (existing?.metadata) {
+        finalMetadata = { ...(existing.metadata as Record<string, string>), ...metadata }
+      }
+    }
     const update: Record<string, unknown> = { last_interaction_at: new Date() }
     if (name) update.name = name
     if (email) update.email = email
-    if (metadata) update.metadata = metadata
+    if (finalMetadata) update.metadata = finalMetadata
     await db.from('contacts').update(update).eq('id', upserted.id)
   }
 

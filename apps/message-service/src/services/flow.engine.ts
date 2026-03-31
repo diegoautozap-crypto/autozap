@@ -1,6 +1,7 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { generateId, normalizeBRPhone } from '@autozap/utils'
+import { ensureContact, ensureConversation } from './contact.helper'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
@@ -595,47 +596,20 @@ export class FlowEngine {
           // Normaliza telefone
           const finalPhone = phone ? normalizeBRPhone(phone) : `webhook_${Date.now()}`
 
-          // Cria ou atualiza contato
-          const { data: existingContact } = await db
-            .from('contacts').select('id, metadata').eq('tenant_id', ctx.tenantId).eq('phone', finalPhone).maybeSingle()
+          const metadata = Object.keys(extraFields).length > 0 ? extraFields : null
+          const notePreview = name ? `Lead: ${name}` : `Lead via webhook`
 
-          let contactId: string
-          if (existingContact) {
-            contactId = existingContact.id
-            const metadata = { ...(existingContact.metadata || {}), ...extraFields }
-            const update: Record<string, unknown> = { last_interaction_at: new Date(), metadata }
-            if (name) update.name = name
-            if (email) update.email = email
-            await db.from('contacts').update(update).eq('id', contactId).eq('tenant_id', ctx.tenantId)
-          } else {
-            const metadata = Object.keys(extraFields).length > 0 ? extraFields : null
-            const { data: newContact } = await db
-              .from('contacts')
-              .insert({ id: generateId(), tenant_id: ctx.tenantId, phone: finalPhone, name: name || finalPhone, email: email || null, origin: 'webhook', status: 'active', metadata, last_interaction_at: new Date() })
-              .select('id').single()
-            if (!newContact) break
-            contactId = newContact.id
-          }
+          // Usa helpers centralizados para criar/atualizar contato e conversa
+          const { contactId } = await ensureContact({
+            tenantId: ctx.tenantId, phone: finalPhone, name: name || undefined,
+            email: email || undefined, origin: 'webhook', metadata, mergeMetadata: true,
+          })
 
-          // Cria ou reutiliza conversa
-          const { data: existingConv } = await db
-            .from('conversations').select('id').eq('tenant_id', ctx.tenantId).eq('contact_id', contactId)
-            .eq('channel_id', ctx.channelId).in('status', ['open', 'waiting'])
-            .order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-          let conversationId: string
-          if (existingConv) {
-            conversationId = existingConv.id
-          } else {
-            const { data: channel } = await db.from('channels').select('type').eq('id', ctx.channelId).single()
-            const notePreview = name ? `Lead: ${name}` : `Lead via webhook`
-            const { data: newConv } = await db
-              .from('conversations')
-              .insert({ id: generateId(), tenant_id: ctx.tenantId, contact_id: contactId, channel_id: ctx.channelId, channel_type: channel?.type || 'whatsapp', status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message: notePreview, last_message_at: new Date() })
-              .select('id').single()
-            if (!newConv) break
-            conversationId = newConv.id
-          }
+          const { data: channel } = await db.from('channels').select('type').eq('id', ctx.channelId).single()
+          const { conversationId } = await ensureConversation({
+            tenantId: ctx.tenantId, contactId, channelId: ctx.channelId,
+            channelType: channel?.type || 'whatsapp', lastMessage: notePreview,
+          })
 
           // Salva nota interna com todos os dados organizados
           const noteLines = ['📋 Lead criado via webhook']

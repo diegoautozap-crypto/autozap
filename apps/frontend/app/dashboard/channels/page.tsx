@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { channelApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 
 const WEBHOOK_BASE = process.env.NEXT_PUBLIC_CHANNEL_SERVICE_URL || ''
 
@@ -27,6 +28,7 @@ const CHANNEL_LIMITS: Record<string, number> = {
 const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '' }
 
 export default function ChannelsPage() {
+  const t = useT()
   const queryClient = useQueryClient()
   const [showForm, setShowForm]     = useState(false)
   const [editingId, setEditingId]   = useState<string | null>(null)
@@ -82,8 +84,8 @@ export default function ChannelsPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>Canais</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>Configure seus números do WhatsApp via Gupshup</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>{t('channels.title')}</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>{t('channels.configure')}</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : 'var(--bg-card)', border: `1px solid ${atLimit ? '#fecaca' : 'var(--border)'}`, padding: '4px 12px', borderRadius: '99px' }}>
@@ -94,14 +96,14 @@ export default function ChannelsPage() {
             style={{ padding: '8px 16px', background: atLimit ? 'var(--border)' : '#22c55e', color: atLimit ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
             onMouseEnter={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
-            <Plus size={14} /> Novo canal
+            <Plus size={14} /> {t('channels.new')}
           </button>
         </div>
       </div>
 
       {/* Guia rápido */}
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '16px 18px', marginBottom: '20px' }}>
-        <p style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8', marginBottom: '8px' }}>📋 Como configurar</p>
+        <p style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8', marginBottom: '8px' }}>📋 {t('channels.howTo')}</p>
         <ol style={{ fontSize: '13px', color: '#374151', lineHeight: 1.9, paddingLeft: '18px', margin: 0 }}>
           <li>Crie uma conta em <a href="https://gupshup.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 500 }}>gupshup.io</a> e crie um app WhatsApp</li>
           <li>Copie o <strong>API Key</strong> e o número <strong>Source</strong> do dashboard do Gupshup</li>
@@ -116,8 +118,8 @@ export default function ChannelsPage() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text)', margin: 0 }}>{editingId ? 'Editar canal' : 'Novo canal Gupshup'}</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{editingId ? 'Atualize as credenciais do canal' : 'Preencha as credenciais do Gupshup'}</p>
+              <h3 style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text)', margin: 0 }}>{editingId ? t('channels.editChannel') : t('channels.newChannelForm')}</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{editingId ? t('channels.updateCredentials') : t('channels.fillCredentials')}</p>
             </div>
             <button onClick={closeForm} style={{ background: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)', padding: '7px', display: 'flex' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--border)' }}
@@ -150,9 +152,9 @@ export default function ChannelsPage() {
             <button onClick={handleSubmit} disabled={isPending || !form.name || !form.apiKey || !form.source}
               style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: !form.name || !form.apiKey || !form.source ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !form.name || !form.apiKey || !form.source ? 0.5 : 1 }}>
               {isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              {editingId ? 'Salvar alterações' : 'Criar canal'}
+              {editingId ? t('channels.saveChanges') : t('channels.createChannel')}
             </button>
-            <button onClick={closeForm} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>Cancelar</button>
+            <button onClick={closeForm} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#52525b', fontWeight: 500 }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -165,9 +167,9 @@ export default function ChannelsPage() {
           <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
             <Radio size={24} color="var(--text-faintest)" />
           </div>
-          <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhum canal configurado</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 18px' }}>Conecte seu número do WhatsApp para começar</p>
-          <button onClick={() => setShowForm(true)} style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Novo canal</button>
+          <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('channels.noChannels')}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 18px' }}>{t('channels.connectToStart')}</p>
+          <button onClick={() => setShowForm(true)} style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ {t('channels.new')}</button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -193,7 +195,7 @@ export default function ChannelsPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '99px' }}>
                       <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
-                      Ativo
+                      {t('channels.active')}
                     </div>
                     <button onClick={() => openEdit(ch)} title="Editar canal"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
@@ -201,7 +203,7 @@ export default function ChannelsPage() {
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Pencil size={13} />
                     </button>
-                    <button onClick={() => { if (confirm('Remover canal?')) deleteMutation.mutate(ch.id) }}
+                    <button onClick={() => { if (confirm(t('channels.confirmDelete'))) deleteMutation.mutate(ch.id) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
@@ -249,7 +251,7 @@ export default function ChannelsPage() {
                   {!ch.hasMetaToken && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '7px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px' }}>
                       <span style={{ fontSize: '13px' }}>⚠️</span>
-                      <p style={{ fontSize: '11.5px', color: '#92400e', margin: 0, fontWeight: 500 }}>Token do Meta não configurado — mídias recebidas não serão exibidas</p>
+                      <p style={{ fontSize: '11.5px', color: '#92400e', margin: 0, fontWeight: 500 }}>{t('channels.metaTokenWarning')}</p>
                     </div>
                   )}
                 </div>

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { createClient } from '@supabase/supabase-js'
+import { useT } from '@/lib/i18n'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,12 +21,7 @@ const supabase = createClient(
 
 const CONVERSATION_SERVICE_URL = process.env.NEXT_PUBLIC_CONVERSATION_SERVICE_URL || ''
 
-const statusFilters = [
-  { key: 'all',     label: 'Todas' },
-  { key: 'open',    label: 'Abertas' },
-  { key: 'waiting', label: 'Aguardando' },
-  { key: 'closed',  label: 'Fechadas' },
-]
+// statusFilters moved inside InboxPage to use i18n
 
 function cleanText(t: string) { return (t || '').replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\n/g, '\n') }
 function getInitials(n: string | undefined | null) { return ((n || '??').trim().slice(0, 2)).toUpperCase() }
@@ -62,25 +58,26 @@ function MessageStatusIcon({ status }: { status: string }) {
   return <Check size={11} color="#fff" style={{ opacity: 0.3 }} />
 }
 function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: boolean; channelId?: string; tenantId?: string }) {
+  const t = useT()
   const tc = isOut ? '#fff' : 'var(--text)'
   const sc = isOut ? 'rgba(255,255,255,0.65)' : 'var(--text-faint)'
   const type = msg.content_type || 'text'
   const url = getMediaUrl(msg.media_url, channelId, tenantId)
   if (type === 'image') return (
     <div>
-      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>[Imagem]</p>}
+      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.image')}</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
     </div>
   )
   if (type === 'audio') return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Music size={13} color={tc} /><span style={{ fontSize: '12px', color: sc }}>Áudio</span></div>
-      {url ? <audio controls style={{ maxWidth: '220px', height: '34px' }}><source src={url} /></audio> : <p style={{ fontSize: '13px', color: sc }}>[Áudio não disponível]</p>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Music size={13} color={tc} /><span style={{ fontSize: '12px', color: sc }}>{t('inbox.audio')}</span></div>
+      {url ? <audio controls style={{ maxWidth: '220px', height: '34px' }}><source src={url} /></audio> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.audioUnavailable')}</p>}
     </div>
   )
   if (type === 'video') return (
     <div>
-      {url ? <video controls style={{ maxWidth: '240px', borderRadius: '8px', display: 'block' }}><source src={url} /></video> : <p style={{ fontSize: '13px', color: sc }}>[Vídeo não disponível]</p>}
+      {url ? <video controls style={{ maxWidth: '240px', borderRadius: '8px', display: 'block' }}><source src={url} /></video> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.videoUnavailable')}</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc }}>{cleanText(msg.body)}</p>}
     </div>
   )
@@ -92,7 +89,7 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
           <FileText size={20} color={isOut ? '#fff' : 'var(--text-muted)'} />
           <div>
             <p style={{ fontSize: '13px', fontWeight: 500, color: tc, margin: 0 }}>{String(fn).slice(0, 30)}{String(fn).length > 30 ? '...' : ''}</p>
-            <p style={{ fontSize: '11px', color: sc, margin: 0 }}>Clique para abrir</p>
+            <p style={{ fontSize: '11px', color: sc, margin: 0 }}>{t('inbox.clickToOpen')}</p>
           </div>
         </div>
       </a>
@@ -102,6 +99,7 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
 }
 
 function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
+  const t = useT()
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -114,8 +112,8 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   })
   const createMutation = useMutation({
     mutationFn: async () => { await conversationApi.post('/quick-replies', { title: newTitle, body: newBody }) },
-    onSuccess: () => { toast.success('Resposta rápida criada!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
-    onError: () => toast.error('Erro ao criar'),
+    onSuccess: () => { toast.success('OK'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
+    onError: () => toast.error('Error'),
   })
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await conversationApi.delete(`/quick-replies/${id}`) },
@@ -126,9 +124,9 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   return (
     <div style={{ position: 'absolute', bottom: '60px', left: '14px', right: '14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', zIndex: 50, maxHeight: '360px', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Zap size={14} color="#22c55e" /><span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Respostas rápidas</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Zap size={14} color="#22c55e" /><span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{t('inbox.quickReplies')}</span></div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={() => setShowForm(!showForm)} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}><Plus size={12} /> Nova</button>
+          <button onClick={() => setShowForm(!showForm)} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}><Plus size={12} /> {t('inbox.new')}</button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faint)', display: 'flex' }}><X size={16} /></button>
         </div>
       </div>
@@ -137,8 +135,8 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
           <input style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder="Título (ex: Saudação)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
           <textarea style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', resize: 'none' as const, height: '60px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder="Texto da resposta..." value={newBody} onChange={e => setNewBody(e.target.value)} />
           <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-            <button onClick={() => createMutation.mutate()} disabled={!newTitle || !newBody || createMutation.isPending} style={{ padding: '5px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (!newTitle || !newBody) ? 0.5 : 1 }}>Salvar</button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '5px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-muted)' }}>Cancelar</button>
+            <button onClick={() => createMutation.mutate()} disabled={!newTitle || !newBody || createMutation.isPending} style={{ padding: '5px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (!newTitle || !newBody) ? 0.5 : 1 }}>{t('common.save')}</button>
+            <button onClick={() => setShowForm(false)} style={{ padding: '5px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-muted)' }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -147,7 +145,7 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {isLoading ? <div style={{ padding: '20px', textAlign: 'center' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
-          : filtered.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px' }}>{(replies as any[]).length === 0 ? 'Nenhuma resposta rápida criada ainda' : 'Nenhum resultado'}</div>
+          : filtered.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px' }}>{(replies as any[]).length === 0 ? t('inbox.noQuickReplies') : t('inbox.noResults')}</div>
           : filtered.map((r: any) => (
             <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--divider)', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '8px' }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card-hover)'}
@@ -169,6 +167,7 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
 }
 
 function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: string; contactTags: any[]; onChanged: () => void }) {
+  const t = useT()
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const [open, setOpen] = useState(false)
@@ -187,7 +186,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
       if (activeIds.has(tag.id)) await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
       else await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
       onChanged()
-    } catch { toast.error('Erro ao atualizar tag') }
+    } catch { toast.error('Error') }
     setLoading(null)
   }
 
@@ -208,7 +207,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
         <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow)', padding: '6px', minWidth: '160px', marginTop: '4px' }}
           onMouseLeave={() => setOpen(false)}>
           {(allTags as any[]).length === 0
-            ? <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '6px 8px', margin: 0 }}>Nenhuma tag criada</p>
+            ? <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '6px 8px', margin: 0 }}>{t('inbox.noTagsCreated')}</p>
             : (allTags as any[]).map((tag: any) => {
               const active = activeIds.has(tag.id)
               return (

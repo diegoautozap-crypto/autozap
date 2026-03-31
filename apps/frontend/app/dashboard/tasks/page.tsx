@@ -8,6 +8,7 @@ import {
   CheckSquare, Plus, Trash2, Loader2, Calendar, AlertTriangle,
   User, Clock, X, Flag,
 } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,10 +69,10 @@ function dueDateColor(dueDate: string | null, status: string): string {
   return 'var(--text-faint)'
 }
 
-function priorityConfig(p: string): { label: string; bg: string; color: string } {
-  if (p === 'high') return { label: 'Alta', bg: '#fef2f2', color: '#dc2626' }
-  if (p === 'medium') return { label: 'Média', bg: '#fffbeb', color: '#d97706' }
-  return { label: 'Baixa', bg: 'var(--bg)', color: 'var(--text-muted)' }
+function priorityConfig(p: string, t: (key: string) => string): { label: string; bg: string; color: string } {
+  if (p === 'high') return { label: t('tasks.priorityHigh'), bg: '#fef2f2', color: '#dc2626' }
+  if (p === 'medium') return { label: t('tasks.priorityMedium'), bg: '#fffbeb', color: '#d97706' }
+  return { label: t('tasks.priorityLow'), bg: 'var(--bg)', color: 'var(--text-muted)' }
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -91,19 +92,20 @@ const selectStyle: React.CSSProperties = {
 
 type FilterTab = 'all' | 'pending' | 'overdue' | 'today' | 'completed'
 
-const filterTabs: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'Todas' },
-  { key: 'pending', label: 'Pendentes' },
-  { key: 'overdue', label: 'Atrasadas' },
-  { key: 'today', label: 'Hoje' },
-  { key: 'completed', label: 'Concluídas' },
-]
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
+  const t = useT()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
+
+  const filterTabs: { key: FilterTab; label: string }[] = [
+    { key: 'all', label: t('tasks.all') },
+    { key: 'pending', label: t('tasks.pending') },
+    { key: 'overdue', label: t('tasks.overdue') },
+    { key: 'today', label: t('tasks.today') },
+    { key: 'completed', label: t('tasks.completed') },
+  ]
   const [showModal, setShowModal] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
@@ -213,9 +215,9 @@ export default function TasksPage() {
             <CheckSquare size={20} color="#22c55e" />
           </div>
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Tarefas</h1>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('tasks.title')}</h1>
             <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
-              Gerencie todas as tarefas da equipe
+              {t('tasks.subtitle')}
             </p>
           </div>
         </div>
@@ -232,7 +234,7 @@ export default function TasksPage() {
           onMouseEnter={e => (e.currentTarget.style.background = '#16a34a')}
           onMouseLeave={e => (e.currentTarget.style.background = '#22c55e')}
         >
-          <Plus size={16} /> Nova tarefa
+          <Plus size={16} /> {t('tasks.new')}
         </button>
       </div>
 
@@ -280,7 +282,7 @@ export default function TasksPage() {
       }}>
         {isLoading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '60px 0', color: 'var(--text-faint)' }}>
-            <Loader2 size={20} className="animate-spin" /> Carregando tarefas...
+            <Loader2 size={20} className="animate-spin" /> {t('tasks.loading')}
           </div>
         ) : filteredTasks.length === 0 ? (
           /* Empty state */
@@ -289,13 +291,13 @@ export default function TasksPage() {
               <CheckSquare size={26} color="var(--text-faintest)" />
             </div>
             <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-muted)', margin: '0 0 4px' }}>
-              {activeTab === 'completed' ? 'Nenhuma tarefa concluída' :
-               activeTab === 'overdue' ? 'Nenhuma tarefa atrasada' :
-               activeTab === 'today' ? 'Nenhuma tarefa para hoje' :
-               'Nenhuma tarefa encontrada'}
+              {activeTab === 'completed' ? t('tasks.completedNone') :
+               activeTab === 'overdue' ? t('tasks.overdueNone') :
+               activeTab === 'today' ? t('tasks.todayNone') :
+               t('tasks.noTasks')}
             </p>
             <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
-              {activeTab === 'overdue' ? 'Tudo em dia!' : 'Crie uma nova tarefa para comecar.'}
+              {activeTab === 'overdue' ? t('tasks.allClear') : t('tasks.createFirst')}
             </p>
           </div>
         ) : (
@@ -303,7 +305,7 @@ export default function TasksPage() {
             const completed = task.status === 'completed'
             const overdue = !completed && isOverdue(task.due_date)
             const todayTask = !completed && isToday(task.due_date)
-            const prio = priorityConfig(task.priority)
+            const prio = priorityConfig(task.priority, t)
             const contactName = task.conversations?.contacts?.name || null
             const hovered = hoveredId === task.id
 
@@ -365,7 +367,7 @@ export default function TasksPage() {
                         fontSize: '11px', fontWeight: 600, padding: '2px 8px',
                         borderRadius: '6px', background: '#fef2f2', color: '#dc2626',
                       }}>
-                        <AlertTriangle size={11} /> Atrasada
+                        <AlertTriangle size={11} /> {t('tasks.overdueBadge')}
                       </span>
                     )}
                   </div>
@@ -384,7 +386,7 @@ export default function TasksPage() {
                         fontWeight: (overdue || todayTask) ? 600 : 400,
                       }}>
                         <Calendar size={12} />
-                        {todayTask ? 'Hoje' : formatDate(task.due_date)}
+                        {todayTask ? t('tasks.todayBadge') : formatDate(task.due_date)}
                       </span>
                     )}
                   </div>
@@ -393,7 +395,7 @@ export default function TasksPage() {
                 {/* Delete button (on hover) */}
                 <button
                   onClick={() => {
-                    if (confirm('Remover esta tarefa?')) deleteMutation.mutate(task.id)
+                    if (confirm(t('tasks.confirmDelete'))) deleteMutation.mutate(task.id)
                   }}
                   style={{
                     padding: '6px', borderRadius: '6px', border: 'none',
@@ -432,7 +434,7 @@ export default function TasksPage() {
           >
             {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Nova tarefa</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('tasks.modalTitle')}</h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{ padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px', color: 'var(--text-muted)' }}
@@ -444,12 +446,12 @@ export default function TasksPage() {
             {/* Title */}
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
-                Titulo *
+                {t('tasks.titleLabel')}
               </label>
               <input
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
-                placeholder="Ex: Retornar ligacao do cliente"
+                placeholder={t('tasks.titlePlaceholder')}
                 style={inputStyle}
                 autoFocus
               />
@@ -458,12 +460,12 @@ export default function TasksPage() {
             {/* Description */}
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
-                Descricao
+                {t('tasks.descriptionLabel')}
               </label>
               <textarea
                 value={newDescription}
                 onChange={e => setNewDescription(e.target.value)}
-                placeholder="Detalhes adicionais (opcional)"
+                placeholder={t('tasks.descriptionPlaceholder')}
                 rows={3}
                 style={{ ...inputStyle, resize: 'vertical' }}
               />
@@ -473,7 +475,7 @@ export default function TasksPage() {
             <div style={{ display: 'flex', gap: '12px', marginBottom: '22px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
-                  Data limite
+                  {t('tasks.dueDate')}
                 </label>
                 <input
                   type="date"
@@ -484,16 +486,16 @@ export default function TasksPage() {
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
-                  Prioridade
+                  {t('tasks.priority')}
                 </label>
                 <select
                   value={newPriority}
                   onChange={e => setNewPriority(e.target.value as any)}
                   style={selectStyle}
                 >
-                  <option value="low">Baixa</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
+                  <option value="low">{t('tasks.priorityLow')}</option>
+                  <option value="medium">{t('tasks.priorityMedium')}</option>
+                  <option value="high">{t('tasks.priorityHigh')}</option>
                 </select>
               </div>
             </div>
@@ -509,7 +511,7 @@ export default function TasksPage() {
                   cursor: 'pointer',
                 }}
               >
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button
                 disabled={!newTitle.trim() || createMutation.isPending}
@@ -524,7 +526,7 @@ export default function TasksPage() {
                 }}
               >
                 {createMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                Criar tarefa
+                {t('tasks.create')}
               </button>
             </div>
           </div>

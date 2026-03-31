@@ -7,6 +7,7 @@ import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
+import { useT } from '@/lib/i18n'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
@@ -39,6 +40,7 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
 }
 
 export default function CampaignsPage() {
+  const t = useT()
   const queryClient = useQueryClient()
   const [showModal, setShowModal]               = useState(false)
   const [contactsText, setContactsText]         = useState('')
@@ -155,12 +157,12 @@ export default function CampaignsPage() {
         if (contactMode === 'segment' && hasSegmentFilter) payload.recurrenceFilter = buildFilter()
       }
 
-      toast.info('Criando campanha...')
+      toast.info(t('campaigns.toast.creating'))
       const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
 
       if (contactMode === 'segment' && hasSegmentFilter) {
-        toast.info('Carregando contatos por segmento...')
+        toast.info(t('campaigns.toast.loadingSegment'))
         const { data: filterResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-filter`, buildFilter())
         toast.info(`${filterResult?.data?.imported || 0} contatos carregados`)
       } else {
@@ -217,19 +219,19 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>Campanhas</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>Gerencie seus disparos em massa</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>{t('campaigns.title')}</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>{t('campaigns.subtitle')}</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => refetch()} style={{ padding: '8px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
-            <RefreshCw size={13} /> Atualizar
+            <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
-            <Plus size={14} /> Nova campanha
+            <Plus size={14} /> {t('campaigns.new')}
           </button>
         </div>
       </div>
@@ -249,17 +251,17 @@ export default function CampaignsPage() {
                   <Megaphone size={22} color="var(--text-faint)" />
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>Nenhuma campanha ainda</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>Crie seu primeiro disparo em massa</p>
+                  <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('campaigns.noCampaigns')}</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('campaigns.createFirst')}</p>
                 </div>
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                  + Criar campanha
+                  + {t('campaigns.createCampaign')}
                 </button>
               </div>
             ) : (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 120px 100px', gap: '8px', padding: '11px 20px', background: 'var(--bg-input)', borderBottom: '1px solid var(--divider)' }}>
-                  {['Campanha', 'Total', 'Enviadas', 'Status', 'Ações'].map(h => (
+                  {[t('campaigns.campaign'), 'Total', t('dashboard.sent'), 'Status', t('campaigns.actions')].map(h => (
                     <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
                 </div>
@@ -295,11 +297,11 @@ export default function CampaignsPage() {
                       <div onClick={e => e.stopPropagation()}>
                         {camp.status === 'running' ? (
                           <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                            <Pause size={10} /> Pausar
+                            <Pause size={10} /> {t('campaigns.pause')}
                           </button>
                         ) : ['draft', 'paused'].includes(camp.status) ? (
                           <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Play size={10} fill="#fff" /> Disparar
+                            <Play size={10} fill="#fff" /> {t('campaigns.send')}
                           </button>
                         ) : null}
                       </div>
@@ -346,14 +348,14 @@ export default function CampaignsPage() {
                   <div style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', display: 'flex', gap: '8px' }}>
                     <Calendar size={13} color="#a78bfa" style={{ flexShrink: 0, marginTop: '1px' }} />
                     <div>
-                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agendada para</p>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('campaigns.scheduledFor')}</p>
                       <p style={{ fontSize: '12px', color: '#c4b5fd', margin: 0 }}>{new Date(selectedCamp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>
                 )}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progresso</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('campaigns.progress')}</span>
                     <span style={{ fontSize: '18px', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.03em' }}>{pct}%</span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '99px', overflow: 'hidden' }}>
@@ -362,11 +364,11 @@ export default function CampaignsPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
                   {[
-                    { label: 'Total',     value: total,     color: 'rgba(255,255,255,0.5)', icon: BarChart2 },
-                    { label: 'Enviadas',  value: sent,      color: '#60a5fa',               icon: Send },
-                    { label: 'Entregues', value: delivered, color: '#22c55e',               icon: CheckCheck },
-                    { label: 'Lidas',     value: read,      color: '#a78bfa',               icon: TrendingUp },
-                    { label: 'Falhas',    value: failed,    color: '#f87171',               icon: AlertCircle },
+                    { label: 'Total',                    value: total,     color: 'rgba(255,255,255,0.5)', icon: BarChart2 },
+                    { label: t('campaigns.sentLabel'),  value: sent,      color: '#60a5fa',               icon: Send },
+                    { label: t('campaigns.delivered'), value: delivered, color: '#22c55e',               icon: CheckCheck },
+                    { label: t('campaigns.read'),     value: read,      color: '#a78bfa',               icon: TrendingUp },
+                    { label: t('campaigns.failures'),    value: failed,    color: '#f87171',               icon: AlertCircle },
                   ].map(({ label, value, color, icon: Icon }) => (
                     <div key={label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', padding: '9px 11px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
@@ -380,8 +382,8 @@ export default function CampaignsPage() {
                 {sent > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     {[
-                      { rate: deliveryRate, label: 'entregues', color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: CheckCheck },
-                      { rate: readRate,     label: 'lidas',     color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', icon: TrendingUp },
+                      { rate: deliveryRate, label: t('campaigns.deliveredLower'), color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: CheckCheck },
+                      { rate: readRate,     label: t('campaigns.readLower'),     color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', icon: TrendingUp },
                     ].map(({ rate, label, color, bg, border, icon: Icon }) => (
                       <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '7px', padding: '8px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -399,7 +401,7 @@ export default function CampaignsPage() {
                       style={{ width: '100%', padding: '9px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
                       onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'}>
-                      <Pause size={13} /> Pausar campanha
+                      <Pause size={13} /> {t('campaigns.pauseCampaign')}
                     </button>
                   )}
                   {['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
@@ -407,7 +409,7 @@ export default function CampaignsPage() {
                       style={{ width: '100%', padding: '9px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
                       onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
-                      <Play size={13} fill="#fff" /> {selectedCamp.status === 'scheduled' ? 'Disparar agora' : 'Disparar'}
+                      <Play size={13} fill="#fff" /> {selectedCamp.status === 'scheduled' ? t('campaigns.sendNow') : t('campaigns.send')}
                     </button>
                   )}
                   <button onClick={async () => {
@@ -425,7 +427,7 @@ export default function CampaignsPage() {
                     } catch { toast.error('Erro ao exportar') }
                   }}
                     style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                    <Download size={13} /> Exportar resultados (Excel)
+                    <Download size={13} /> {t('campaigns.exportResults')}
                   </button>
 
                   {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
@@ -435,7 +437,7 @@ export default function CampaignsPage() {
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)'}
                       onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}>
                       {deleteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />}
-                      Deletar campanha
+                      {t('campaigns.deleteCampaign')}
                     </button>
                   )}
                 </div>
@@ -446,7 +448,7 @@ export default function CampaignsPage() {
               <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                 <BarChart2 size={20} color="rgba(255,255,255,0.2)" />
               </div>
-              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Selecione uma campanha</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>{t('campaigns.selectCampaign')}</p>
             </div>
           )}
         </div>
@@ -458,8 +460,8 @@ export default function CampaignsPage() {
           <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', margin: 0 }}>Nova Campanha</h2>
-                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '3px' }}>Configure o disparo em massa</p>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', margin: 0 }}>{t('campaigns.newCampaign')}</h2>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '3px' }}>{t('campaigns.configureMassSend')}</p>
               </div>
               <button onClick={() => { setShowModal(false); resetModal() }} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px', display: 'flex' }}
                 onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--border)'}
@@ -472,15 +474,15 @@ export default function CampaignsPage() {
 
               {/* Nome */}
               <div>
-                <Lbl>Nome da campanha</Lbl>
-                <input style={inp} placeholder="Ex: Promoção Black Friday" value={campaignName} onChange={e => setCampaignName(e.target.value)}
+                <Lbl>{t('campaigns.campaignName')}</Lbl>
+                <input style={inp} placeholder={t('campaigns.campaignNamePlaceholder')} value={campaignName} onChange={e => setCampaignName(e.target.value)}
                   onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                   onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
               </div>
 
               {/* Canais */}
               <div>
-                <Lbl>Canais WhatsApp — selecione um ou mais para disparar em paralelo</Lbl>
+                <Lbl>{t('campaigns.channelsLabel')}</Lbl>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {(channels as any[]).map((ch: any) => {
                     const sel = selectedChannels.includes(ch.id)
@@ -506,7 +508,7 @@ export default function CampaignsPage() {
               {/* Toggle Template / cURL */}
               <div>
                 <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '13px' }}>
-                  {[{ v: true, label: 'Templates salvos' }, { v: false, label: 'cURL manual' }].map(opt => (
+                  {[{ v: true, label: t('campaigns.savedTemplates') }, { v: false, label: t('campaigns.manualCurl') }].map(opt => (
                     <button key={String(opt.v)} onClick={() => { setUseTemplate(opt.v); setSelectedTemplates([]); setCurlCopies(['']) }}
                       style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate === opt.v ? 'var(--bg-card)' : 'transparent', color: useTemplate === opt.v ? 'var(--text)' : 'var(--text-muted)', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
                       {opt.label}
@@ -519,13 +521,13 @@ export default function CampaignsPage() {
                   selectedChannels.length > 0 ? (
                     (templates as any[]).length === 0 ? (
                       <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '13px 15px' }}>
-                        <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 500, margin: 0 }}>Nenhum template para este canal</p>
+                        <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 500, margin: 0 }}>{t('campaigns.noTemplatesForChannel')}</p>
                       </div>
                     ) : (
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                            Templates — selecione um ou mais
+                            {t('campaigns.selectTemplates')}
                           </span>
                           {selectedTemplates.length > 0 && (
                             <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
@@ -534,7 +536,7 @@ export default function CampaignsPage() {
                           )}
                         </div>
                         <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: '0 0 8px' }}>
-                          Selecione múltiplos para rotacionar aleatoriamente entre os contatos
+                          {t('campaigns.selectMultipleToRotate')}
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
                           {(templates as any[]).map((t: any) => {
@@ -558,23 +560,23 @@ export default function CampaignsPage() {
                         </div>
                         {selectedTemplates.length > 1 && (
                           <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
-                            🎲 Cada contato receberá um dos {selectedTemplates.length} templates aleatoriamente
+                            🎲 {t('campaigns.eachContactReceivesRandom').replace('{count}', String(selectedTemplates.length))}
                           </p>
                         )}
                       </div>
                     )
                   ) : (
                     <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '14px 16px', textAlign: 'center', border: '1px solid var(--divider)' }}>
-                      <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>Selecione um canal para ver os templates</p>
+                      <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>{t('campaigns.selectChannelForTemplates')}</p>
                     </div>
                   )
                 ) : (
                   // ── Modo cURL: múltiplas copies ──
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>cURLs do Gupshup — rotacionados aleatoriamente</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>{t('campaigns.curlsRotated')}</span>
                       <button onClick={addCurlCopy} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px', color: '#16a34a', fontWeight: 600, cursor: 'pointer' }}>
-                        <Plus size={11} /> Adicionar copy
+                        <Plus size={11} /> {t('campaigns.addCopy')}
                       </button>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -599,7 +601,7 @@ export default function CampaignsPage() {
                     </div>
                     {validCurlCopies.length > 1 && (
                       <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
-                        🎲 {validCurlCopies.length} copies — cada contato recebe uma aleatoriamente
+                        🎲 {validCurlCopies.length} copies — {t('campaigns.eachContactReceivesOneRandom')}
                       </p>
                     )}
                   </div>
@@ -608,9 +610,9 @@ export default function CampaignsPage() {
 
               {/* Contatos */}
               <div>
-                <Lbl>Destinatários</Lbl>
+                <Lbl>{t('campaigns.recipients')}</Lbl>
                 <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '10px' }}>
-                  {[{ v: 'segment', label: 'Segmento', Icon: Tag }, { v: 'manual', label: 'Lista manual', Icon: Upload }].map(({ v, label, Icon }) => (
+                  {[{ v: 'segment', label: t('campaigns.segment'), Icon: Tag }, { v: 'manual', label: t('campaigns.manualList'), Icon: Upload }].map(({ v, label, Icon }) => (
                     <button key={v} onClick={() => setContactMode(v as any)}
                       style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: contactMode === v ? 'var(--bg-card)' : 'transparent', color: contactMode === v ? 'var(--text)' : 'var(--text-muted)', boxShadow: contactMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
                       <Icon size={13} /> {label}
@@ -623,9 +625,9 @@ export default function CampaignsPage() {
 
                     {/* Passo 1: Selecione as tags */}
                     <div>
-                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>Selecione as tags dos contatos</p>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>{t('campaigns.selectContactTags')}</p>
                       {tags.length === 0 ? (
-                        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Nenhuma tag cadastrada. Crie na página de Contatos.</p>
+                        <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{t('campaigns.noTagsRegistered')}</p>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {tags.map((tag: any) => {
@@ -645,30 +647,30 @@ export default function CampaignsPage() {
                     {/* Passo 2: Refinar (opcional, colapsável) */}
                     <details style={{ background: 'var(--bg-input)', border: '1px solid var(--divider)', borderRadius: '10px', padding: '0' }}>
                       <summary style={{ padding: '10px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Plus size={12} /> Refinar segmento (opcional)
+                        <Plus size={12} /> {t('campaigns.refineSegment')}
                       </summary>
                       <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                           <div>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Inativos há quantos dias?</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('campaigns.inactiveDays')}</p>
                             <input type="number" min="0" style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segNoInteraction || ''} placeholder="Ex: 30" onChange={e => { setSegNoInteraction(Number(e.target.value) || 0); setPreviewCount(null) }} />
                           </div>
                           <div>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Como o contato chegou?</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('campaigns.contactOrigin')}</p>
                             <select style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segOrigin} onChange={e => { setSegOrigin(e.target.value); setPreviewCount(null) }}>
-                              <option value="">Qualquer origem</option>
-                              <option value="manual">Cadastro manual</option>
-                              <option value="csv_import">Importação CSV</option>
-                              <option value="webhook">Formulário/Webhook</option>
+                              <option value="">{t('campaigns.anyOrigin')}</option>
+                              <option value="manual">{t('campaigns.manualRegister')}</option>
+                              <option value="csv_import">{t('campaigns.csvImport')}</option>
+                              <option value="webhook">{t('campaigns.formWebhook')}</option>
                               <option value="whatsapp">WhatsApp</option>
                             </select>
                           </div>
                         </div>
                         <div>
-                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Filtrar por campo personalizado</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('campaigns.filterByCustomField')}</p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Nome do campo" value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
-                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Valor" value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
+                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder={t('campaigns.fieldName')} value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
+                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder={t('common.value')} value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
                           </div>
                         </div>
                       </div>
@@ -678,7 +680,7 @@ export default function CampaignsPage() {
                     <button onClick={loadPreview} disabled={!hasSegmentFilter || loadingPreview}
                       style={{ width: '100%', padding: '9px', background: previewCount !== null ? '#f0fdf4' : hasSegmentFilter ? '#f0f9ff' : 'var(--bg-input)', border: `1px solid ${previewCount !== null ? '#bbf7d0' : hasSegmentFilter ? '#bae6fd' : 'var(--border)'}`, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: previewCount !== null ? '#15803d' : hasSegmentFilter ? '#0369a1' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                       {loadingPreview ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : previewCount !== null ? <CheckCheck size={13} /> : <Search size={13} />}
-                      {previewCount !== null ? `${previewCount} contatos encontrados` : 'Ver quantos contatos serão enviados'}
+                      {previewCount !== null ? `${previewCount} ${t('campaigns.contactsFound')}` : t('campaigns.previewContacts')}
                     </button>
                   </div>
                 ) : (
@@ -688,7 +690,7 @@ export default function CampaignsPage() {
                       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-input)' }}>
                       <Upload size={14} color="var(--text-faint)" style={{ margin: '0 auto 5px' }} />
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>Upload <strong style={{ color: 'var(--text)' }}>.csv</strong></p>
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>{t('campaigns.uploadCsv')} <strong style={{ color: 'var(--text)' }}>.csv</strong></p>
                     </div>
                     <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
                     <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
@@ -696,7 +698,7 @@ export default function CampaignsPage() {
                     {contactsText && (
                       <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                        {contactsText.split('\n').filter(Boolean).length} contatos detectados
+                        {contactsText.split('\n').filter(Boolean).length} {t('campaigns.contactsDetected')}
                       </p>
                     )}
                   </>
@@ -705,7 +707,7 @@ export default function CampaignsPage() {
 
               {/* Velocidade */}
               <div>
-                <Lbl>Velocidade por canal</Lbl>
+                <Lbl>{t('campaigns.speedPerChannel')}</Lbl>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input type="number" min="1" max="1200" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
@@ -715,7 +717,7 @@ export default function CampaignsPage() {
                     }}
                     onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                     onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>msg/min por canal</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('campaigns.msgMinPerChannel')}</span>
                 </div>
                 <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px' }}>
                   {speedHint(messagesPerMin, contactsText, selectedChannels.length)}
@@ -724,9 +726,9 @@ export default function CampaignsPage() {
 
               {/* Quando disparar */}
               <div>
-                <Lbl>Quando disparar?</Lbl>
+                <Lbl>{t('campaigns.whenToSend')}</Lbl>
                 <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '12px' }}>
-                  {[{ v: 'now', label: 'Disparar agora', Icon: Send }, { v: 'scheduled', label: 'Agendar', Icon: Calendar }].map(({ v, label, Icon }) => (
+                  {[{ v: 'now', label: t('campaigns.sendNow'), Icon: Send }, { v: 'scheduled', label: t('campaigns.schedule'), Icon: Calendar }].map(({ v, label, Icon }) => (
                     <button key={v} onClick={() => setScheduleMode(v as any)}
                       style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: scheduleMode === v ? 'var(--bg-card)' : 'transparent', color: scheduleMode === v ? 'var(--text)' : 'var(--text-muted)', boxShadow: scheduleMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                       <Icon size={12} /> {label}
@@ -747,13 +749,13 @@ export default function CampaignsPage() {
 
               {/* Recorrência */}
               <div>
-                <Lbl>Repetir campanha?</Lbl>
+                <Lbl>{t('campaigns.repeatCampaign')}</Lbl>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {[
-                    { v: 'none', label: 'Não repetir' },
-                    { v: 'daily', label: 'Diariamente' },
-                    { v: 'weekly', label: 'Semanalmente' },
-                    { v: 'monthly', label: 'Mensalmente' },
+                    { v: 'none', label: t('campaigns.noRepeat') },
+                    { v: 'daily', label: t('campaigns.daily') },
+                    { v: 'weekly', label: t('campaigns.weekly') },
+                    { v: 'monthly', label: t('campaigns.monthly') },
                   ].map(({ v, label }) => (
                     <button key={v} onClick={() => setRecurrence(v as any)}
                       style={{ padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: `1.5px solid ${recurrence === v ? '#7c3aed' : 'var(--border)'}`, background: recurrence === v ? '#f5f3ff' : 'var(--bg-card)', color: recurrence === v ? '#7c3aed' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.1s' }}>
@@ -763,8 +765,8 @@ export default function CampaignsPage() {
                 </div>
                 {recurrence !== 'none' && (
                   <p style={{ fontSize: '11px', color: '#7c3aed', marginTop: '6px' }}>
-                    Após concluir, uma nova campanha será criada automaticamente para {recurrence === 'daily' ? 'o dia seguinte' : recurrence === 'weekly' ? 'a próxima semana' : 'o próximo mês'}.
-                    {contactMode === 'segment' ? ' Os contatos serão recarregados pelo segmento.' : ' Use segmento para recarregar contatos automaticamente.'}
+                    {t('campaigns.recurrenceDesc')} {recurrence === 'daily' ? t('campaigns.nextDay') : recurrence === 'weekly' ? t('campaigns.nextWeek') : t('campaigns.nextMonth')}.
+                    {contactMode === 'segment' ? ` ${t('campaigns.contactsReloadedBySegment')}` : ` ${t('campaigns.useSegmentToReload')}`}
                   </p>
                 )}
               </div>
@@ -772,12 +774,12 @@ export default function CampaignsPage() {
 
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--divider)', display: 'flex', gap: '8px', flexShrink: 0 }}>
               <button onClick={() => { setShowModal(false); resetModal() }} style={{ flex: 1, padding: '10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13.5px', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !isValid}
                 style={{ flex: 1, padding: '10px', background: !isValid || createMutation.isPending ? 'var(--text-faintest)' : scheduleMode === 'scheduled' ? '#7c3aed' : '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, cursor: !isValid || createMutation.isPending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.12s' }}>
                 {createMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : scheduleMode === 'scheduled' ? <Calendar size={14} /> : <Send size={14} />}
-                {scheduleMode === 'scheduled' ? 'Agendar' : 'Criar e disparar'}
+                {scheduleMode === 'scheduled' ? t('campaigns.schedule') : t('campaigns.createAndSend')}
               </button>
             </div>
           </div>
