@@ -24,6 +24,7 @@ export interface CreateCampaignInput {
 export interface CampaignContact {
   phone: string
   name?: string
+  contactId?: string
   variables?: Record<string, string>
 }
 
@@ -65,6 +66,7 @@ export class CampaignService {
       id: generateId(),
       campaign_id: campaignId,
       tenant_id: tenantId,
+      contact_id: c.contactId || null,
       phone: c.phone,
       name: c.name,
       variables: c.variables || {},
@@ -100,6 +102,38 @@ export class CampaignService {
       },
     }))
     return this.addContacts(campaignId, tenantId, contacts)
+  }
+
+  async addContactsByTag(campaignId: string, tenantId: string, tagIds: string[]) {
+    // Busca contatos únicos que têm qualquer uma das tags selecionadas
+    const { data: contactIds } = await db
+      .from('contact_tags')
+      .select('contact_id')
+      .in('tag_id', tagIds)
+
+    if (!contactIds || contactIds.length === 0) return 0
+
+    const uniqueIds = [...new Set(contactIds.map(r => r.contact_id))]
+
+    const { data: contacts } = await db
+      .from('contacts')
+      .select('id, phone, name, email')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .in('id', uniqueIds)
+
+    if (!contacts || contacts.length === 0) return 0
+
+    const rows: CampaignContact[] = contacts
+      .filter(c => c.phone && c.phone.length >= 8)
+      .map(c => ({
+        phone: c.phone,
+        name: c.name || c.phone,
+        contactId: c.id,
+        variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone },
+      }))
+
+    return this.addContacts(campaignId, tenantId, rows)
   }
 
   async getCampaign(campaignId: string, tenantId: string) {

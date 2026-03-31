@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { campaignApi, channelApi } from '@/lib/api'
+import { campaignApi, channelApi, contactApi } from '@/lib/api'
+import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle } from 'lucide-react'
 
@@ -50,6 +51,8 @@ export default function CampaignsPage() {
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const [scheduleMode, setScheduleMode]         = useState<'now' | 'scheduled'>('now')
   const [scheduledAt, setScheduledAt]           = useState('')
+  const [contactMode, setContactMode]           = useState<'manual' | 'tag'>('manual')
+  const [selectedTagIds, setSelectedTagIds]     = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -60,6 +63,10 @@ export default function CampaignsPage() {
   const { data: channels = [] } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
+  })
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags-campaign'],
+    queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] },
   })
   const { data: templates = [] } = useQuery({
     queryKey: ['templates', selectedChannels[0]],
@@ -86,9 +93,9 @@ export default function CampaignsPage() {
 
   const resetModal = () => {
     setCampaignName(''); setContactsText(''); setCurlCopies([''])
-    setSelectedChannels([]); setSelectedTemplates([])
+    setSelectedChannels([]); setSelectedTemplates([]); setSelectedTagIds([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
-    setMessagesPerMin(1200)
+    setMessagesPerMin(1200); setContactMode('manual')
   }
 
   const toggleChannel  = (id: string) => setSelectedChannels(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
@@ -98,6 +105,7 @@ export default function CampaignsPage() {
   const updateCurlCopy = (i: number, val: string) => setCurlCopies(prev => prev.map((c, idx) => idx === i ? val : c))
 
   const validCurlCopies = curlCopies.filter(c => c.trim())
+  const hasContacts = contactMode === 'tag' ? selectedTagIds.length > 0 : contactsText.trim().length > 0
   const isValid = campaignName && selectedChannels.length > 0 &&
     (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0)
 
@@ -115,11 +123,15 @@ export default function CampaignsPage() {
       if (scheduleMode === 'scheduled' && scheduledAt) payload.scheduledAt = new Date(scheduledAt).toISOString()
       const { data: campData } = await campaignApi.post('/campaigns', payload)
       const campId = campData.data.id
-      const rows = contactsText.split('\n').filter(Boolean).map(line => {
-        const parts = line.split(','); const phone = parts[0]?.trim().replace(/\D/g, '')
-        return { phone, name: parts.slice(1).join(',').trim() || phone, message: parts.slice(1).join(',').trim() || '' }
-      }).filter(r => r.phone && r.phone.length >= 8)
-      if (rows.length > 0) await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
+      if (contactMode === 'tag' && selectedTagIds.length > 0) {
+        await campaignApi.post(`/campaigns/${campId}/contacts/by-tag`, { tagIds: selectedTagIds })
+      } else {
+        const rows = contactsText.split('\n').filter(Boolean).map(line => {
+          const parts = line.split(','); const phone = parts[0]?.trim().replace(/\D/g, '')
+          return { phone, name: parts.slice(1).join(',').trim() || phone, message: parts.slice(1).join(',').trim() || '' }
+        }).filter(r => r.phone && r.phone.length >= 8)
+        if (rows.length > 0) await campaignApi.post(`/campaigns/${campId}/contacts/import`, { rows })
+      }
       if (scheduleMode === 'now') await campaignApi.post(`/campaigns/${campId}/start`)
       return campData.data
     },
@@ -533,22 +545,60 @@ export default function CampaignsPage() {
 
               {/* Contatos */}
               <div>
-                <Lbl>Contatos — formato: numero,mensagem</Lbl>
-                <div onClick={() => fileRef.current?.click()}
-                  style={{ border: '2px dashed #e4e4e7', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa', transition: 'all 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}>
-                  <Upload size={14} color="#a1a1aa" style={{ margin: '0 auto 5px' }} />
-                  <p style={{ fontSize: '13px', color: '#71717a', margin: 0 }}>Upload <strong style={{ color: '#18181b' }}>.csv</strong></p>
+                <Lbl>Destinatários</Lbl>
+                <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '10px' }}>
+                  {[{ v: 'tag', label: 'Por tag', Icon: Tag }, { v: 'manual', label: 'Lista manual', Icon: Upload }].map(({ v, label, Icon }) => (
+                    <button key={v} onClick={() => setContactMode(v as any)}
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: contactMode === v ? '#fff' : 'transparent', color: contactMode === v ? '#18181b' : '#71717a', boxShadow: contactMode === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+                      <Icon size={13} /> {label}
+                    </button>
+                  ))}
                 </div>
-                <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
-                <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
-                  placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
-                {contactsText && (
-                  <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                    {contactsText.split('\n').filter(Boolean).length} contatos detectados
-                  </p>
+
+                {contactMode === 'tag' ? (
+                  <div>
+                    {tags.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada. Crie tags na página de Contatos.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {tags.map((tag: any) => {
+                          const sel = selectedTagIds.includes(tag.id)
+                          return (
+                            <div key={tag.id} onClick={() => setSelectedTagIds(prev => sel ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
+                              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                              <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {selectedTagIds.length > 0 && (
+                      <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                        {selectedTagIds.length} tag{selectedTagIds.length > 1 ? 's' : ''} selecionada{selectedTagIds.length > 1 ? 's' : ''} — contatos serão carregados ao criar
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div onClick={() => fileRef.current?.click()}
+                      style={{ border: '2px dashed #e4e4e7', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', marginBottom: '8px', background: '#fafafa', transition: 'all 0.15s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLDivElement).style.background = '#fafafa' }}>
+                      <Upload size={14} color="#a1a1aa" style={{ margin: '0 auto 5px' }} />
+                      <p style={{ fontSize: '13px', color: '#71717a', margin: 0 }}>Upload <strong style={{ color: '#18181b' }}>.csv</strong></p>
+                    </div>
+                    <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
+                    <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
+                      placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
+                    {contactsText && (
+                      <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                        {contactsText.split('\n').filter(Boolean).length} contatos detectados
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 

@@ -196,6 +196,18 @@ router.post('/campaigns/:id/contacts/import', validate(importContactsSchema), as
   } catch (err) { next(err) }
 })
 
+// Adicionar contatos por tag
+router.post('/campaigns/:id/contacts/by-tag', async (req, res, next) => {
+  try {
+    const { tagIds } = req.body
+    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
+      throw new AppError('VALIDATION', 'tagIds é obrigatório', 400)
+    }
+    const count = await campaignService.addContactsByTag(req.params.id, req.auth.tid, tagIds)
+    res.json(ok({ imported: count }))
+  } catch (err) { next(err) }
+})
+
 router.post('/campaigns/:id/start', async (req, res, next) => {
   try {
     const role = req.auth.role
