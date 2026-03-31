@@ -109,7 +109,7 @@ router.delete('/contacts/:id', requireRole('admin', 'owner'), async (req, res, n
 // POST /contacts/:id/tags
 router.post('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next) => {
   try {
-    await contactService.addTags(req.params.id, req.body.tagIds)
+    await contactService.addTags(req.params.id, req.body.tagIds, req.auth.tid)
     res.json(ok({ message: 'Tags added' }))
   } catch (err) { next(err) }
 })
@@ -117,7 +117,7 @@ router.post('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next
 // DELETE /contacts/:id/tags
 router.delete('/contacts/:id/tags', validate(addTagsSchema), async (req, res, next) => {
   try {
-    await contactService.removeTags(req.params.id, req.body.tagIds)
+    await contactService.removeTags(req.params.id, req.body.tagIds, req.auth.tid)
     res.json(ok({ message: 'Tags removed' }))
   } catch (err) { next(err) }
 })

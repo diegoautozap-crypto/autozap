@@ -116,7 +116,7 @@ export class MessageService {
     const contact = await this.findOrCreateContact(tenantId, msg.from)
     const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
     if (senderName && (!contact.name || looksLikePhone(contact.name))) {
-      await db.from('contacts').update({ name: senderName }).eq('id', contact.id)
+      await db.from('contacts').update({ name: senderName }).eq('id', contact.id).eq('tenant_id', tenantId)
     }
     const conversation = await this.findOrCreateConversation(tenantId, channelId, contact.id, msg.channelType)
     await db.from('messages').insert({
@@ -135,7 +135,7 @@ export class MessageService {
     try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {
       await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
     }
-    await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id)
+    await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id).eq('tenant_id', tenantId)
 
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,

@@ -177,12 +177,22 @@ export class ContactService {
 
   // ── Tags ──────────────────────────────────────────────────────────────────
 
-  async addTags(contactId: string, tagIds: string[]) {
-    const rows = tagIds.map(tagId => ({ contact_id: contactId, tag_id: tagId }))
+  async addTags(contactId: string, tagIds: string[], tenantId: string) {
+    // Valida que o contato pertence ao tenant
+    const { data: contact } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', tenantId).single()
+    if (!contact) throw new AppError('NOT_FOUND', 'Contact not found', 404)
+    // Valida que as tags pertencem ao tenant
+    const { data: validTags } = await db.from('tags').select('id').eq('tenant_id', tenantId).in('id', tagIds)
+    const validIds = (validTags || []).map(t => t.id)
+    if (validIds.length === 0) return
+    const rows = validIds.map(tagId => ({ contact_id: contactId, tag_id: tagId }))
     await db.from('contact_tags').upsert(rows, { onConflict: 'contact_id,tag_id' })
   }
 
-  async removeTags(contactId: string, tagIds: string[]) {
+  async removeTags(contactId: string, tagIds: string[], tenantId: string) {
+    // Valida que o contato pertence ao tenant
+    const { data: contact } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', tenantId).single()
+    if (!contact) throw new AppError('NOT_FOUND', 'Contact not found', 404)
     await db.from('contact_tags')
       .delete()
       .eq('contact_id', contactId)

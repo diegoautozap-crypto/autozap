@@ -35,7 +35,7 @@ export async function ensureContact(opts: EnsureContactOpts): Promise<{ contactI
     const update: Record<string, unknown> = { last_interaction_at: new Date(), metadata: merged }
     if (name) update.name = name
     if (email) update.email = email
-    await db.from('contacts').update(update).eq('id', existing.id)
+    await db.from('contacts').update(update).eq('id', existing.id).eq('tenant_id', tenantId)
     return { contactId: existing.id, isNew: false }
   }
 

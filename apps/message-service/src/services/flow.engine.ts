@@ -595,7 +595,7 @@ export class FlowEngine {
             const update: Record<string, unknown> = { last_interaction_at: new Date(), metadata }
             if (name) update.name = name
             if (email) update.email = email
-            await db.from('contacts').update(update).eq('id', contactId)
+            await db.from('contacts').update(update).eq('id', contactId).eq('tenant_id', ctx.tenantId)
           } else {
             const metadata = Object.keys(extraFields).length > 0 ? extraFields : null
             const { data: newContact } = await db
@@ -665,7 +665,7 @@ export class FlowEngine {
             const newPhone = this.interpolate(phoneVar.from, ctx, variables).replace(/\D/g, '')
             if (newPhone && newPhone !== ctx.phone) {
               const normalized = normalizeBRPhone(newPhone)
-              await db.from('contacts').update({ phone: normalized }).eq('id', ctx.contactId)
+              await db.from('contacts').update({ phone: normalized }).eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId)
               ctx.phone = normalized
             }
           }
@@ -674,14 +674,14 @@ export class FlowEngine {
           const nameVar = mappings.find(m => m.to === 'nome' || m.to === 'name')
           if (nameVar) {
             const newName = this.interpolate(nameVar.from, ctx, variables)
-            if (newName) await db.from('contacts').update({ name: newName }).eq('id', ctx.contactId)
+            if (newName) await db.from('contacts').update({ name: newName }).eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId)
           }
 
           // Atualiza email se mapeado
           const emailVar = mappings.find(m => m.to === 'email')
           if (emailVar) {
             const newEmail = this.interpolate(emailVar.from, ctx, variables)
-            if (newEmail) await db.from('contacts').update({ email: newEmail }).eq('id', ctx.contactId)
+            if (newEmail) await db.from('contacts').update({ email: newEmail }).eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId)
           }
 
           break
@@ -712,7 +712,7 @@ export class FlowEngine {
           if (fields.length === 0) break
 
           const updateData: Record<string, unknown> = {}
-          const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).single()
+          const { data: contact } = await db.from('contacts').select('metadata').eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId).single()
           const metadata: Record<string, string> = contact?.metadata || {}
           let metadataChanged = false
 
@@ -725,7 +725,7 @@ export class FlowEngine {
             else if (f.field === 'custom' && f.customField) { metadata[f.customField] = val; metadataChanged = true }
           }
           if (metadataChanged) updateData.metadata = metadata
-          if (Object.keys(updateData).length > 0) await db.from('contacts').update(updateData).eq('id', ctx.contactId)
+          if (Object.keys(updateData).length > 0) await db.from('contacts').update(updateData).eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId)
           break
         }
 
