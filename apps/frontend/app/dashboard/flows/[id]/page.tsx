@@ -12,7 +12,7 @@ import '@xyflow/react/dist/style.css'
 import { messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Save, ArrowLeft, Loader2, Workflow } from 'lucide-react'
+import { Save, ArrowLeft, Loader2, Workflow, BarChart2 } from 'lucide-react'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
@@ -105,6 +105,14 @@ export default function FlowEditorPage() {
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const { data: analytics } = useQuery({
+    queryKey: ['flow-analytics', id],
+    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=7`); return data.data },
+    enabled: showAnalytics,
+    refetchInterval: showAnalytics ? 15000 : false,
+  })
+
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
     queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}`); return data.data },
@@ -266,7 +274,35 @@ export default function FlowEditorPage() {
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
           Salvar
         </button>
+        <button onClick={() => setShowAnalytics(p => !p)}
+          style={{ padding: '7px 14px', background: showAnalytics ? '#f5f3ff' : '#f9fafb', border: `1px solid ${showAnalytics ? '#ddd6fe' : '#e5e7eb'}`, borderRadius: '7px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: showAnalytics ? '#7c3aed' : '#6b7280' }}>
+          <BarChart2 size={13} /> Analytics
+        </button>
       </div>
+
+      {showAnalytics && analytics && (
+        <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '20px', alignItems: 'center', fontSize: '13px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
+            <span style={{ color: '#6d28d9' }}><strong>{analytics.totalFlowRuns}</strong> execuções</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
+            <span style={{ color: '#1d4ed8' }}><strong>{analytics.uniqueContacts}</strong> contatos</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
+            <span style={{ color: '#15803d' }}><strong>{analytics.totalExecutions}</strong> nós processados</span>
+          </div>
+          {analytics.totalErrors > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+              <span style={{ color: '#dc2626' }}><strong>{analytics.totalErrors}</strong> erros</span>
+            </div>
+          )}
+          <span style={{ fontSize: '11px', color: '#a78bfa', marginLeft: 'auto' }}>Últimos 7 dias</span>
+        </div>
+      )}
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>

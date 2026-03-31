@@ -260,6 +260,35 @@ router.post('/flows/:id/run', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /flows/:id/analytics
+router.get('/flows/:id/analytics', async (req, res, next) => {
+  try {
+    const flowId = req.params.id
+    const tenantId = req.auth.tid
+    const days = Number(req.query.days) || 7
+    const since = new Date(Date.now() - days * 86400000).toISOString()
+
+    const { data: logs } = await db.from('flow_logs')
+      .select('node_id, status, contact_id, created_at')
+      .eq('flow_id', flowId).eq('tenant_id', tenantId).gte('created_at', since)
+
+    const nodeStats: Record<string, { success: number; error: number; total: number }> = {}
+    let totalExecutions = 0, totalErrors = 0, totalFlowRuns = 0
+    const contactSet = new Set<string>()
+
+    for (const log of (logs || [])) {
+      if (!nodeStats[log.node_id]) nodeStats[log.node_id] = { success: 0, error: 0, total: 0 }
+      nodeStats[log.node_id].total++
+      if (log.status === 'success') nodeStats[log.node_id].success++
+      else if (log.status === 'error') { nodeStats[log.node_id].error++; totalErrors++ }
+      if (log.status === 'flow_executed') { totalFlowRuns++; if (log.contact_id) contactSet.add(log.contact_id) }
+      totalExecutions++
+    }
+
+    res.json(ok({ totalFlowRuns, totalExecutions, totalErrors, uniqueContacts: contactSet.size, nodeStats }))
+  } catch (err) { next(err) }
+})
+
 // GET /flows/:id/logs
 router.get('/flows/:id/logs', async (req, res, next) => {
   try {
