@@ -17,8 +17,8 @@ const supabase = createClient(
 
 const MESSAGE_SERVICE_URL = process.env.NEXT_PUBLIC_MESSAGE_SERVICE_URL || 'https://autozapmessage-service-production.up.railway.app'
 
-export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose, onDelete }: {
-  node: Node; tags: any[]; flows: any[]; tenantId: string
+export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdate, onClose, onDelete }: {
+  node: Node; tags: any[]; flows: any[]; channels: any[]; tenantId: string
   onUpdate: (id: string, data: any) => void
   onClose: () => void
   onDelete: (id: string) => void
@@ -427,6 +427,15 @@ export function NodeConfigPanel({ node, tags, flows, tenantId, onUpdate, onClose
 
         {d.type === 'send_message' && (<>
           <SubtypeSelector options={SEND_SUBTYPES} />
+          {channels.length > 1 && (
+            <div>
+              <label style={labelStyle}>Canal de envio</label>
+              <select style={{ ...inputStyle, background: '#fafafa' }} value={d.channelId || ''} onChange={e => onUpdate(node.id, { channelId: e.target.value || null })} onFocus={focusInput} onBlur={blurInput}>
+                <option value="">Canal padrão (da conversa)</option>
+                {channels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}{ch.phone_number ? ` (${ch.phone_number})` : ''}</option>)}
+              </select>
+            </div>
+          )}
           {(d.subtype === 'text' || !d.subtype) && (
             <div>
               <label style={labelStyle}>Mensagem</label>

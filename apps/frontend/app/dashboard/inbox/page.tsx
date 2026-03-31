@@ -231,6 +231,7 @@ export default function InboxPage() {
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [messageText, setMessageText] = useState('')
+  const [sendChannelId, setSendChannelId] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
   const [inputMode, setInputMode] = useState<'message' | 'note'>('message')
   const [statusFilter, setStatusFilter] = useState('open')
@@ -422,7 +423,7 @@ export default function InboxPage() {
       if (role !== 'admin' && role !== 'owner' && allowedChannels.length > 0) {
         if (!allowedChannels.includes(selectedConv.channel_id)) throw new Error('Sem permissão para enviar neste canal')
       }
-      await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
+      await messageApi.post('/messages/send', { channelId: sendChannelId || selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
     onSuccess: () => {
       setMessageText(''); setPendingFile(null)
@@ -497,7 +498,7 @@ export default function InboxPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, notes])
 
   const handleSelectConv = async (convId: string) => {
-    setSelectedConvId(convId); setPendingFile(null); setShowQuickReplies(false)
+    setSelectedConvId(convId); setPendingFile(null); setShowQuickReplies(false); setSendChannelId(null)
     await conversationApi.post(`/conversations/${convId}/read`)
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
@@ -691,6 +692,20 @@ export default function InboxPage() {
                   </button>
                 </div>
                 <div style={{ padding: '10px 12px' }}>
+                  {visibleChannels.length > 1 && inputMode === 'message' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <Phone size={12} color="#a1a1aa" />
+                      <span style={{ fontSize: '11px', color: '#a1a1aa' }}>Enviar por:</span>
+                      <select
+                        value={sendChannelId || selectedConv?.channel_id || ''}
+                        onChange={e => setSendChannelId(e.target.value)}
+                        style={{ fontSize: '11px', padding: '2px 6px', border: '1px solid #e4e4e7', borderRadius: '5px', background: '#fafafa', color: '#18181b', outline: 'none', cursor: 'pointer' }}>
+                        {visibleChannels.map((ch: any) => (
+                          <option key={ch.id} value={ch.id}>{ch.name}{ch.phone_number ? ` (${ch.phone_number})` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {isRecording ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />

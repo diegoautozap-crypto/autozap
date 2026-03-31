@@ -9,7 +9,7 @@ import {
   Panel, BackgroundVariant, MarkerType, getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { messageApi, contactApi } from '@/lib/api'
+import { messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Save, ArrowLeft, Loader2, Workflow } from 'lucide-react'
@@ -99,6 +99,10 @@ export default function FlowEditorPage() {
   const { data: allFlows = [] } = useQuery({
     queryKey: ['flows-list'],
     queryFn: async () => { const { data } = await messageApi.get('/flows'); return (data.data || []).filter((f: any) => f.id !== id) },
+  })
+  const { data: channels = [] } = useQuery({
+    queryKey: ['channels'],
+    queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['flow', id],
@@ -337,6 +341,7 @@ export default function FlowEditorPage() {
             node={selectedNode}
             tags={tags}
             flows={allFlows}
+            channels={channels}
             tenantId={tenantId}
             onUpdate={updateNodeData}
             onClose={() => setSelectedNode(null)}
