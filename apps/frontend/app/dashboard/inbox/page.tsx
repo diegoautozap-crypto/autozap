@@ -33,11 +33,11 @@ function getAvatarColor(n: string | undefined | null) {
   const colors = [{ bg: '#dbeafe', color: '#1d4ed8' }, { bg: '#dcfce7', color: '#15803d' }, { bg: '#fce7f3', color: '#be185d' }, { bg: '#ede9fe', color: '#6d28d9' }, { bg: '#ffedd5', color: '#c2410c' }, { bg: '#e0f2fe', color: '#0369a1' }]
   return colors[((n || '').charCodeAt(0) || 0) % colors.length]
 }
-function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined): string | null {
+function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined, tenantId?: string): string | null {
   if (!mediaUrl) return null
   if (mediaUrl.startsWith('http')) return mediaUrl
   if (!channelId) return null
-  return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}`
+  return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}${tenantId ? `&t=${tenantId}` : ''}`
 }
 function getContentType(file: File): 'image' | 'audio' | 'video' | 'document' {
   if (file.type.startsWith('image/')) return 'image'
@@ -61,11 +61,11 @@ function MessageStatusIcon({ status }: { status: string }) {
   if (status === 'sent') return <Check size={11} color="#fff" style={{ opacity: 0.65 }} />
   return <Check size={11} color="#fff" style={{ opacity: 0.3 }} />
 }
-function MessageContent({ msg, isOut, channelId }: { msg: any; isOut: boolean; channelId?: string }) {
+function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: boolean; channelId?: string; tenantId?: string }) {
   const tc = isOut ? '#fff' : 'var(--text)'
   const sc = isOut ? 'rgba(255,255,255,0.65)' : 'var(--text-faint)'
   const type = msg.content_type || 'text'
-  const url = getMediaUrl(msg.media_url, channelId)
+  const url = getMediaUrl(msg.media_url, channelId, tenantId)
   if (type === 'image') return (
     <div>
       {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>[Imagem]</p>}
@@ -751,7 +751,7 @@ export default function InboxPage() {
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.2s' }}>
                       <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#22c55e' : 'var(--bg-card)', boxShadow: matchesSearch ? '0 0 0 2px #2563eb' : '0 1px 2px rgba(0,0,0,.06)' }}>
-                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} />
+                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} tenantId={tenantId} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : 'var(--text-faint)' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                           {isOut && <MessageStatusIcon status={msg.status} />}
