@@ -1,5 +1,6 @@
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
+import { decryptCredentials } from '../lib/crypto'
 import { generateId, normalizeBRPhone } from '@autozap/utils'
 import { ensureContact, ensureConversation } from './contact.helper'
 
@@ -517,9 +518,7 @@ export class FlowEngine {
         }
 
         case 'transcribe_audio': {
-          // Se é áudio: baixa, transcreve com Whisper. Se é texto: usa direto.
           const saveVar = data?.transcribeSaveAs || 'transcricao'
-          const contentType = ctx.messageBody ? 'text' : 'audio'
 
           // Busca última mensagem pra saber o tipo
           const { data: lastMsg } = await db.from('messages').select('content_type, media_url, body')
@@ -527,7 +526,7 @@ export class FlowEngine {
             .order('created_at', { ascending: false }).limit(1).single()
 
           if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
-            // Transcrever áudio via Whisper
+            // Busca chave OpenAI
             let whisperKey = data?.apiKey
             if (!whisperKey) {
               const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
@@ -536,55 +535,53 @@ export class FlowEngine {
             if (!whisperKey) { logger.warn('Transcribe node: no OpenAI API key'); variables[saveVar] = lastMsg.body || ''; break }
 
             try {
-              // Baixa o áudio
+              // Busca credenciais do canal (criptografadas)
               const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
-              let audioUrl = lastMsg.media_url
-              if (!audioUrl.startsWith('http')) {
-                // Precisa do media proxy pra baixar
-                const creds = channel?.credentials ? JSON.parse(channel.credentials) : {}
-                const apiKey = creds?.apiKey
-                const metaToken = creds?.metaToken
-                if (/^\d+$/.test(audioUrl) && metaToken) {
-                  const metaRes = await fetch(`https://graph.facebook.com/v18.0/${audioUrl}`, { headers: { Authorization: `Bearer ${metaToken}` } })
-                  const metaData = await metaRes.json() as any
-                  audioUrl = metaData.url || audioUrl
-                  // Baixa com token
-                  const audioRes = await fetch(audioUrl, { headers: { Authorization: `Bearer ${metaToken}` } })
-                  const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
-                  const { default: OpenAI } = await import('openai')
-                  const openai = new OpenAI({ apiKey: whisperKey })
-                  const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-                  const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
-                  variables[saveVar] = transcription.text || ''
-                } else if (apiKey) {
-                  const audioRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${audioUrl}`, { headers: { apikey: apiKey } })
-                  const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
-                  const { default: OpenAI } = await import('openai')
-                  const openai = new OpenAI({ apiKey: whisperKey })
-                  const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-                  const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
-                  variables[saveVar] = transcription.text || ''
-                } else {
-                  variables[saveVar] = lastMsg.body || ''
+              const creds = channel?.credentials ? decryptCredentials(typeof channel.credentials === 'string' ? JSON.parse(channel.credentials) : channel.credentials) : {}
+
+              // Resolve URL da mídia
+              let audioBuffer: Buffer | null = null
+              const mediaId = lastMsg.media_url
+
+              if (mediaId.startsWith('http')) {
+                const res = await fetch(mediaId)
+                audioBuffer = Buffer.from(await res.arrayBuffer())
+              } else if (/^\d+$/.test(mediaId) && creds.metaToken) {
+                // Meta/WhatsApp Cloud API
+                const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
+                const metaData = await metaRes.json() as any
+                if (metaData.url) {
+                  const res = await fetch(metaData.url, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
+                  audioBuffer = Buffer.from(await res.arrayBuffer())
                 }
-              } else {
-                // URL direta
-                const audioRes = await fetch(audioUrl)
-                const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
-                const { default: OpenAI } = await import('openai')
+              } else if (creds.apiKey) {
+                // Gupshup
+                const res = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: creds.apiKey } })
+                audioBuffer = Buffer.from(await res.arrayBuffer())
+              }
+
+              if (audioBuffer && audioBuffer.length > 0) {
+                const { default: OpenAI, toFile } = await import('openai')
                 const openai = new OpenAI({ apiKey: whisperKey })
-                const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+                const file = await toFile(audioBuffer, 'audio.ogg', { type: 'audio/ogg' })
                 const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: data?.transcribeLanguage || 'pt' })
                 variables[saveVar] = transcription.text || ''
+                ctx.messageBody = transcription.text || ctx.messageBody
+                logger.info('Audio transcribed', { flowId, nodeId: node.id, length: transcription.text?.length })
+              } else {
+                logger.warn('Could not download audio', { flowId, mediaId })
+                variables[saveVar] = lastMsg.body || ctx.messageBody || ''
               }
             } catch (err) {
               logger.error('Transcribe audio error', { err: err instanceof Error ? err.message : String(err) })
-              variables[saveVar] = lastMsg.body || ''
+              variables[saveVar] = lastMsg.body || ctx.messageBody || ''
             }
           } else {
-            // Texto normal — usa o body direto
+            // Texto normal — usa direto
             variables[saveVar] = lastMsg?.body || ctx.messageBody || ''
           }
+          // Atualiza contexto pra que nós seguintes (IA, condição) usem o texto
+          ctx.messageBody = variables[saveVar] || ctx.messageBody
           break
         }
 
