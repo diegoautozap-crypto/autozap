@@ -13,14 +13,16 @@ import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n'
 import Pusher from 'pusher-js'
 
-const DEFAULT_COLUMNS = [
-  { key: 'lead',         label: 'Lead',        color: '#6b7280' },
-  { key: 'qualificacao', label: 'Qualificação', color: '#2563eb' },
-  { key: 'proposta',     label: 'Proposta',     color: '#7c3aed' },
-  { key: 'negociacao',   label: 'Negociação',   color: '#d97706' },
-  { key: 'ganho',        label: 'Ganho',        color: '#16a34a' },
-  { key: 'perdido',      label: 'Perdido',      color: '#dc2626' },
-]
+function getDefaultColumns(t: (key: string) => string) {
+  return [
+    { key: 'lead',         label: t('pipeline.defaultLead'),          color: '#6b7280' },
+    { key: 'qualificacao', label: t('pipeline.defaultQualification'), color: '#2563eb' },
+    { key: 'proposta',     label: t('pipeline.defaultProposal'),      color: '#7c3aed' },
+    { key: 'negociacao',   label: t('pipeline.defaultNegotiation'),   color: '#d97706' },
+    { key: 'ganho',        label: t('pipeline.defaultWon'),           color: '#16a34a' },
+    { key: 'perdido',      label: t('pipeline.defaultLost'),          color: '#dc2626' },
+  ]
+}
 
 const COLOR_PRESETS = [
   '#6b7280', '#2563eb', '#7c3aed', '#d97706',
@@ -51,7 +53,7 @@ function parseCurrency(s: string): number | null {
 }
 
 // ── Inline value editor no card ───────────────────────────────────────────────
-function DealValueEditor({ convId, value, onSaved }: { convId: string; value: number | null; onSaved: (v: number | null) => void }) {
+function DealValueEditor({ convId, value, onSaved, t }: { convId: string; value: number | null; onSaved: (v: number | null) => void; t: (key: string) => string }) {
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState('')
 
@@ -69,7 +71,7 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
       try {
         await conversationApi.patch(`/conversations/${convId}/deal-value`, { dealValue: parsed })
         onSaved(parsed)
-      } catch { toast.error('Erro ao salvar valor') }
+      } catch { toast.error(t('pipeline.toastSaveValueError')) }
     }
   }
 
@@ -99,12 +101,12 @@ function DealValueEditor({ convId, value, onSaved }: { convId: string; value: nu
       onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
       draggable={false}
       style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', cursor: 'pointer' }}
-      title="Clique para definir valor">
+      title={t('pipeline.clickToSetValue')}>
       {value ? (
         <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(value)}</span>
       ) : (
         <span style={{ fontSize: '11px', color: 'var(--text-faintest)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-          <DollarSign size={10} /> valor
+          <DollarSign size={10} /> {t('pipeline.valuePlaceholder')}
         </span>
       )}
     </div>
@@ -201,10 +203,10 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
         pipelineId: pipelineId,
         removedIds,
       })
-      toast.success('Colunas salvas!')
+      toast.success(t('pipeline.toastColumnsSaved'))
       onSaved(); onClose()
     } catch (e: any) {
-      toast.error('Erro ao salvar: ' + (e?.response?.data?.error?.message || e.message || 'tente novamente'))
+      toast.error(t('pipeline.toastSaveError') + ' ' + (e?.response?.data?.error?.message || e.message || ''))
     } finally { setSaving(false) }
   }
 
@@ -234,7 +236,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
                   ) : (
                     <span onClick={() => !isPendingDelete && startEdit(col)} style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: isPendingDelete ? '#ef4444' : 'var(--text)', cursor: 'text' }}>{col.label}</span>
                   )}
-                  {cardCount > 0 && !isPendingDelete && <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginRight: '2px' }}>{cardCount} conv.</span>}
+                  {cardCount > 0 && !isPendingDelete && <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginRight: '2px' }}>{cardCount} {t('pipeline.convAbbrev')}</span>}
                   <button onClick={() => tryRemoveColumn(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPendingDelete ? '#ef4444' : 'var(--text-faintest)', padding: '2px', borderRadius: '4px', display: 'flex' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                     onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = isPendingDelete ? '#ef4444' : 'var(--text-faintest)'}>
@@ -243,8 +245,8 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
                 </div>
                 {isPendingDelete && (
                   <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '10px 12px' }}>
-                    <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>⚠️ Esta coluna tem {cardCount} conversa{cardCount !== 1 ? 's' : ''}</p>
-                    <p style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', lineHeight: '1.4' }}>Ao excluir, essas conversas ficam invisíveis no pipeline.</p>
+                    <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginBottom: '4px' }}>⚠️ {t('pipeline.columnHasConvs').replace('{count}', String(cardCount)).replace('{plural}', cardCount !== 1 ? 's' : '')}</p>
+                    <p style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', lineHeight: '1.4' }}>{t('pipeline.columnDeleteWarning')}</p>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => setPendingDeleteId(null)} style={{ flex: 1, padding: '6px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#52525b', cursor: 'pointer' }}>{t('common.cancel')}</button>
                       <button onClick={() => confirmRemoveColumn(col.id)} style={{ flex: 1, padding: '6px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>{t('common.delete')}</button>
@@ -257,10 +259,10 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 10px', marginTop: '4px', borderRadius: '8px', border: '1.5px dashed var(--border)', background: 'var(--bg-input)' }}>
             <GripVertical size={14} color="var(--border)" style={{ flexShrink: 0 }} />
             <ColorPicker value={newColor} onChange={setNewColor} />
-            <input placeholder="Nome da nova coluna…" value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addColumn() }}
+            <input placeholder={t('pipeline.newColumnPlaceholder')} value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addColumn() }}
               style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', color: 'var(--text)', outline: 'none' }} />
             <button onClick={addColumn} style={{ background: '#22c55e', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', padding: '4px 10px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Plus size={12} /> Add
+              <Plus size={12} /> {t('pipeline.addColumn')}
             </button>
           </div>
         </div>
@@ -300,6 +302,7 @@ export default function PipelinePage() {
   const [dealValues, setDealValues] = useState<Record<string, number | null>>({})
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
+  const DEFAULT_COLUMNS = getDefaultColumns(t)
 
   const { data: pipelines = [], refetch: refetchPipelines } = useQuery({
     queryKey: ['pipelines', tenantId],
@@ -395,25 +398,25 @@ export default function PipelinePage() {
       await conversationApi.patch(`/conversations/${id}/pipeline`, { stage, pipelineId: selectedPipelineId })
     },
     onSuccess: () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) },
-    onError: () => { localBoardRef.current = null; forceRender(n => n + 1); toast.error('Erro ao mover conversa') },
+    onError: () => { localBoardRef.current = null; forceRender(n => n + 1); toast.error(t('pipeline.toastMoveError')) },
   })
 
   const createPipelineMutation = useMutation({
     mutationFn: async (name: string) => { const { data } = await conversationApi.post('/pipelines', { name }); return data.data },
-    onSuccess: (pipeline) => { toast.success('Pipeline criada!'); refetchPipelines(); setSelectedPipelineId(pipeline.id); setShowNewPipeline(false); setNewPipelineName('') },
-    onError: () => toast.error('Erro ao criar pipeline'),
+    onSuccess: (pipeline) => { toast.success(t('pipeline.toastPipelineCreated')); refetchPipelines(); setSelectedPipelineId(pipeline.id); setShowNewPipeline(false); setNewPipelineName('') },
+    onError: () => toast.error(t('pipeline.toastPipelineCreateError')),
   })
 
   const deletePipelineMutation = useMutation({
     mutationFn: async (id: string) => { await conversationApi.delete(`/pipelines/${id}`) },
-    onSuccess: () => { toast.success('Pipeline removida'); setSelectedPipelineId(null); setLocalStages(null); refetchPipelines(); queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) },
-    onError: () => toast.error('Erro ao remover pipeline'),
+    onSuccess: () => { toast.success(t('pipeline.toastPipelineRemoved')); setSelectedPipelineId(null); setLocalStages(null); refetchPipelines(); queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) },
+    onError: () => toast.error(t('pipeline.toastPipelineRemoveError')),
   })
 
   const renamePipelineMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => { await conversationApi.patch(`/pipelines/${id}`, { name }) },
     onSuccess: () => { refetchPipelines(); setEditingPipelineId(null) },
-    onError: () => toast.error('Erro ao renomear pipeline'),
+    onError: () => toast.error(t('pipeline.toastPipelineRenameError')),
   })
 
   const handleDragStart = (e: React.DragEvent, convId: string) => { setDraggingId(convId); e.dataTransfer.effectAllowed = 'move' }
@@ -519,7 +522,7 @@ export default function PipelinePage() {
               <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> {t('pipeline.refresh')}
             </button>
             <button onClick={async () => {
-              if (!board) { toast.error('Nenhum dado'); return }
+              if (!board) { toast.error(t('pipeline.noData')); return }
               const rows: any[] = []
               for (const [stage, convs] of Object.entries(board as Record<string, any[]>)) {
                 const cols = dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS
@@ -535,10 +538,10 @@ export default function PipelinePage() {
                   })
                 }
               }
-              if (rows.length === 0) { toast.error('Pipeline vazio'); return }
+              if (rows.length === 0) { toast.error(t('pipeline.pipelineEmpty')); return }
               const { exportToExcel } = await import('@/lib/export')
               exportToExcel(rows, 'pipeline_funil', 'Pipeline')
-              toast.success(`${rows.length} registros exportados!`)
+              toast.success(`${rows.length} ${t('pipeline.recordsExported')}`)
             }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
@@ -567,14 +570,14 @@ export default function PipelinePage() {
               {selectedPipelineId === p.id && !editingPipelineId && (
                 <>
                   <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><Pencil size={11} /></button>
-                  <button onClick={e => { e.stopPropagation(); if (confirm(`Remover pipeline "${p.name}"?`)) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><X size={11} /></button>
+                  <button onClick={e => { e.stopPropagation(); if (confirm(t('pipeline.confirmRemovePipeline').replace('{name}', p.name))) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><X size={11} /></button>
                 </>
               )}
             </div>
           ))}
           {showNewPipeline ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-              <input autoFocus placeholder="Nome da pipeline…" value={newPipelineName} onChange={e => setNewPipelineName(e.target.value)}
+              <input autoFocus placeholder={t('pipeline.pipelineNamePlaceholder')} value={newPipelineName} onChange={e => setNewPipelineName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()); if (e.key === 'Escape') { setShowNewPipeline(false); setNewPipelineName('') } }}
                 style={{ border: 'none', background: 'transparent', fontSize: '13px', color: 'var(--text)', outline: 'none', width: '130px' }} />
               <button onClick={() => { if (newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()) }} style={{ background: '#22c55e', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><Check size={10} color="#fff" strokeWidth={3} /></button>
@@ -659,12 +662,12 @@ export default function PipelinePage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
                                 {overdue.length > 0 && (
                                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '1px 6px', borderRadius: '99px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    <AlertTriangle size={9} /> {overdue.length} atrasada{overdue.length > 1 ? 's' : ''}
+                                    <AlertTriangle size={9} /> {overdue.length} {overdue.length > 1 ? t('pipeline.overdueCountPlural') : t('pipeline.overdueCount')}
                                   </span>
                                 )}
                                 {tasks.length > overdue.length && (
                                   <span style={{ fontSize: '10px', fontWeight: 600, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '99px' }}>
-                                    {tasks.length - overdue.length} tarefa{tasks.length - overdue.length > 1 ? 's' : ''}
+                                    {tasks.length - overdue.length} {(tasks.length - overdue.length) > 1 ? t('pipeline.taskCountPlural') : t('pipeline.taskCount')}
                                   </span>
                                 )}
                               </div>
@@ -675,6 +678,7 @@ export default function PipelinePage() {
                           <DealValueEditor
                             convId={conv.id}
                             value={currentValue ?? null}
+                            t={t}
                             onSaved={(v) => {
                               setDealValues(prev => ({ ...prev, [conv.id]: v }))
                               forceRender(n => n + 1)

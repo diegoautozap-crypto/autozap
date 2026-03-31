@@ -9,128 +9,144 @@ import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, Chevr
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
 
-const FLOW_TEMPLATES = [
-  {
-    id: 'welcome',
-    name: '👋 Boas-vindas',
-    desc: 'Saudação automática na primeira mensagem',
-    category: 'Simples',
-    nodes: [
-      { id: 'n1', type: 'trigger_first_message', position_x: 100, position_y: 200, data: { type: 'trigger_first_message', keywords: [] } },
-      { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Seja bem-vindo(a)! Como posso te ajudar hoje?' } },
-    ],
-    edges: [{ id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' }],
-  },
-  {
-    id: 'outside_hours',
-    name: '🕐 Fora do horário',
-    desc: 'Mensagem automática fora do expediente',
-    category: 'Simples',
-    nodes: [
-      { id: 'n1', type: 'trigger_outside_hours', position_x: 100, position_y: 200, data: { type: 'trigger_outside_hours', start: 9, end: 18 } },
-      { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Nosso horário de atendimento é de segunda a sexta, das 9h às 18h. Deixe sua mensagem que responderemos assim que possível! 😊' } },
-      { id: 'n3', type: 'end', position_x: 700, position_y: 200, data: { type: 'end' } },
-    ],
-    edges: [
-      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
-      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
-    ],
-  },
-  {
-    id: 'lead_qualify',
-    name: '🎯 Qualificação de lead',
-    desc: 'Coleta nome, interesse e classifica o lead',
-    category: 'Intermediário',
-    nodes: [
-      { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'info', 'quero'], matchType: 'contains' } },
-      { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 😊 Para te atender melhor, qual é o seu nome?' } },
-      { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nome' } },
-      { id: 'n4', type: 'send_message', position_x: 880, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Prazer, {{nome}}! O que te interessa?\n\n1️⃣ Conhecer o produto\n2️⃣ Saber preços\n3️⃣ Suporte' } },
-      { id: 'n5', type: 'input', position_x: 1160, position_y: 200, data: { type: 'input', question: '', saveAs: 'interesse' } },
-      { id: 'n6', type: 'tag_contact', position_x: 1440, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
-      { id: 'n7', type: 'move_pipeline', position_x: 1440, position_y: 300, data: { type: 'move_pipeline', stage: 'qualificacao' } },
-      { id: 'n8', type: 'assign_agent', position_x: 1720, position_y: 200, data: { type: 'assign_agent', message: 'Obrigado, {{nome}}! Um atendente já vai te ajudar. 🚀' } },
-    ],
-    edges: [
-      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
-      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
-      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
-      { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'success' },
-      { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
-      { id: 'e6', source_node: 'n5', target_node: 'n7', source_handle: 'success' },
-      { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
-    ],
-  },
-  {
-    id: 'satisfaction',
-    name: '⭐ Pesquisa de satisfação',
-    desc: 'Pergunta nota, classifica e adiciona tag',
-    category: 'Intermediário',
-    nodes: [
-      { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['pesquisa', 'avaliar', 'feedback'], matchType: 'contains' } },
-      { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Gostaríamos de saber sua opinião. De 1 a 5, como avalia nosso atendimento?' } },
-      { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nota' } },
-      { id: 'n4', type: 'condition', position_x: 880, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Nota alta (4-5)', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'nota', operator: 'contains', value: '4, 5' }] }, { id: 'b2', label: 'Nota baixa (1-3)', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'nota', operator: 'contains', value: '1, 2, 3' }] }] } },
-      { id: 'n5', type: 'send_message', position_x: 1200, position_y: 100, data: { type: 'send_message', subtype: 'text', message: 'Muito obrigado! 🎉 Ficamos felizes com sua avaliação!' } },
-      { id: 'n6', type: 'send_message', position_x: 1200, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo feedback. 🙏 Vamos melhorar! Um atendente vai entrar em contato.' } },
-      { id: 'n7', type: 'assign_agent', position_x: 1500, position_y: 350, data: { type: 'assign_agent' } },
-    ],
-    edges: [
-      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
-      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
-      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
-      { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
-      { id: 'e5', source_node: 'n4', target_node: 'n6', source_handle: 'branch_b2' },
-      { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
-    ],
-  },
-  {
-    id: 'webhook_lead',
-    name: '🔗 Lead via formulário',
-    desc: 'Recebe lead do Make/Zapier, cria contato e envia mensagem',
-    category: 'Avançado',
-    nodes: [
-      { id: 'n1', type: 'trigger_webhook', position_x: 50, position_y: 200, data: { type: 'trigger_webhook' } },
-      { id: 'n2', type: 'create_contact', position_x: 350, position_y: 200, data: { type: 'create_contact', fields: [{ label: 'Telefone', variable: '{{webhook_phone}}', contactField: 'phone' }, { label: 'Nome', variable: '{{webhook_name}}', contactField: 'name' }, { label: 'Email', variable: '{{webhook_email}}', contactField: 'email' }] } },
-      { id: 'n3', type: 'send_message', position_x: 650, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá {{webhook_name}}! Recebemos seu contato. Em breve um consultor vai te atender! 🚀' } },
-      { id: 'n4', type: 'tag_contact', position_x: 950, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
-      { id: 'n5', type: 'move_pipeline', position_x: 950, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
-    ],
-    edges: [
-      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
-      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
-      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
-      { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'success' },
-    ],
-  },
-  {
-    id: 'ai_support',
-    name: '🤖 Atendimento com IA',
-    desc: 'IA responde automaticamente e escala para humano quando necessário',
-    category: 'Avançado',
-    nodes: [
-      { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 200, data: { type: 'trigger_any_reply' } },
-      { id: 'n2', type: 'ai', position_x: 350, position_y: 200, data: { type: 'ai', mode: 'classify', classifyOptions: 'duvida, comprar, suporte, reclamação, outro', saveAs: 'intencao' } },
-      { id: 'n3', type: 'condition', position_x: 650, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Quer comprar', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'comprar' }] }, { id: 'b2', label: 'Reclamação', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'reclamação' }] }] } },
-      { id: 'n4', type: 'ai', position_x: 1000, position_y: 50, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um consultor de vendas simpático. Apresente os produtos e benefícios.' } },
-      { id: 'n5', type: 'assign_agent', position_x: 1000, position_y: 250, data: { type: 'assign_agent', message: 'Entendo sua preocupação. Vou te conectar com um atendente agora mesmo.' } },
-      { id: 'n6', type: 'ai', position_x: 1000, position_y: 400, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um assistente prestativo. Responda dúvidas de forma clara e objetiva.' } },
-    ],
-    edges: [
-      { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
-      { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
-      { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'branch_b1' },
-      { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'branch_b2' },
-      { id: 'e5', source_node: 'n3', target_node: 'n6', source_handle: 'fallback' },
-    ],
-  },
-]
+function getFlowTemplates(t: (key: string) => string) {
+  return [
+    {
+      id: 'welcome',
+      emoji: '👋',
+      name: t('flows.templateWelcome'),
+      desc: t('flows.templateWelcomeDesc'),
+      category: t('flows.categorySimple'),
+      categoryKey: 'simple',
+      nodes: [
+        { id: 'n1', type: 'trigger_first_message', position_x: 100, position_y: 200, data: { type: 'trigger_first_message', keywords: [] } },
+        { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Seja bem-vindo(a)! Como posso te ajudar hoje?' } },
+      ],
+      edges: [{ id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' }],
+    },
+    {
+      id: 'outside_hours',
+      emoji: '🕐',
+      name: t('flows.templateOutsideHours'),
+      desc: t('flows.templateOutsideHoursDesc'),
+      category: t('flows.categorySimple'),
+      categoryKey: 'simple',
+      nodes: [
+        { id: 'n1', type: 'trigger_outside_hours', position_x: 100, position_y: 200, data: { type: 'trigger_outside_hours', start: 9, end: 18 } },
+        { id: 'n2', type: 'send_message', position_x: 400, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Nosso horário de atendimento é de segunda a sexta, das 9h às 18h. Deixe sua mensagem que responderemos assim que possível! 😊' } },
+        { id: 'n3', type: 'end', position_x: 700, position_y: 200, data: { type: 'end' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+      ],
+    },
+    {
+      id: 'lead_qualify',
+      emoji: '🎯',
+      name: t('flows.templateLeadQualify'),
+      desc: t('flows.templateLeadQualifyDesc'),
+      category: t('flows.categoryIntermediate'),
+      categoryKey: 'intermediate',
+      nodes: [
+        { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'info', 'quero'], matchType: 'contains' } },
+        { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! 😊 Para te atender melhor, qual é o seu nome?' } },
+        { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nome' } },
+        { id: 'n4', type: 'send_message', position_x: 880, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Prazer, {{nome}}! O que te interessa?\n\n1️⃣ Conhecer o produto\n2️⃣ Saber preços\n3️⃣ Suporte' } },
+        { id: 'n5', type: 'input', position_x: 1160, position_y: 200, data: { type: 'input', question: '', saveAs: 'interesse' } },
+        { id: 'n6', type: 'tag_contact', position_x: 1440, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n7', type: 'move_pipeline', position_x: 1440, position_y: 300, data: { type: 'move_pipeline', stage: 'qualificacao' } },
+        { id: 'n8', type: 'assign_agent', position_x: 1720, position_y: 200, data: { type: 'assign_agent', message: 'Obrigado, {{nome}}! Um atendente já vai te ajudar. 🚀' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'success' },
+        { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
+        { id: 'e6', source_node: 'n5', target_node: 'n7', source_handle: 'success' },
+        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
+      ],
+    },
+    {
+      id: 'satisfaction',
+      emoji: '⭐',
+      name: t('flows.templateSatisfaction'),
+      desc: t('flows.templateSatisfactionDesc'),
+      category: t('flows.categoryIntermediate'),
+      categoryKey: 'intermediate',
+      nodes: [
+        { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 200, data: { type: 'trigger_keyword', keywords: ['pesquisa', 'avaliar', 'feedback'], matchType: 'contains' } },
+        { id: 'n2', type: 'send_message', position_x: 320, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá! Gostaríamos de saber sua opinião. De 1 a 5, como avalia nosso atendimento?' } },
+        { id: 'n3', type: 'input', position_x: 600, position_y: 200, data: { type: 'input', question: '', saveAs: 'nota' } },
+        { id: 'n4', type: 'condition', position_x: 880, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Nota alta (4-5)', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'nota', operator: 'contains', value: '4, 5' }] }, { id: 'b2', label: 'Nota baixa (1-3)', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'nota', operator: 'contains', value: '1, 2, 3' }] }] } },
+        { id: 'n5', type: 'send_message', position_x: 1200, position_y: 100, data: { type: 'send_message', subtype: 'text', message: 'Muito obrigado! 🎉 Ficamos felizes com sua avaliação!' } },
+        { id: 'n6', type: 'send_message', position_x: 1200, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo feedback. 🙏 Vamos melhorar! Um atendente vai entrar em contato.' } },
+        { id: 'n7', type: 'assign_agent', position_x: 1500, position_y: 350, data: { type: 'assign_agent' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
+        { id: 'e5', source_node: 'n4', target_node: 'n6', source_handle: 'branch_b2' },
+        { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
+      ],
+    },
+    {
+      id: 'webhook_lead',
+      emoji: '🔗',
+      name: t('flows.templateWebhookLead'),
+      desc: t('flows.templateWebhookLeadDesc'),
+      category: t('flows.categoryAdvanced'),
+      categoryKey: 'advanced',
+      nodes: [
+        { id: 'n1', type: 'trigger_webhook', position_x: 50, position_y: 200, data: { type: 'trigger_webhook' } },
+        { id: 'n2', type: 'create_contact', position_x: 350, position_y: 200, data: { type: 'create_contact', fields: [{ label: 'Telefone', variable: '{{webhook_phone}}', contactField: 'phone' }, { label: 'Nome', variable: '{{webhook_name}}', contactField: 'name' }, { label: 'Email', variable: '{{webhook_email}}', contactField: 'email' }] } },
+        { id: 'n3', type: 'send_message', position_x: 650, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'Olá {{webhook_name}}! Recebemos seu contato. Em breve um consultor vai te atender! 🚀' } },
+        { id: 'n4', type: 'tag_contact', position_x: 950, position_y: 100, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n5', type: 'move_pipeline', position_x: 950, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'success' },
+      ],
+    },
+    {
+      id: 'ai_support',
+      emoji: '🤖',
+      name: t('flows.templateAiSupport'),
+      desc: t('flows.templateAiSupportDesc'),
+      category: t('flows.categoryAdvanced'),
+      categoryKey: 'advanced',
+      nodes: [
+        { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 200, data: { type: 'trigger_any_reply' } },
+        { id: 'n2', type: 'ai', position_x: 350, position_y: 200, data: { type: 'ai', mode: 'classify', classifyOptions: 'duvida, comprar, suporte, reclamação, outro', saveAs: 'intencao' } },
+        { id: 'n3', type: 'condition', position_x: 650, position_y: 200, data: { type: 'condition', branches: [{ id: 'b1', label: 'Quer comprar', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'comprar' }] }, { id: 'b2', label: 'Reclamação', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'reclamação' }] }] } },
+        { id: 'n4', type: 'ai', position_x: 1000, position_y: 50, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um consultor de vendas simpático. Apresente os produtos e benefícios.' } },
+        { id: 'n5', type: 'assign_agent', position_x: 1000, position_y: 250, data: { type: 'assign_agent', message: 'Entendo sua preocupação. Vou te conectar com um atendente agora mesmo.' } },
+        { id: 'n6', type: 'ai', position_x: 1000, position_y: 400, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é um assistente prestativo. Responda dúvidas de forma clara e objetiva.' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'branch_b1' },
+        { id: 'e4', source_node: 'n3', target_node: 'n5', source_handle: 'branch_b2' },
+        { id: 'e5', source_node: 'n3', target_node: 'n6', source_handle: 'fallback' },
+      ],
+    },
+  ]
+}
 
-const COOLDOWN_OPTIONS = [
-  { value: '24h',    label: '24 horas',   desc: 'Dispara no máximo 1x por dia por conversa' },
-  { value: 'once',   label: 'Uma vez só', desc: 'Dispara apenas 1 vez por conversa, nunca mais' },
-  { value: 'always', label: 'Sempre',     desc: 'Dispara toda vez que o gatilho for acionado' },
-]
+function getCooldownOptions(t: (key: string) => string) {
+  return [
+    { value: '24h',    label: t('flows.cooldown24h'),    desc: t('flows.cooldown24hDesc') },
+    { value: 'once',   label: t('flows.cooldownOnce'),   desc: t('flows.cooldownOnceDesc') },
+    { value: 'always', label: t('flows.cooldownAlways'), desc: t('flows.cooldownAlwaysDesc') },
+  ]
+}
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -144,7 +160,8 @@ const labelStyle: React.CSSProperties = {
   color: '#52525b', marginBottom: '5px',
 }
 
-function CooldownSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CooldownSelector({ value, onChange, t }: { value: string; onChange: (v: string) => void; t: (key: string) => string }) {
+  const COOLDOWN_OPTIONS = getCooldownOptions(t)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {COOLDOWN_OPTIONS.map(opt => (
@@ -188,26 +205,29 @@ export default function FlowsPage() {
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
 
+  const FLOW_TEMPLATES = getFlowTemplates(t)
+  const COOLDOWN_OPTIONS = getCooldownOptions(t)
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const { data } = await messageApi.post('/flows', { name: newName, channelId: newChannelId || null, cooldown_type: newCooldown })
       return data.data
     },
     onSuccess: (flow) => {
-      toast.success('Flow criado!')
+      toast.success(t('flows.toastCreated'))
       queryClient.invalidateQueries({ queryKey: ['flows'] })
       setShowNew(false); setNewName(''); setNewChannelId(''); setNewCooldown('24h')
       router.push(`/dashboard/flows/${flow.id}`)
     },
-    onError: () => toast.error('Erro ao criar flow'),
+    onError: () => toast.error(t('flows.toastCreateError')),
   })
 
   const updateMutation = useMutation({
     mutationFn: async () => {
       await messageApi.patch(`/flows/${editingFlow.id}`, { name: editName, channelId: editChannelId || null, cooldown_type: editCooldown })
     },
-    onSuccess: () => { toast.success('Flow atualizado!'); queryClient.invalidateQueries({ queryKey: ['flows'] }); setEditingFlow(null) },
-    onError: () => toast.error('Erro ao atualizar'),
+    onSuccess: () => { toast.success(t('flows.toastUpdated')); queryClient.invalidateQueries({ queryKey: ['flows'] }); setEditingFlow(null) },
+    onError: () => toast.error(t('flows.toastUpdateError')),
   })
 
   const toggleMutation = useMutation({
@@ -215,13 +235,13 @@ export default function FlowsPage() {
       await messageApi.patch(`/flows/${id}`, { is_active: !isActive })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flows'] }),
-    onError: () => toast.error('Erro ao atualizar'),
+    onError: () => toast.error(t('flows.toastUpdateError')),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await messageApi.delete(`/flows/${id}`) },
-    onSuccess: () => { toast.success('Flow excluído!'); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
-    onError: () => toast.error('Erro ao excluir'),
+    onSuccess: () => { toast.success(t('flows.toastDeleted')); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
+    onError: () => toast.error(t('flows.toastDeleteError')),
   })
 
   const openEdit = (f: any, e: React.MouseEvent) => {
@@ -230,7 +250,7 @@ export default function FlowsPage() {
   }
 
   const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || t('flows.allChannels')
-  const cooldownLabel = (type: string) => COOLDOWN_OPTIONS.find(o => o.value === type)?.label || '24 horas'
+  const cooldownLabel = (type: string) => COOLDOWN_OPTIONS.find(o => o.value === type)?.label || t('flows.cooldown24h')
 
   return (
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '900px' }}>
@@ -261,8 +281,8 @@ export default function FlowsPage() {
           <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '14px', letterSpacing: '-0.01em' }}>{t('flows.newFlow')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div>
-              <label style={labelStyle}>Nome *</label>
-              <input style={inputStyle} placeholder="Ex: Boas-vindas com qualificação" value={newName} onChange={e => setNewName(e.target.value)} autoFocus
+              <label style={labelStyle}>{t('flows.nameLabel')}</label>
+              <input style={inputStyle} placeholder={t('flows.namePlaceholder')} value={newName} onChange={e => setNewName(e.target.value)} autoFocus
                 onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
             </div>
@@ -276,9 +296,9 @@ export default function FlowsPage() {
           </div>
           <div style={{ marginBottom: '16px' }}>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Clock size={12} /> Cooldown — com que frequência esse flow pode disparar?
+              <Clock size={12} /> {t('flows.cooldownLabel')}
             </label>
-            <CooldownSelector value={newCooldown} onChange={setNewCooldown} />
+            <CooldownSelector value={newCooldown} onChange={setNewCooldown} t={t} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}
@@ -308,7 +328,7 @@ export default function FlowsPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
               <div>
-                <label style={labelStyle}>Nome *</label>
+                <label style={labelStyle}>{t('flows.nameLabel')}</label>
                 <input style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} autoFocus
                   onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
                   onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
@@ -322,9 +342,9 @@ export default function FlowsPage() {
               </div>
               <div>
                 <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={12} /> Cooldown
+                  <Clock size={12} /> {t('flows.cooldownShort')}
                 </label>
-                <CooldownSelector value={editCooldown} onChange={setEditCooldown} />
+                <CooldownSelector value={editCooldown} onChange={setEditCooldown} t={t} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -380,12 +400,12 @@ export default function FlowsPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                  {f.node_count || 0} nós · {f.channel_id ? channelName(f.channel_id) : t('flows.allChannels')} · {cooldownLabel(f.cooldown_type || '24h')}
+                  {f.node_count || 0} {t('flows.nodes')} · {f.channel_id ? channelName(f.channel_id) : t('flows.allChannels')} · {cooldownLabel(f.cooldown_type || '24h')}
                 </p>
               </div>
 
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })} title={f.is_active ? 'Pausar' : 'Ativar'}
+                <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })} title={f.is_active ? t('flows.togglePause') : t('flows.toggleActivate')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: f.is_active ? '#22c55e' : 'var(--text-faintest)', borderRadius: '6px' }}
                   onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
                   onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
@@ -397,7 +417,7 @@ export default function FlowsPage() {
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Pencil size={14} />
                 </button>
-                <button onClick={() => { if (confirm(`Excluir "${f.name}"?`)) deleteMutation.mutate(f.id) }}
+                <button onClick={() => { if (confirm(t('flows.confirmDelete').replace('{name}', f.name))) deleteMutation.mutate(f.id) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
@@ -422,41 +442,42 @@ export default function FlowsPage() {
               <button onClick={() => setShowTemplates(false)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}><X size={15} color="var(--text-muted)" /></button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
-              {['Simples', 'Intermediário', 'Avançado'].map(cat => {
-                const templates = FLOW_TEMPLATES.filter(t => t.category === cat)
+              {['simple', 'intermediate', 'advanced'].map(catKey => {
+                const templates = FLOW_TEMPLATES.filter(tmpl => tmpl.categoryKey === catKey)
                 if (templates.length === 0) return null
+                const catLabel = templates[0].category
                 return (
-                  <div key={cat} style={{ marginBottom: '20px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{cat}</p>
+                  <div key={catKey} style={{ marginBottom: '20px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{catLabel}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {templates.map(t => (
-                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.1s' }}
+                      {templates.map(tmpl => (
+                        <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.1s' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#7c3aed'; (e.currentTarget as HTMLDivElement).style.background = '#faf5ff' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                           onClick={async () => {
                             setCreatingTemplate(true)
                             try {
-                              const { data: flowData } = await messageApi.post('/flows', { name: t.name.replace(/^.+\s/, ''), cooldown_type: 'always' })
+                              const { data: flowData } = await messageApi.post('/flows', { name: tmpl.name, cooldown_type: 'always' })
                               const flowId = flowData.data.id
                               const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
                               const idMap: Record<string, string> = {}
-                              const nodes = t.nodes.map(n => { const newId = uid(); idMap[n.id] = newId; return { ...n, id: newId } })
-                              const edges = t.edges.map(e => ({ ...e, id: uid(), source_node: idMap[e.source_node], target_node: idMap[e.target_node] }))
+                              const nodes = tmpl.nodes.map(n => { const newId = uid(); idMap[n.id] = newId; return { ...n, id: newId } })
+                              const edges = tmpl.edges.map(e => ({ ...e, id: uid(), source_node: idMap[e.source_node], target_node: idMap[e.target_node] }))
                               await messageApi.put(`/flows/${flowId}/graph`, { nodes, edges })
-                              toast.success(`Template "${t.name}" criado!`)
+                              toast.success(t('flows.toastTemplateCreated').replace('{name}', tmpl.name))
                               queryClient.invalidateQueries({ queryKey: ['flows'] })
                               setShowTemplates(false)
                               router.push(`/dashboard/flows/${flowId}`)
-                            } catch { toast.error('Erro ao criar template') }
+                            } catch { toast.error(t('flows.toastTemplateError')) }
                             finally { setCreatingTemplate(false) }
                           }}>
                           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
-                            {t.name.split(' ')[0]}
+                            {tmpl.emoji}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{t.name.split(' ').slice(1).join(' ')}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{t.desc}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '3px' }}>{t.nodes.length} nós · {t.edges.length} conexões</div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{tmpl.name}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{tmpl.desc}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '3px' }}>{tmpl.nodes.length} {t('flows.nodes')} · {tmpl.edges.length} {t('flows.connections')}</div>
                           </div>
                           {creatingTemplate ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#7c3aed' }} /> : <ChevronRight size={16} color="var(--text-faintest)" />}
                         </div>

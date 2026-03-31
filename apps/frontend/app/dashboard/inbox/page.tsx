@@ -112,12 +112,12 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
   })
   const createMutation = useMutation({
     mutationFn: async () => { await conversationApi.post('/quick-replies', { title: newTitle, body: newBody }) },
-    onSuccess: () => { toast.success('OK'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
-    onError: () => toast.error('Error'),
+    onSuccess: () => { toast.success(t('inbox.quickReplySaved')); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }); setNewTitle(''); setNewBody(''); setShowForm(false) },
+    onError: () => toast.error(t('inbox.quickReplyError')),
   })
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await conversationApi.delete(`/quick-replies/${id}`) },
-    onSuccess: () => { toast.success('Removida!'); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }) },
+    onSuccess: () => { toast.success(t('inbox.quickReplyDeleted')); queryClient.invalidateQueries({ queryKey: ['quick-replies'] }) },
   })
   const filtered = replies.filter((r: any) => !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.body.toLowerCase().includes(search.toLowerCase()))
 
@@ -132,8 +132,8 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
       </div>
       {showForm && (
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--divider)', background: 'var(--bg-input)', flexShrink: 0 }}>
-          <input style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder="Título (ex: Saudação)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
-          <textarea style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', resize: 'none' as const, height: '60px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder="Texto da resposta..." value={newBody} onChange={e => setNewBody(e.target.value)} />
+          <input style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder={t('inbox.quickReplyTitlePlaceholder')} value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          <textarea style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', resize: 'none' as const, height: '60px', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder={t('inbox.quickReplyBodyPlaceholder')} value={newBody} onChange={e => setNewBody(e.target.value)} />
           <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
             <button onClick={() => createMutation.mutate()} disabled={!newTitle || !newBody || createMutation.isPending} style={{ padding: '5px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (!newTitle || !newBody) ? 0.5 : 1 }}>{t('common.save')}</button>
             <button onClick={() => setShowForm(false)} style={{ padding: '5px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-muted)' }}>{t('common.cancel')}</button>
@@ -141,7 +141,7 @@ function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => 
         </div>
       )}
       <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
-        <input style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' as const, color: 'var(--text)' }} placeholder={t('inbox.searchShort')} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {isLoading ? <div style={{ padding: '20px', textAlign: 'center' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
@@ -186,7 +186,7 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
       if (activeIds.has(tag.id)) await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
       else await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
       onChanged()
-    } catch { toast.error('Error') }
+    } catch { toast.error(t('inbox.tagError')) }
     setLoading(null)
   }
 
@@ -960,15 +960,15 @@ export default function InboxPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={13} color="#2563eb" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('inbox.tasks')}</p></div>
                 <button onClick={async () => {
-                  const title = prompt('Título da tarefa:')
+                  const title = prompt(t('inbox.taskTitlePrompt'))
                   if (!title) return
-                  const dueDate = prompt('Data de vencimento (dd/mm/aaaa):')
+                  const dueDate = prompt(t('inbox.taskDueDatePrompt'))
                   let due = null
                   if (dueDate) { const [d, m, y] = dueDate.split('/'); due = new Date(Number(y), Number(m) - 1, Number(d), 23, 59).toISOString() }
                   try {
                     await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
-                    toast.success('Tarefa criada!'); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
-                  } catch { toast.error('Erro ao criar tarefa') }
+                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                  } catch { toast.error(t('inbox.taskCreateError')) }
                 }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>
               </div>
               {convTasks.length === 0

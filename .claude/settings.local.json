@@ -16,7 +16,12 @@
       "Bash(grep -rn \"aria-\\\\|role=\\\\|alt=\\\\|htmlFor\" /c/Users/Adm/Desktop/autozap/apps/frontend/app/dashboard/*.tsx)",
       "Bash(grep:*)",
       "Bash(openssl rand:*)",
-      "Bash(grep -rhoP t\\\\\\([''][a-zA-Z_.]+['']\\\\\\) apps/frontend/app/dashboard/)"
+      "Bash(grep -rhoP t\\\\\\([''][a-zA-Z_.]+['']\\\\\\) apps/frontend/app/dashboard/)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/Adm/AppData/Local/Temp/claude/C--Users-Adm-Desktop-autozap/84f47008-10a7-4818-b764-46b70ad9c03d/**)",
+      "Bash(done)",
+      "Bash(find /c/Users/Adm/Desktop/autozap -name constants.ts -path */flows/*)"
     ]
   }
 }

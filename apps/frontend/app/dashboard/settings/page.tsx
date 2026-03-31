@@ -15,26 +15,32 @@ const PLAN_NAMES: Record<string, string> = {
   unlimited:  'Unlimited',
 }
 
-const PLAN_MSGS: Record<string, string> = {
-  starter:    '10.000 msgs',
-  pro:        '50.000 msgs',
-  enterprise: '100.000 msgs',
-  unlimited:  'Ilimitado',
+function getPlanMsgs(t: (key: string) => string): Record<string, string> {
+  return {
+    starter:    '10.000 msgs',
+    pro:        '50.000 msgs',
+    enterprise: '100.000 msgs',
+    unlimited:  t('settings.unlimited'),
+  }
 }
 
-const PLAN_FEATURES: Record<string, string[]> = {
-  starter:    ['10.000 mensagens/mês', 'Inbox em tempo real', 'Campanhas em massa', 'CRM de contatos'],
-  pro:        ['50.000 mensagens/mês', 'Tudo do Starter', 'Múltiplos usuários', 'Suporte prioritário'],
-  enterprise: ['100.000 mensagens/mês', 'Tudo do Pro', 'API dedicada', 'SLA garantido'],
-  unlimited:  ['Mensagens ilimitadas', 'Tudo do Enterprise', 'Onboarding dedicado', 'Suporte 24/7'],
+function getPlanFeatures(t: (key: string) => string): Record<string, string[]> {
+  return {
+    starter:    [t('settings.feat.10kMonth'), t('settings.feat.realtimeInbox'), t('settings.feat.massCampaigns'), t('settings.feat.contactCrm')],
+    pro:        [t('settings.feat.50kMonth'), t('settings.feat.allStarter'), t('settings.feat.multiUsers'), t('settings.feat.prioritySupport')],
+    enterprise: [t('settings.feat.100kMonth'), t('settings.feat.allPro'), t('settings.feat.dedicatedApi'), t('settings.feat.slaGuaranteed')],
+    unlimited:  [t('settings.feat.unlimitedMsgs'), t('settings.feat.allEnterprise'), t('settings.feat.dedicatedOnboarding'), t('settings.feat.support247')],
+  }
 }
 
-const WEBHOOK_EVENTS = [
-  { key: 'message.received',           label: 'Mensagem recebida',         desc: 'Chega uma nova mensagem de um contato' },
-  { key: 'conversation.status_changed', label: 'Conversa mudou de status',  desc: 'Conversa foi aberta, fechada ou colocada em espera' },
-  { key: 'conversation.assigned',       label: 'Conversa assumida',         desc: 'Atendente assumiu ou liberou o bot' },
-  { key: 'pipeline.stage_changed',      label: 'Card movido no pipeline',   desc: 'Card foi arrastado para outra coluna' },
-]
+function getWebhookEvents(t: (key: string) => string) {
+  return [
+    { key: 'message.received',           label: t('settings.webhookEvent.messageReceived'),      desc: t('settings.webhookEvent.messageReceivedDesc') },
+    { key: 'conversation.status_changed', label: t('settings.webhookEvent.statusChanged'),        desc: t('settings.webhookEvent.statusChangedDesc') },
+    { key: 'conversation.assigned',       label: t('settings.webhookEvent.conversationAssigned'), desc: t('settings.webhookEvent.conversationAssignedDesc') },
+    { key: 'pipeline.stage_changed',      label: t('settings.webhookEvent.pipelineChanged'),     desc: t('settings.webhookEvent.pipelineChangedDesc') },
+  ]
+}
 
 function formatCpfCnpj(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 14)
@@ -54,6 +60,7 @@ function formatCpfCnpj(value: string) {
 
 // ── Webhook de Entrada (Lead Capture) ─────────────────────────────────────────
 function InboundWebhookSection() {
+  const t = useT()
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid || ''
   const [showToken, setShowToken] = useState(false)
@@ -81,29 +88,29 @@ function InboundWebhookSection() {
     try {
       const { data } = await tenantApi.post('/tenant/webhook-token')
       setToken(data.data.token)
-      toast.success('Token gerado!')
-    } catch { toast.error('Erro ao gerar token') }
+      toast.success(t('settings.toast.tokenGenerated'))
+    } catch { toast.error(t('settings.toast.errorGenerateToken')) }
     finally { setGenerating(false) }
   }
 
   const copyUrl = () => {
-    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success('URL copiada!') }
+    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success(t('settings.toast.urlCopied')) }
   }
 
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
       <div style={{ marginBottom: '16px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhook de Entrada — Captura de Leads</span>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Receba leads de formulários da Meta, Zapier, Make ou qualquer sistema externo direto no CRM</p>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>{t('settings.inboundWebhookTitle')}</span>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('settings.inboundWebhookDesc')}</p>
       </div>
 
       {!token ? (
         <div style={{ textAlign: 'center', padding: '20px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Gere sua URL única para receber leads externos</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>{t('settings.generateYourUrl')}</p>
           <button onClick={handleGenerate} disabled={generating}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>
             {generating ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />}
-            Gerar URL
+            {t('settings.generateUrl')}
           </button>
         </div>
       ) : (
@@ -121,14 +128,14 @@ function InboundWebhookSection() {
           </div>
 
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.6 }}>
-            <p style={{ fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>Campos aceitos no POST:</p>
+            <p style={{ fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>{t('settings.fieldsAccepted')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
               {[
-                ['phone / phone_number', 'Telefone (obrigatório)'],
-                ['name / full_name', 'Nome do contato'],
+                ['phone / phone_number', t('settings.fieldPhone')],
+                ['name / full_name', t('settings.fieldName')],
                 ['email', 'Email'],
-                ['source / campaign_name', 'Origem do lead'],
-                ['message / mensagem', 'Mensagem inicial'],
+                ['source / campaign_name', t('settings.fieldSource')],
+                ['message / mensagem', t('settings.fieldMessage')],
               ].map(([field, desc]) => (
                 <div key={field} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                   <code style={{ fontSize: '10px', background: 'var(--bg)', padding: '1px 5px', borderRadius: '4px', color: 'var(--text)', flexShrink: 0 }}>{field}</code>
@@ -139,7 +146,7 @@ function InboundWebhookSection() {
           </div>
 
           <details>
-            <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' as const }}>Ver exemplo de payload</summary>
+            <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' as const }}>{t('settings.viewPayloadExample')}</summary>
             <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto' as const, lineHeight: 1.5 }}>{JSON.stringify({
               phone_number: '5511999999999',
               full_name: 'João Silva',
@@ -157,6 +164,8 @@ function InboundWebhookSection() {
 
 // ── Seção de Webhooks ──────────────────────────────────────────────────────────
 function WebhooksSection() {
+  const t = useT()
+  const WEBHOOK_EVENTS = getWebhookEvents(t)
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [url, setUrl] = useState('')
@@ -176,8 +185,8 @@ function WebhooksSection() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await tenantApi.delete(`/tenant/webhooks/${id}`) },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['webhook-configs'] }); toast.success('Webhook removido') },
-    onError: () => toast.error('Erro ao remover webhook'),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['webhook-configs'] }); toast.success(t('settings.toast.webhookRemoved')) },
+    onError: () => toast.error(t('settings.toast.errorRemoveWebhook')),
   })
 
   const toggleMutation = useMutation({
@@ -185,7 +194,7 @@ function WebhooksSection() {
       await tenantApi.patch(`/tenant/webhooks/${id}`, { active })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['webhook-configs'] }),
-    onError: () => toast.error('Erro ao atualizar webhook'),
+    onError: () => toast.error(t('settings.toast.errorUpdateWebhook')),
   })
 
   const toggleEvent = (key: string) => {
@@ -195,9 +204,9 @@ function WebhooksSection() {
   }
 
   const handleSave = async () => {
-    if (!url.trim()) { toast.error('URL é obrigatória'); return }
-    if (!url.startsWith('http')) { toast.error('URL inválida — deve começar com http:// ou https://'); return }
-    if (selectedEvents.length === 0) { toast.error('Selecione pelo menos um evento'); return }
+    if (!url.trim()) { toast.error(t('settings.toast.urlRequired')); return }
+    if (!url.startsWith('http')) { toast.error(t('settings.toast.urlInvalid')); return }
+    if (selectedEvents.length === 0) { toast.error(t('settings.toast.selectEvent')); return }
     setSaving(true)
     try {
       await tenantApi.post('/tenant/webhooks', {
@@ -206,10 +215,10 @@ function WebhooksSection() {
         secret: secret.trim() || null,
       })
       queryClient.invalidateQueries({ queryKey: ['webhook-configs'] })
-      toast.success('Webhook configurado!')
+      toast.success(t('settings.toast.webhookConfigured'))
       setShowForm(false); setUrl(''); setSecret(''); setSelectedEvents(['message.received'])
     } catch (e: any) {
-      toast.error(e?.response?.data?.error?.message || 'Erro ao salvar webhook')
+      toast.error(e?.response?.data?.error?.message || t('settings.toast.errorSaveWebhook'))
     } finally { setSaving(false) }
   }
 
@@ -217,8 +226,8 @@ function WebhooksSection() {
     setTestingId(id)
     try {
       await tenantApi.post(`/tenant/webhooks/${id}/test`)
-      toast.success('Evento de teste enviado!')
-    } catch { toast.error('Erro ao enviar teste') }
+      toast.success(t('settings.toast.testSent'))
+    } catch { toast.error(t('settings.toast.errorTest')) }
     finally { setTestingId(null) }
   }
 
@@ -226,13 +235,13 @@ function WebhooksSection() {
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>Webhooks & Integrações</span>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Envie eventos para Zapier, n8n, Make ou qualquer URL</p>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>{t('settings.webhooksTitle')}</span>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('settings.webhooksDesc')}</p>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
-            <Plus size={13} /> Novo webhook
+            <Plus size={13} /> {t('settings.newWebhook')}
           </button>
         )}
       </div>
@@ -241,7 +250,7 @@ function WebhooksSection() {
       {showForm && (
         <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '18px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>URL do webhook *</label>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>{t('settings.webhookUrl')}</label>
             <input
               placeholder="https://hooks.zapier.com/hooks/catch/..."
               value={url}
@@ -254,12 +263,12 @@ function WebhooksSection() {
 
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>
-              Secret (opcional) <span style={{ fontWeight: 400, color: 'var(--text-faint)' }}>— para verificar autenticidade</span>
+              {t('settings.webhookSecret')} <span style={{ fontWeight: 400, color: 'var(--text-faint)' }}>— {t('settings.webhookSecretHint')}</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showSecret ? 'text' : 'password'}
-                placeholder="Deixe em branco para não usar"
+                placeholder={t('settings.webhookSecretPlaceholder')}
                 value={secret}
                 onChange={e => setSecret(e.target.value)}
                 style={{ width: '100%', padding: '9px 36px 9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
@@ -273,7 +282,7 @@ function WebhooksSection() {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Eventos *</label>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>{t('settings.webhookEvents')}</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {WEBHOOK_EVENTS.map(ev => (
                 <label key={ev.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '7px', border: `1px solid ${selectedEvents.includes(ev.key) ? '#bbf7d0' : 'var(--divider)'}`, background: selectedEvents.includes(ev.key) ? '#f0fdf4' : 'var(--bg-card)', cursor: 'pointer' }}>
@@ -290,12 +299,12 @@ function WebhooksSection() {
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowForm(false); setUrl(''); setSecret(''); setSelectedEvents(['message.received']) }}
               style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}>
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button onClick={handleSave} disabled={saving}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-              Salvar webhook
+              {t('settings.saveWebhook')}
             </button>
           </div>
         </div>
@@ -309,8 +318,8 @@ function WebhooksSection() {
       ) : webhooks.length === 0 && !showForm ? (
         <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-faint)' }}>
           <Webhook size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
-          <p style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>Nenhum webhook configurado</p>
-          <p style={{ fontSize: '12px' }}>Adicione um para integrar com Zapier, n8n, Make e outros</p>
+          <p style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>{t('settings.noWebhooks')}</p>
+          <p style={{ fontSize: '12px' }}>{t('settings.noWebhooksDesc')}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -332,17 +341,17 @@ function WebhooksSection() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   <button onClick={() => handleTest(wh.id)} disabled={testingId === wh.id}
-                    title="Enviar evento de teste"
+                    title={t('settings.sendTestEvent')}
                     style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input)', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {testingId === wh.id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={11} />}
-                    Testar
+                    {t('settings.test')}
                   </button>
                   <button onClick={() => toggleMutation.mutate({ id: wh.id, active: !wh.active })}
-                    title={wh.active ? 'Desativar' : 'Ativar'}
+                    title={wh.active ? t('settings.deactivate') : t('settings.activate')}
                     style={{ fontSize: '11px', fontWeight: 600, padding: '4px 10px', border: `1px solid ${wh.active ? '#fde68a' : '#bbf7d0'}`, borderRadius: '6px', background: wh.active ? '#fffbeb' : '#f0fdf4', color: wh.active ? '#d97706' : '#16a34a', cursor: 'pointer' }}>
-                    {wh.active ? 'Pausar' : 'Ativar'}
+                    {wh.active ? t('settings.pause') : t('settings.activate')}
                   </button>
-                  <button onClick={() => { if (confirm('Remover webhook?')) deleteMutation.mutate(wh.id) }}
+                  <button onClick={() => { if (confirm(t('settings.confirmRemoveWebhook'))) deleteMutation.mutate(wh.id) }}
                     style={{ background: 'none', border: '1px solid #fee2e2', borderRadius: '6px', cursor: 'pointer', color: '#fca5a5', padding: '4px 7px', display: 'flex' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5' }}>
@@ -357,7 +366,7 @@ function WebhooksSection() {
 
       {/* Exemplo de payload */}
       <details style={{ marginTop: '14px' }}>
-        <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' }}>Ver exemplo de payload</summary>
+        <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' }}>{t('settings.viewPayloadExample')}</summary>
         <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto', lineHeight: 1.5 }}>{JSON.stringify({
           event: 'message.received',
           timestamp: '2026-03-30T14:00:00.000Z',
@@ -378,6 +387,8 @@ function WebhooksSection() {
 
 export default function SettingsPage() {
   const t = useT()
+  const PLAN_MSGS = getPlanMsgs(t)
+  const PLAN_FEATURES = getPlanFeatures(t)
   const { user } = useAuthStore()
   const [subscribing, setSubscribing] = useState<string | null>(null)
   const [showCpfModal, setShowCpfModal] = useState<string | null>(null)
@@ -504,7 +515,7 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('settings.currentPlan')}</span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: isTrial ? '#d97706' : '#16a34a', background: isTrial ? '#fffbeb' : '#f0fdf4', border: `1px solid ${isTrial ? '#fde68a' : '#bbf7d0'}`, padding: '2px 10px', borderRadius: '99px' }}>
-                {isTrial ? '🎯 Trial (7 dias)' : planName}
+                {isTrial ? `🎯 Trial (7 ${t('settings.days')})` : planName}
               </span>
             </div>
           </div>

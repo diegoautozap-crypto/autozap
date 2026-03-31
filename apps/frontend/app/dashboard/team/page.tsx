@@ -30,15 +30,15 @@ function getRoles(t: (key: string) => string) {
   ]
 }
 
-const ALL_PAGES = [
-  { href: '/dashboard',           label: 'Dashboard' },
-  { href: '/dashboard/campaigns', label: 'Campanhas' },
-  { href: '/dashboard/templates', label: 'Templates' },
-  { href: '/dashboard/contacts',  label: 'CRM' },
-  { href: '/dashboard/inbox',     label: 'Inbox' },
-  { href: '/dashboard/pipeline',  label: 'Pipeline' },
-  { href: '/dashboard/flows',     label: 'Flows' },
-  { href: '/dashboard/channels',  label: 'Canais' },
+const ALL_PAGES_KEYS = [
+  { href: '/dashboard',           i18nKey: 'nav.dashboard' },
+  { href: '/dashboard/campaigns', i18nKey: 'nav.campaigns' },
+  { href: '/dashboard/templates', i18nKey: 'nav.templates' },
+  { href: '/dashboard/contacts',  i18nKey: 'nav.contacts' },
+  { href: '/dashboard/inbox',     i18nKey: 'nav.inbox' },
+  { href: '/dashboard/pipeline',  i18nKey: 'nav.pipeline' },
+  { href: '/dashboard/flows',     i18nKey: 'nav.flows' },
+  { href: '/dashboard/channels',  i18nKey: 'nav.channels' },
 ]
 
 function getCampaignAccessOptions(t: (key: string) => string) {
@@ -96,12 +96,12 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
   const saveMutation = useMutation({
     mutationFn: async () => { await authApi.patch(`/auth/team/${member.id}/permissions`, effectivePerms) },
     onSuccess: () => {
-      toast.success('Permissões salvas!')
+      toast.success(t('team.toast.permissionsSaved'))
       setPerms(null)
       queryClient.invalidateQueries({ queryKey: ['member-permissions', member.id] })
       queryClient.invalidateQueries({ queryKey: ['team'] })
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao salvar'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorSave')),
   })
 
   const update = (key: string, value: any) => setPerms({ ...effectivePerms, [key]: value })
@@ -166,7 +166,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📄 {t('team.allowedPages')}</p>
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-              {ALL_PAGES.map(page => {
+              {ALL_PAGES_KEYS.map(page => {
                 const isChecked = (effectivePerms.allowed_pages || []).includes(page.href)
                 const isLocked = page.href === '/dashboard/inbox'
                 return (
@@ -175,7 +175,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
                     <div style={{ width: '15px', height: '15px', borderRadius: '4px', flexShrink: 0, background: isChecked ? '#22c55e' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {isChecked && <Check size={9} color="#fff" strokeWidth={3} />}
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: isChecked ? 600 : 400, color: isChecked ? '#15803d' : 'var(--text-muted)' }}>{page.label}</span>
+                    <span style={{ fontSize: '12px', fontWeight: isChecked ? 600 : 400, color: isChecked ? '#15803d' : 'var(--text-muted)' }}>{t(page.i18nKey)}</span>
                     {isLocked && <span style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{t('team.fixed')}</span>}
                   </div>
                 )
@@ -280,29 +280,29 @@ export default function TeamPage() {
   const inviteMutation = useMutation({
     mutationFn: async () => { const { data } = await authApi.post('/auth/team/invite', form); return data },
     onSuccess: () => {
-      toast.success('Membro adicionado! Email com credenciais enviado.')
+      toast.success(t('team.toast.memberAdded'))
       queryClient.invalidateQueries({ queryKey: ['team'] })
       setShowForm(false); setForm({ name: '', email: '', role: 'agent' })
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao adicionar'),
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorAdd')),
   })
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => { await authApi.patch(`/auth/team/${id}`, data) },
-    onSuccess: () => { toast.success('Atualizado!'); queryClient.invalidateQueries({ queryKey: ['team'] }); setEditingId(null) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar'),
+    onSuccess: () => { toast.success(t('team.toast.updated')); queryClient.invalidateQueries({ queryKey: ['team'] }); setEditingId(null) },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorUpdate')),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await authApi.delete(`/auth/team/${id}`) },
-    onSuccess: () => { toast.success('Membro removido'); queryClient.invalidateQueries({ queryKey: ['team'] }) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao remover'),
+    onSuccess: () => { toast.success(t('team.toast.memberRemoved')); queryClient.invalidateQueries({ queryKey: ['team'] }) },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorRemove')),
   })
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (id: string) => { await authApi.post(`/auth/team/${id}/reset-password`, {}) },
-    onSuccess: () => toast.success('Nova senha enviada por email'),
-    onError: () => toast.error('Erro ao redefinir senha'),
+    onSuccess: () => toast.success(t('team.toast.passwordReset')),
+    onError: () => toast.error(t('team.toast.errorResetPassword')),
   })
 
   const startEdit = (m: any) => { setEditingId(m.id); setEditForm({ name: m.name, role: m.role }) }
@@ -471,21 +471,21 @@ export default function TeamPage() {
                     ) : (
                       <>
                         {/* Toggle ativo/inativo */}
-                        <button onClick={() => updateMutation.mutate({ id: m.id, data: { is_active: !m.is_active } })} title={m.is_active ? 'Desativar' : 'Reativar'}
+                        <button onClick={() => updateMutation.mutate({ id: m.id, data: { is_active: !m.is_active } })} title={m.is_active ? t('team.deactivate') : t('team.reactivate')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: m.is_active ? '#22c55e' : 'var(--text-faintest)', borderRadius: '6px' }}
                           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
                           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
                           {m.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                         </button>
                         {/* Permissões */}
-                        <button onClick={() => setConfiguringMember(m)} title="Configurar permissões"
+                        <button onClick={() => setConfiguringMember(m)} title={t('team.configurePermissions')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'; (e.currentTarget as HTMLButtonElement).style.color = '#22c55e' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                           <Settings size={14} />
                         </button>
                         {/* Editar */}
-                        <button onClick={() => startEdit(m)} title="Editar"
+                        <button onClick={() => startEdit(m)} title={t('common.edit')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>

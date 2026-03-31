@@ -52,25 +52,25 @@ export default function ChannelsPage() {
     mutationFn: async () => {
       await channelApi.post('/channels', { name: form.name, type: 'gupshup', phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: {} })
     },
-    onSuccess: () => { toast.success('Canal criado!'); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setForm(emptyForm) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao criar canal'),
+    onSuccess: () => { toast.success(t('channels.toast.created')); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setForm(emptyForm) },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('channels.toast.errorCreate')),
   })
   const editMutation = useMutation({
     mutationFn: async () => {
       await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined } })
     },
-    onSuccess: () => { toast.success('Canal atualizado!'); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setEditingId(null); setForm(emptyForm) },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao atualizar canal'),
+    onSuccess: () => { toast.success(t('channels.toast.updated')); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setEditingId(null); setForm(emptyForm) },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('channels.toast.errorUpdate')),
   })
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await channelApi.delete(`/channels/${id}`) },
-    onSuccess: () => { toast.success('Canal removido!'); queryClient.invalidateQueries({ queryKey: ['channels'] }) },
-    onError: () => toast.error('Erro ao remover canal'),
+    onSuccess: () => { toast.success(t('channels.toast.deleted')); queryClient.invalidateQueries({ queryKey: ['channels'] }) },
+    onError: () => toast.error(t('channels.toast.errorDelete')),
   })
 
   const openEdit = (ch: any) => { setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '' }); setEditingId(ch.id); setShowForm(true) }
   const closeForm = () => { setShowForm(false); setEditingId(null); setForm(emptyForm) }
-  const copyWebhook = (_: string, apiKey: string) => { navigator.clipboard.writeText(`${WEBHOOK_BASE}/webhook/gupshup/${apiKey}`); toast.success('URL do webhook copiada!') }
+  const copyWebhook = (_: string, apiKey: string) => { navigator.clipboard.writeText(`${WEBHOOK_BASE}/webhook/gupshup/${apiKey}`); toast.success(t('channels.toast.webhookCopied')) }
   const toggleApiKey = (id: string) => setShowApiKey(prev => ({ ...prev, [id]: !prev[id] }))
   const handleSubmit = () => editingId ? editMutation.mutate() : createMutation.mutate()
   const isPending = createMutation.isPending || editMutation.isPending
@@ -89,10 +89,10 @@ export default function ChannelsPage() {
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : 'var(--bg-card)', border: `1px solid ${atLimit ? '#fecaca' : 'var(--border)'}`, padding: '4px 12px', borderRadius: '99px' }}>
-            {channelCount}/{channelLimit} canal{channelLimit > 1 ? 'is' : ''}
+            {channelCount}/{channelLimit} {channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}
           </div>
           <button
-            onClick={() => { if (atLimit) { toast.error(`Seu plano permite ${channelLimit} canal${channelLimit > 1 ? 'is' : ''}. Faça upgrade.`); return }; closeForm(); setShowForm(true) }}
+            onClick={() => { if (atLimit) { toast.error(`${t('channels.toast.planLimit')} ${channelLimit} ${channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}.`); return }; closeForm(); setShowForm(true) }}
             style={{ padding: '8px 16px', background: atLimit ? 'var(--border)' : '#22c55e', color: atLimit ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
             onMouseEnter={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
@@ -105,11 +105,11 @@ export default function ChannelsPage() {
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '16px 18px', marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8', marginBottom: '8px' }}>📋 {t('channels.howTo')}</p>
         <ol style={{ fontSize: '13px', color: '#374151', lineHeight: 1.9, paddingLeft: '18px', margin: 0 }}>
-          <li>Crie uma conta em <a href="https://gupshup.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 500 }}>gupshup.io</a> e crie um app WhatsApp</li>
-          <li>Copie o <strong>API Key</strong> e o número <strong>Source</strong> do dashboard do Gupshup</li>
-          <li>Adicione o canal aqui e copie a <strong>URL do Webhook</strong></li>
-          <li>Cole a URL no Gupshup em <strong>Webhooks → URL de retorno</strong>, formato <strong>Meta (v3)</strong></li>
-          <li>Ative os eventos: <strong>Mensagem</strong> e <strong>Recebido</strong></li>
+          <li>{t('channels.step1')} <a href="https://gupshup.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 500 }}>gupshup.io</a> {t('channels.step1Suffix')}</li>
+          <li>{t('channels.step2')} <strong>API Key</strong> {t('channels.step2Suffix')}</li>
+          <li>{t('channels.step3')}</li>
+          <li>{t('channels.step4')}</li>
+          <li>{t('channels.step5')}</li>
         </ol>
       </div>
 
@@ -130,10 +130,10 @@ export default function ChannelsPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             {[
-              { label: 'Nome do canal *',          key: 'name',    placeholder: 'Ex: WhatsApp Vendas' },
-              { label: 'Número source (sem +) *',  key: 'source',  placeholder: '15558406981' },
-              { label: 'API Key do Gupshup *',     key: 'apiKey',  placeholder: 'sk_xxxxxxxxxxxxxxxxxx' },
-              { label: 'src.name (nome do app) *', key: 'srcName', placeholder: 'MeuApp' },
+              { label: t('channels.formName'),    key: 'name',    placeholder: t('channels.formNamePlaceholder') },
+              { label: t('channels.formSource'),  key: 'source',  placeholder: '15558406981' },
+              { label: t('channels.formApiKey'),   key: 'apiKey',  placeholder: 'sk_xxxxxxxxxxxxxxxxxx' },
+              { label: t('channels.formSrcName'), key: 'srcName', placeholder: t('channels.formSrcNamePlaceholder') },
             ].map(field => (
               <div key={field.key}>
                 <label style={lbl}>{field.label}</label>
@@ -143,9 +143,9 @@ export default function ChannelsPage() {
           </div>
 
           <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
-            <label style={lbl}>Token do Meta <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>(opcional)</span></label>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>Meta Business Manager → WhatsApp → API Setup → System User Token — necessário para visualizar mídias recebidas</p>
-            <input style={inp} type="password" placeholder={editingId ? 'Deixe em branco para manter o atual' : 'EAAxxxxxxx...'} value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+            <label style={lbl}>{t('channels.formMetaToken')} <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>({t('channels.formOptional')})</span></label>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>{t('channels.formMetaTokenHint')}</p>
+            <input style={inp} type="password" placeholder={editingId ? t('channels.formMetaTokenKeep') : 'EAAxxxxxxx...'} value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -197,7 +197,7 @@ export default function ChannelsPage() {
                       <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
                       {t('channels.active')}
                     </div>
-                    <button onClick={() => openEdit(ch)} title="Editar canal"
+                    <button onClick={() => openEdit(ch)} title={t('channels.editChannel')}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
@@ -231,17 +231,17 @@ export default function ChannelsPage() {
 
                 {/* Webhook URL */}
                 <div>
-                  <label style={lbl}>URL do Webhook — cole no Gupshup</label>
+                  <label style={lbl}>{t('channels.webhookUrlLabel')}</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly value={webhookUrl}
                       style={{ ...inp, flex: 1, background: 'var(--bg-input)', color: '#52525b', fontSize: '11.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
-                    <button onClick={() => copyWebhook(ch.id, ch.webhookApiKey)} title="Copiar"
+                    <button onClick={() => copyWebhook(ch.id, ch.webhookApiKey)} title={t('channels.copy')}
                       style={{ padding: '9px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: 'var(--text-faint)', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                       <Copy size={13} />
                     </button>
-                    <a href="https://app.gupshup.io" target="_blank" rel="noopener noreferrer" title="Abrir Gupshup"
+                    <a href="https://app.gupshup.io" target="_blank" rel="noopener noreferrer" title={t('channels.openGupshup')}
                       style={{ padding: '9px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', color: 'var(--text-faint)', textDecoration: 'none', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLAnchorElement).style.color = '#52525b' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-faint)' }}>

@@ -157,7 +157,7 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
     },
-    onError: () => toast.error('Erro ao atualizar tarefa'),
+    onError: () => toast.error(t('tasks.toastUpdateError')),
   })
 
   const deleteMutation = useMutation({
@@ -167,9 +167,9 @@ export default function TasksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
-      toast.success('Tarefa removida')
+      toast.success(t('tasks.toastRemoved'))
     },
-    onError: () => toast.error('Erro ao remover tarefa'),
+    onError: () => toast.error(t('tasks.toastRemoveError')),
   })
 
   const createMutation = useMutation({
@@ -182,14 +182,14 @@ export default function TasksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
-      toast.success('Tarefa criada!')
+      toast.success(t('tasks.toastCreated'))
       setShowModal(false)
       setNewTitle('')
       setNewDescription('')
       setNewDueDate('')
       setNewPriority('medium')
     },
-    onError: () => toast.error('Erro ao criar tarefa'),
+    onError: () => toast.error(t('tasks.toastCreateError')),
   })
 
   // ── Tab counts ───────────────────────────────────────────────────────────

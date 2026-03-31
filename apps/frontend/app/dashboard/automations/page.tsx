@@ -91,7 +91,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
 
         {/* Delay desta ação */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <span style={{ fontSize: '12px', color: '#9ca3af', whiteSpace: 'nowrap' }}>Delay:</span>
+          <span style={{ fontSize: '12px', color: '#9ca3af', whiteSpace: 'nowrap' }}>{t('automations.delayLabel')}</span>
           <input
             type="number" min="0" max="86400"
             style={{ ...inputStyle, width: '70px', textAlign: 'center' }}
@@ -130,7 +130,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
           <label style={labelStyle}>{t('automations.messageLabel')}</label>
           <textarea
             style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' as any }}
-            placeholder="Olá! Recebemos sua mensagem. Use {{phone}} para o número do contato."
+            placeholder={t('automations.sendMessagePlaceholder')}
             value={action.value?.message || ''}
             onChange={e => onChange({ ...action, value: { ...action.value, message: e.target.value } })}
           />
@@ -142,7 +142,7 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
           <label style={labelStyle}>{t('automations.assignAgentMessage')}</label>
           <textarea
             style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as any }}
-            placeholder="Aguarde, um atendente irá te responder em breve."
+            placeholder={t('automations.assignAgentPlaceholder')}
             value={action.value?.message || ''}
             onChange={e => onChange({ ...action, value: { ...action.value, message: e.target.value } })}
           />
@@ -283,7 +283,7 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
       </div>
 
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <button onClick={onToggle} title={automation.is_active ? 'Pausar' : 'Ativar'}
+        <button onClick={onToggle} title={automation.is_active ? t('automations.pauseTitle') : t('automations.activateTitle')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: automation.is_active ? '#16a34a' : '#d1d5db' }}>
           {automation.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
         </button>
@@ -466,7 +466,7 @@ export default function AutomationsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
             <div>
               <label style={labelStyle}>{t('automations.name')} *</label>
-              <input style={inputStyle} placeholder="Ex: Resposta fora do horário" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <input style={inputStyle} placeholder={t('automations.namePlaceholder')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
               <label style={labelStyle}>{t('automations.channelOptional')}</label>
@@ -493,7 +493,7 @@ export default function AutomationsPage() {
             {form.trigger_type === 'keyword' && (
               <div>
                 <label style={labelStyle}>{t('automations.keywordsLabel')}</label>
-                <input style={inputStyle} placeholder="preço, valor, quanto custa" value={form.trigger_value.keywords}
+                <input style={inputStyle} placeholder={t('automations.keywordsPlaceholder')} value={form.trigger_value.keywords}
                   onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, keywords: e.target.value } })} />
               </div>
             )}

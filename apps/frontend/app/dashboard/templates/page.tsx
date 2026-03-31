@@ -190,11 +190,11 @@ export default function TemplatesPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             <div>
               <label style={labelStyle}>{t('templates.templateName')} *</label>
-              <input style={inputStyle} placeholder="Ex: Boas-vindas clientes" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <input style={inputStyle} placeholder={t('templates.namePlaceholder')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
               <label style={labelStyle}>{t('templates.templateId')} *</label>
-              <input style={inputStyle} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })} />
+              <input style={inputStyle} placeholder={t('templates.idPlaceholder')} value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })} />
             </div>
           </div>
 
@@ -214,7 +214,7 @@ export default function TemplatesPage() {
             <label style={labelStyle}>{t('templates.messageBody')} *</label>
             <textarea
               style={{ ...inputStyle, minHeight: '100px', resize: 'vertical', lineHeight: 1.6 } as any}
-              placeholder="Olá {{1}}, temos uma oferta especial para você em {{2}}!"
+              placeholder={t('templates.bodyPlaceholder')}
               value={form.body}
               onChange={e => setForm({ ...form, body: e.target.value })}
             />
@@ -225,7 +225,7 @@ export default function TemplatesPage() {
             <label style={labelStyle}>{t('templates.variableNames')}</label>
             <input
               style={inputStyle}
-              placeholder="Ex: nome, cidade, desconto"
+              placeholder={t('templates.variablesPlaceholder')}
               value={form.variables}
               onChange={e => setForm({ ...form, variables: e.target.value })}
             />

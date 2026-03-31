@@ -55,7 +55,7 @@ function TagEditor({ contactId, contactTags, allTags, onChanged }: { contactId: 
       if (activeIds.has(tag.id)) await contactApi.delete(`/contacts/${contactId}/tags`, { data: { tagIds: [tag.id] } })
       else await contactApi.post(`/contacts/${contactId}/tags`, { tagIds: [tag.id] })
       onChanged()
-    } catch { toast.error('Erro ao atualizar tag') }
+    } catch { toast.error(t('contacts.errorUpdateTag')) }
     setLoading(null)
   }
   useEffect(() => { if (!open) return; const close = () => setOpen(false); window.addEventListener('click', close); return () => window.removeEventListener('click', close) }, [open])
@@ -109,20 +109,20 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
     const name = newField.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     const options = newField.type === 'select' ? newField.options.split(',').map(o => o.trim()).filter(Boolean) : []
     const { error } = await supabase.from('custom_fields').insert({ tenant_id: tenantId, name, label: newField.label.trim(), type: newField.type, options, required: newField.required, sort_order: fields.length })
-    if (error) toast.error('Erro: ' + error.message)
-    else { toast.success('Campo criado!'); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
+    if (error) toast.error(t('contacts.error') + ': ' + error.message)
+    else { toast.success(t('contacts.fieldCreated')); setNewField({ label: '', type: 'text', options: '', required: false }); await loadFields(); onSaved() }
     setSaving(false)
   }
   const handleDeleteField = async (id: string, label: string) => {
-    if (!confirm(`Excluir o campo "${label}"?`)) return; setDeleting(id)
+    if (!confirm(`${t('contacts.confirmDeleteField')} "${label}"?`)) return; setDeleting(id)
     const { error } = await supabase.from('custom_fields').delete().eq('id', id).eq('tenant_id', tenantId)
-    if (error) toast.error('Erro ao excluir campo'); else { toast.success('Campo excluído!'); await loadFields(); onSaved() }
+    if (error) toast.error(t('contacts.errorDeleteField')); else { toast.success(t('contacts.fieldDeleted')); await loadFields(); onSaved() }
     setDeleting(null)
   }
   const handleDragStart = (index: number) => setDragging(index)
   const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); if (dragging === null || dragging === index) return; const r = [...fields]; const [m] = r.splice(dragging, 1); r.splice(index, 0, m); setFields(r); setDragging(index) }
   const handleDragEnd = async () => { setDragging(null); await Promise.all(fields.map((f, i) => supabase.from('custom_fields').update({ sort_order: i }).eq('id', f.id).eq('tenant_id', tenantId))); onSaved() }
-  const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = { text: 'Texto', number: 'Número', date: 'Data', select: 'Seleção' }
+  const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = { text: t('contacts.fieldTypeText'), number: t('contacts.fieldTypeNumber'), date: t('contacts.fieldTypeDate'), select: t('contacts.fieldTypeSelect') }
   const FIELD_TYPE_COLORS: Record<CustomFieldType, { bg: string; color: string }> = { text: { bg: '#eff6ff', color: '#2563eb' }, number: { bg: '#f0fdf4', color: '#16a34a' }, date: { bg: '#fef3c7', color: '#d97706' }, select: { bg: '#faf5ff', color: '#7c3aed' } }
 
   return (
@@ -137,9 +137,9 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#52525b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('contacts.newField')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px', marginBottom: '10px' }}>
               <div><label style={lbl}>{t('contacts.fieldName')}</label><input style={inp} placeholder="Ex: CPF, Aniversário, Plano..." value={newField.label} onChange={e => setNewField({ ...newField, label: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleAddField() }} /></div>
-              <div><label style={lbl}>{t('contacts.fieldType')}</label><select style={{ ...inp, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}><option value="text">Texto</option><option value="number">Número</option><option value="date">Data</option><option value="select">Seleção</option></select></div>
+              <div><label style={lbl}>{t('contacts.fieldType')}</label><select style={{ ...inp, cursor: 'pointer' }} value={newField.type} onChange={e => setNewField({ ...newField, type: e.target.value as CustomFieldType })}><option value="text">{t('contacts.fieldTypeText')}</option><option value="number">{t('contacts.fieldTypeNumber')}</option><option value="date">{t('contacts.fieldTypeDate')}</option><option value="select">{t('contacts.fieldTypeSelect')}</option></select></div>
             </div>
-            {newField.type === 'select' && <div style={{ marginBottom: '10px' }}><label style={lbl}>Opções (separadas por vírgula)</label><input style={inp} placeholder="Ex: Ativo, Inativo, Pendente" value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} /></div>}
+            {newField.type === 'select' && <div style={{ marginBottom: '10px' }}><label style={lbl}>{t('contacts.optionsLabel')}</label><input style={inp} placeholder={t('contacts.optionsPlaceholder')} value={newField.options} onChange={e => setNewField({ ...newField, options: e.target.value })} /></div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#52525b' }}>
                 <input type="checkbox" checked={newField.required} onChange={e => setNewField({ ...newField, required: e.target.checked })} style={{ accentColor: '#7c3aed', width: '14px', height: '14px' }} /> {t('contacts.requiredField')}
@@ -164,7 +164,7 @@ function CustomFieldsModal({ onClose, onSaved, tenantId }: { onClose: () => void
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '13.5px', fontWeight: 500, color: 'var(--text)' }}>{field.label}</span>
-                          {field.required && <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 700 }}>OBRIGATÓRIO</span>}
+                          {field.required && <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 700 }}>{t('contacts.requiredBadge')}</span>}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', marginTop: '3px' }}>
                           <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: ts.bg, color: ts.color }}>{FIELD_TYPE_LABELS[field.type]}</span>
@@ -211,24 +211,24 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       const payload = rows.map(r => ({ phone: String(r.telefone || r.phone || r.Phone || r.Telefone || '').replace(/\D/g, ''), name: r.nome || r.name || r.Name || r.Nome || '', email: r.email || r.Email || '', company: r.empresa || r.company || r.Company || r.Empresa || '' })).filter(r => r.phone.length >= 8)
       const { data } = await contactApi.post('/contacts/import', { rows: payload, tagId: importTagId || undefined }); return data
     },
-    onSuccess: (data) => { toast.success(`${data?.data?.imported || rows.length} contatos importados!`); onSuccess(); onClose() },
-    onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro ao importar'),
+    onSuccess: (data) => { toast.success(`${data?.data?.imported || rows.length} ${t('contacts.contactsImported')}`); onSuccess(); onClose() },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('contacts.errorImport')),
   })
 
   const parseFile = (file: File) => {
     setError('')
     const MAX_FILE_SIZE = 10 * 1024 * 1024
-    if (file.size > MAX_FILE_SIZE) { toast.error('Arquivo muito grande. O tamanho máximo é 10MB.'); return }
-    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { toast.error('Formato inválido. Use .xlsx, .xls ou .csv'); return }
+    if (file.size > MAX_FILE_SIZE) { toast.error(t('contacts.fileTooLarge')); return }
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { toast.error(t('contacts.invalidFormat')); return }
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
         const wb = XLSX.read(data, { type: 'array' }); const ws = wb.Sheets[wb.SheetNames[0]]
         const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
-        if (!json.length) { setError('Planilha vazia'); return }
+        if (!json.length) { setError(t('contacts.emptySpreadsheet')); return }
         setRows(json); setStep('preview')
-      } catch { setError('Erro ao ler o arquivo.') }
+      } catch { setError(t('contacts.errorReadFile')) }
     }
     reader.readAsArrayBuffer(file)
   }
@@ -258,10 +258,10 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '14px 16px' }}>
               <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('contacts.recognizedColumns')}</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                {[['telefone / phone', 'obrigatório'],['nome / name','opcional'],['email','opcional'],['empresa / company','opcional']].map(([col, req]) => (
+                {[['telefone / phone', t('contacts.columnRequired')],['nome / name', t('contacts.columnOptional')],['email', t('contacts.columnOptional')],['empresa / company', t('contacts.columnOptional')]].map(([col, req]) => (
                   <div key={col} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', fontFamily: 'monospace', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px' }}>{col}</span>
-                    <span style={{ fontSize: '11px', color: req === 'obrigatório' ? '#dc2626' : 'var(--text-faint)' }}>{req}</span>
+                    <span style={{ fontSize: '11px', color: req === t('contacts.columnRequired') ? '#dc2626' : 'var(--text-faint)' }}>{req}</span>
                   </div>
                 ))}
               </div>
@@ -294,7 +294,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                     </div>
                   )
                 })}
-                {validRows.length > 50 && <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center' }}>+ {validRows.length - 50} não exibidos</div>}
+                {validRows.length > 50 && <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center' }}>+ {validRows.length - 50} {t('contacts.notDisplayed')}</div>}
               </div>
             </div>
           </>)}
@@ -358,27 +358,27 @@ export default function ContactsPage() {
   const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
   const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] } })
 
-  const createTagMutation = useMutation({ mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) }, onSuccess: () => { toast.success('Tag criada!'); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) }, onError: () => toast.error('Erro ao criar tag') })
-  const deleteTagMutation = useMutation({ mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) }, onSuccess: () => { toast.success('Tag excluída!'); queryClient.invalidateQueries({ queryKey: ['tags'] }) }, onError: () => toast.error('Erro ao excluir tag') })
-  const createMutation = useMutation({ mutationFn: async () => { const { data } = await contactApi.post('/contacts', { ...form, metadata: createMetadata }); return data }, onSuccess: () => { toast.success('Contato criado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }); setCreateMetadata({}) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro') })
-  const updateMutation = useMutation({ mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) }, onSuccess: () => { toast.success('Atualizado!'); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || 'Erro') })
-  const deleteMutation = useMutation({ mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) }, onSuccess: () => { toast.success('Excluído(s)!'); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error('Erro ao excluir') })
-  const deleteAllMutation = useMutation({ mutationFn: async () => { await contactApi.delete('/contacts/all') }, onSuccess: () => { toast.success('Todos excluídos!'); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error('Erro') })
+  const createTagMutation = useMutation({ mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) }, onSuccess: () => { toast.success(t('contacts.tagCreated')); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) }, onError: () => toast.error(t('contacts.errorCreateTag')) })
+  const deleteTagMutation = useMutation({ mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) }, onSuccess: () => { toast.success(t('contacts.tagDeleted')); queryClient.invalidateQueries({ queryKey: ['tags'] }) }, onError: () => toast.error(t('contacts.errorDeleteTag')) })
+  const createMutation = useMutation({ mutationFn: async () => { const { data } = await contactApi.post('/contacts', { ...form, metadata: createMetadata }); return data }, onSuccess: () => { toast.success(t('contacts.contactCreated')); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setShowCreate(false); setForm({ phone: '', name: '', email: '', company: '' }); setCreateMetadata({}) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('contacts.error')) })
+  const updateMutation = useMutation({ mutationFn: async ({ id, data }: { id: string; data: any }) => { await contactApi.patch(`/contacts/${id}`, data) }, onSuccess: () => { toast.success(t('contacts.updated')); queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditingId(null) }, onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('contacts.error')) })
+  const deleteMutation = useMutation({ mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) }, onSuccess: () => { toast.success(t('contacts.deleted')); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error(t('contacts.errorDeleteContacts')) })
+  const deleteAllMutation = useMutation({ mutationFn: async () => { await contactApi.delete('/contacts/all') }, onSuccess: () => { toast.success(t('contacts.allDeleted')); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error(t('contacts.error')) })
 
-  const handleExport = async () => { const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' }); const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click(); toast.success('CSV exportado!') }
+  const handleExport = async () => { const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' }); const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click(); toast.success(t('contacts.csvExported')) }
   const handleExportExcel = async () => {
     try {
       let allContacts: any[] = []; let p = 1
       while (true) { const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`); const rows = data?.data || []; allContacts = [...allContacts, ...rows]; if (!data?.meta?.hasMore) break; p++ }
-      if (allContacts.length === 0) { toast.error('Nenhum contato'); return }
+      if (allContacts.length === 0) { toast.error(t('contacts.noContactsShort')); return }
       const rows = allContacts.map((c: any) => { const base: any = { telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '', tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '), ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '' }; customFields.forEach(cf => { base[cf.label] = c.metadata?.[cf.name] ?? '' }); return base })
-      const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Contatos'); XLSX.writeFile(wb, 'contatos.xlsx'); toast.success(`${allContacts.length} exportados!`)
-    } catch { toast.error('Erro ao exportar') }
+      const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Contatos'); XLSX.writeFile(wb, 'contatos.xlsx'); toast.success(`${allContacts.length} ${t('contacts.exported')}`)
+    } catch { toast.error(t('contacts.errorExport')) }
   }
 
-  const handleDelete = (id: string, name: string) => { if (confirm(`Excluir "${name}"?`)) deleteMutation.mutate([id]) }
-  const handleDeleteSelected = () => { if (confirm(`Excluir ${selected.size} contato(s)?`)) deleteMutation.mutate(Array.from(selected)) }
-  const handleDeleteAll = () => { if (confirm(`⚠️ Excluir TODOS os ${meta?.total?.toLocaleString()} contatos?`)) deleteAllMutation.mutate() }
+  const handleDelete = (id: string, name: string) => { if (confirm(`${t('contacts.confirmDelete')} "${name}"?`)) deleteMutation.mutate([id]) }
+  const handleDeleteSelected = () => { if (confirm(t('contacts.confirmDeleteSelected').replace('{count}', String(selected.size)))) deleteMutation.mutate(Array.from(selected)) }
+  const handleDeleteAll = () => { if (confirm(t('contacts.confirmDeleteAll').replace('{count}', meta?.total?.toLocaleString() || '0'))) deleteAllMutation.mutate() }
   const startEdit = (c: any) => { setEditingId(c.id); setEditForm({ name: c.name || '', email: c.email || '', company: c.company || '', metadata: c.metadata || {} }) }
   const saveEdit = () => { if (!editingId) return; updateMutation.mutate({ id: editingId, data: editForm }) }
   const toggleSelect = (id: string) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next) }
@@ -410,7 +410,7 @@ export default function ContactsPage() {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>{t('contacts.title')}</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '4px' }}>
             {meta?.total ? `${meta.total.toLocaleString()} ${t('contacts.count')}` : `0 ${t('contacts.count')}`}
-            {customFields.length > 0 && ` · ${customFields.length} campo${customFields.length > 1 ? 's' : ''} personalizado${customFields.length > 1 ? 's' : ''}`}
+            {customFields.length > 0 && ` · ${customFields.length} ${customFields.length > 1 ? t('contacts.customFieldsCountPlural') : t('contacts.customFieldsCount')}`}
           </p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -483,7 +483,7 @@ export default function ContactsPage() {
                 <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
                   <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{tag.name}</span>
-                  <button onClick={() => { if (confirm(`Excluir "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
+                  <button onClick={() => { if (confirm(`${t('contacts.confirmDeleteTag')} "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: 'var(--text-faintest)', marginLeft: '2px' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                     onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'}>
