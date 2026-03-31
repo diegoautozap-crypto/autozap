@@ -595,20 +595,21 @@ export default function CampaignsPage() {
                 </div>
 
                 {contactMode === 'segment' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {/* Tags */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                    {/* Passo 1: Selecione as tags */}
                     <div>
-                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tags</p>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#18181b', marginBottom: '8px' }}>Selecione as tags dos contatos</p>
                       {tags.length === 0 ? (
-                        <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada.</p>
+                        <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada. Crie na página de Contatos.</p>
                       ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {tags.map((tag: any) => {
                             const sel = selectedTagIds.includes(tag.id)
                             return (
                               <div key={tag.id} onClick={() => { setSelectedTagIds(prev => sel ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPreviewCount(null) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '11px', fontWeight: 500, transition: 'all 0.1s' }}>
-                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 11px', borderRadius: '99px', cursor: 'pointer', border: `1.5px solid ${sel ? (tag.color || '#22c55e') : '#e4e4e7'}`, background: sel ? `${tag.color || '#22c55e'}12` : '#fff', fontSize: '12px', fontWeight: 500, transition: 'all 0.1s' }}>
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280' }} />
                                 <span style={{ color: sel ? (tag.color || '#22c55e') : '#18181b' }}>{tag.name}</span>
                               </div>
                             )
@@ -617,39 +618,43 @@ export default function CampaignsPage() {
                       )}
                     </div>
 
-                    {/* Filtros extras */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sem interação há (dias)</p>
-                        <input type="number" min="0" style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} value={segNoInteraction || ''} placeholder="0" onChange={e => { setSegNoInteraction(Number(e.target.value) || 0); setPreviewCount(null) }} />
+                    {/* Passo 2: Refinar (opcional, colapsável) */}
+                    <details style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '10px', padding: '0' }}>
+                      <summary style={{ padding: '10px 14px', fontSize: '12px', fontWeight: 600, color: '#71717a', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Plus size={12} /> Refinar segmento (opcional)
+                      </summary>
+                      <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Inativos há quantos dias?</p>
+                            <input type="number" min="0" style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segNoInteraction || ''} placeholder="Ex: 30" onChange={e => { setSegNoInteraction(Number(e.target.value) || 0); setPreviewCount(null) }} />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Como o contato chegou?</p>
+                            <select style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} value={segOrigin} onChange={e => { setSegOrigin(e.target.value); setPreviewCount(null) }}>
+                              <option value="">Qualquer origem</option>
+                              <option value="manual">Cadastro manual</option>
+                              <option value="csv_import">Importação CSV</option>
+                              <option value="webhook">Formulário/Webhook</option>
+                              <option value="whatsapp">WhatsApp</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Filtrar por campo personalizado</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Nome do campo" value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
+                            <input style={{ ...inp, padding: '7px 10px', fontSize: '12px' }} placeholder="Valor" value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Origem</p>
-                        <select style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} value={segOrigin} onChange={e => { setSegOrigin(e.target.value); setPreviewCount(null) }}>
-                          <option value="">Todas</option>
-                          <option value="manual">Manual</option>
-                          <option value="csv_import">Importação CSV</option>
-                          <option value="webhook">Webhook</option>
-                          <option value="whatsapp">WhatsApp</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campo personalizado</p>
-                        <input style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} placeholder="interesse_principal" value={segCustomField} onChange={e => { setSegCustomField(e.target.value); setPreviewCount(null) }} />
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#71717a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor do campo</p>
-                        <input style={{ ...inp, padding: '6px 10px', fontSize: '12px' }} placeholder="comercial" value={segCustomValue} onChange={e => { setSegCustomValue(e.target.value); setPreviewCount(null) }} />
-                      </div>
-                    </div>
+                    </details>
 
                     {/* Preview */}
                     <button onClick={loadPreview} disabled={!hasSegmentFilter || loadingPreview}
-                      style={{ width: '100%', padding: '8px', background: hasSegmentFilter ? '#f0f9ff' : '#fafafa', border: `1px solid ${hasSegmentFilter ? '#bae6fd' : '#e4e4e7'}`, borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: hasSegmentFilter ? '#0369a1' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                      {loadingPreview ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={12} />}
-                      {previewCount !== null ? `${previewCount} contatos encontrados` : 'Contar contatos'}
+                      style={{ width: '100%', padding: '9px', background: previewCount !== null ? '#f0fdf4' : hasSegmentFilter ? '#f0f9ff' : '#fafafa', border: `1px solid ${previewCount !== null ? '#bbf7d0' : hasSegmentFilter ? '#bae6fd' : '#e4e4e7'}`, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: hasSegmentFilter ? 'pointer' : 'not-allowed', color: previewCount !== null ? '#15803d' : hasSegmentFilter ? '#0369a1' : '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      {loadingPreview ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : previewCount !== null ? <CheckCheck size={13} /> : <Search size={13} />}
+                      {previewCount !== null ? `${previewCount} contatos encontrados` : 'Ver quantos contatos serão enviados'}
                     </button>
                   </div>
                 ) : (
