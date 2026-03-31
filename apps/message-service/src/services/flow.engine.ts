@@ -31,6 +31,7 @@ interface FlowRow {
 }
 
 interface FlowNodeData {
+  subtype?: string
   keywords?: string[]
   matchType?: 'equals' | 'contains'
   message?: string
@@ -683,9 +684,15 @@ export class FlowEngine {
           break
         }
 
+        case 'tag_contact':
         case 'add_tag': {
           if (!data?.tagId) break
-          await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: data.tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
+          const tagAction = data?.subtype || 'add'
+          if (tagAction === 'remove') {
+            await db.from('contact_tags').delete().eq('contact_id', ctx.contactId).eq('tag_id', data.tagId)
+          } else {
+            await db.from('contact_tags').upsert({ contact_id: ctx.contactId, tag_id: data.tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true })
+          }
           break
         }
 
