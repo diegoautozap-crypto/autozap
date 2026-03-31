@@ -508,7 +508,8 @@ export default function PipelinePage() {
               if (!board) { toast.error('Nenhum dado'); return }
               const rows: any[] = []
               for (const [stage, convs] of Object.entries(board as Record<string, any[]>)) {
-                const colLabel = columns.find(c => c.key === stage)?.label || stage
+                const cols = dbColumns && dbColumns.length > 0 ? dbColumns : DEFAULT_COLUMNS
+                const colLabel = cols.find((c: any) => c.key === stage)?.label || stage
                 for (const conv of convs) {
                   rows.push({
                     etapa: colLabel,
