@@ -104,16 +104,18 @@ export default function FlowEditorPage() {
     const pusher = new Pusher(key, { cluster })
     const channel = pusher.subscribe(`tenant-${tenantId}`)
 
-    channel.bind('flow.node.start', (data: any) => {
-      if (data.flowId !== id) return
-      setActiveNodeId(data.nodeId)
+    channel.bind('flow.node.start', (ev: any) => {
+      if (ev.flowId !== id) return
+      setActiveNodeId(ev.nodeId)
+      setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: 'flow-node-active' } : n))
     })
-    channel.bind('flow.node.done', (data: any) => {
-      if (data.flowId !== id) return
-      setDoneNodes(prev => ({ ...prev, [data.nodeId]: data.status }))
+    channel.bind('flow.node.done', (ev: any) => {
+      if (ev.flowId !== id) return
+      const cls = ev.status === 'success' ? 'flow-node-success' : 'flow-node-error'
+      setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: cls } : n))
       setTimeout(() => setActiveNodeId(null), 300)
-      // Limpa badge depois de 8s
-      setTimeout(() => setDoneNodes(prev => { const next = { ...prev }; delete next[data.nodeId]; return next }), 8000)
+      // Limpa classe depois de 8s
+      setTimeout(() => setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: '' } : n)), 8000)
     })
 
     return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`) }
@@ -375,12 +377,6 @@ export default function FlowEditorPage() {
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
             selectionOnDrag
-            nodeClassName={(node) => {
-              if (activeNodeId === node.id) return 'flow-node-active'
-              if (doneNodes[node.id] === 'success') return 'flow-node-success'
-              if (doneNodes[node.id] === 'error') return 'flow-node-error'
-              return ''
-            }}
             defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
