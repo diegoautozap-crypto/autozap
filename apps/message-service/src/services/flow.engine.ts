@@ -565,13 +565,29 @@ export class FlowEngine {
                   logger.info('Trying Gupshup media endpoint', { url: url.slice(0, 80), mediaId })
                   try {
                     const res = await fetch(url, { headers: { apikey: creds.apiKey, Authorization: creds.apiKey } })
-                    logger.info('Gupshup endpoint response', { status: res.status, contentType: res.headers.get('content-type'), url: url.slice(0, 80) })
+                    const ct = res.headers.get('content-type') || ''
+                    logger.info('Gupshup endpoint response', { status: res.status, contentType: ct, url: url.slice(0, 80) })
                     if (res.ok) {
-                      const ct = res.headers.get('content-type') || ''
                       if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet') || ct.includes('mpeg')) {
+                        // Resposta é o áudio binário direto
                         audioBuffer = Buffer.from(await res.arrayBuffer())
-                        logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length, endpoint: url.slice(0, 80) })
+                        logger.info('Audio downloaded (binary)', { mediaId, size: audioBuffer.length })
                         break
+                      } else {
+                        // Resposta pode ser URL ou JSON com URL
+                        const body = await res.text()
+                        logger.info('Gupshup response body', { body: body.slice(0, 300) })
+                        // Tenta extrair URL da resposta
+                        const urlMatch = body.match(/https?:\/\/[^\s"'<>]+/)
+                        if (urlMatch) {
+                          logger.info('Following media URL from response', { followUrl: urlMatch[0].slice(0, 100) })
+                          const mediaRes = await fetch(urlMatch[0])
+                          if (mediaRes.ok) {
+                            audioBuffer = Buffer.from(await mediaRes.arrayBuffer())
+                            logger.info('Audio downloaded (follow URL)', { mediaId, size: audioBuffer.length })
+                            break
+                          }
+                        }
                       }
                     }
                   } catch (e) { /* try next endpoint */ }
