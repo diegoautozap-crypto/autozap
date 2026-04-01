@@ -10,6 +10,7 @@ import { MediaUpload, ConditionPanel } from './ConditionPanel'
 import { messageApi, contactApi, conversationApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,6 +64,8 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
   const d = node.data as any
   const color = NODE_COLORS[d.type] || '#6b7280'
   const t = useT()
+  const { canEdit } = usePermissions()
+  const canEditFlows = canEdit('/dashboard/flows')
   const nodeLabels = getNodeLabels(t)
   const SEND_SUBTYPES = getSendSubtypes(t)
   const TAG_SUBTYPES = getTagSubtypes(t)
@@ -932,14 +935,14 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         )}
       </div>
 
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #f4f4f5' }}>
+      {canEditFlows && <div style={{ padding: '12px 16px', borderTop: '1px solid #f4f4f5' }}>
         <button onClick={() => onDelete(node.id)}
           style={{ width: '100%', padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.1s' }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2'}
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'}>
           {t('nodes.removeNode')}
         </button>
-      </div>
+      </div>}
       <style>{"@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
     </div>
   )

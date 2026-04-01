@@ -525,7 +525,7 @@ export default function PipelinePage() {
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
               <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> {t('pipeline.refresh')}
             </button>
-            <button onClick={async () => {
+            {canEdit('/dashboard/pipeline') && <button onClick={async () => {
               if (!board) { toast.error(t('pipeline.noData')); return }
               const rows: any[] = []
               for (const [stage, convs] of Object.entries(board as Record<string, any[]>)) {
@@ -550,7 +550,7 @@ export default function PipelinePage() {
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
               <DollarSign size={13} /> {t('pipeline.exportExcel')}
-            </button>
+            </button>}
           </div>
         </div>
 
