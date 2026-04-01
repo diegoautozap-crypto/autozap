@@ -540,10 +540,18 @@ export class FlowEngine {
               let audioBuffer: Buffer | null = null
               const mediaId = lastMsg.media_url
 
-              // Baixa áudio via Meta Graph API com token da env var
-              const metaToken = process.env.META_ACCESS_TOKEN
+              // Busca credenciais do canal (podem estar em texto puro ou criptografadas)
+              const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
+              const rawCreds = channel?.credentials || {}
+              const creds = typeof rawCreds === 'string' ? JSON.parse(rawCreds) : rawCreds
+              // Tenta descriptografar — se já estiver em texto puro, retorna como está
+              const metaToken = creds.metaToken?.startsWith('EAA') ? creds.metaToken : decryptCredentials(creds).metaToken
+              const apiKey = creds.apiKey?.length < 100 ? creds.apiKey : decryptCredentials(creds).apiKey
+
+              logger.info('Transcribe creds', { hasMetaToken: !!metaToken, metaTokenStart: metaToken?.slice(0, 10), hasApiKey: !!apiKey, mediaId })
+
+              // 1. Meta Graph API (pra Gupshup Cloud API / WhatsApp Cloud)
               if (metaToken && /^\d+$/.test(mediaId)) {
-                logger.info('Downloading audio via Meta Graph API', { mediaId })
                 const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${metaToken}` } })
                 if (metaRes.ok) {
                   const metaData = await metaRes.json() as any
@@ -555,13 +563,14 @@ export class FlowEngine {
                     }
                   }
                 } else {
-                  logger.error('Meta Graph failed', { status: metaRes.status, mediaId })
+                  const err = await metaRes.text()
+                  logger.error('Meta Graph failed', { status: metaRes.status, body: err.slice(0, 150), mediaId })
                 }
               }
 
-              // Fallback: tenta Gupshup API
-              if (!audioBuffer && process.env.GUPSHUP_APIKEY) {
-                const gupshupRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: process.env.GUPSHUP_APIKEY } })
+              // 2. Fallback: Gupshup API
+              if (!audioBuffer && apiKey) {
+                const gupshupRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: apiKey } })
                 if (gupshupRes.ok) {
                   const ct = gupshupRes.headers.get('content-type') || ''
                   if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet')) {
