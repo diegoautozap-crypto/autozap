@@ -35,6 +35,7 @@ const updateMemberSchema = z.object({
 
 const userPermissionsSchema = z.object({
   allowed_pages:        z.array(z.string()).optional(),
+  editable_pages:       z.array(z.string()).optional(),
   allowed_channels:     z.array(z.string().uuid()).optional(),
   campaign_access:      z.enum(['none', 'view', 'create', 'manage']).optional(),
   conversation_access:  z.enum(['all', 'assigned']).optional(),
