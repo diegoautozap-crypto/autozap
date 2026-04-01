@@ -568,13 +568,29 @@ export class FlowEngine {
               } else {
                 logger.warn('No credentials to download media', { hasApiKey: !!creds.apiKey, hasMetaToken: !!creds.metaToken, channelId: ctx.channelId })
               }
-              // Fallback: Meta Cloud API (se tiver metaToken e não baixou ainda)
-              if (!audioBuffer && /^\d+$/.test(mediaId) && creds.metaToken) {
-                const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
-                const metaData = await metaRes.json() as any
-                if (metaData.url) {
-                  const res = await fetch(metaData.url, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
-                  if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
+              // Fallback: Meta Cloud API
+              if (!audioBuffer && /^\d+$/.test(mediaId)) {
+                // Tenta pegar metaToken de várias fontes
+                const metaToken = creds.metaToken || creds.meta_token || creds.accessToken
+                logger.info('Trying Meta Graph API fallback', { hasMetaToken: !!metaToken, mediaId, credKeys: Object.keys(creds) })
+                if (metaToken) {
+                  const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${metaToken}` } })
+                  logger.info('Meta Graph response', { status: metaRes.status, mediaId })
+                  if (metaRes.ok) {
+                    const metaData = await metaRes.json() as any
+                    if (metaData.url) {
+                      const res = await fetch(metaData.url, { headers: { Authorization: `Bearer ${metaToken}` } })
+                      if (res.ok) {
+                        audioBuffer = Buffer.from(await res.arrayBuffer())
+                        logger.info('Audio downloaded via Meta', { mediaId, size: audioBuffer.length })
+                      }
+                    }
+                  } else {
+                    const errBody = await metaRes.text()
+                    logger.error('Meta Graph download failed', { status: metaRes.status, body: errBody.slice(0, 200), mediaId })
+                  }
+                } else {
+                  logger.warn('No metaToken available for Meta Graph API', { credKeys: Object.keys(creds) })
                 }
               }
 
