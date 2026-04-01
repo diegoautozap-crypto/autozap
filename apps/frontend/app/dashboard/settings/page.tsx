@@ -6,6 +6,7 @@ import { tenantApi, conversationApi } from '@/lib/api'
 import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 const PLAN_NAMES: Record<string, string> = {
   trial:      'Trial',
@@ -387,6 +388,7 @@ function WebhooksSection() {
 
 export default function SettingsPage() {
   const t = useT()
+  const { isAdmin } = usePermissions()
   const PLAN_MSGS = getPlanMsgs(t)
   const PLAN_FEATURES = getPlanFeatures(t)
   const { user } = useAuthStore()
@@ -463,7 +465,7 @@ export default function SettingsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
         {/* Banner trial expirado */}
-        {isTrial && trialExpired && (
+        {isAdmin && isTrial && trialExpired && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AlertTriangle size={18} color="#ef4444" />
@@ -479,7 +481,7 @@ export default function SettingsPage() {
         )}
 
         {/* Banner trial ativo */}
-        {isTrial && !trialExpired && (
+        {isAdmin && isTrial && !trialExpired && (
           <div style={{ background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4', border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`, borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
@@ -494,7 +496,7 @@ export default function SettingsPage() {
         )}
 
         {/* Banner plano ativo */}
-        {!isTrial && (
+        {isAdmin && !isTrial && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ {t('settings.plan')} {planName} {t('settings.planActive')}</p>
@@ -538,13 +540,13 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Webhook de Entrada ── */}
-        <InboundWebhookSection />
+        {isAdmin && <InboundWebhookSection />}
 
         {/* ── Webhooks de Saída ── */}
-        <WebhooksSection />
+        {isAdmin && <WebhooksSection />}
 
         {/* Planos */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
+        {isAdmin && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
             {isTrial ? `🚀 ${t('settings.choosePlan')}` : t('settings.availablePlans')}
           </span>
@@ -588,7 +590,7 @@ export default function SettingsPage() {
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '12px', marginTop: '14px' }}>
             {t('settings.paymentSecure')}
           </p>
-        </div>
+        </div>}
       </div>
 
       {/* Modal CPF/CNPJ */}

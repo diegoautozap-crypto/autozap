@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 import { subscribeTenant } from '@/lib/pusher'
 
 function getDefaultColumns(t: (key: string) => string) {
@@ -280,6 +281,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
 
 export default function PipelinePage() {
   const t = useT()
+  const { isAdmin } = usePermissions()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
@@ -511,11 +513,13 @@ export default function PipelinePage() {
                 {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
+            {isAdmin && (
             <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
               <Settings2 size={13} /> {t('pipeline.columns')}
             </button>
+            )}
             <button onClick={() => { localBoardRef.current = null; refetch() }} disabled={isFetching} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
@@ -567,7 +571,7 @@ export default function PipelinePage() {
               ) : (
                 <span style={{ fontSize: '13px', fontWeight: selectedPipelineId === p.id ? 700 : 500, color: selectedPipelineId === p.id ? '#fff' : 'var(--text-muted)' }}>{p.name}</span>
               )}
-              {selectedPipelineId === p.id && !editingPipelineId && (
+              {isAdmin && selectedPipelineId === p.id && !editingPipelineId && (
                 <>
                   <button onClick={e => { e.stopPropagation(); setEditingPipelineId(p.id); setEditingPipelineName(p.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><Pencil size={11} /></button>
                   <button onClick={e => { e.stopPropagation(); if (confirm(t('pipeline.confirmRemovePipeline').replace('{name}', p.name))) deletePipelineMutation.mutate(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-faint)', display: 'flex' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}><X size={11} /></button>
@@ -575,7 +579,7 @@ export default function PipelinePage() {
               )}
             </div>
           ))}
-          {showNewPipeline ? (
+          {isAdmin && (showNewPipeline ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
               <input autoFocus placeholder={t('pipeline.pipelineNamePlaceholder')} value={newPipelineName} onChange={e => setNewPipelineName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && newPipelineName.trim()) createPipelineMutation.mutate(newPipelineName.trim()); if (e.key === 'Escape') { setShowNewPipeline(false); setNewPipelineName('') } }}
@@ -589,7 +593,7 @@ export default function PipelinePage() {
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
               <Plus size={12} /> {t('pipeline.newPipeline').replace('+ ', '')}
             </button>
-          )}
+          ))}
         </div>
       </div>
 

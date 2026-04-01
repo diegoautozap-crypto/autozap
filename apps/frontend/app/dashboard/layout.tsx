@@ -6,11 +6,19 @@ import { tenantApi } from '@/lib/api'
 import { Sidebar } from '@/components/layout/sidebar'
 import { TrialBanner } from '@/components/layout/TrialBanner'
 import { useNotifications } from '@/hooks/useNotifications'
+import { usePermissionsStore } from '@/store/permissions.store'
 
 // Componente separado — só monta quando o usuário já está autenticado
 // Isso garante que o tenantId está disponível quando o Pusher conecta
 function NotificationsProvider() {
   useNotifications()
+  return null
+}
+
+function PermissionsLoader() {
+  const { loaded, load } = usePermissionsStore()
+  const { useEffect } = require('react')
+  useEffect(() => { if (!loaded) load() }, [loaded, load])
   return null
 }
 
@@ -41,6 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Só monta aqui — depois que hydrated=true e isAuthenticated=true */}
       <NotificationsProvider />
+      <PermissionsLoader />
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />

@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 const S: Record<string, { color: string; bg: string; dot: string; label: string; bar: string }> = {
   running:   { color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e', label: 'Enviando',  bar: '#22c55e' },
@@ -41,6 +42,7 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
 
 export default function CampaignsPage() {
   const t = useT()
+  const { canCreateCampaigns, canManageCampaigns, canDelete } = usePermissions()
   const queryClient = useQueryClient()
   const [showModal, setShowModal]               = useState(false)
   const [contactsText, setContactsText]         = useState('')
@@ -228,11 +230,13 @@ export default function CampaignsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
+          {canCreateCampaigns() && (
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
             <Plus size={14} /> {t('campaigns.new')}
           </button>
+          )}
         </div>
       </div>
 
@@ -254,9 +258,11 @@ export default function CampaignsPage() {
                   <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('campaigns.noCampaigns')}</p>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('campaigns.createFirst')}</p>
                 </div>
+                {canCreateCampaigns() && (
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   + {t('campaigns.createCampaign')}
                 </button>
+                )}
               </div>
             ) : (
               <>
@@ -396,7 +402,7 @@ export default function CampaignsPage() {
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {selectedCamp.status === 'running' && (
+                  {canManageCampaigns() && selectedCamp.status === 'running' && (
                     <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
                       style={{ width: '100%', padding: '9px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
@@ -404,7 +410,7 @@ export default function CampaignsPage() {
                       <Pause size={13} /> {t('campaigns.pauseCampaign')}
                     </button>
                   )}
-                  {['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
+                  {canManageCampaigns() && ['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => startMutation.mutate(selectedCamp.id)}
                       style={{ width: '100%', padding: '9px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
@@ -430,7 +436,7 @@ export default function CampaignsPage() {
                     <Download size={13} /> {t('campaigns.exportResults')}
                   </button>
 
-                  {['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
+                  {canDelete() && ['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => { if (window.confirm(`${t('campaigns.deleteCampaign')} "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}
                       style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f87171', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}

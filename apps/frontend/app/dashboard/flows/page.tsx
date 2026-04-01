@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 function getFlowTemplates(t: (key: string) => string) {
   return [
@@ -441,6 +442,7 @@ function CooldownSelector({ value, onChange, t }: { value: string; onChange: (v:
 
 export default function FlowsPage() {
   const t = useT()
+  const { canEdit, canDelete } = usePermissions()
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showNew, setShowNew] = useState(false)
@@ -521,16 +523,20 @@ export default function FlowsPage() {
           <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>{t('flows.subtitleAlt')}</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
+          {canEdit() && (
           <button onClick={() => setShowTemplates(true)}
             style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Copy size={14} /> {t('flows.templates')}
           </button>
+          )}
+          {canEdit() && (
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
             <Plus size={14} /> {t('flows.new')}
           </button>
+          )}
         </div>
       </div>
 
@@ -664,24 +670,30 @@ export default function FlowsPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                {canEdit() && (
                 <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })} title={f.is_active ? t('flows.togglePause') : t('flows.toggleActivate')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: f.is_active ? '#22c55e' : 'var(--text-faintest)', borderRadius: '6px' }}
                   onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
                   onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
                   {f.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                 </button>
+                )}
+                {canEdit() && (
                 <button onClick={e => openEdit(f, e)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Pencil size={14} />
                 </button>
+                )}
+                {canDelete() && (
                 <button onClick={() => { if (confirm(t('flows.confirmDelete').replace('{name}', f.name))) deleteMutation.mutate(f.id) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Trash2 size={14} />
                 </button>
+                )}
                 <ChevronRight size={15} color="var(--text-faintest)" />
               </div>
             </div>

@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
@@ -335,6 +336,7 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 export default function ContactsPage() {
   const t = useT()
   const { user } = useAuthStore()
+  const { isAdmin, canEdit, canDelete } = usePermissions()
   const tenantId = user?.tenantId || ''
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -414,13 +416,13 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {selected.size > 0 && (
+          {canDelete() && selected.size > 0 && (
             <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <Trash2 size={13} /> {t('common.delete')} {selected.size}
             </button>
           )}
-          {meta?.total > 0 && (
+          {canDelete() && meta?.total > 0 && (
             <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} {t('contacts.deleteAll')}
@@ -443,12 +445,14 @@ export default function ContactsPage() {
             style={{ padding: '8px 12px', background: showTags ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showTags ? '#22c55e' : 'var(--border)'}`, borderRadius: '8px', color: showTags ? '#16a34a' : '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Tag size={13} /> {t('contacts.tags')} {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
           </button>
+          {canEdit() && (
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 3px rgba(34,197,94,0.3)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
             <Plus size={13} /> {t('contacts.newContact').replace('+ ', '')}
           </button>
+          )}
         </div>
       </div>
 
@@ -472,10 +476,12 @@ export default function ContactsPage() {
                 {TAG_COLORS.map(c => <div key={c} onClick={() => setNewTagColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${newTagColor === c ? 'var(--text)' : 'transparent'}`, transition: 'border 0.1s' }} />)}
               </div>
             </div>
+            {canEdit() && (
             <button onClick={() => createTagMutation.mutate()} disabled={!newTagName || createTagMutation.isPending}
               style={{ padding: '9px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !newTagName ? 0.5 : 1, whiteSpace: 'nowrap' }}>
               {createTagMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} {t('contacts.createTag')}
             </button>
+            )}
           </div>
           {(tags as any[]).length === 0 ? <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('contacts.noTags')}</p> : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -483,12 +489,14 @@ export default function ContactsPage() {
                 <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
                   <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{tag.name}</span>
+                  {canEdit() && (
                   <button onClick={() => { if (confirm(`${t('contacts.confirmDeleteTag')} "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: 'var(--text-faintest)', marginLeft: '2px' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                     onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'}>
                     <X size={12} />
                   </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -585,16 +593,20 @@ export default function ContactsPage() {
                       </>
                     ) : (
                       <>
+                        {canEdit() && (
                         <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
                           <Pencil size={13} />
                         </button>
+                        )}
+                        {canDelete() && (
                         <button onClick={() => handleDelete(c.id, c.name || c.phone)} style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
                           <Trash2 size={13} />
                         </button>
+                        )}
                       </>
                     )}
                   </div>
