@@ -1,7 +1,7 @@
 import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
-  RefreshCw, AlignLeft, Link, Play, Mic, Variable, Calculator, ClipboardList, Bell, Split, Shuffle,
+  RefreshCw, AlignLeft, Link, Play, Mic, ClipboardList, Bell, Split, Shuffle,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -27,8 +27,6 @@ export const NODE_COLORS: Record<string, string> = {
   end:                   '#dc2626',
   loop:                  '#7c3aed',
   transcribe_audio:      '#7c3aed',
-  set_variable:          '#0369a1',
-  math:                  '#0369a1',
   create_task:           '#d97706',
   send_notification:     '#db2777',
   split_ab:              '#ea580c',
@@ -58,8 +56,6 @@ export const NODE_ICONS: Record<string, any> = {
   end:                   Square,
   loop:                  RefreshCw,
   transcribe_audio:      Mic,
-  set_variable:          Variable,
-  math:                  Calculator,
   create_task:           ClipboardList,
   send_notification:     Bell,
   split_ab:              Split,
@@ -87,8 +83,6 @@ export const NODE_LABELS: Record<string, string> = {
   end:                   'Finalizar flow',
   loop:                  'Loop',
   transcribe_audio:      'Transcrever áudio',
-  set_variable:          'Definir variável',
-  math:                  'Cálculo',
   create_task:           'Criar tarefa',
   send_notification:     'Notificar agente',
   split_ab:              'Teste A/B',

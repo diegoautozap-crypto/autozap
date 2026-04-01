@@ -953,29 +953,6 @@ export class FlowEngine {
           return { success: true, ended: true }
         }
 
-        case 'set_variable': {
-          const varName = data?.variableName || 'variavel'
-          const varValue = this.interpolate(data?.variableValue || '', ctx, variables)
-          variables[varName] = varValue
-          break
-        }
-
-        case 'math': {
-          const mathVar = data?.mathVariable || 'score'
-          const currentVal = this.extractNumber(variables[mathVar] || '0')
-          const operand = this.extractNumber(this.interpolate(data?.mathValue || '0', ctx, variables))
-          let result = currentVal
-          switch (data?.mathOperator) {
-            case '+': result = currentVal + operand; break
-            case '-': result = currentVal - operand; break
-            case '*': result = currentVal * operand; break
-            case '/': result = operand !== 0 ? currentVal / operand : 0; break
-            default: result = currentVal + operand
-          }
-          variables[mathVar] = String(Math.round(result * 100) / 100)
-          break
-        }
-
         case 'create_task': {
           const title = this.interpolate(data?.taskTitle || 'Tarefa do flow', ctx, variables)
           const dueDate = data?.taskDueHours ? new Date(Date.now() + data.taskDueHours * 3600000).toISOString() : null

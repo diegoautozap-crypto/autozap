@@ -840,27 +840,6 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
         </>)}
 
-        {d.type === 'set_variable' && (<>
-          <div><label style={labelStyle}>Nome da variável</label><input style={inputStyle} placeholder="score" value={d.variableName || ''} onChange={e => onUpdate(node.id, { variableName: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="Ex: 10, {{nome}}, lead_quente" value={d.variableValue || ''} onChange={e => onUpdate(node.id, { variableValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{variavel}}'} pra referir outras variáveis</p>
-        </>)}
-
-        {d.type === 'math' && (<>
-          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#1e40af' }}>
-            🧮 Faz cálculos com variáveis. Ex: lead scoring, contadores, valores.
-          </div>
-          <div><label style={labelStyle}>Variável</label><input style={inputStyle} placeholder="score" value={d.mathVariable || ''} onChange={e => onUpdate(node.id, { mathVariable: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Operação</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.mathOperator || '+'} onChange={e => onUpdate(node.id, { mathOperator: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-            <option value="+">+ Somar</option>
-            <option value="-">- Subtrair</option>
-            <option value="*">× Multiplicar</option>
-            <option value="/">÷ Dividir</option>
-          </select></div>
-          <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="10" value={d.mathValue || ''} onChange={e => onUpdate(node.id, { mathValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <p style={{ fontSize: '11px', color: '#a1a1aa' }}>Resultado: {d.mathVariable || 'score'} = {d.mathVariable || 'score'} {d.mathOperator || '+'} {d.mathValue || '0'}</p>
-        </>)}
-
         {d.type === 'create_task' && (<>
           <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#92400e' }}>
             📋 Cria uma tarefa automaticamente vinculada à conversa.
