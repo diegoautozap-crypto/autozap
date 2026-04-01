@@ -213,7 +213,8 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </>
       )}
 
-      {!isCondition && !isLoop && data.type !== 'end' && data.type === 'input' && data.timeoutHours > 0 ? (
+      {/* Input com timeout: 2 saídas */}
+      {data.type === 'input' && data.timeoutHours > 0 ? (
         <>
           <Handle type="source" position={Position.Right} id="success"
             style={{ background: color, width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
@@ -221,6 +222,28 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
           <div style={{ position: 'absolute', right: -70, top: '28%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ resposta</div>
           <div style={{ position: 'absolute', right: -62, top: '58%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ timeout</div>
+        </>
+      ) : (data.type === 'split_ab' || data.type === 'random_path') ? (
+        <>
+          {/* Split/Random: múltiplas saídas */}
+          {(data.type === 'split_ab'
+            ? (data.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }])
+            : (data.randomPaths || ['A', 'B']).map((p: string, i: number) => ({ label: p, i }))
+          ).map((p: any, i: number) => (
+            <Handle key={i} type="source" position={Position.Right}
+              id={data.type === 'split_ab' ? `split_${i}` : `random_${i}`}
+              style={{ background: BRANCH_COLORS[i % BRANCH_COLORS.length], width: 10, height: 10, border: '2px solid #fff', top: `${20 + i * (60 / Math.max((data.splitPaths || data.randomPaths || ['A', 'B']).length - 1, 1))}%` }} />
+          ))}
+          <div style={{ position: 'absolute', right: -50, top: '10%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {(data.type === 'split_ab'
+              ? (data.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }])
+              : (data.randomPaths || ['A', 'B']).map((p: string) => ({ label: p }))
+            ).map((p: any, i: number) => (
+              <span key={i} style={{ fontSize: '9px', fontWeight: 700, color: BRANCH_COLORS[i % BRANCH_COLORS.length] }}>
+                {p.label}{data.type === 'split_ab' ? ` ${p.weight}%` : ''}
+              </span>
+            ))}
+          </div>
         </>
       ) : !isCondition && !isLoop && data.type !== 'end' ? (
         <Handle type="source" position={Position.Right} id="success"

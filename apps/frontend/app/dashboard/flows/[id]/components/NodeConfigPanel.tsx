@@ -840,6 +840,107 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
         </>)}
 
+        {d.type === 'set_variable' && (<>
+          <div><label style={labelStyle}>Nome da variável</label><input style={inputStyle} placeholder="score" value={d.variableName || ''} onChange={e => onUpdate(node.id, { variableName: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="Ex: 10, {{nome}}, lead_quente" value={d.variableValue || ''} onChange={e => onUpdate(node.id, { variableValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{variavel}}'} pra referir outras variáveis</p>
+        </>)}
+
+        {d.type === 'math' && (<>
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#1e40af' }}>
+            🧮 Faz cálculos com variáveis. Ex: lead scoring, contadores, valores.
+          </div>
+          <div><label style={labelStyle}>Variável</label><input style={inputStyle} placeholder="score" value={d.mathVariable || ''} onChange={e => onUpdate(node.id, { mathVariable: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Operação</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.mathOperator || '+'} onChange={e => onUpdate(node.id, { mathOperator: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="+">+ Somar</option>
+            <option value="-">- Subtrair</option>
+            <option value="*">× Multiplicar</option>
+            <option value="/">÷ Dividir</option>
+          </select></div>
+          <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="10" value={d.mathValue || ''} onChange={e => onUpdate(node.id, { mathValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <p style={{ fontSize: '11px', color: '#a1a1aa' }}>Resultado: {d.mathVariable || 'score'} = {d.mathVariable || 'score'} {d.mathOperator || '+'} {d.mathValue || '0'}</p>
+        </>)}
+
+        {d.type === 'create_task' && (<>
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#92400e' }}>
+            📋 Cria uma tarefa automaticamente vinculada à conversa.
+          </div>
+          <div><label style={labelStyle}>Título da tarefa</label><input style={inputStyle} placeholder="Ligar pro cliente {{nome}}" value={d.taskTitle || ''} onChange={e => onUpdate(node.id, { taskTitle: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Vencimento em (horas)</label><input type="number" min="0" style={inputStyle} placeholder="72 = 3 dias" value={d.taskDueHours || ''} onChange={e => onUpdate(node.id, { taskDueHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Atribuir para</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.taskAssignTo || ''} onChange={e => onUpdate(node.id, { taskAssignTo: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="">Sem atribuição</option>
+            {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+          </select></div>
+        </>)}
+
+        {d.type === 'send_notification' && (<>
+          <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9d174d' }}>
+            🔔 Envia notificação em tempo real pro atendente no inbox.
+          </div>
+          <div><label style={labelStyle}>Mensagem da notificação</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Lead quente! {{nome}} quer o plano Enterprise" value={d.notificationMessage || ''} onChange={e => onUpdate(node.id, { notificationMessage: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>Notificar quem</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.notifyAgentId || ''} onChange={e => onUpdate(node.id, { notifyAgentId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="">Todos os agentes</option>
+            {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+          </select></div>
+        </>)}
+
+        {d.type === 'split_ab' && (<>
+          <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9a3412' }}>
+            🧪 Divide o tráfego em caminhos diferentes por porcentagem. Útil pra testar qual mensagem converte mais.
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={labelStyle}>Caminhos</label>
+              <button onClick={() => {
+                const paths = [...(d.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }])]
+                paths.push({ label: String.fromCharCode(65 + paths.length), weight: Math.round(100 / (paths.length + 1)) })
+                onUpdate(node.id, { splitPaths: paths })
+              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+            </div>
+            {(d.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }]).map((p: any, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color, minWidth: '20px' }}>{p.label}</span>
+                <input type="number" min="1" max="100" style={{ ...inputStyle, flex: 1, padding: '6px 8px', fontSize: '12px' }} value={p.weight} onChange={e => {
+                  const paths = [...(d.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }])]
+                  paths[i] = { ...p, weight: Number(e.target.value) }
+                  onUpdate(node.id, { splitPaths: paths })
+                }} onFocus={focusInput} onBlur={blurInput} />
+                <span style={{ fontSize: '11px', color: '#a1a1aa' }}>%</span>
+                {(d.splitPaths || []).length > 2 && <button onClick={() => {
+                  const paths = (d.splitPaths || []).filter((_: any, j: number) => j !== i)
+                  onUpdate(node.id, { splitPaths: paths })
+                }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>×</button>}
+              </div>
+            ))}
+          </div>
+        </>)}
+
+        {d.type === 'random_path' && (<>
+          <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9a3412' }}>
+            🎲 Escolhe um caminho aleatório a cada execução. Útil pra rotacionar mensagens.
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={labelStyle}>Caminhos</label>
+              <button onClick={() => {
+                const paths = [...(d.randomPaths || ['A', 'B'])]
+                paths.push(String.fromCharCode(65 + paths.length))
+                onUpdate(node.id, { randomPaths: paths })
+              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+            </div>
+            {(d.randomPaths || ['A', 'B']).map((p: string, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color, minWidth: '20px' }}>{p}</span>
+                <span style={{ fontSize: '11px', color: '#a1a1aa' }}>chance igual</span>
+                {(d.randomPaths || []).length > 2 && <button onClick={() => {
+                  const paths = (d.randomPaths || []).filter((_: any, j: number) => j !== i)
+                  onUpdate(node.id, { randomPaths: paths })
+                }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>×</button>}
+              </div>
+            ))}
+          </div>
+        </>)}
+
         {d.type === 'end' && (
           <div><label style={labelStyle}>Mensagem de encerramento (opcional)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Obrigado pelo contato! Até mais 👋" value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         )}

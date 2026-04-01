@@ -83,6 +83,24 @@ interface FlowNodeData {
   agentId?: string
   transcribeSaveAs?: string
   transcribeLanguage?: string
+  // set_variable
+  variableName?: string
+  variableValue?: string
+  // math
+  mathVariable?: string
+  mathOperator?: '+' | '-' | '*' | '/'
+  mathValue?: string
+  // create_task
+  taskTitle?: string
+  taskDueHours?: number
+  taskAssignTo?: string
+  // send_notification
+  notificationMessage?: string
+  notifyAgentId?: string
+  // split_ab
+  splitPaths?: { label: string; weight: number }[]
+  // random_path
+  randomPaths?: string[]
   seconds?: number
   minutes?: number
   hours?: number
@@ -933,6 +951,98 @@ export class FlowEngine {
           if (!targetFlow || !targetFlow.is_active) break
           await this.executeFlow(targetFlow, ctx, variables)
           return { success: true, ended: true }
+        }
+
+        case 'set_variable': {
+          const varName = data?.variableName || 'variavel'
+          const varValue = this.interpolate(data?.variableValue || '', ctx, variables)
+          variables[varName] = varValue
+          break
+        }
+
+        case 'math': {
+          const mathVar = data?.mathVariable || 'score'
+          const currentVal = this.extractNumber(variables[mathVar] || '0')
+          const operand = this.extractNumber(this.interpolate(data?.mathValue || '0', ctx, variables))
+          let result = currentVal
+          switch (data?.mathOperator) {
+            case '+': result = currentVal + operand; break
+            case '-': result = currentVal - operand; break
+            case '*': result = currentVal * operand; break
+            case '/': result = operand !== 0 ? currentVal / operand : 0; break
+            default: result = currentVal + operand
+          }
+          variables[mathVar] = String(Math.round(result * 100) / 100)
+          break
+        }
+
+        case 'create_task': {
+          const title = this.interpolate(data?.taskTitle || 'Tarefa do flow', ctx, variables)
+          const dueDate = data?.taskDueHours ? new Date(Date.now() + data.taskDueHours * 3600000).toISOString() : null
+          await db.from('tasks').insert({
+            id: generateId(),
+            tenant_id: ctx.tenantId,
+            conversation_id: ctx.conversationId,
+            contact_id: ctx.contactId,
+            assigned_to: data?.taskAssignTo || null,
+            created_by: null,
+            title,
+            due_date: dueDate,
+            status: 'pending',
+            priority: 'medium',
+          })
+          logger.info('Task created by flow', { flowId, title })
+          break
+        }
+
+        case 'send_notification': {
+          const notifMsg = this.interpolate(data?.notificationMessage || 'Notificação do flow', ctx, variables)
+          // Busca nome do contato pra enriquecer a notificação
+          const { data: contactInfo } = await db.from('contacts').select('name, phone').eq('id', ctx.contactId).single()
+          const fullMsg = `📢 ${notifMsg}\n\n👤 ${contactInfo?.name || 'Contato'} (${contactInfo?.phone || ctx.phone})`
+
+          // Salva como nota interna na conversa pra aparecer no inbox
+          await db.from('messages').insert({
+            id: generateId(),
+            tenant_id: ctx.tenantId,
+            conversation_id: ctx.conversationId,
+            contact_id: ctx.contactId,
+            direction: 'internal',
+            content_type: 'text',
+            body: fullMsg,
+            status: 'delivered',
+          })
+
+          // Emite via Pusher pro agente ver em tempo real
+          emitPusher(ctx.tenantId, 'flow.notification', {
+            conversationId: ctx.conversationId,
+            contactName: contactInfo?.name || ctx.phone,
+            message: notifMsg,
+            agentId: data?.notifyAgentId || null,
+          })
+          break
+        }
+
+        case 'split_ab': {
+          const paths = data?.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }]
+          const totalWeight = paths.reduce((sum: number, p: any) => sum + (p.weight || 1), 0)
+          const rand = Math.random() * totalWeight
+          let cumulative = 0
+          let selectedIndex = 0
+          for (let i = 0; i < paths.length; i++) {
+            cumulative += paths[i].weight || 1
+            if (rand <= cumulative) { selectedIndex = i; break }
+          }
+          const selectedPath = paths[selectedIndex]
+          variables['ab_path'] = selectedPath.label || String.fromCharCode(65 + selectedIndex)
+          return { success: true, nextHandle: `split_${selectedIndex}` }
+        }
+
+        case 'random_path': {
+          const rpaths = data?.randomPaths || ['A', 'B']
+          const idx = Math.floor(Math.random() * rpaths.length)
+          variables['random_path'] = rpaths[idx]
+          return { success: true, nextHandle: `random_${idx}` }
         }
 
         case 'end': {
