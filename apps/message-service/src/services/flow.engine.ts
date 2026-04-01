@@ -525,6 +525,8 @@ export class FlowEngine {
             .eq('conversation_id', ctx.conversationId).eq('direction', 'inbound')
             .order('created_at', { ascending: false }).limit(1).single()
 
+          logger.info('Transcribe node: last message', { contentType: lastMsg?.content_type, hasMedia: !!lastMsg?.media_url, body: lastMsg?.body?.slice(0, 50) })
+
           if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
             // Busca chave OpenAI
             let whisperKey = data?.apiKey
@@ -544,8 +546,12 @@ export class FlowEngine {
               const mediaId = lastMsg.media_url
 
               if (mediaId.startsWith('http')) {
-                const res = await fetch(mediaId)
-                audioBuffer = Buffer.from(await res.arrayBuffer())
+                // URL direta (Gupshup v2) — tenta com e sem apiKey
+                let res = await fetch(mediaId)
+                if (!res.ok && creds.apiKey) {
+                  res = await fetch(mediaId, { headers: { apikey: creds.apiKey } })
+                }
+                if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
               } else if (/^\d+$/.test(mediaId) && creds.metaToken) {
                 // Meta/WhatsApp Cloud API
                 const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
