@@ -552,18 +552,22 @@ export class FlowEngine {
                   res = await fetch(mediaId, { headers: { apikey: creds.apiKey } })
                 }
                 if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
-              } else if (/^\d+$/.test(mediaId) && creds.metaToken) {
-                // Meta/WhatsApp Cloud API
+              } else if (creds.apiKey) {
+                // Gupshup — ID numérico ou qualquer media ID
+                const res = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: creds.apiKey } })
+                if (res.ok) {
+                  audioBuffer = Buffer.from(await res.arrayBuffer())
+                  logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length })
+                }
+              }
+              // Fallback: Meta Cloud API (se tiver metaToken e não baixou ainda)
+              if (!audioBuffer && /^\d+$/.test(mediaId) && creds.metaToken) {
                 const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
                 const metaData = await metaRes.json() as any
                 if (metaData.url) {
                   const res = await fetch(metaData.url, { headers: { Authorization: `Bearer ${creds.metaToken}` } })
-                  audioBuffer = Buffer.from(await res.arrayBuffer())
+                  if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
                 }
-              } else if (creds.apiKey) {
-                // Gupshup
-                const res = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: creds.apiKey } })
-                audioBuffer = Buffer.from(await res.arrayBuffer())
               }
 
               if (audioBuffer && audioBuffer.length > 0) {
