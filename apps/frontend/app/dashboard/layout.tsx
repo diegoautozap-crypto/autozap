@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
+import { tenantApi } from '@/lib/api'
 import { Sidebar } from '@/components/layout/sidebar'
 import { TrialBanner } from '@/components/layout/TrialBanner'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -23,13 +24,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!hydrated) return
-    validateSession()
     const state = useAuthStore.getState()
     if (!state.user || !state.accessToken) {
       router.replace('/login')
       return
     }
-    setValidating(false)
+    // Valida com chamada real à API
+    tenantApi.get('/').then(() => {
+      setValidating(false)
+    }).catch(() => {
+      useAuthStore.getState().logout()
+      router.replace('/login')
+    })
   }, [hydrated])
 
   if (!hydrated || validating) return (
