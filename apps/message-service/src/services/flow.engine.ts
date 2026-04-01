@@ -539,7 +539,9 @@ export class FlowEngine {
             try {
               // Busca credenciais do canal (criptografadas)
               const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
-              const creds = channel?.credentials ? decryptCredentials(typeof channel.credentials === 'string' ? JSON.parse(channel.credentials) : channel.credentials) : {}
+              const rawCreds = channel?.credentials ? (typeof channel.credentials === 'string' ? JSON.parse(channel.credentials) : channel.credentials) : {}
+              const creds = decryptCredentials(rawCreds)
+              logger.info('Transcribe creds check', { hasEncryptionKey: !!process.env.ENCRYPTION_KEY, metaTokenStart: creds.metaToken?.slice(0, 10), metaTokenLength: creds.metaToken?.length })
 
               // Resolve URL da mídia
               let audioBuffer: Buffer | null = null
