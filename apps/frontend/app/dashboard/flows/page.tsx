@@ -310,6 +310,92 @@ REGRAS:
         { id: 'e26', source_node: 'n5', target_node: 'n27', source_handle: 'fallback' },
       ],
     },
+    {
+      id: 'demo_all_nodes',
+      emoji: '🧪',
+      name: '🧪 Demonstração — Todos os Nós',
+      desc: 'Flow de teste que usa todos os nós novos: variável, cálculo, tarefa, notificação, teste A/B e caminho aleatório',
+      category: t('flows.categoryAdvanced'),
+      categoryKey: 'advanced',
+      nodes: [
+        // 1. Trigger
+        { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 300, data: { type: 'trigger_any_reply' } },
+
+        // 2. Transcrever áudio
+        { id: 'n2', type: 'transcribe_audio', position_x: 300, position_y: 300, data: { type: 'transcribe_audio', transcribeSaveAs: 'transcricao' } },
+
+        // 3. Definir variável — inicia score com 0
+        { id: 'n3', type: 'set_variable', position_x: 550, position_y: 300, data: { type: 'set_variable', variableName: 'score', variableValue: '0' } },
+
+        // 4. Cálculo — soma 10 pontos por ter mandado mensagem
+        { id: 'n4', type: 'math', position_x: 800, position_y: 300, data: { type: 'math', mathVariable: 'score', mathOperator: '+', mathValue: '10' } },
+
+        // 5. Teste A/B — divide em 2 caminhos
+        { id: 'n5', type: 'split_ab', position_x: 1050, position_y: 300, data: { type: 'split_ab', splitPaths: [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }] } },
+
+        // 6A. Caminho A — mensagem formal
+        { id: 'n6', type: 'send_message', position_x: 1350, position_y: 150, data: { type: 'send_message', subtype: 'text', message: '🅰️ Olá! Obrigado por entrar em contato. Como posso ajudá-lo hoje?\n\n(Você caiu no caminho A do teste A/B)\n\nSeu score atual: {{score}} pontos' } },
+
+        // 6B. Caminho B — mensagem informal
+        { id: 'n7', type: 'send_message', position_x: 1350, position_y: 450, data: { type: 'send_message', subtype: 'text', message: '🅱️ Fala! Beleza? 😄 Que bom que mandou mensagem!\n\n(Você caiu no caminho B do teste A/B)\n\nSeu score atual: {{score}} pontos' } },
+
+        // 7. Cálculo — soma mais 20 pontos (interagiu)
+        { id: 'n8', type: 'math', position_x: 1650, position_y: 300, data: { type: 'math', mathVariable: 'score', mathOperator: '+', mathValue: '20' } },
+
+        // 8. Criar tarefa — lembrete de follow-up
+        { id: 'n9', type: 'create_task', position_x: 1900, position_y: 300, data: { type: 'create_task', taskTitle: 'Follow-up com {{phone}} — score {{score}}', taskDueHours: 24 } },
+
+        // 9. Notificar agente
+        { id: 'n10', type: 'send_notification', position_x: 2150, position_y: 300, data: { type: 'send_notification', notificationMessage: 'Novo lead com score {{score}}! Caminho: {{ab_path}}' } },
+
+        // 10. Caminho aleatório — 3 mensagens de despedida
+        { id: 'n11', type: 'random_path', position_x: 2400, position_y: 300, data: { type: 'random_path', randomPaths: ['A', 'B', 'C'] } },
+
+        // 11A. Despedida 1
+        { id: 'n12', type: 'send_message', position_x: 2700, position_y: 100, data: { type: 'send_message', subtype: 'text', message: '✅ Tudo certo! Sua tarefa de follow-up foi criada.\n\nScore final: {{score}} pontos\nCaminho A/B: {{ab_path}}\nCaminho aleatório: {{random_path}}\n\n(Despedida versão 1 de 3)' } },
+
+        // 11B. Despedida 2
+        { id: 'n13', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: '🎯 Perfeito! Já criei um lembrete pra entrar em contato.\n\nScore: {{score}} | Teste A/B: {{ab_path}} | Random: {{random_path}}\n\n(Despedida versão 2 de 3)' } },
+
+        // 11C. Despedida 3
+        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 500, data: { type: 'send_message', subtype: 'text', message: '🚀 Show! Tá tudo registrado.\n\nPontuação: {{score}} | Grupo: {{ab_path}} | Sorteio: {{random_path}}\n\n(Despedida versão 3 de 3)' } },
+
+        // 12. Definir variável — marca que passou pelo demo
+        { id: 'n15', type: 'set_variable', position_x: 3000, position_y: 300, data: { type: 'set_variable', variableName: 'demo_completo', variableValue: 'sim' } },
+
+        // 13. Tag
+        { id: 'n16', type: 'tag_contact', position_x: 3250, position_y: 300, data: { type: 'tag_contact', subtype: 'add' } },
+
+        // 14. Fim
+        { id: 'n17', type: 'end', position_x: 3500, position_y: 300, data: { type: 'end', message: '🏁 Demo completo! Todos os nós foram testados. Variável demo_completo = {{demo_completo}}' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'success' },
+        // A/B split
+        { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'split_0' },
+        { id: 'e6', source_node: 'n5', target_node: 'n7', source_handle: 'split_1' },
+        // Ambos convergem
+        { id: 'e7', source_node: 'n6', target_node: 'n8', source_handle: 'success' },
+        { id: 'e8', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
+        // Continua
+        { id: 'e9', source_node: 'n8', target_node: 'n9', source_handle: 'success' },
+        { id: 'e10', source_node: 'n9', target_node: 'n10', source_handle: 'success' },
+        { id: 'e11', source_node: 'n10', target_node: 'n11', source_handle: 'success' },
+        // Random path
+        { id: 'e12', source_node: 'n11', target_node: 'n12', source_handle: 'random_0' },
+        { id: 'e13', source_node: 'n11', target_node: 'n13', source_handle: 'random_1' },
+        { id: 'e14', source_node: 'n11', target_node: 'n14', source_handle: 'random_2' },
+        // Todos convergem pro final
+        { id: 'e15', source_node: 'n12', target_node: 'n15', source_handle: 'success' },
+        { id: 'e16', source_node: 'n13', target_node: 'n15', source_handle: 'success' },
+        { id: 'e17', source_node: 'n14', target_node: 'n15', source_handle: 'success' },
+        { id: 'e18', source_node: 'n15', target_node: 'n16', source_handle: 'success' },
+        { id: 'e19', source_node: 'n16', target_node: 'n17', source_handle: 'success' },
+      ],
+    },
   ]
 }
 
