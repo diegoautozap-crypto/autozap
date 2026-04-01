@@ -554,11 +554,19 @@ export class FlowEngine {
                 if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
               } else if (creds.apiKey) {
                 // Gupshup — ID numérico ou qualquer media ID
-                const res = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: creds.apiKey } })
+                const gupshupUrl = `https://api.gupshup.io/wa/api/v1/media/${mediaId}`
+                logger.info('Trying Gupshup media download', { gupshupUrl, hasApiKey: true })
+                const res = await fetch(gupshupUrl, { headers: { apikey: creds.apiKey } })
+                logger.info('Gupshup media response', { status: res.status, contentType: res.headers.get('content-type'), mediaId })
                 if (res.ok) {
                   audioBuffer = Buffer.from(await res.arrayBuffer())
                   logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length })
+                } else {
+                  const errBody = await res.text()
+                  logger.error('Gupshup media download failed', { status: res.status, body: errBody.slice(0, 200), mediaId })
                 }
+              } else {
+                logger.warn('No credentials to download media', { hasApiKey: !!creds.apiKey, hasMetaToken: !!creds.metaToken, channelId: ctx.channelId })
               }
               // Fallback: Meta Cloud API (se tiver metaToken e não baixou ainda)
               if (!audioBuffer && /^\d+$/.test(mediaId) && creds.metaToken) {
