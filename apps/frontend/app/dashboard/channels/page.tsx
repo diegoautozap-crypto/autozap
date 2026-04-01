@@ -222,8 +222,8 @@ export default function ChannelsPage() {
 
                 <div style={{ height: '1px', background: 'var(--bg)', marginBottom: '14px' }} />
 
-                {/* API Key */}
-                <div style={{ marginBottom: '12px' }}>
+                {/* API Key — só visível pra quem pode editar */}
+                {canEdit('/dashboard/channels') && <div style={{ marginBottom: '12px' }}>
                   <label style={lbl}>API Key</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly type={isVisible ? 'text' : 'password'} value={ch.webhookApiKey || ''}
@@ -235,10 +235,10 @@ export default function ChannelsPage() {
                       {isVisible ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
                   </div>
-                </div>
+                </div>}
 
-                {/* Webhook URL */}
-                <div>
+                {/* Webhook URL — só visível pra quem pode editar */}
+                {canEdit('/dashboard/channels') && <div>
                   <label style={lbl}>{t('channels.webhookUrlLabel')}</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly value={webhookUrl}
@@ -262,7 +262,7 @@ export default function ChannelsPage() {
                       <p style={{ fontSize: '11.5px', color: '#92400e', margin: 0, fontWeight: 500 }}>{t('channels.metaTokenWarning')}</p>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             )
           })}
