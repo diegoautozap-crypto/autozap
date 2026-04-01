@@ -10,7 +10,7 @@ import {
   User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot,
   UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft,
 } from 'lucide-react'
-import Pusher from 'pusher-js'
+import { subscribeTenant } from '@/lib/pusher'
 import { createClient } from '@supabase/supabase-js'
 import { useT } from '@/lib/i18n'
 
@@ -299,27 +299,28 @@ export default function InboxPage() {
 
   // ── Pusher WebSocket — substitui todo o polling ───────────────────────────
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
-    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-    if (!key || !user || !tenantId) return
-    const pusher = new Pusher(key, { cluster })
-    const channel = pusher.subscribe(`tenant-${tenantId}`)
-    channel.bind('inbound.message', (data: any) => {
+    if (!user || !tenantId) return
+    const channel = subscribeTenant(tenantId)
+    if (!channel) return
+    const onInbound = (data: any) => {
       setConvPage(1); setAllConvs([]); setHasMoreConvs(true)
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
       playNotificationSound()
-    })
-    channel.bind('conversation.updated', (data: any) => {
+    }
+    const onConvUpdated = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
-    })
-    channel.bind('message.status', (data: any) => {
+    }
+    const onStatus = (data: any) => {
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
-    })
-    return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
+    }
+    channel.bind('inbound.message', onInbound)
+    channel.bind('conversation.updated', onConvUpdated)
+    channel.bind('message.status', onStatus)
+    return () => { channel.unbind('inbound.message', onInbound); channel.unbind('conversation.updated', onConvUpdated); channel.unbind('message.status', onStatus) }
   }, [user, selectedConvId, queryClient, tenantId])
 
   useEffect(() => { setAllConvs([]); setConvPage(1); setHasMoreConvs(true) }, [statusFilter, channelFilter])

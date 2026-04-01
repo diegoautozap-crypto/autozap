@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-import Pusher from 'pusher-js'
 import { useAuthStore } from '@/store/auth.store'
+import { subscribeTenant } from '@/lib/pusher'
 
 function playNotificationSound() {
   try {
@@ -88,29 +88,21 @@ export function useNotifications() {
   }, [registerSW, requestPermission])
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
-    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-    if (!key || !tenantId) return
+    if (!tenantId) return
 
-    const pusher = new Pusher(key, { cluster })
-    pusherRef.current = pusher
+    const channel = subscribeTenant(tenantId)
+    if (!channel) return
 
-    const channel = pusher.subscribe(`tenant-${tenantId}`)
-
-    channel.bind('inbound.message', (data: any) => {
+    const handler = (data: any) => {
       const contactName = data?.contactName || data?.phone || 'Contato'
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
         : 'Nova mensagem'
       showNotification(`💬 ${contactName}`, preview, '/dashboard/inbox')
-    })
-
-    return () => {
-      channel.unbind_all()
-      pusher.unsubscribe(`tenant-${tenantId}`)
-      pusher.disconnect()
-      pusherRef.current = null
     }
+
+    channel.bind('inbound.message', handler)
+    return () => { channel.unbind('inbound.message', handler) }
   }, [tenantId, showNotification])
 
   return { requestPermission, clearBadge }

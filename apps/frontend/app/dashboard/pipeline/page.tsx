@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n'
-import Pusher from 'pusher-js'
+import { subscribeTenant } from '@/lib/pusher'
 
 function getDefaultColumns(t: (key: string) => string) {
   return [
@@ -367,14 +367,14 @@ export default function PipelinePage() {
   }, {} as Record<string, any[]>)
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
-    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-    if (!key || !user || !tenantId) return
-    const pusher = new Pusher(key, { cluster })
-    const channel = pusher.subscribe(`tenant-${tenantId}`)
-    channel.bind('inbound.message', () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) })
-    channel.bind('conversation.updated', () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) })
-    return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`); pusher.disconnect() }
+    if (!user || !tenantId) return
+    const channel = subscribeTenant(tenantId)
+    if (!channel) return
+    const onInbound = () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) }
+    const onConvUpdated = () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) }
+    channel.bind('inbound.message', onInbound)
+    channel.bind('conversation.updated', onConvUpdated)
+    return () => { channel.unbind('inbound.message', onInbound); channel.unbind('conversation.updated', onConvUpdated) }
   }, [user, queryClient, tenantId])
 
   const displayBoard = localBoardRef.current ?? board

@@ -13,6 +13,7 @@ import { messageApi, contactApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Save, ArrowLeft, Loader2, Workflow, BarChart2 } from 'lucide-react'
+import { subscribeTenant } from '@/lib/pusher'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
@@ -110,28 +111,27 @@ export default function FlowEditorPage() {
 
   // Pusher — execution animation
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_PUSHER_KEY
-    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'sa1'
-    if (!key || !tenantId) return
-    const Pusher = require('pusher-js')
-    const pusher = new Pusher(key, { cluster })
-    const channel = pusher.subscribe(`tenant-${tenantId}`)
+    if (!tenantId) return
+    const channel = subscribeTenant(tenantId)
+    if (!channel) return
 
-    channel.bind('flow.node.start', (ev: any) => {
+    const onStart = (ev: any) => {
       if (ev.flowId !== id) return
       setActiveNodeId(ev.nodeId)
       setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: 'flow-node-active' } : n))
-    })
-    channel.bind('flow.node.done', (ev: any) => {
+    }
+    const onDone = (ev: any) => {
       if (ev.flowId !== id) return
       const cls = ev.status === 'success' ? 'flow-node-success' : 'flow-node-error'
       setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: cls } : n))
       setTimeout(() => setActiveNodeId(null), 300)
       // Limpa classe depois de 8s
       setTimeout(() => setNodes(nds => nds.map(n => n.id === ev.nodeId ? { ...n, className: '' } : n)), 8000)
-    })
+    }
+    channel.bind('flow.node.start', onStart)
+    channel.bind('flow.node.done', onDone)
 
-    return () => { channel.unbind_all(); pusher.unsubscribe(`tenant-${tenantId}`) }
+    return () => { channel.unbind('flow.node.start', onStart); channel.unbind('flow.node.done', onDone) }
   }, [tenantId, id])
 
   const { data: tags = [] } = useQuery({
