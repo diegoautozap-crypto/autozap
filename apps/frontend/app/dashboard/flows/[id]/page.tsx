@@ -74,8 +74,6 @@ const ACTION_NODES = [
   { type: 'update_contact', label: 'Atualizar contato' },
   { type: 'move_pipeline',  label: 'Mover no funil' },
   { type: 'transcribe_audio', label: 'Transcrever áudio' },
-  { type: 'set_variable',   label: 'Definir variável' },
-  { type: 'math',           label: 'Cálculo' },
   { type: 'create_task',    label: 'Criar tarefa' },
   { type: 'send_notification', label: 'Notificar agente' },
   { type: 'split_ab',       label: 'Teste A/B' },
