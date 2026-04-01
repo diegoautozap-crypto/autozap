@@ -553,17 +553,28 @@ export class FlowEngine {
                 }
                 if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
               } else if (creds.apiKey) {
-                // Gupshup — ID numérico ou qualquer media ID
-                const gupshupUrl = `https://api.gupshup.io/wa/api/v1/media/${mediaId}`
-                logger.info('Trying Gupshup media download', { gupshupUrl, hasApiKey: true })
-                const res = await fetch(gupshupUrl, { headers: { apikey: creds.apiKey } })
-                logger.info('Gupshup media response', { status: res.status, contentType: res.headers.get('content-type'), mediaId })
-                if (res.ok) {
-                  audioBuffer = Buffer.from(await res.arrayBuffer())
-                  logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length })
-                } else {
-                  const errBody = await res.text()
-                  logger.error('Gupshup media download failed', { status: res.status, body: errBody.slice(0, 200), mediaId })
+                // Gupshup — tenta múltiplos endpoints
+                const source = creds.source || creds.srcName || ''
+                const endpoints = [
+                  `https://api.gupshup.io/wa/api/v1/msg/${source}/media/${mediaId}`,
+                  `https://api.gupshup.io/wa/api/v1/media/${mediaId}`,
+                  `https://media.smsgupshup.com/GatewayAPI/rest?method=wa.getMedia&userid=${source}&password=${creds.apiKey}&mediaid=${mediaId}`,
+                ]
+                for (const url of endpoints) {
+                  if (!url.includes('//api') && !url.includes('//media')) continue
+                  logger.info('Trying Gupshup media endpoint', { url: url.slice(0, 80), mediaId })
+                  try {
+                    const res = await fetch(url, { headers: { apikey: creds.apiKey, Authorization: creds.apiKey } })
+                    logger.info('Gupshup endpoint response', { status: res.status, contentType: res.headers.get('content-type'), url: url.slice(0, 80) })
+                    if (res.ok) {
+                      const ct = res.headers.get('content-type') || ''
+                      if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet') || ct.includes('mpeg')) {
+                        audioBuffer = Buffer.from(await res.arrayBuffer())
+                        logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length, endpoint: url.slice(0, 80) })
+                        break
+                      }
+                    }
+                  } catch (e) { /* try next endpoint */ }
                 }
               } else {
                 logger.warn('No credentials to download media', { hasApiKey: !!creds.apiKey, hasMetaToken: !!creds.metaToken, channelId: ctx.channelId })
