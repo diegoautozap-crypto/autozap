@@ -975,6 +975,55 @@ export class FlowEngine {
     return rules.every(rule => this.evaluateRule(rule, ctx, variables))
   }
 
+  private extractNumber(text: string): number {
+    // Tenta converter direto
+    const direct = Number(text.replace(/[.,\s]/g, ''))
+    if (!isNaN(direct) && text.replace(/\s/g, '').length > 0) return direct
+
+    // Converte texto por extenso pra número (pt-BR)
+    const t = text.toLowerCase().trim()
+    const map: Record<string, number> = {
+      'zero': 0, 'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'três': 3,
+      'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8, 'nove': 9, 'dez': 10,
+      'onze': 11, 'doze': 12, 'treze': 13, 'quatorze': 14, 'catorze': 14, 'quinze': 15,
+      'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50, 'sessenta': 60,
+      'setenta': 70, 'oitenta': 80, 'noventa': 90, 'cem': 100, 'cento': 100,
+      'duzentos': 200, 'trezentos': 300, 'quatrocentos': 400, 'quinhentos': 500,
+      'mil': 1000, 'milhao': 1000000, 'milhão': 1000000, 'milhoes': 1000000, 'milhões': 1000000,
+    }
+
+    // Tenta "cinquenta mil", "cem mil", "5 mil", "10k", etc
+    const kMatch = t.match(/(\d+)\s*k/)
+    if (kMatch) return Number(kMatch[1]) * 1000
+
+    const milMatch = t.match(/(\d+)\s*mil/)
+    if (milMatch) return Number(milMatch[1]) * 1000
+
+    // "cinquenta mil" → 50 * 1000
+    const words = t.replace(/\s+e\s+/g, ' ').split(/\s+/)
+    let result = 0
+    let current = 0
+    for (const w of words) {
+      if (map[w] !== undefined) {
+        if (w === 'mil') { result += (current || 1) * 1000; current = 0 }
+        else if (w === 'milhao' || w === 'milhão' || w === 'milhoes' || w === 'milhões') { result += (current || 1) * 1000000; current = 0 }
+        else { current += map[w] }
+      } else {
+        const n = Number(w.replace(/[.,]/g, ''))
+        if (!isNaN(n)) current += n
+      }
+    }
+    result += current
+
+    // Se não extraiu nada, tenta pegar qualquer número da string
+    if (result === 0) {
+      const numMatch = t.match(/[\d.,]+/)
+      if (numMatch) return Number(numMatch[0].replace(/[.,]/g, ''))
+    }
+
+    return result
+  }
+
   private matchOperator(fv: string, operator: string, rawVal: string): boolean {
     fv = fv.toLowerCase()
     // Suporta múltiplos valores separados por vírgula (ex: "1, conhecer, crm")
@@ -989,10 +1038,10 @@ export class FlowEngine {
       case 'ends_with':    return values.length > 1 ? values.some(v => fv.endsWith(v)) : fv.endsWith(val)
       case 'is_empty':     return fv === ''
       case 'is_not_empty': return fv !== ''
-      case 'greater_than':  return Number(fv) > Number(val)
-      case 'less_than':     return Number(fv) < Number(val)
-      case 'greater_equal': return Number(fv) >= Number(val)
-      case 'less_equal':    return Number(fv) <= Number(val)
+      case 'greater_than':  return this.extractNumber(fv) > this.extractNumber(val)
+      case 'less_than':     return this.extractNumber(fv) < this.extractNumber(val)
+      case 'greater_equal': return this.extractNumber(fv) >= this.extractNumber(val)
+      case 'less_equal':    return this.extractNumber(fv) <= this.extractNumber(val)
       default:             return values.length > 1 ? values.some(v => fv.includes(v)) : fv.includes(val)
     }
   }
