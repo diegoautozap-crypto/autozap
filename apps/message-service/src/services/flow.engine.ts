@@ -537,90 +537,23 @@ export class FlowEngine {
             if (!whisperKey) { logger.warn('Transcribe node: no OpenAI API key'); variables[saveVar] = lastMsg.body || ''; break }
 
             try {
-              // Busca credenciais do canal (criptografadas)
-              const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
-              const rawCreds = channel?.credentials ? (typeof channel.credentials === 'string' ? JSON.parse(channel.credentials) : channel.credentials) : {}
-              const creds = decryptCredentials(rawCreds)
-              logger.info('Transcribe creds check', { hasEncryptionKey: !!process.env.ENCRYPTION_KEY, metaTokenStart: creds.metaToken?.slice(0, 10), metaTokenLength: creds.metaToken?.length })
-
-              // Resolve URL da mídia
               let audioBuffer: Buffer | null = null
               const mediaId = lastMsg.media_url
 
-              if (mediaId.startsWith('http')) {
-                // URL direta (Gupshup v2) — tenta com e sem apiKey
-                let res = await fetch(mediaId)
-                if (!res.ok && creds.apiKey) {
-                  res = await fetch(mediaId, { headers: { apikey: creds.apiKey } })
-                }
-                if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
-              } else if (creds.apiKey) {
-                // Gupshup — tenta múltiplos endpoints
-                const source = creds.source || creds.srcName || ''
-                const endpoints = [
-                  `https://api.gupshup.io/wa/api/v1/msg/${source}/media/${mediaId}`,
-                  `https://api.gupshup.io/wa/api/v1/media/${mediaId}`,
-                  `https://media.smsgupshup.com/GatewayAPI/rest?method=wa.getMedia&userid=${source}&password=${creds.apiKey}&mediaid=${mediaId}`,
-                ]
-                for (const url of endpoints) {
-                  if (!url.includes('//api') && !url.includes('//media')) continue
-                  logger.info('Trying Gupshup media endpoint', { url: url.slice(0, 80), mediaId })
-                  try {
-                    const res = await fetch(url, { headers: { apikey: creds.apiKey, Authorization: creds.apiKey } })
-                    const ct = res.headers.get('content-type') || ''
-                    logger.info('Gupshup endpoint response', { status: res.status, contentType: ct, url: url.slice(0, 80) })
-                    if (res.ok) {
-                      if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet') || ct.includes('mpeg')) {
-                        // Resposta é o áudio binário direto
-                        audioBuffer = Buffer.from(await res.arrayBuffer())
-                        logger.info('Audio downloaded (binary)', { mediaId, size: audioBuffer.length })
-                        break
-                      } else {
-                        // Resposta pode ser URL ou JSON com URL
-                        const body = await res.text()
-                        logger.info('Gupshup response body', { body: body.slice(0, 300) })
-                        // Tenta extrair URL da resposta
-                        const urlMatch = body.match(/https?:\/\/[^\s"'<>]+/)
-                        if (urlMatch) {
-                          logger.info('Following media URL from response', { followUrl: urlMatch[0].slice(0, 100) })
-                          const mediaRes = await fetch(urlMatch[0])
-                          if (mediaRes.ok) {
-                            audioBuffer = Buffer.from(await mediaRes.arrayBuffer())
-                            logger.info('Audio downloaded (follow URL)', { mediaId, size: audioBuffer.length })
-                            break
-                          }
-                        }
-                      }
-                    }
-                  } catch (e) { /* try next endpoint */ }
-                }
+              // Usa o media proxy do conversation-service (que já funciona pra imagens no inbox)
+              const CONV_SERVICE = process.env.CONVERSATION_SERVICE_URL || 'http://localhost:3002'
+              const proxyUrl = `${CONV_SERVICE}/conversations/media/${mediaId}?channelId=${ctx.channelId}&t=${ctx.tenantId}`
+              logger.info('Downloading audio via media proxy', { proxyUrl: proxyUrl.slice(0, 120), mediaId })
+
+              const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) })
+              logger.info('Media proxy response', { status: res.status, contentType: res.headers.get('content-type'), mediaId })
+
+              if (res.ok) {
+                audioBuffer = Buffer.from(await res.arrayBuffer())
+                logger.info('Audio downloaded via proxy', { mediaId, size: audioBuffer.length })
               } else {
-                logger.warn('No credentials to download media', { hasApiKey: !!creds.apiKey, hasMetaToken: !!creds.metaToken, channelId: ctx.channelId })
-              }
-              // Fallback: Meta Cloud API
-              if (!audioBuffer && /^\d+$/.test(mediaId)) {
-                // Tenta pegar metaToken de várias fontes
-                const metaToken = creds.metaToken || creds.meta_token || creds.accessToken
-                logger.info('Trying Meta Graph API fallback', { hasMetaToken: !!metaToken, mediaId, credKeys: Object.keys(creds) })
-                if (metaToken) {
-                  const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${metaToken}` } })
-                  logger.info('Meta Graph response', { status: metaRes.status, mediaId })
-                  if (metaRes.ok) {
-                    const metaData = await metaRes.json() as any
-                    if (metaData.url) {
-                      const res = await fetch(metaData.url, { headers: { Authorization: `Bearer ${metaToken}` } })
-                      if (res.ok) {
-                        audioBuffer = Buffer.from(await res.arrayBuffer())
-                        logger.info('Audio downloaded via Meta', { mediaId, size: audioBuffer.length })
-                      }
-                    }
-                  } else {
-                    const errBody = await metaRes.text()
-                    logger.error('Meta Graph download failed', { status: metaRes.status, body: errBody.slice(0, 200), mediaId })
-                  }
-                } else {
-                  logger.warn('No metaToken available for Meta Graph API', { credKeys: Object.keys(creds) })
-                }
+                const errBody = await res.text()
+                logger.error('Media proxy failed', { status: res.status, body: errBody.slice(0, 200), mediaId })
               }
 
               if (audioBuffer && audioBuffer.length > 0) {
