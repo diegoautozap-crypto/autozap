@@ -540,20 +540,35 @@ export class FlowEngine {
               let audioBuffer: Buffer | null = null
               const mediaId = lastMsg.media_url
 
-              // Usa o media proxy do conversation-service (que já funciona pra imagens no inbox)
-              const CONV_SERVICE = process.env.CONVERSATION_SERVICE_URL || 'http://localhost:3002'
-              const proxyUrl = `${CONV_SERVICE}/conversations/media/${mediaId}?channelId=${ctx.channelId}&t=${ctx.tenantId}`
-              logger.info('Downloading audio via media proxy', { proxyUrl: proxyUrl.slice(0, 120), mediaId })
+              // Baixa áudio via Meta Graph API com token da env var
+              const metaToken = process.env.META_ACCESS_TOKEN
+              if (metaToken && /^\d+$/.test(mediaId)) {
+                logger.info('Downloading audio via Meta Graph API', { mediaId })
+                const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${metaToken}` } })
+                if (metaRes.ok) {
+                  const metaData = await metaRes.json() as any
+                  if (metaData.url) {
+                    const audioRes = await fetch(metaData.url, { headers: { Authorization: `Bearer ${metaToken}` } })
+                    if (audioRes.ok) {
+                      audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+                      logger.info('Audio downloaded via Meta', { mediaId, size: audioBuffer.length })
+                    }
+                  }
+                } else {
+                  logger.error('Meta Graph failed', { status: metaRes.status, mediaId })
+                }
+              }
 
-              const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) })
-              logger.info('Media proxy response', { status: res.status, contentType: res.headers.get('content-type'), mediaId })
-
-              if (res.ok) {
-                audioBuffer = Buffer.from(await res.arrayBuffer())
-                logger.info('Audio downloaded via proxy', { mediaId, size: audioBuffer.length })
-              } else {
-                const errBody = await res.text()
-                logger.error('Media proxy failed', { status: res.status, body: errBody.slice(0, 200), mediaId })
+              // Fallback: tenta Gupshup API
+              if (!audioBuffer && process.env.GUPSHUP_APIKEY) {
+                const gupshupRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: process.env.GUPSHUP_APIKEY } })
+                if (gupshupRes.ok) {
+                  const ct = gupshupRes.headers.get('content-type') || ''
+                  if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet')) {
+                    audioBuffer = Buffer.from(await gupshupRes.arrayBuffer())
+                    logger.info('Audio downloaded via Gupshup', { mediaId, size: audioBuffer.length })
+                  }
+                }
               }
 
               if (audioBuffer && audioBuffer.length > 0) {
