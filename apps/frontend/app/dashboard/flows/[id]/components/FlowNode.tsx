@@ -213,10 +213,19 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </>
       )}
 
-      {!isCondition && !isLoop && data.type !== 'end' && (
+      {!isCondition && !isLoop && data.type !== 'end' && data.type === 'input' && data.timeoutHours > 0 ? (
+        <>
+          <Handle type="source" position={Position.Right} id="success"
+            style={{ background: color, width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
+          <Handle type="source" position={Position.Right} id="timeout"
+            style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
+          <div style={{ position: 'absolute', right: -70, top: '28%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ resposta</div>
+          <div style={{ position: 'absolute', right: -62, top: '58%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ timeout</div>
+        </>
+      ) : !isCondition && !isLoop && data.type !== 'end' ? (
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />
-      )}
+      ) : null}
 
       {data._execCount > 0 && (
         <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '3px' }}>
