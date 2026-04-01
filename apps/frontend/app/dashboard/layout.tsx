@@ -23,14 +23,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!hydrated) return
-    const check = async () => {
-      await validateSession()
-      if (!useAuthStore.getState().isAuthenticated) {
-        router.push('/login')
-      }
-      setValidating(false)
+    validateSession()
+    const state = useAuthStore.getState()
+    if (!state.user || !state.accessToken) {
+      router.replace('/login')
+      return
     }
-    check()
+    setValidating(false)
   }, [hydrated])
 
   if (!hydrated || validating) return (
