@@ -24,6 +24,7 @@ const inviteSchema = z.object({
   name:  z.string().min(2).max(100),
   email: z.string().email(),
   role:  z.enum(['admin', 'supervisor', 'agent']),
+  password: z.string().min(6).max(100),
 })
 
 const updateMemberSchema = z.object({
@@ -146,14 +147,13 @@ router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res,
 
 router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate(inviteSchema), async (req, res, next) => {
   try {
-    const { name, email, role } = req.body
+    const { name, email, role, password } = req.body
 
     const { data: existing } = await db
       .from('users').select('id').eq('email', email.toLowerCase()).maybeSingle()
     if (existing) throw new AppError('CONFLICT', 'Este email já possui uma conta na plataforma. Peça para a pessoa acessar com suas credenciais existentes.', 409)
 
-    const tempPassword = randomBytes(4).toString('hex').toUpperCase()
-    const passwordHash = await hashPassword(tempPassword)
+    const passwordHash = await hashPassword(password)
     const userId = generateId()
 
     const { error } = await db.from('users').insert({
@@ -177,7 +177,7 @@ router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate
     })
 
     const { data: tenant } = await db.from('tenants').select('name').eq('id', req.auth.tid).single()
-    sendTeamInviteEmail({ to: email, name, tenantName: tenant?.name || 'sua empresa', tempPassword })
+    sendTeamInviteEmail({ to: email, name, tenantName: tenant?.name || 'sua empresa', tempPassword: '(definida pelo administrador)' })
       .catch(err => logger.error('Failed to send team invite email', { err }))
 
     res.status(201).json(ok({ id: userId, name, email, role }))

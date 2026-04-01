@@ -265,7 +265,7 @@ export default function TeamPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'agent' })
-  const [form, setForm] = useState({ name: '', email: '', role: 'agent' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent' })
   const [configuringMember, setConfiguringMember] = useState<any>(null)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
@@ -282,7 +282,7 @@ export default function TeamPage() {
     onSuccess: () => {
       toast.success(t('team.toast.memberAdded'))
       queryClient.invalidateQueries({ queryKey: ['team'] })
-      setShowForm(false); setForm({ name: '', email: '', role: 'agent' })
+      setShowForm(false); setForm({ name: '', email: '', password: '', role: 'agent' })
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorAdd')),
   })
@@ -370,6 +370,11 @@ export default function TeamPage() {
               <input style={inputStyle} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                 onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Senha *</label>
+              <input style={inputStyle} type="password" placeholder="Mínimo 6 caracteres" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
+            </div>
           </div>
           <div style={{ marginBottom: '16px' }}>
             <label style={labelStyle}>{t('team.accessType')}</label>
@@ -390,11 +395,11 @@ export default function TeamPage() {
             </div>
           </div>
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#15803d' }}>
-            📧 {t('team.emailNotice')}
+            📧 O membro receberá um email de boas-vindas. Compartilhe a senha diretamente com ele.
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => inviteMutation.mutate()} disabled={!form.name || !form.email || inviteMutation.isPending}
-              style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (!form.name || !form.email) ? 0.5 : 1 }}>
+            <button onClick={() => inviteMutation.mutate()} disabled={!form.name || !form.email || form.password.length < 6 || inviteMutation.isPending}
+              style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (!form.name || !form.email || form.password.length < 6) ? 0.5 : 1 }}>
               {inviteMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               {t('team.addAndSend')}
             </button>
