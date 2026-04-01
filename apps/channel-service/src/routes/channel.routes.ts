@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
 import { ok, rateLimit } from '@autozap/utils'
-import { encryptCredentials } from '../lib/crypto'
+import { encryptCredentials, decryptCredentials } from '../lib/crypto'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
 import ffmpeg from 'fluent-ffmpeg'
@@ -84,14 +84,15 @@ router.patch('/channels/:id', requireRole('admin', 'owner'), async (req, res, ne
       return
     }
 
-    // Merge: mantém metaToken atual se não enviar novo
+    // Descriptografa credenciais atuais antes de fazer merge
+    const currentCreds = decryptCredentials(current.credentials || {})
     const mergedCredentials = {
-      ...current.credentials,
+      ...currentCreds,
       ...credentials,
     }
-    if (credentials?.metaToken === '' || credentials?.metaToken === undefined) {
-      delete mergedCredentials.metaToken
-      mergedCredentials.metaToken = current.credentials?.metaToken
+    // Mantém metaToken atual se não enviar novo
+    if (!credentials?.metaToken) {
+      mergedCredentials.metaToken = currentCreds.metaToken || ''
     }
 
     const updateData: any = { credentials: encryptCredentials(mergedCredentials) }
