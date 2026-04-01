@@ -17,16 +17,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const { isAuthenticated, validateSession } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
+  const [validating, setValidating] = useState(true)
 
   useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
     if (!hydrated) return
-    validateSession()
-    if (!isAuthenticated) router.push('/login')
-  }, [hydrated, isAuthenticated, router])
+    const check = async () => {
+      await validateSession()
+      if (!useAuthStore.getState().isAuthenticated) {
+        router.push('/login')
+      }
+      setValidating(false)
+    }
+    check()
+  }, [hydrated])
 
-  if (!hydrated) return null
+  if (!hydrated || validating) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+      </div>
+    </div>
+  )
   if (!isAuthenticated) return null
 
   return (
