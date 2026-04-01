@@ -16,34 +16,26 @@ function NotificationsProvider() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const user = useAuthStore(s => s.user)
-  const accessToken = useAuthStore(s => s.accessToken)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
-  const [ready, setReady] = useState(false)
+  const { validateSession } = useAuthStore()
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
-    // Espera um tick pro zustand hidratar do localStorage
-    const timer = setTimeout(() => {
-      const state = useAuthStore.getState()
-      if (!state.user || !state.accessToken || !state.isAuthenticated) {
-        router.replace('/login')
-      } else {
-        // Valida com API real
-        tenantApi.get('/').then(() => setReady(true)).catch(() => {
-          state.logout()
-          router.replace('/login')
-        })
-      }
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [])
+    if (!hydrated) return
+    validateSession()
+    if (!useAuthStore.getState().isAuthenticated) {
+      router.replace('/login')
+    }
+  }, [hydrated])
 
-  if (!ready) return (
+  // Middleware já protege no server-side. Aqui é fallback client-side.
+  if (!hydrated || !isAuthenticated) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f4f4f5' }}>
       <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
-  if (!isAuthenticated) return null
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
