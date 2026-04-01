@@ -13,7 +13,7 @@ router.use(requireAuth)
 const createContactSchema = z.object({
   phone: z.string().min(8),
   name: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.union([z.string().email(), z.literal('')]).optional(),
   company: z.string().optional(),
   origin: z.string().optional(),
   notes: z.string().optional(),
@@ -23,7 +23,7 @@ const createContactSchema = z.object({
 
 const updateContactSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email().optional().nullable(),
+  email: z.union([z.string().email(), z.literal('')]).optional().nullable(),
   company: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.enum(['active', 'blocked', 'unsubscribed']).optional(),
