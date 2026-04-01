@@ -251,6 +251,7 @@ export class CampaignService {
     await db.from('campaign_contacts').delete().eq('campaign_id', campaignId)
     await db.from('campaign_status_events').delete().eq('campaign_id', campaignId)
     await db.from('messages').update({ campaign_id: null }).eq('campaign_id', campaignId).eq('tenant_id', tenantId)
+    await db.from('conversations').update({ campaign_id: null }).eq('campaign_id', campaignId).eq('tenant_id', tenantId)
     const { error } = await db.from('campaigns').delete().eq('id', campaignId).eq('tenant_id', tenantId)
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     logger.info('Campaign deleted', { campaignId, tenantId })
