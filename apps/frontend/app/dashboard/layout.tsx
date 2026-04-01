@@ -16,33 +16,31 @@ function NotificationsProvider() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { isAuthenticated, validateSession } = useAuthStore()
-  const [hydrated, setHydrated] = useState(false)
-  const [validating, setValidating] = useState(true)
-
-  useEffect(() => { setHydrated(true) }, [])
+  const user = useAuthStore(s => s.user)
+  const accessToken = useAuthStore(s => s.accessToken)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (!hydrated) return
-    const state = useAuthStore.getState()
-    if (!state.user || !state.accessToken) {
-      router.replace('/login')
-      return
-    }
-    // Valida com chamada real à API
-    tenantApi.get('/').then(() => {
-      setValidating(false)
-    }).catch(() => {
-      useAuthStore.getState().logout()
-      router.replace('/login')
-    })
-  }, [hydrated])
+    // Espera um tick pro zustand hidratar do localStorage
+    const timer = setTimeout(() => {
+      const state = useAuthStore.getState()
+      if (!state.user || !state.accessToken || !state.isAuthenticated) {
+        router.replace('/login')
+      } else {
+        // Valida com API real
+        tenantApi.get('/').then(() => setReady(true)).catch(() => {
+          state.logout()
+          router.replace('/login')
+        })
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
 
-  if (!hydrated || validating) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-      </div>
+  if (!ready) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f4f4f5' }}>
+      <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
   if (!isAuthenticated) return null
