@@ -18,6 +18,7 @@ import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
@@ -97,6 +98,8 @@ export default function FlowEditorPage() {
   const { user } = useAuthStore()
   const tenantId = user?.tenantId || ''
   const t = useT()
+  const { canEdit } = usePermissions()
+  const canEditFlows = canEdit('/dashboard/flows')
 
   const TRIGGER_NODES = getTriggerNodes(t)
   const ACTION_NODES = getActionNodes(t)
@@ -341,11 +344,11 @@ export default function FlowEditorPage() {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           {t('nodes.copySelected')}
         </button>
-        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
+        {canEditFlows && <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
           {t('nodes.save')}
-        </button>
+        </button>}
         <button onClick={() => setShowAnalytics(p => !p)}
           style={{ padding: '7px 14px', background: showAnalytics ? '#f5f3ff' : '#f9fafb', border: `1px solid ${showAnalytics ? '#ddd6fe' : '#e5e7eb'}`, borderRadius: '7px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: showAnalytics ? '#7c3aed' : '#6b7280' }}>
           <BarChart2 size={13} /> Analytics
@@ -377,7 +380,7 @@ export default function FlowEditorPage() {
       )}
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        <div className="flow-sidebar mobile-hide" style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
+        {canEditFlows && <div className="flow-sidebar mobile-hide" style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{t('nodes.sectionTriggers')}</p>
           {TRIGGER_NODES.map(n => {
             const Icon = NODE_ICONS[n.type]
@@ -404,7 +407,7 @@ export default function FlowEditorPage() {
               </button>
             )
           })}
-        </div>
+        </div>}
 
         <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>
           <ReactFlow

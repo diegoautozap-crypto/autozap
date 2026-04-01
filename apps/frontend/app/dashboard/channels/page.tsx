@@ -30,7 +30,7 @@ const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: ''
 
 export default function ChannelsPage() {
   const t = useT()
-  const { isAdmin } = usePermissions()
+  const { isAdmin, canEdit, canDelete } = usePermissions()
   const queryClient = useQueryClient()
   const [showForm, setShowForm]     = useState(false)
   const [editingId, setEditingId]   = useState<string | null>(null)
@@ -93,7 +93,7 @@ export default function ChannelsPage() {
           <div style={{ fontSize: '12px', fontWeight: 600, color: atLimit ? '#dc2626' : '#52525b', background: atLimit ? '#fef2f2' : 'var(--bg-card)', border: `1px solid ${atLimit ? '#fecaca' : 'var(--border)'}`, padding: '4px 12px', borderRadius: '99px' }}>
             {channelCount}/{channelLimit} {channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}
           </div>
-          {isAdmin && (
+          {canEdit('/dashboard/channels') && (
           <button
             onClick={() => { if (atLimit) { toast.error(`${t('channels.toast.planLimit')} ${channelLimit} ${channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}.`); return }; closeForm(); setShowForm(true) }}
             style={{ padding: '8px 16px', background: atLimit ? 'var(--border)' : '#22c55e', color: atLimit ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
@@ -173,7 +173,7 @@ export default function ChannelsPage() {
           </div>
           <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('channels.noChannels')}</p>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 18px' }}>{t('channels.connectToStart')}</p>
-          {isAdmin && <button onClick={() => setShowForm(true)} style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ {t('channels.new')}</button>}
+          {canEdit('/dashboard/channels') && <button onClick={() => setShowForm(true)} style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ {t('channels.new')}</button>}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -201,7 +201,7 @@ export default function ChannelsPage() {
                       <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
                       {t('channels.active')}
                     </div>
-                    {isAdmin && (
+                    {canEdit('/dashboard/channels') && (
                     <button onClick={() => openEdit(ch)} title={t('channels.editChannel')}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6366f1'; (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff' }}
@@ -209,7 +209,7 @@ export default function ChannelsPage() {
                       <Pencil size={13} />
                     </button>
                     )}
-                    {isAdmin && (
+                    {canEdit('/dashboard/channels') && (
                     <button onClick={() => { if (confirm(t('channels.confirmDelete'))) deleteMutation.mutate(ch.id) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex', borderRadius: '6px', transition: 'all 0.12s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}

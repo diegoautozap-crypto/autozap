@@ -6,6 +6,7 @@ import { campaignApi, channelApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Plus, X, Check, Loader2, Pencil, Trash2, FileText, ChevronDown } from 'lucide-react'
 import { useT } from '@/lib/i18n'
+import { usePermissions } from '@/store/permissions.store'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -28,6 +29,8 @@ const emptyForm = { name: '', templateId: '', body: '', category: 'marketing', v
 
 export default function TemplatesPage() {
   const t = useT()
+  const { canEdit } = usePermissions()
+  const canEditTemplates = canEdit('/dashboard/templates')
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)

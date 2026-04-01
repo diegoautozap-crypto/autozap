@@ -388,7 +388,7 @@ function WebhooksSection() {
 
 export default function SettingsPage() {
   const t = useT()
-  const { isAdmin } = usePermissions()
+  const { isAdmin, canEdit } = usePermissions()
   const PLAN_MSGS = getPlanMsgs(t)
   const PLAN_FEATURES = getPlanFeatures(t)
   const { user } = useAuthStore()
@@ -465,7 +465,7 @@ export default function SettingsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
         {/* Banner trial expirado */}
-        {isAdmin && isTrial && trialExpired && (
+        {canEdit('/dashboard/settings') && isTrial && trialExpired && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AlertTriangle size={18} color="#ef4444" />
@@ -481,7 +481,7 @@ export default function SettingsPage() {
         )}
 
         {/* Banner trial ativo */}
-        {isAdmin && isTrial && !trialExpired && (
+        {canEdit('/dashboard/settings') && isTrial && !trialExpired && (
           <div style={{ background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4', border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`, borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
@@ -496,7 +496,7 @@ export default function SettingsPage() {
         )}
 
         {/* Banner plano ativo */}
-        {isAdmin && !isTrial && (
+        {canEdit('/dashboard/settings') && !isTrial && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ {t('settings.plan')} {planName} {t('settings.planActive')}</p>
@@ -540,13 +540,13 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Webhook de Entrada ── */}
-        {isAdmin && <InboundWebhookSection />}
+        {canEdit('/dashboard/settings') && <InboundWebhookSection />}
 
         {/* ── Webhooks de Saída ── */}
-        {isAdmin && <WebhooksSection />}
+        {canEdit('/dashboard/settings') && <WebhooksSection />}
 
         {/* Planos */}
-        {isAdmin && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
+        {canEdit('/dashboard/settings') && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
             {isTrial ? `🚀 ${t('settings.choosePlan')}` : t('settings.availablePlans')}
           </span>
