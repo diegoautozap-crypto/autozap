@@ -618,7 +618,7 @@ export default function PipelinePage() {
                   style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: isOver ? stage.bg : 'var(--bg-card)', border: `1px solid ${overColKey === stage.key ? stage.color : isOver ? stage.color : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s, opacity 0.15s', opacity: draggingColKey === stage.key ? 0.4 : 1, boxShadow: 'var(--shadow)' }}>
 
                   {/* ── Header da coluna com total monetário ── */}
-                  <div data-col-header draggable onDragStart={e => handleColDragStart(e, stage.key)} onDragEnd={handleColDragEnd}
+                  <div data-col-header draggable={canEdit('/dashboard/pipeline')} onDragStart={e => { if (canEdit('/dashboard/pipeline')) handleColDragStart(e, stage.key) }} onDragEnd={handleColDragEnd}
                     style={{ padding: '12px 14px', borderBottom: `1px solid ${stage.border}`, background: stage.bg, flexShrink: 0, cursor: 'grab', userSelect: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -647,7 +647,7 @@ export default function PipelinePage() {
                       const isDragging = draggingId === conv.id
                       const currentValue = dealValues[conv.id] !== undefined ? dealValues[conv.id] : conv.deal_value
                       return (
-                        <div key={conv.id} draggable data-card onDragStart={e => handleDragStart(e, conv.id)} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
+                        <div key={conv.id} draggable={canEdit('/dashboard/pipeline')} data-card onDragStart={e => { if (canEdit('/dashboard/pipeline')) handleDragStart(e, conv.id) }} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
                           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : 'var(--shadow)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
                           onMouseEnter={e => { if (!isDragging) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
                           onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
@@ -679,6 +679,7 @@ export default function PipelinePage() {
                           })()}
 
                           {/* ── Valor do negócio ── */}
+                          {canEdit('/dashboard/pipeline') ? (
                           <DealValueEditor
                             convId={conv.id}
                             value={currentValue ?? null}
@@ -688,6 +689,11 @@ export default function PipelinePage() {
                               forceRender(n => n + 1)
                             }}
                           />
+                          ) : currentValue ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(currentValue)}</span>
+                            </div>
+                          ) : null}
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                             {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}

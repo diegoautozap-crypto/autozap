@@ -416,35 +416,45 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {canDelete('/dashboard/contacts') && selected.size > 0 && (
+          {canEdit('/dashboard/contacts') && canDelete('/dashboard/contacts') && selected.size > 0 && (
             <button onClick={handleDeleteSelected} disabled={deleteMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <Trash2 size={13} /> {t('common.delete')} {selected.size}
             </button>
           )}
-          {canDelete('/dashboard/contacts') && meta?.total > 0 && (
+          {canEdit('/dashboard/contacts') && canDelete('/dashboard/contacts') && meta?.total > 0 && (
             <button onClick={handleDeleteAll} disabled={deleteAllMutation.isPending}
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} {t('contacts.deleteAll')}
             </button>
           )}
+          {canEdit('/dashboard/contacts') && (
           <button onClick={handleExport} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
             <Download size={13} /> {t('contacts.csv')}
           </button>
+          )}
+          {canEdit('/dashboard/contacts') && (
           <button onClick={handleExportExcel} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
             <FileSpreadsheet size={13} /> {t('contacts.excel')}
           </button>
+          )}
+          {canEdit('/dashboard/contacts') && (
           <button onClick={() => setShowImport(true)} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Upload size={13} /> {t('contacts.import')}
           </button>
+          )}
+          {canEdit('/dashboard/contacts') && (
           <button onClick={() => setShowCustomFields(true)}
             style={{ padding: '8px 12px', background: customFields.length > 0 ? '#faf5ff' : 'var(--bg-card)', border: `1px solid ${customFields.length > 0 ? '#a855f7' : 'var(--border)'}`, borderRadius: '8px', color: customFields.length > 0 ? '#7c3aed' : '#52525b', fontSize: '13px', fontWeight: customFields.length > 0 ? 600 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Settings2 size={13} /> {t('contacts.fields')} {customFields.length > 0 && `(${customFields.length})`}
           </button>
+          )}
+          {canEdit('/dashboard/contacts') && (
           <button onClick={() => setShowTags(!showTags)}
             style={{ padding: '8px 12px', background: showTags ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showTags ? '#22c55e' : 'var(--border)'}`, borderRadius: '8px', color: showTags ? '#16a34a' : '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Tag size={13} /> {t('contacts.tags')} {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
           </button>
+          )}
           {canEdit('/dashboard/contacts') && (
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 3px rgba(34,197,94,0.3)' }}
@@ -570,7 +580,7 @@ export default function ContactsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {isEditing
                         ? <input style={{ ...inp, padding: '6px 10px', fontSize: '13px' }} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} autoFocus />
-                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--text)' }}>{c.name || '—'}</div><TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /></>}
+                        : <><div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--text)' }}>{c.name || '—'}</div>{canEdit('/dashboard/contacts') ? <TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /> : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>{(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean).map((tag: any) => <span key={tag.id} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>)}</div>}</>}
                     </div>
                   </div>
                   <span style={{ color: '#52525b', fontSize: '13px' }}>{c.phone}</span>

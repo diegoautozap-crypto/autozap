@@ -136,12 +136,14 @@ export default function TemplatesPage() {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('nav.templates')}</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '3px' }}>{t('templates.subtitle')}</p>
         </div>
+        {canEditTemplates && (
         <button
           className="mobile-header-actions"
           onClick={() => { closeForm(); setShowForm(true) }}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={14} /> {t('templates.new')}
         </button>
+        )}
       </div>
 
       {/* Info box */}
@@ -169,7 +171,7 @@ export default function TemplatesPage() {
       )}
 
       {/* Form criar/editar */}
-      {showForm && (
+      {canEditTemplates && showForm && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
             <h3 style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)' }}>
@@ -261,9 +263,11 @@ export default function TemplatesPage() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '60px', textAlign: 'center' }}>
           <FileText size={32} color="var(--border)" style={{ margin: '0 auto 12px' }} />
           <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginBottom: '14px' }}>{t('templates.noTemplates')}</p>
+          {canEditTemplates && (
           <button onClick={() => setShowForm(true)} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + {t('templates.new')}
           </button>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -290,6 +294,7 @@ export default function TemplatesPage() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {canEditTemplates && (
                     <button
                       onClick={e => { e.stopPropagation(); openEdit(tpl) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
@@ -297,6 +302,8 @@ export default function TemplatesPage() {
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Pencil size={14} />
                     </button>
+                    )}
+                    {canEditTemplates && (
                     <button
                       onClick={e => { e.stopPropagation(); if (confirm(t('templates.confirmDelete'))) deleteMutation.mutate(tpl.id) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px', display: 'flex', borderRadius: '4px' }}
@@ -304,6 +311,7 @@ export default function TemplatesPage() {
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
                       <Trash2 size={14} />
                     </button>
+                    )}
                     <ChevronDown size={14} color="var(--text-faint)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                   </div>
                 </div>

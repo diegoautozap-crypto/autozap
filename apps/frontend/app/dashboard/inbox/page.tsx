@@ -546,12 +546,14 @@ export default function InboxPage() {
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
           <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', margin: 0 }}>{t('inbox.title')}</h2>
+            {canEdit('/dashboard/inbox') && (
             <button onClick={() => { setBulkMode(p => !p); setBulkSelected(new Set()) }} title={t('inbox.selectConversations')}
               style={{ width: '28px', height: '28px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: bulkMode ? '#22c55e' : 'transparent', color: bulkMode ? '#fff' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
               onMouseEnter={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)' }}
               onMouseLeave={e => { if (!bulkMode) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
               <CheckCheck size={15} />
             </button>
+            )}
           </div>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
@@ -692,10 +694,10 @@ export default function InboxPage() {
                         {releaseBotMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={12} />} {t('inbox.releaseBot')}
                       </button>
                 )}
-                {selectedConv?.status !== 'closed'
+                {canEdit('/dashboard/inbox') && (selectedConv?.status !== 'closed'
                   ? <button onClick={closeConv} style={{ padding: '5px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 500 }}>{t('inbox.close')}</button>
                   : <button onClick={openConv} style={{ padding: '5px 12px', background: '#22c55e', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600 }}>{t('inbox.reopen')}</button>
-                }
+                )}
                 <button onClick={() => { setShowChatSearch(p => !p); setChatSearch('') }}
                   style={{ padding: '5px 10px', background: showChatSearch ? '#f0f9ff' : 'var(--bg-input)', border: `1px solid ${showChatSearch ? '#bae6fd' : 'var(--border)'}`, borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: showChatSearch ? '#0369a1' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <Search size={13} />
@@ -773,7 +775,7 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {pendingFile && !isRecording && (
+            {canEdit('/dashboard/inbox') && pendingFile && !isRecording && (
               <div style={{ padding: '8px 14px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {pendingFile.contentType === 'image'
                   ? <img src={pendingFile.previewUrl} alt="preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
@@ -790,9 +792,13 @@ export default function InboxPage() {
               </div>
             )}
 
-            {showQuickReplies && <QuickRepliesModal onSelect={text => { setMessageText(text); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />}
+            {canEdit('/dashboard/inbox') && showQuickReplies && <QuickRepliesModal onSelect={text => { setMessageText(text); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />}
 
-            {selectedConv?.status !== 'closed' ? (
+            {!canEdit('/dashboard/inbox') ? (
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)', textAlign: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('inbox.conversationClosed')}</span>
+              </div>
+            ) : selectedConv?.status !== 'closed' ? (
               <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-card)', flexShrink: 0, position: 'relative' }}>
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)' }}>
                   <button onClick={() => setInputMode('message')} style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'transparent', color: inputMode === 'message' ? '#22c55e' : 'var(--text-faint)', borderBottom: inputMode === 'message' ? '2px solid #22c55e' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '5px', transition: 'color 0.1s' }}>
@@ -931,7 +937,7 @@ export default function InboxPage() {
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Tag size={13} color="var(--text-faint)" /><p style={{ fontSize: '10px', color: 'var(--text-faint)', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('inbox.tags')}</p></div>
-                <InboxTagEditor contactId={contactId!} contactTags={contactTags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contact', contactId] }); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} />
+                {canEdit('/dashboard/inbox') ? <InboxTagEditor contactId={contactId!} contactTags={contactTags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contact', contactId] }); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} /> : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>{contactTags.map((tag: any) => <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>)}</div>}
               </div>
             </div>
 
@@ -945,12 +951,12 @@ export default function InboxPage() {
                         <p style={{ fontSize: '12px', color: '#92400e', margin: '0 0 6px', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{note.body}</p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <p style={{ fontSize: '10px', color: '#d97706', margin: 0 }}>{new Date(note.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                          <button onClick={() => deleteNoteMutation.mutate(note.id)}
+                          {canEdit('/dashboard/inbox') && <button onClick={() => deleteNoteMutation.mutate(note.id)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#fde68a', display: 'flex' }}
                             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fde68a'}>
                             <Trash2 size={12} />
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     ))}
@@ -962,7 +968,7 @@ export default function InboxPage() {
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={13} color="#2563eb" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('inbox.tasks')}</p></div>
-                <button onClick={async () => {
+                {canEdit('/dashboard/inbox') && <button onClick={async () => {
                   const title = prompt(t('inbox.taskTitlePrompt'))
                   if (!title) return
                   const dueDate = prompt(t('inbox.taskDueDatePrompt'))
@@ -972,7 +978,7 @@ export default function InboxPage() {
                     await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
                     toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
                   } catch { toast.error(t('inbox.taskCreateError')) }
-                }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>
+                }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>}
               </div>
               {convTasks.length === 0
                   ? <p style={{ fontSize: '12px', color: 'var(--text-faintest)', textAlign: 'center', padding: '4px 0' }}>{t('inbox.noTasks')}</p>

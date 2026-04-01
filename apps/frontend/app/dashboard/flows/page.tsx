@@ -639,10 +639,12 @@ export default function FlowsPage() {
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>{t('flows.noFlowsShort')}</p>
           <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginBottom: '20px' }}>{t('flows.createFirstAlt')}</p>
+          {canEdit('/dashboard/flows') && (
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {t('flows.createFirstFlow')}
           </button>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

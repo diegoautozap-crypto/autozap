@@ -42,7 +42,7 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
 
 export default function CampaignsPage() {
   const t = useT()
-  const { canCreateCampaigns, canManageCampaigns, canDelete } = usePermissions()
+  const { canCreateCampaigns, canManageCampaigns, canDelete, canEdit } = usePermissions()
   const queryClient = useQueryClient()
   const [showModal, setShowModal]               = useState(false)
   const [contactsText, setContactsText]         = useState('')
@@ -230,7 +230,7 @@ export default function CampaignsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
-          {canCreateCampaigns() && (
+          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
@@ -258,7 +258,7 @@ export default function CampaignsPage() {
                   <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('campaigns.noCampaigns')}</p>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('campaigns.createFirst')}</p>
                 </div>
-                {canCreateCampaigns() && (
+                {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   + {t('campaigns.createCampaign')}
                 </button>
@@ -301,11 +301,11 @@ export default function CampaignsPage() {
                         <span style={{ fontSize: '12px', fontWeight: 600, color: s.color }}>{s.label}</span>
                       </div>
                       <div onClick={e => e.stopPropagation()}>
-                        {camp.status === 'running' ? (
+                        {canEdit('/dashboard/campaigns') && camp.status === 'running' ? (
                           <button onClick={() => pauseMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontWeight: 500 }}>
                             <Pause size={10} /> {t('campaigns.pause')}
                           </button>
-                        ) : ['draft', 'paused'].includes(camp.status) ? (
+                        ) : canEdit('/dashboard/campaigns') && ['draft', 'paused'].includes(camp.status) ? (
                           <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Play size={10} fill="#fff" /> {t('campaigns.send')}
                           </button>
@@ -402,7 +402,7 @@ export default function CampaignsPage() {
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {canManageCampaigns() && selectedCamp.status === 'running' && (
+                  {canEdit('/dashboard/campaigns') && canManageCampaigns() && selectedCamp.status === 'running' && (
                     <button onClick={() => pauseMutation.mutate(selectedCamp.id)}
                       style={{ width: '100%', padding: '9px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
@@ -410,7 +410,7 @@ export default function CampaignsPage() {
                       <Pause size={13} /> {t('campaigns.pauseCampaign')}
                     </button>
                   )}
-                  {canManageCampaigns() && ['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
+                  {canEdit('/dashboard/campaigns') && canManageCampaigns() && ['draft', 'paused', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => startMutation.mutate(selectedCamp.id)}
                       style={{ width: '100%', padding: '9px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
@@ -418,6 +418,7 @@ export default function CampaignsPage() {
                       <Play size={13} fill="#fff" /> {selectedCamp.status === 'scheduled' ? t('campaigns.sendNow') : t('campaigns.send')}
                     </button>
                   )}
+                  {canEdit('/dashboard/campaigns') && (
                   <button onClick={async () => {
                     try {
                       toast.info(t('campaigns.toast.exporting'))
@@ -435,8 +436,9 @@ export default function CampaignsPage() {
                     style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 500 }}>
                     <Download size={13} /> {t('campaigns.exportResults')}
                   </button>
+                  )}
 
-                  {canDelete('/dashboard/campaigns') && ['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
+                  {canEdit('/dashboard/campaigns') && canDelete('/dashboard/campaigns') && ['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => { if (window.confirm(`${t('campaigns.deleteCampaign')} "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}
                       style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f87171', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}
