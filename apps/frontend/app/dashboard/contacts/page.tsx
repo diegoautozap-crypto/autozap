@@ -506,7 +506,7 @@ export default function ContactsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div><label style={lbl}>{t('contacts.phone')} *</label><input style={inp} placeholder="+5547999990001" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
             <div><label style={lbl}>{t('contacts.name')}</label><input style={inp} placeholder="João Silva" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><label style={lbl}>{t('contacts.email')}</label><input style={inp} type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            <div><label style={lbl}>{t('contacts.email')}</label><input style={inp} type="text" placeholder="joao@empresa.com (opcional)" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div><label style={lbl}>{t('contacts.company')}</label><input style={inp} placeholder="Minha Empresa" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} /></div>
             {customFields.map(cf => (
               <div key={cf.id}>
