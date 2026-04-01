@@ -220,6 +220,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               keywords={d.keywords || []}
               onChange={keywords => onUpdate(node.id, { keywords })}
               inputStyle={inputStyle}
+              placeholder={(d.keywords || []).length === 0 ? t('nodes.inputPlaceholder') : t('nodes.inputAddMore')}
             />
           </div>
           <div>
@@ -395,7 +396,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                           value={field.contactField || 'custom'}
                           onChange={e => {
                             const fields = [...(d.fields || [])]
-                            const defaultLabels: Record<string, string> = { phone: 'Telefone', name: 'Nome', email: 'Email' }
+                            const defaultLabels: Record<string, string> = { phone: t('nodes.fieldPhone'), name: t('nodes.fieldName'), email: t('nodes.fieldEmail') }
                             const newLabel = e.target.value === 'custom' ? (field.label || '') : defaultLabels[e.target.value] || ''
                             fields[idx] = { ...fields[idx], contactField: e.target.value, label: newLabel }
                             onUpdate(node.id, { fields })
@@ -452,9 +453,9 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
             <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px', fontSize: '11px', color: '#71717a' }}>
               <p style={{ fontWeight: 600, marginBottom: '4px' }}>{t('nodes.configExample')}</p>
-              <p>📱 Telefone → <code style={{ color: '#0891b2' }}>{'{{webhook_phone}}'}</code></p>
-              <p>👤 Nome → <code style={{ color: '#0891b2' }}>{'{{webhook_name}}'}</code></p>
-              <p>✏️ Cidade → <code style={{ color: '#0891b2' }}>{'{{webhook_cidade}}'}</code></p>
+              <p>📱 {t('nodes.fieldPhone')} → <code style={{ color: '#0891b2' }}>{'{{webhook_phone}}'}</code></p>
+              <p>👤 {t('nodes.fieldName')} → <code style={{ color: '#0891b2' }}>{'{{webhook_name}}'}</code></p>
+              <p>✏️ {t('nodes.fieldCustom')} → <code style={{ color: '#0891b2' }}>{'{{webhook_cidade}}'}</code></p>
             </div>
           </div>
         )}
@@ -541,7 +542,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px' }}>
               <p style={{ fontSize: '11px', fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>{t('nodes.specialVarsLabel')}</p>
               <p style={{ fontSize: '11px', color: '#a1a1aa', lineHeight: 1.6 }}>
-                Se você salvar como <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>telefone</code>, <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>nome</code> ou <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>email</code>, o contato será atualizado automaticamente.
+                {t('nodes.specialVarsHint')}
               </p>
             </div>
           </div>
@@ -560,71 +561,71 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           )}
           {(d.subtype === 'text' || !d.subtype) && (
             <div>
-              <label style={labelStyle}>Mensagem</label>
-              <textarea style={{ ...inputStyle, minHeight: '120px', resize: 'vertical' as const }} placeholder="Olá {{nome}}! Como posso ajudar?" value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
-              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{variavel}}'} para personalizar</p>
+              <label style={labelStyle}>{t('nodes.message')}</label>
+              <textarea style={{ ...inputStyle, minHeight: '120px', resize: 'vertical' as const }} placeholder={t('nodes.messagePlaceholder')} value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.useVariablePersonalize')}</p>
             </div>
           )}
           {d.subtype === 'image' && (<>
-            <div><label style={labelStyle}>Imagem</label><MediaUpload accept="image/*" label="Upload de imagem" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
-            <div><label style={labelStyle}>Legenda (opcional)</label><input style={inputStyle} placeholder="Confira nosso catálogo!" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.image')}</label><MediaUpload accept="image/*" label={t('nodes.imageUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
-          {d.subtype === 'video' && (<div><label style={labelStyle}>Vídeo</label><MediaUpload accept="video/*" label="Upload de vídeo" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
-          {d.subtype === 'audio' && (<div><label style={labelStyle}>Áudio</label><MediaUpload accept="audio/*" label="Upload de áudio" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
+          {d.subtype === 'video' && (<div><label style={labelStyle}>{t('nodes.video')}</label><MediaUpload accept="video/*" label={t('nodes.videoUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
+          {d.subtype === 'audio' && (<div><label style={labelStyle}>{t('nodes.audio')}</label><MediaUpload accept="audio/*" label={t('nodes.audioUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
           {d.subtype === 'document' && (<>
-            <div><label style={labelStyle}>Documento</label><MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label="Upload de documento" currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
-            <div><label style={labelStyle}>Nome do arquivo</label><input style={inputStyle} placeholder="catalogo.pdf" value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.document')}</label><MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label={t('nodes.documentUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
+            <div><label style={labelStyle}>{t('nodes.filename')}</label><input style={inputStyle} placeholder={t('nodes.filenamePlaceholder')} value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
         </>)}
 
         {d.type === 'input' && (<>
-          <div><label style={labelStyle}>Pergunta para o usuário</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Ex: Qual é o seu nome?" value={d.question || ''} onChange={e => onUpdate(node.id, { question: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.questionLabel')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.questionPlaceholder')} value={d.question || ''} onChange={e => onUpdate(node.id, { question: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div>
-            <label style={labelStyle}>Salvar resposta como variável</label>
+            <label style={labelStyle}>{t('nodes.saveResponseAs')}</label>
             <input style={inputStyle} placeholder="nome" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' }{d.saveAs || 'variavel'}{'}}' } nos próximos nós</p>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.useVariableHint')}: {'{{' }{d.saveAs || 'variavel'}{'}}' }</p>
           </div>
           <div>
-            <label style={labelStyle}>Timeout (horas)</label>
-            <input type="number" min="0" max="168" step="1" style={inputStyle} placeholder="0 = sem timeout" value={d.timeoutHours || ''} onChange={e => onUpdate(node.id, { timeoutHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Se não responder em {d.timeoutHours || 'X'}h, segue pela saída "timeout"</p>
+            <label style={labelStyle}>{t('nodes.timeoutHours')}</label>
+            <input type="number" min="0" max="168" step="1" style={inputStyle} placeholder={t('nodes.timeoutPlaceholder')} value={d.timeoutHours || ''} onChange={e => onUpdate(node.id, { timeoutHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.timeoutHint').replace('{hours}', String(d.timeoutHours || 'X'))}</p>
           </div>
         </>)}
 
         {d.type === 'condition' && (<ConditionPanel d={d} nodeId={node.id} inputStyle={inputStyle} onUpdate={onUpdate} />)}
 
         {d.type === 'ai' && (<>
-          <div><label style={labelStyle}>Modo</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.mode || 'respond'} onChange={e => onUpdate(node.id, { mode: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="respond">Responder automaticamente</option><option value="classify">Classificar intenção</option><option value="extract">Extrair dado da mensagem</option><option value="summarize">Resumir mensagem</option></select></div>
+          <div><label style={labelStyle}>{t('nodes.aiMode')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.mode || 'respond'} onChange={e => onUpdate(node.id, { mode: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="respond">{t('nodes.aiRespond')}</option><option value="classify">{t('nodes.aiClassify')}</option><option value="extract">{t('nodes.aiExtract')}</option><option value="summarize">{t('nodes.aiSummarize')}</option></select></div>
           <div>
-            <label style={labelStyle}>Chave da API OpenAI</label>
-            <input style={inputStyle} placeholder="sk-... (deixe vazio para usar a chave das Configurações)" type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#0891b2', marginTop: '4px' }}>💡 Você pode configurar a chave uma vez em <a href="/dashboard/settings" style={{ color: '#0891b2', fontWeight: 600 }}>Configurações</a> e todos os nós usam automaticamente</p>
+            <label style={labelStyle}>{t('nodes.openaiKey')}</label>
+            <input style={inputStyle} placeholder={t('nodes.openaiKeyPlaceholder')} type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '11px', color: '#0891b2', marginTop: '4px' }}>💡 {t('nodes.openaiKeyHint')}</p>
           </div>
-          <div><label style={labelStyle}>Modelo</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.model || 'gpt-4o-mini'} onChange={e => onUpdate(node.id, { model: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option><option value="gpt-4o">GPT-4o (mais inteligente)</option><option value="gpt-3.5-turbo">GPT-3.5 Turbo</option></select></div>
-          {d.mode === 'respond' && <div><label style={labelStyle}>Instrução para a IA</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Você é um atendente da empresa X." value={d.systemPrompt || ''} onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
-          {d.mode === 'classify' && <div><label style={labelStyle}>Categorias (separadas por vírgula)</label><input style={inputStyle} placeholder="comprar, suporte, cancelar" defaultValue={d.classifyOptions || ''} onFocus={focusInput} onBlur={e => { blurInput(e); onUpdate(node.id, { classifyOptions: e.target.value }) }} /></div>}
-          {d.mode === 'extract' && <div><label style={labelStyle}>O que extrair</label><input style={inputStyle} placeholder="o nome completo, o CPF..." value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
-          <div><label style={labelStyle}>Salvar resposta como variável</label><input style={inputStyle} placeholder="intencao" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.aiModel')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.model || 'gpt-4o-mini'} onChange={e => onUpdate(node.id, { model: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="gpt-4o-mini">{t('nodes.aiModelMini')}</option><option value="gpt-4o">{t('nodes.aiModelFull')}</option><option value="gpt-3.5-turbo">{t('nodes.aiModelLegacy')}</option></select></div>
+          {d.mode === 'respond' && <div><label style={labelStyle}>{t('nodes.aiInstruction')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.aiInstructionPlaceholder')} value={d.systemPrompt || ''} onChange={e => onUpdate(node.id, { systemPrompt: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
+          {d.mode === 'classify' && <div><label style={labelStyle}>{t('nodes.aiCategories')}</label><input style={inputStyle} placeholder={t('nodes.aiCategoriesPlaceholder')} defaultValue={d.classifyOptions || ''} onFocus={focusInput} onBlur={e => { blurInput(e); onUpdate(node.id, { classifyOptions: e.target.value }) }} /></div>}
+          {d.mode === 'extract' && <div><label style={labelStyle}>{t('nodes.aiExtractLabel')}</label><input style={inputStyle} placeholder={t('nodes.aiExtractPlaceholder')} value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
+          <div><label style={labelStyle}>{t('nodes.saveResponseAs')}</label><input style={inputStyle} placeholder="intencao" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div>
-            <label style={labelStyle}>Mensagens do histórico para contexto</label>
+            <label style={labelStyle}>{t('nodes.aiHistoryLabel')}</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input type="range" min="0" max="200" step="5" value={d.historyMessages ?? 20} onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} style={{ flex: 1, accentColor: color }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color, minWidth: '42px', textAlign: 'right' }}>{d.historyMessages === 0 ? 'nenhuma' : d.historyMessages === 200 ? 'todas' : `${d.historyMessages ?? 20}`}</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color, minWidth: '42px', textAlign: 'right' }}>{d.historyMessages === 0 ? t('nodes.aiHistoryNone') : d.historyMessages === 200 ? t('nodes.aiHistoryAll') : `${d.historyMessages ?? 20}`}</span>
             </div>
           </div>
         </>)}
 
         {d.type === 'webhook' && (<>
-          <div><label style={labelStyle}>URL</label><input style={inputStyle} placeholder="https://api.seusite.com/webhook" value={d.url || ''} onChange={e => onUpdate(node.id, { url: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Método HTTP</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.method || 'POST'} onChange={e => onUpdate(node.id, { method: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option></select></div>
-          {(d.method || 'POST') !== 'GET' && <div><label style={labelStyle}>Body (JSON)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }} placeholder='{
+          <div><label style={labelStyle}>{t('nodes.webhookUrl')}</label><input style={inputStyle} placeholder={t('nodes.webhookUrlPlaceholder')} value={d.url || ''} onChange={e => onUpdate(node.id, { url: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.httpMethod')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.method || 'POST'} onChange={e => onUpdate(node.id, { method: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option></select></div>
+          {(d.method || 'POST') !== 'GET' && <div><label style={labelStyle}>{t('nodes.bodyJson')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }} placeholder='{
   "phone": "{{phone}}"
 }' value={d.body || ''} onChange={e => onUpdate(node.id, { body: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
-          <div><label style={labelStyle}>Salvar resposta como variável</label><input style={inputStyle} placeholder="resposta_webhook" value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.saveWebhookResponse')}</label><input style={inputStyle} placeholder={t('nodes.saveWebhookPlaceholder')} value={d.saveResponseAs || ''} onChange={e => onUpdate(node.id, { saveResponseAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={labelStyle}>Headers (opcional)</label>
-              <button onClick={() => onUpdate(node.id, { headers: [...(d.headers || []), { key: '', value: '' }] })} style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+              <label style={labelStyle}>{t('nodes.headersOptional')}</label>
+              <button onClick={() => onUpdate(node.id, { headers: [...(d.headers || []), { key: '', value: '' }] })} style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>{t('nodes.add')}</button>
             </div>
             {(d.headers || []).map((h: any, i: number) => (
               <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
@@ -638,13 +639,13 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
         {d.type === 'wait' && (<>
           <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1' }}>
-            Acima de 5 minutos o flow pausa e retoma automaticamente via fila.
+            {t('nodes.waitInfo')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div><label style={labelStyle}>Dias</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>Horas</label><input type="number" min="0" max="23" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>Minutos</label><input type="number" min="0" max="59" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>Segundos</label><input type="number" min="0" max="59" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.days')}</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.hours')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.minutes')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.seconds')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </div>
           {(() => {
             const total = (d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)
@@ -655,8 +656,8 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             if (d.seconds) parts.push(`${d.seconds}s`)
             return (
               <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>
-                Total: {parts.join(' ') || '0s'}
-                {total > 300 ? ' — agendado via fila ✓' : total > 0 ? ' — espera síncrona' : ''}
+                {t('nodes.total')} {parts.join(' ') || '0s'}
+                {total > 300 ? ` — ${t('nodes.scheduledViaQueue')} ✓` : total > 0 ? ` — ${t('nodes.syncWait')}` : ''}
               </p>
             )
           })()}
@@ -665,7 +666,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'tag_contact' && (<>
           <SubtypeSelector options={TAG_SUBTYPES} />
           <div>
-            <label style={labelStyle}>{(d.subtype || 'add') === 'add' ? 'Tags para adicionar' : 'Tags para remover'}</label>
+            <label style={labelStyle}>{(d.subtype || 'add') === 'add' ? t('nodes.tagsToAdd') : t('nodes.tagsToRemove')}</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {tags.map((tag: any) => {
                 const selectedIds: string[] = d.tagIds || (d.tagId ? [d.tagId] : [])
@@ -686,24 +687,24 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
           {(d.subtype || 'add') === 'add' && (
             <div style={{ marginTop: '8px' }}>
-              <label style={labelStyle}>Criar nova tag</label>
+              <label style={labelStyle}>{t('nodes.createNewTag')}</label>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '12px' }} placeholder="Nome da tag..." value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                <input style={{ ...inputStyle, flex: 1, padding: '6px 10px', fontSize: '12px' }} placeholder={t('nodes.tagNamePlaceholder')} value={newTagName} onChange={e => setNewTagName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (async () => {
                     if (!newTagName.trim()) return; setCreatingTag(true)
-                    try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" criada!`) }
-                    catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
+                    try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" ${t('nodes.tagCreated')}`) }
+                    catch (err: any) { toast.error(err?.response?.data?.error?.message || t('nodes.tagCreateError')) }
                     finally { setCreatingTag(false) }
                   })() } }}
                   onFocus={focusInput} onBlur={blurInput} />
                 <button disabled={creatingTag || !newTagName.trim()} onClick={async () => {
                   if (!newTagName.trim()) return; setCreatingTag(true)
-                  try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" criada!`) }
-                  catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao criar tag') }
+                  try { const { data } = await contactApi.post('/tags', { name: newTagName.trim(), color: '#22c55e' }); onUpdate(node.id, { tagId: data.data.id, tagName: data.data.name }); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); toast.success(`Tag "${data.data.name}" ${t('nodes.tagCreated')}`) }
+                  catch (err: any) { toast.error(err?.response?.data?.error?.message || t('nodes.tagCreateError')) }
                   finally { setCreatingTag(false) }
                 }}
                   style={{ padding: '6px 12px', background: newTagName.trim() ? '#22c55e' : '#e4e4e7', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: newTagName.trim() ? 'pointer' : 'not-allowed', flexShrink: 0 }}>
-                  {creatingTag ? '...' : '+ Criar'}
+                  {creatingTag ? '...' : t('nodes.create')}
                 </button>
               </div>
             </div>
@@ -730,14 +731,14 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                         else if (v === 'custom_new') updateField(i, { field: 'custom', customField: '' })
                         else updateField(i, { field: v, customField: '' })
                       }} onFocus={focusInput} onBlur={blurInput}>
-                      <option value="name">Nome</option>
-                      <option value="phone">Telefone</option>
-                      <option value="email">Email</option>
-                      {customFields.length > 0 && <option disabled>── Campos personalizados ──</option>}
+                      <option value="name">{t('nodes.fieldName')}</option>
+                      <option value="phone">{t('nodes.fieldPhone')}</option>
+                      <option value="email">{t('nodes.fieldEmail')}</option>
+                      {customFields.length > 0 && <option disabled>{t('nodes.customFieldsSeparator')}</option>}
                       {customFields.map((cf: { name: string; label: string }) => (
                         <option key={cf.name} value={`cf:${cf.name}`}>{cf.label}</option>
                       ))}
-                      <option value="custom_new">+ Outro campo...</option>
+                      <option value="custom_new">{t('nodes.otherField')}</option>
                     </select>
                     {fields.length > 1 && (
                       <button onClick={() => removeField(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#a1a1aa', display: 'flex', flexShrink: 0 }}
@@ -748,16 +749,16 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                     )}
                   </div>
                   {f.field === 'custom' && !customFields.some(cf => cf.name === f.customField) && (
-                    <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="Nome do campo (ex: cargo, empresa)" value={f.customField || ''} onChange={e => updateField(i, { customField: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                    <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder={t('nodes.customFieldPlaceholder')} value={f.customField || ''} onChange={e => updateField(i, { customField: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
                   )}
-                  <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder="{{variavel}} ou texto fixo" value={f.value} onChange={e => updateField(i, { value: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                  <input style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} placeholder={t('nodes.valuePlaceholder')} value={f.value} onChange={e => updateField(i, { value: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
                 </div>
               ))}
               <button onClick={addField}
                 style={{ width: '100%', padding: '7px', background: 'transparent', border: '1.5px dashed #e4e4e7', borderRadius: '8px', color: '#71717a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'border-color 0.15s, color 0.15s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e4e4e7'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}>
-                <Plus size={13} /> Adicionar campo
+                <Plus size={13} /> {t('nodes.addFieldButton')}
               </button>
             </>)
           })()}
@@ -765,31 +766,31 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
         {d.type === 'move_pipeline' && (<>
           {pipelines.length > 0 && (
-            <div><label style={labelStyle}>Pipeline</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.pipelineId || ''} onChange={e => onUpdate(node.id, { pipelineId: e.target.value || null, stage: '', stageLabel: '' })} onFocus={focusInput} onBlur={blurInput}><option value="">Pipeline padrão</option>{pipelines.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+            <div><label style={labelStyle}>{t('nodes.pipeline')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.pipelineId || ''} onChange={e => onUpdate(node.id, { pipelineId: e.target.value || null, stage: '', stageLabel: '' })} onFocus={focusInput} onBlur={blurInput}><option value="">{t('nodes.defaultPipeline')}</option>{pipelines.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           )}
-          <div><label style={labelStyle}>Etapa do funil</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.stage || ''} onChange={e => { const selected = pipelineColumns.find((c: any) => c.key === e.target.value); onUpdate(node.id, { stage: e.target.value, stageLabel: selected?.label || e.target.value }) }} onFocus={focusInput} onBlur={blurInput}><option value="">Selecione uma etapa</option>{pipelineColumns.map((col: any) => <option key={col.key} value={col.key}>{col.label}</option>)}</select></div>
+          <div><label style={labelStyle}>{t('nodes.funnelStage')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.stage || ''} onChange={e => { const selected = pipelineColumns.find((c: any) => c.key === e.target.value); onUpdate(node.id, { stage: e.target.value, stageLabel: selected?.label || e.target.value }) }} onFocus={focusInput} onBlur={blurInput}><option value="">{t('nodes.selectStage')}</option>{pipelineColumns.map((col: any) => <option key={col.key} value={col.key}>{col.label}</option>)}</select></div>
         </>)}
 
         {d.type === 'assign_agent' && (<>
           <div>
-            <label style={labelStyle}>Atribuir para</label>
+            <label style={labelStyle}>{t('nodes.assignTo')}</label>
             <select style={{ ...inputStyle, background: '#fafafa' }} value={d.agentId || ''} onChange={e => onUpdate(node.id, { agentId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-              <option value="">Ninguém (só desativar bot)</option>
-              <option value="round_robin">🔄 Round-robin (menos ocupado)</option>
+              <option value="">{t('nodes.assignNobody')}</option>
+              <option value="round_robin">🔄 {t('nodes.assignRoundRobin')}</option>
               {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
             </select>
           </div>
-          <div><label style={labelStyle}>Mensagem para o cliente (opcional)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Aguarde, um atendente irá te responder." value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.clientMessage')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.clientMessagePlaceholder')} value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
         {d.type === 'go_to' && (
           <div>
-            <label style={labelStyle}>Flow de destino</label>
+            <label style={labelStyle}>{t('nodes.targetFlow')}</label>
             {flows.length === 0
-              ? <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhum outro flow disponível.</p>
-              : <select style={{ ...inputStyle, background: '#fafafa' }} value={d.targetFlowId || ''} onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="">Selecione um flow</option>{flows.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+              ? <p style={{ fontSize: '12px', color: '#a1a1aa' }}>{t('nodes.noOtherFlows')}</p>
+              : <select style={{ ...inputStyle, background: '#fafafa' }} value={d.targetFlowId || ''} onChange={e => onUpdate(node.id, { targetFlowId: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="">{t('nodes.selectFlow')}</option>{flows.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
             }
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>O flow atual para e o flow selecionado começa</p>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.goToHint')}</p>
           </div>
         )}
 
@@ -797,40 +798,40 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <SubtypeSelector options={LOOP_SUBTYPES} />
           {(d.subtype === 'repeat' || !d.subtype) && (<>
             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#6d28d9' }}>
-              Conecte a saída <strong>Loop</strong> aos nós que devem repetir. <strong>Concluído</strong> segue após terminar todas as repetições.
+              {t('nodes.loopRepeatInfo')}
             </div>
-            <div><label style={labelStyle}>Número de repetições</label><input type="number" min="1" max="100" style={inputStyle} value={d.times ?? 1} onChange={e => onUpdate(node.id, { times: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.repetitions')}</label><input type="number" min="1" max="100" style={inputStyle} value={d.times ?? 1} onChange={e => onUpdate(node.id, { times: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
           {d.subtype === 'retry' && (<>
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#ea580c' }}>
-              Conecte a saída <strong>Tentativa</strong> ao fluxo de tentativa. <strong>Esgotado</strong> dispara quando atingir o limite.
+              {t('nodes.loopRetryInfo')}
             </div>
-            <div><label style={labelStyle}>Máximo de tentativas</label><input type="number" min="1" max="20" style={inputStyle} value={d.maxRetries ?? 3} onChange={e => onUpdate(node.id, { maxRetries: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.maxRetries')}</label><input type="number" min="1" max="20" style={inputStyle} value={d.maxRetries ?? 3} onChange={e => onUpdate(node.id, { maxRetries: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
           {d.subtype === 'while' && (<>
-            <div><label style={labelStyle}>Campo</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.conditionField || 'variable'} onChange={e => onUpdate(node.id, { conditionField: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="variable">Variável</option><option value="message">Mensagem</option><option value="phone">Telefone</option></select></div>
+            <div><label style={labelStyle}>{t('nodes.whileField')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.conditionField || 'variable'} onChange={e => onUpdate(node.id, { conditionField: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="variable">{t('nodes.whileVariable')}</option><option value="message">{t('nodes.whileMessage')}</option><option value="phone">{t('nodes.whilePhone')}</option></select></div>
             {(d.conditionField || 'variable') === 'variable' && (
-              <div><label style={labelStyle}>Nome da variável</label><input style={inputStyle} placeholder="ex: status_pagamento" value={d.conditionFieldName || ''} onChange={e => onUpdate(node.id, { conditionFieldName: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+              <div><label style={labelStyle}>{t('nodes.variableName')}</label><input style={inputStyle} placeholder={t('nodes.variableNamePlaceholder')} value={d.conditionFieldName || ''} onChange={e => onUpdate(node.id, { conditionFieldName: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
             )}
-            <div><label style={labelStyle}>Operador</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.conditionOperator || 'is_empty'} onChange={e => onUpdate(node.id, { conditionOperator: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="is_empty">Está vazio</option><option value="is_not_empty">Não está vazio</option><option value="equals">É igual a</option><option value="not_equals">É diferente de</option><option value="contains">Contém</option><option value="not_contains">Não contém</option></select></div>
+            <div><label style={labelStyle}>{t('nodes.operator')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.conditionOperator || 'is_empty'} onChange={e => onUpdate(node.id, { conditionOperator: e.target.value })} onFocus={focusInput} onBlur={blurInput}><option value="is_empty">{t('nodes.opIsEmpty')}</option><option value="is_not_empty">{t('nodes.opIsNotEmpty')}</option><option value="equals">{t('nodes.opEquals')}</option><option value="not_equals">{t('nodes.opNotEquals')}</option><option value="contains">{t('nodes.opContains')}</option><option value="not_contains">{t('nodes.opNotContains')}</option></select></div>
             {!['is_empty', 'is_not_empty'].includes(d.conditionOperator || 'is_empty') && (
-              <div><label style={labelStyle}>Valor</label><input style={inputStyle} placeholder="valor para comparar" value={d.conditionValue || ''} onChange={e => onUpdate(node.id, { conditionValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+              <div><label style={labelStyle}>{t('nodes.valueLabel')}</label><input style={inputStyle} placeholder={t('nodes.valueCompare')} value={d.conditionValue || ''} onChange={e => onUpdate(node.id, { conditionValue: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
             )}
-            <div><label style={labelStyle}>Máximo de iterações (segurança)</label><input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.maxIterations')}</label><input type="number" min="1" max="100" style={inputStyle} value={d.maxIterations ?? 10} onChange={e => onUpdate(node.id, { maxIterations: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
         </>)}
 
         {d.type === 'transcribe_audio' && (<>
           <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#6d28d9' }}>
-            🎙️ Se o contato enviar <b>áudio</b>, transcreve para texto automaticamente. Se enviar <b>texto</b>, usa direto. O resultado fica na variável abaixo.
+            🎙️ {t('nodes.transcribeInfo')}
           </div>
           <div>
-            <label style={labelStyle}>Salvar transcrição como variável</label>
+            <label style={labelStyle}>{t('nodes.saveTranscription')}</label>
             <input style={inputStyle} placeholder="transcricao" value={d.transcribeSaveAs || ''} onChange={e => onUpdate(node.id, { transcribeSaveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Use {'{{' }{d.transcribeSaveAs || 'transcricao'}{'}}' } nos próximos nós (ex: IA, condição)</p>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.transcriptionHint')}: {'{{' }{d.transcribeSaveAs || 'transcricao'}{'}}' }</p>
           </div>
           <div>
-            <label style={labelStyle}>Idioma do áudio</label>
+            <label style={labelStyle}>{t('nodes.audioLanguage')}</label>
             <select style={{ ...inputStyle, background: '#fafafa' }} value={d.transcribeLanguage || 'pt'} onChange={e => onUpdate(node.id, { transcribeLanguage: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
               <option value="pt">Português</option>
               <option value="en">English</option>
@@ -841,46 +842,46 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Chave OpenAI (opcional)</label>
-            <input style={inputStyle} placeholder="Deixe vazio para usar a chave das Configurações" type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            <label style={labelStyle}>{t('nodes.openaiKeyOptional')}</label>
+            <input style={inputStyle} placeholder={t('nodes.openaiKeyOptionalPlaceholder')} type="password" value={d.apiKey || ''} onChange={e => onUpdate(node.id, { apiKey: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
           </div>
         </>)}
 
         {d.type === 'create_task' && (<>
           <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#92400e' }}>
-            📋 Cria uma tarefa automaticamente vinculada à conversa.
+            📋 {t('nodes.createTaskInfo')}
           </div>
-          <div><label style={labelStyle}>Título da tarefa</label><input style={inputStyle} placeholder="Ligar pro cliente {{nome}}" value={d.taskTitle || ''} onChange={e => onUpdate(node.id, { taskTitle: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Vencimento em (horas)</label><input type="number" min="0" style={inputStyle} placeholder="72 = 3 dias" value={d.taskDueHours || ''} onChange={e => onUpdate(node.id, { taskDueHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Atribuir para</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.taskAssignTo || ''} onChange={e => onUpdate(node.id, { taskAssignTo: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-            <option value="">Sem atribuição</option>
+          <div><label style={labelStyle}>{t('nodes.taskTitle')}</label><input style={inputStyle} placeholder={t('nodes.taskTitlePlaceholder')} value={d.taskTitle || ''} onChange={e => onUpdate(node.id, { taskTitle: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.taskDueHours')}</label><input type="number" min="0" style={inputStyle} placeholder={t('nodes.taskDuePlaceholder')} value={d.taskDueHours || ''} onChange={e => onUpdate(node.id, { taskDueHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.taskAssignTo')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.taskAssignTo || ''} onChange={e => onUpdate(node.id, { taskAssignTo: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="">{t('nodes.noAssignment')}</option>
             {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
           </select></div>
         </>)}
 
         {d.type === 'send_notification' && (<>
           <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9d174d' }}>
-            🔔 Envia notificação em tempo real pro atendente no inbox.
+            🔔 {t('nodes.notificationInfo')}
           </div>
-          <div><label style={labelStyle}>Mensagem da notificação</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Lead quente! {{nome}} quer o plano Enterprise" value={d.notificationMessage || ''} onChange={e => onUpdate(node.id, { notificationMessage: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Notificar quem</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.notifyAgentId || ''} onChange={e => onUpdate(node.id, { notifyAgentId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-            <option value="">Todos os agentes</option>
+          <div><label style={labelStyle}>{t('nodes.notificationMessage')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.notificationPlaceholder')} value={d.notificationMessage || ''} onChange={e => onUpdate(node.id, { notificationMessage: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.notifyWho')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.notifyAgentId || ''} onChange={e => onUpdate(node.id, { notifyAgentId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="">{t('nodes.allAgents')}</option>
             {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
           </select></div>
         </>)}
 
         {d.type === 'split_ab' && (<>
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9a3412' }}>
-            🧪 Divide o tráfego em caminhos diferentes por porcentagem. Útil pra testar qual mensagem converte mais.
+            🧪 {t('nodes.splitInfo')}
           </div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={labelStyle}>Caminhos</label>
+              <label style={labelStyle}>{t('nodes.paths')}</label>
               <button onClick={() => {
                 const paths = [...(d.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }])]
                 paths.push({ label: String.fromCharCode(65 + paths.length), weight: Math.round(100 / (paths.length + 1)) })
                 onUpdate(node.id, { splitPaths: paths })
-              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>{t('nodes.add')}</button>
             </div>
             {(d.splitPaths || [{ label: 'A', weight: 50 }, { label: 'B', weight: 50 }]).map((p: any, i: number) => (
               <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
@@ -902,21 +903,21 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
         {d.type === 'random_path' && (<>
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#9a3412' }}>
-            🎲 Escolhe um caminho aleatório a cada execução. Útil pra rotacionar mensagens.
+            🎲 {t('nodes.randomInfo')}
           </div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={labelStyle}>Caminhos</label>
+              <label style={labelStyle}>{t('nodes.paths')}</label>
               <button onClick={() => {
                 const paths = [...(d.randomPaths || ['A', 'B'])]
                 paths.push(String.fromCharCode(65 + paths.length))
                 onUpdate(node.id, { randomPaths: paths })
-              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Adicionar</button>
+              }} style={{ fontSize: '11px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>{t('nodes.add')}</button>
             </div>
             {(d.randomPaths || ['A', 'B']).map((p: string, i: number) => (
               <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color, minWidth: '20px' }}>{p}</span>
-                <span style={{ fontSize: '11px', color: '#a1a1aa' }}>chance igual</span>
+                <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{t('nodes.equalChance')}</span>
                 {(d.randomPaths || []).length > 2 && <button onClick={() => {
                   const paths = (d.randomPaths || []).filter((_: any, j: number) => j !== i)
                   onUpdate(node.id, { randomPaths: paths })
@@ -927,7 +928,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         </>)}
 
         {d.type === 'end' && (
-          <div><label style={labelStyle}>Mensagem de encerramento (opcional)</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Obrigado pelo contato! Até mais 👋" value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.endMessage')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.endPlaceholder')} value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         )}
       </div>
 
@@ -936,7 +937,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           style={{ width: '100%', padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.1s' }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2'}
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'}>
-          Remover nó
+          {t('nodes.removeNode')}
         </button>
       </div>
       <style>{"@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>

@@ -25,7 +25,9 @@
       "Bash(curl -s \"https://graph.facebook.com/v18.0/2772735963077843\" -H \"Authorization: Bearer EAARXcJCFDEsBRMkEylBcmD7vKp1qBJkdZCC2RXXQaLv9WEZBKrPdAKvHfOteqWeY5WampViBuTUVuHvU4NplUjSPfmaMoBm7JyYsQY3szMkli8ZCR7xbjTR6feB9ZBbTP89rVZAlXuNR8mjZAYs6mx7vZCXhDwbCQUgXT8VVshBBaZA1H7MHqgis3Dg1YWbFKUvdtQZDZD\")",
       "Bash(npm install:*)",
       "Bash(ls apps/*/package.json)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

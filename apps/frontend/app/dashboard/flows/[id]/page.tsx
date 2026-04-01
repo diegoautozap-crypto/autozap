@@ -253,7 +253,7 @@ export default function FlowEditorPage() {
       data: {
         type,
         ...(['trigger_webhook', 'trigger_manual'].includes(type) ? { flowId: id } : {}),
-        ...(type === 'condition' ? { branches: [defaultBranch('Caminho 1')] } : {}),
+        ...(type === 'condition' ? { branches: [defaultBranch(`${t('nodes.paths')} 1`)] } : {}),
       },
     }])
     setIsDirty(true)
