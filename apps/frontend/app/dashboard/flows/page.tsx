@@ -138,90 +138,176 @@ function getFlowTemplates(t: (key: string) => string) {
       ],
     },
     {
-      id: 'ai_sales_audio',
+      id: 'ai_sales_complete',
       emoji: '🎙️',
-      name: '🎙️ Vendas com IA + Áudio',
-      desc: 'Atendente IA que entende áudio, qualifica lead por volume, separa por plano e faz follow-up automático',
+      name: '🎙️ Vendedor IA Completo',
+      desc: 'IA que vende sozinha: entende áudio, responde tudo sobre o produto, qualifica por volume, recomenda plano e faz follow-up',
       category: t('flows.categoryAdvanced'),
       categoryKey: 'advanced',
       nodes: [
-        // Trigger
-        { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 400, data: { type: 'trigger_any_reply' } },
-        // Transcrever áudio (se texto, passa direto)
-        { id: 'n2', type: 'transcribe_audio', position_x: 300, position_y: 400, data: { type: 'transcribe_audio', transcribeSaveAs: 'transcricao' } },
-        // IA classifica intenção
-        { id: 'n3', type: 'ai', position_x: 550, position_y: 400, data: { type: 'ai', mode: 'classify', classifyOptions: 'comprar, teste, suporte, cancelar, outro', saveAs: 'intencao', historyMessages: 10 } },
-        // Condição por intenção
-        { id: 'n4', type: 'condition', position_x: 850, position_y: 400, data: { type: 'condition', branches: [
+        // 1. Trigger: qualquer mensagem
+        { id: 'n1', type: 'trigger_any_reply', position_x: 50, position_y: 300, data: { type: 'trigger_any_reply' } },
+
+        // 2. Transcrever áudio (texto passa direto)
+        { id: 'n2', type: 'transcribe_audio', position_x: 300, position_y: 300, data: { type: 'transcribe_audio', transcribeSaveAs: 'transcricao' } },
+
+        // 3. IA responde E classifica ao mesmo tempo
+        { id: 'n3', type: 'ai', position_x: 550, position_y: 300, data: { type: 'ai', mode: 'respond', historyMessages: 30, systemPrompt: `Você é o assistente comercial do AutoZap no WhatsApp. Responda de forma natural, curta (máx 3 frases) e consultiva. Use emojis com moderação.
+
+IMPORTANTE: No FINAL de TODA resposta, adicione numa linha separada uma dessas tags (invisível pro cliente, é pra classificação interna):
+[INTENT:comprar] - quando demonstrou interesse claro em assinar/comprar
+[INTENT:testar] - quando quer experimentar/trial/teste grátis
+[INTENT:suporte] - quando é cliente com problema técnico
+[INTENT:cancelar] - quando quer cancelar assinatura
+[INTENT:humano] - quando pede pra falar com humano/atendente
+[INTENT:conversa] - pra todo o resto (dúvidas, curiosidades, saudações)
+
+SOBRE O AUTOZAP:
+O AutoZap é uma plataforma profissional de CRM + WhatsApp. Permite gerenciar atendimento, vendas e marketing tudo pelo WhatsApp.
+
+FUNCIONALIDADES:
+• Inbox em tempo real — todas as conversas do WhatsApp num só lugar
+• CRM de contatos — base completa com tags, campos personalizados, importação CSV/Excel
+• Pipeline de vendas — funil kanban com arrasta-e-solta, valores, tarefas
+• Campanhas em massa — disparo pra milhares com templates, segmentação, agendamento, recorrência
+• Flows de automação — editor visual com 22 tipos de nó (sem programar)
+• IA integrada — responde, classifica, extrai dados, resume mensagens
+• Transcrição de áudio — cliente manda áudio, o bot entende como texto
+• Relatórios — exportação PDF e Excel
+• Multi-usuários — equipe com permissões por página e canal
+• Integrações — webhooks, Zapier, Make, n8n, qualquer API
+• Multi-idioma — português, inglês, espanhol
+
+PLANOS:
+• Starter — R$97/mês — 10.000 mensagens — inbox, campanhas, CRM, flows
+• Pro — R$197/mês — 50.000 mensagens — tudo do Starter + multi-usuários + suporte prioritário
+• Enterprise — R$397/mês — 100.000 mensagens — tudo do Pro + API dedicada + SLA
+• Unlimited — R$697/mês — mensagens ilimitadas
+• Todos têm 7 dias de trial grátis
+• Pagamento: PIX ou cartão, cancela quando quiser
+
+DIFERENCIAIS (use quando comparar com concorrentes):
+• Único que transcreve áudio no WhatsApp automaticamente
+• IA nativa (não precisa de ferramenta externa)
+• Editor de automação visual (não precisa programar)
+• Round-robin automático (distribui leads pro menos ocupado)
+• Follow-up automático se lead não responder
+
+PERGUNTAS FREQUENTES:
+• "Funciona com meu número?" → Sim, via Gupshup (parceiro oficial do WhatsApp)
+• "Precisa de CNPJ?" → Não, pessoa física também pode
+• "Posso testar grátis?" → Sim, 7 dias com acesso total
+• "Quantos atendentes?" → Starter 1, Pro até 10, Enterprise ilimitado
+• "Tem API?" → Sim, webhooks de entrada/saída + REST API
+• "É seguro?" → Dados criptografados, LGPD compliant
+• "Posso importar contatos?" → Sim, CSV e Excel
+• "Integra com Zapier?" → Sim, e também Make, n8n, qualquer webhook
+• "Posso enviar imagem/vídeo/documento?" → Sim, todos os tipos de mídia
+• "Como configuro?" → Cria conta, conecta número via Gupshup, pronto
+• "Demora pra configurar?" → 15 minutos em média
+• "Tem suporte?" → Sim, via WhatsApp e email
+
+REGRAS:
+- NUNCA invente funcionalidades que não existem
+- Se não souber algo específico, diga "Vou verificar com a equipe e te retorno!"
+- Se o cliente insistir em falar com humano, responda normalmente e coloque [INTENT:humano]
+- Quando recomendar plano, baseie no volume que o cliente informar
+- Não repita informações que já deu na conversa (use o histórico)` } },
+
+        // 4. IA extrai a intent da resposta
+        { id: 'n4', type: 'ai', position_x: 850, position_y: 300, data: { type: 'ai', mode: 'extract', extractField: 'a tag [INTENT:xxx] da mensagem. Retorne APENAS a palavra depois de INTENT: (comprar, testar, suporte, cancelar, humano ou conversa). Se não encontrar tag, retorne conversa', saveAs: 'intencao', historyMessages: 1 } },
+
+        // 5. Condição por intenção
+        { id: 'n5', type: 'condition', position_x: 1150, position_y: 300, data: { type: 'condition', branches: [
           { id: 'b1', label: '💰 Comprar', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'comprar' }] },
-          { id: 'b2', label: '🧪 Testar', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'teste' }] },
+          { id: 'b2', label: '🧪 Testar', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'testar' }] },
           { id: 'b3', label: '🔧 Suporte', logic: 'AND', rules: [{ id: 'r3', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'suporte' }] },
           { id: 'b4', label: '❌ Cancelar', logic: 'AND', rules: [{ id: 'r4', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'cancelar' }] },
+          { id: 'b5', label: '👤 Humano', logic: 'AND', rules: [{ id: 'r5', field: 'variable', fieldName: 'intencao', operator: 'contains', value: 'humano' }] },
         ] } },
 
-        // COMPRAR → pergunta volume
-        { id: 'n5', type: 'input', position_x: 1200, position_y: 100, data: { type: 'input', question: 'Ótimo! 🎯 Quantas mensagens você envia por mês?\nIsso me ajuda a recomendar o plano ideal.', saveAs: 'volume', timeoutHours: 24 } },
-        // Timeout follow-up
-        { id: 'n6', type: 'send_message', position_x: 1550, position_y: 0, data: { type: 'send_message', subtype: 'text', message: 'Oi! Vi que não respondeu 😊\nNossos planos começam em R$97/mês.\nPosso te ajudar a escolher?' } },
+        // === COMPRAR ===
+        { id: 'n6', type: 'tag_contact', position_x: 1500, position_y: 50, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n7', type: 'move_pipeline', position_x: 1750, position_y: 50, data: { type: 'move_pipeline', stage: 'qualificacao' } },
+        { id: 'n8', type: 'input', position_x: 2000, position_y: 50, data: { type: 'input', question: 'Perfeito! 🎯 Pra te recomendar o plano ideal: quantas mensagens você envia por mês aproximadamente?\n\n(pode ser um número aproximado, tipo 5000, 20000, etc)', saveAs: 'volume', timeoutHours: 24 } },
+        // Timeout
+        { id: 'n9', type: 'send_message', position_x: 2350, position_y: -50, data: { type: 'send_message', subtype: 'text', message: 'Oi! 😊 Vi que não respondeu sobre o volume.\n\nSe quiser, posso te apresentar nossos planos:\n• Starter R$97/mês (10k msgs)\n• Pro R$197/mês (50k msgs)\n• Enterprise R$397/mês (100k msgs)\n\nTodos com 7 dias grátis! Qual te interessa?' } },
         // Condição volume
-        { id: 'n7', type: 'condition', position_x: 1550, position_y: 150, data: { type: 'condition', branches: [
-          { id: 'bv1', label: '🏢 >50k', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '50000' }] },
-          { id: 'bv2', label: '🚀 >5k', logic: 'AND', rules: [{ id: 'rv2', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '5000' }] },
+        { id: 'n10', type: 'condition', position_x: 2350, position_y: 100, data: { type: 'condition', branches: [
+          { id: 'bv1', label: '🏢 Enterprise', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '50000' }] },
+          { id: 'bv2', label: '🚀 Pro', logic: 'AND', rules: [{ id: 'rv2', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '5000' }] },
         ] } },
         // Enterprise
-        { id: 'n8', type: 'send_message', position_x: 1900, position_y: 50, data: { type: 'send_message', subtype: 'text', message: 'Com esse volume, o Enterprise (R$397/mês — 100k msgs) é ideal! 🏢\nVou te passar pro gerente.' } },
-        { id: 'n9', type: 'move_pipeline', position_x: 2200, position_y: 50, data: { type: 'move_pipeline', stage: 'negociacao' } },
-        { id: 'n10', type: 'assign_agent', position_x: 2500, position_y: 50, data: { type: 'assign_agent', agentId: 'round_robin' } },
+        { id: 'n11', type: 'send_message', position_x: 2700, position_y: 0, data: { type: 'send_message', subtype: 'text', message: 'Com esse volume, o Enterprise é ideal pra você! 🏢\n\n✅ 100.000 msgs/mês — R$397\n✅ API dedicada + SLA garantido\n✅ Atendentes ilimitados\n\nVou te passar pro nosso gerente pra uma proposta personalizada!' } },
+        { id: 'n12', type: 'move_pipeline', position_x: 3000, position_y: 0, data: { type: 'move_pipeline', stage: 'negociacao' } },
+        { id: 'n13', type: 'assign_agent', position_x: 3250, position_y: 0, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Um gerente comercial vai te atender agora! 🚀' } },
         // Pro
-        { id: 'n11', type: 'send_message', position_x: 1900, position_y: 200, data: { type: 'send_message', subtype: 'text', message: 'O plano Pro (R$197/mês — 50k msgs) é perfeito! 🚀\nInclui multi-usuários e suporte prioritário.\nQuer testar grátis 7 dias?' } },
-        { id: 'n12', type: 'move_pipeline', position_x: 2200, position_y: 200, data: { type: 'move_pipeline', stage: 'qualificacao' } },
+        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 150, data: { type: 'send_message', subtype: 'text', message: 'O Pro é perfeito pra esse volume! 🚀\n\n✅ 50.000 msgs/mês — R$197\n✅ Multi-usuários (até 10)\n✅ Suporte prioritário\n\n7 dias grátis pra testar! Quer criar sua conta?' } },
+        { id: 'n15', type: 'move_pipeline', position_x: 3000, position_y: 150, data: { type: 'move_pipeline', stage: 'qualificacao' } },
         // Starter (fallback)
-        { id: 'n13', type: 'send_message', position_x: 1900, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'O Starter (R$97/mês — 10k msgs) é ideal pra começar! 💡\nInclui inbox, campanhas e CRM.\nQuer testar grátis 7 dias?' } },
-        { id: 'n14', type: 'move_pipeline', position_x: 2200, position_y: 350, data: { type: 'move_pipeline', stage: 'lead' } },
+        { id: 'n16', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'O Starter é ideal pra começar! 💡\n\n✅ 10.000 msgs/mês — R$97\n✅ Inbox + Campanhas + CRM + Flows\n✅ IA integrada\n\n7 dias grátis! Quer testar agora?' } },
+        { id: 'n17', type: 'move_pipeline', position_x: 3000, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
 
-        // TESTAR
-        { id: 'n15', type: 'send_message', position_x: 1200, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'Ótimo! 🎉 Testa grátis por 7 dias:\nhttps://app.autozap.com/register\n\nPrecisou de ajuda, é só chamar!' } },
-        { id: 'n16', type: 'move_pipeline', position_x: 1550, position_y: 350, data: { type: 'move_pipeline', stage: 'qualificacao' } },
+        // === TESTAR ===
+        { id: 'n18', type: 'tag_contact', position_x: 1500, position_y: 250, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n19', type: 'send_message', position_x: 1750, position_y: 250, data: { type: 'send_message', subtype: 'text', message: '🎉 Ótima escolha! Cria sua conta grátis aqui:\n\n👉 https://app.autozap.com/register\n\nSão 7 dias com acesso total a tudo.\nSe precisar de ajuda pra configurar, é só chamar aqui!' } },
+        { id: 'n20', type: 'move_pipeline', position_x: 2000, position_y: 250, data: { type: 'move_pipeline', stage: 'qualificacao' } },
 
-        // SUPORTE
-        { id: 'n17', type: 'send_message', position_x: 1200, position_y: 500, data: { type: 'send_message', subtype: 'text', message: 'Vou te transferir pro suporte agora! 🔧' } },
-        { id: 'n18', type: 'assign_agent', position_x: 1550, position_y: 500, data: { type: 'assign_agent', agentId: 'round_robin' } },
+        // === SUPORTE ===
+        { id: 'n21', type: 'tag_contact', position_x: 1500, position_y: 400, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n22', type: 'assign_agent', position_x: 1750, position_y: 400, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com nosso suporte agora! 🔧 Um momento...' } },
 
-        // CANCELAR
-        { id: 'n19', type: 'send_message', position_x: 1200, position_y: 650, data: { type: 'send_message', subtype: 'text', message: 'Entendi 😔 Vou te passar pro responsável.' } },
-        { id: 'n20', type: 'assign_agent', position_x: 1550, position_y: 650, data: { type: 'assign_agent', agentId: 'round_robin' } },
+        // === CANCELAR ===
+        { id: 'n23', type: 'tag_contact', position_x: 1500, position_y: 530, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n24', type: 'move_pipeline', position_x: 1750, position_y: 530, data: { type: 'move_pipeline', stage: 'lead' } },
+        { id: 'n25', type: 'assign_agent', position_x: 2000, position_y: 530, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Entendi. Vou te passar pro responsável pra te ajudar com isso. 🤝' } },
 
-        // FALLBACK → IA responde
-        { id: 'n21', type: 'ai', position_x: 1200, position_y: 800, data: { type: 'ai', mode: 'respond', systemPrompt: 'Você é o assistente comercial do AutoZap, um CRM com WhatsApp integrado.\n\nPlanos: Starter R$97/mês (10k msgs), Pro R$197/mês (50k msgs), Enterprise R$397/mês (100k msgs).\n\nFuncionalidades: inbox, CRM, pipeline, campanhas em massa, flows de automação, IA integrada, transcrição de áudio, multi-usuários, integrações.\n\nSeja breve (máx 3 frases), profissional e amigável.', historyMessages: 20 } },
+        // === HUMANO ===
+        { id: 'n26', type: 'assign_agent', position_x: 1500, position_y: 660, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Claro! Vou te transferir agora. Um momento! 😊' } },
+
+        // === CONVERSA (fallback) — nada, IA já respondeu no n3 ===
+        { id: 'n27', type: 'end', position_x: 1500, position_y: 780, data: { type: 'end' } },
       ],
       edges: [
-        // Trigger → transcrever → classificar → condição
+        // Fluxo principal: trigger → transcrever → IA responde → extrair intent → condição
         { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
         { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
         { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
-        // Comprar → pergunta volume
-        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
-        { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'timeout' },
-        { id: 'e6', source_node: 'n5', target_node: 'n7', source_handle: 'success' },
-        // Volume → Enterprise / Pro / Starter
-        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'branch_bv1' },
-        { id: 'e8', source_node: 'n8', target_node: 'n9', source_handle: 'success' },
-        { id: 'e9', source_node: 'n9', target_node: 'n10', source_handle: 'success' },
-        { id: 'e10', source_node: 'n7', target_node: 'n11', source_handle: 'branch_bv2' },
+        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'success' },
+
+        // Comprar
+        { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'branch_b1' },
+        { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
+        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
+        { id: 'e8', source_node: 'n8', target_node: 'n9', source_handle: 'timeout' },
+        { id: 'e9', source_node: 'n8', target_node: 'n10', source_handle: 'success' },
+        { id: 'e10', source_node: 'n10', target_node: 'n11', source_handle: 'branch_bv1' },
         { id: 'e11', source_node: 'n11', target_node: 'n12', source_handle: 'success' },
-        { id: 'e12', source_node: 'n7', target_node: 'n13', source_handle: 'fallback' },
-        { id: 'e13', source_node: 'n13', target_node: 'n14', source_handle: 'success' },
+        { id: 'e12', source_node: 'n12', target_node: 'n13', source_handle: 'success' },
+        { id: 'e13', source_node: 'n10', target_node: 'n14', source_handle: 'branch_bv2' },
+        { id: 'e14', source_node: 'n14', target_node: 'n15', source_handle: 'success' },
+        { id: 'e15', source_node: 'n10', target_node: 'n16', source_handle: 'fallback' },
+        { id: 'e16', source_node: 'n16', target_node: 'n17', source_handle: 'success' },
+
         // Testar
-        { id: 'e14', source_node: 'n4', target_node: 'n15', source_handle: 'branch_b2' },
-        { id: 'e15', source_node: 'n15', target_node: 'n16', source_handle: 'success' },
-        // Suporte
-        { id: 'e16', source_node: 'n4', target_node: 'n17', source_handle: 'branch_b3' },
-        { id: 'e17', source_node: 'n17', target_node: 'n18', source_handle: 'success' },
-        // Cancelar
-        { id: 'e18', source_node: 'n4', target_node: 'n19', source_handle: 'branch_b4' },
+        { id: 'e17', source_node: 'n5', target_node: 'n18', source_handle: 'branch_b2' },
+        { id: 'e18', source_node: 'n18', target_node: 'n19', source_handle: 'success' },
         { id: 'e19', source_node: 'n19', target_node: 'n20', source_handle: 'success' },
-        // Fallback → IA
-        { id: 'e20', source_node: 'n4', target_node: 'n21', source_handle: 'fallback' },
+
+        // Suporte
+        { id: 'e20', source_node: 'n5', target_node: 'n21', source_handle: 'branch_b3' },
+        { id: 'e21', source_node: 'n21', target_node: 'n22', source_handle: 'success' },
+
+        // Cancelar
+        { id: 'e22', source_node: 'n5', target_node: 'n23', source_handle: 'branch_b4' },
+        { id: 'e23', source_node: 'n23', target_node: 'n24', source_handle: 'success' },
+        { id: 'e24', source_node: 'n24', target_node: 'n25', source_handle: 'success' },
+
+        // Humano
+        { id: 'e25', source_node: 'n5', target_node: 'n26', source_handle: 'branch_b5' },
+
+        // Conversa (fallback) — IA já respondeu, só finaliza
+        { id: 'e26', source_node: 'n5', target_node: 'n27', source_handle: 'fallback' },
       ],
     },
   ]
