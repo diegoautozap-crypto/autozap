@@ -228,7 +228,53 @@ export class FlowEngine {
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
     const variables = state.variables || {}
     const loopCounters = state.loop_counters || {}
-    if (state.waiting_variable) variables[state.waiting_variable] = ctx.messageBody
+    // Se a resposta é áudio, busca a última mensagem e tenta transcrever
+    if (state.waiting_variable) {
+      let responseText = ctx.messageBody
+      if (!responseText || responseText.trim() === '') {
+        // Pode ser áudio — busca última mensagem
+        const { data: lastMsg } = await db.from('messages').select('content_type, media_url, body')
+          .eq('conversation_id', ctx.conversationId).eq('direction', 'inbound')
+          .order('created_at', { ascending: false }).limit(1).single()
+        if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
+          // Tenta transcrever
+          try {
+            const { data: channel } = await db.from('channels').select('credentials').eq('id', ctx.channelId).single()
+            const creds = channel?.credentials || {}
+            const metaToken = (typeof creds === 'object' && creds.metaToken?.startsWith('EAA')) ? creds.metaToken : (typeof creds === 'object' ? decryptCredentials(creds).metaToken : null)
+            let openaiKey = process.env.OPENAI_API_KEY
+            if (!openaiKey) {
+              const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+              openaiKey = tenant?.metadata?.openai_api_key
+            }
+            if (metaToken && openaiKey && /^\d+$/.test(lastMsg.media_url)) {
+              const metaRes = await fetch(`https://graph.facebook.com/v18.0/${lastMsg.media_url}`, { headers: { Authorization: `Bearer ${metaToken}` } })
+              if (metaRes.ok) {
+                const metaData = await metaRes.json() as any
+                if (metaData.url) {
+                  const audioRes = await fetch(metaData.url, { headers: { Authorization: `Bearer ${metaToken}` } })
+                  if (audioRes.ok) {
+                    const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+                    const { default: OpenAI, toFile } = await import('openai')
+                    const openai = new OpenAI({ apiKey: openaiKey })
+                    const file = await toFile(audioBuffer, 'audio.ogg', { type: 'audio/ogg' })
+                    const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: 'pt' })
+                    responseText = transcription.text || ''
+                    logger.info('Input audio transcribed on resume', { text: responseText.slice(0, 50) })
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            logger.error('Input audio transcription error', { err: err instanceof Error ? err.message : String(err) })
+          }
+        }
+        // Se ainda vazio, usa o body da mensagem
+        if (!responseText) responseText = lastMsg?.body || ''
+      }
+      variables[state.waiting_variable] = responseText
+      ctx.messageBody = responseText || ctx.messageBody
+    }
     await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
 
     const { data: flow } = await db.from('flows').select('*').eq('id', state.flow_id).single()
