@@ -38,7 +38,6 @@ function clearBadge() {
 export function useNotifications() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
-  const pusherRef = useRef<Pusher | null>(null)
   const swRegistered = useRef(false)
 
   const registerSW = useCallback(async () => {

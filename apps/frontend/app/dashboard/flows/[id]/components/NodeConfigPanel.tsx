@@ -5,10 +5,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@supabase/supabase-js'
 import { Node } from '@xyflow/react'
 import { X, Copy, RefreshCw, Loader2, Plus, Play } from 'lucide-react'
-import { NODE_COLORS, NODE_LABELS, DEFAULT_STAGES, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
+import { NODE_COLORS, DEFAULT_STAGES, getNodeLabels, getSendSubtypes, getTagSubtypes, getLoopSubtypes } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
 import { messageApi, contactApi, conversationApi } from '@/lib/api'
 import { toast } from 'sonner'
+import { useT } from '@/lib/i18n'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,6 +62,11 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 }) {
   const d = node.data as any
   const color = NODE_COLORS[d.type] || '#6b7280'
+  const t = useT()
+  const nodeLabels = getNodeLabels(t)
+  const SEND_SUBTYPES = getSendSubtypes(t)
+  const TAG_SUBTYPES = getTagSubtypes(t)
+  const LOOP_SUBTYPES = getLoopSubtypes(t)
   const queryClient = useQueryClient()
   const [newTagName, setNewTagName] = useState('')
   const [creatingTag, setCreatingTag] = useState(false)
@@ -154,18 +160,18 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
     try {
       await messageApi.post(`/flows/${d.flowId}/webhook-token`)
       refetchFlow()
-      toast.success('URL gerada!')
-    } catch { toast.error('Erro ao gerar URL') }
+      toast.success(t('nodes.urlGenerated'))
+    } catch { toast.error(t('nodes.urlGenerateError')) }
     finally { setGeneratingToken(false) }
   }
 
   const copyUrl = () => {
-    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success('URL copiada!') }
+    if (webhookUrl) { navigator.clipboard.writeText(webhookUrl); toast.success(t('nodes.urlCopied')) }
   }
 
   const SubtypeSelector = ({ options }: { options: { value: string; label: string; emoji: string; desc?: string }[] }) => (
     <div>
-      <label style={labelStyle}>Tipo</label>
+      <label style={labelStyle}>{t('nodes.type')}</label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {options.map(opt => {
           const active = (d.subtype || options[0].value) === opt.value
@@ -196,9 +202,9 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
       <div style={{ padding: '16px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>
-            {d.type?.startsWith('trigger_') ? 'Gatilho' : d.type === 'end' ? 'Fim' : 'Ação'}
+            {d.type?.startsWith('trigger_') ? t('nodes.sectionTrigger') : d.type === 'end' ? t('nodes.sectionEnd') : t('nodes.sectionAction')}
           </div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.01em' }}>{NODE_LABELS[d.type] || d.type}</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#18181b', letterSpacing: '-0.01em' }}>{nodeLabels[d.type] || d.type}</div>
         </div>
         <button onClick={onClose} style={{ background: '#f4f4f5', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}>
           <X size={15} color="#71717a" />
@@ -209,7 +215,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
 
         {d.type === 'trigger_keyword' && (<>
           <div>
-            <label style={labelStyle}>Palavras-chave</label>
+            <label style={labelStyle}>{t('nodes.keywords')}</label>
             <KeywordChipInput
               keywords={d.keywords || []}
               onChange={keywords => onUpdate(node.id, { keywords })}
@@ -217,36 +223,36 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             />
           </div>
           <div>
-            <label style={labelStyle}>Tipo de comparação</label>
+            <label style={labelStyle}>{t('nodes.matchType')}</label>
             <select style={{ ...inputStyle, background: '#fafafa' }} value={d.matchType || 'contains'} onChange={e => onUpdate(node.id, { matchType: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-              <option value="contains">Contém a palavra</option>
-              <option value="equals">Igual à palavra</option>
+              <option value="contains">{t('nodes.matchContains')}</option>
+              <option value="equals">{t('nodes.matchEquals')}</option>
             </select>
           </div>
         </>)}
 
         {d.type === 'trigger_first_message' && (<>
           <div>
-            <label style={labelStyle}>Filtrar por palavra-chave (opcional)</label>
+            <label style={labelStyle}>{t('nodes.filterByKeyword')}</label>
             <KeywordChipInput
               keywords={d.keywords || []}
               onChange={keywords => onUpdate(node.id, { keywords })}
               inputStyle={inputStyle}
-              placeholder="Deixe vazio para qualquer mensagem"
+              placeholder={t('nodes.filterByKeywordPlaceholder')}
             />
           </div>
         </>)}
 
         {d.type === 'trigger_any_reply' && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px' }}>
-            <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500 }}>Dispara quando o contato enviar qualquer mensagem.</p>
+            <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500 }}>{t('nodes.anyReplyInfo')}</p>
           </div>
         )}
 
         {d.type === 'trigger_outside_hours' && (<>
-          <div><label style={labelStyle}>Início do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Fim do expediente (hora)</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>Fuso horário</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.timezone || 'America/Sao_Paulo'} onChange={e => onUpdate(node.id, { timezone: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+          <div><label style={labelStyle}>{t('nodes.businessStart')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.businessEnd')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.timezone')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.timezone || 'America/Sao_Paulo'} onChange={e => onUpdate(node.id, { timezone: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
             <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
             <option value="America/Manaus">Manaus (GMT-4)</option>
             <option value="America/Fortaleza">Fortaleza (GMT-3)</option>
@@ -262,12 +268,12 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'trigger_manual' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>
-                Selecione as tags e clique em <strong>Executar</strong> para disparar o flow para todos os contatos dessas tags.
+                {t('nodes.manualInfo')}
               </div>
               <div>
-                <label style={labelStyle}>Tags dos destinatários</label>
+                <label style={labelStyle}>{t('nodes.recipientTags')}</label>
                 {tags.length === 0 ? (
-                  <p style={{ fontSize: '12px', color: '#a1a1aa' }}>Nenhuma tag cadastrada.</p>
+                  <p style={{ fontSize: '12px', color: '#a1a1aa' }}>{t('nodes.noTagsRegistered')}</p>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {tags.map((tag: any) => {
@@ -288,15 +294,15 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 try {
                   const { data } = await messageApi.post(`/flows/${d.flowId}/run`, { tagIds: d.tagIds })
                   setManualResult(data.data)
-                  toast.success(`${data.data.queued} contatos enfileirados!`)
-                } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao executar') }
+                  toast.success(`${data.data.queued} ${t('nodes.contactsQueued')}`)
+                } catch (err: any) { toast.error(err?.response?.data?.error?.message || t('nodes.executionError')) }
                 finally { setManualRunning(false) }
               }}
                 style={{ width: '100%', padding: '10px', background: manualRunning || (d.tagIds || []).length === 0 ? '#e4e4e7' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: manualRunning || (d.tagIds || []).length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                {manualRunning ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Executando...</> : <><Play size={14} /> Executar agora</>}
+                {manualRunning ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {t('nodes.executing')}</> : <><Play size={14} /> {t('nodes.executeNow')}</>}
               </button>
               {manualResult && (
-                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {manualResult.queued} contatos enfileirados para execução</p>
+                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {manualResult.queued} {t('nodes.contactsQueued')}</p>
               )}
             </div>
         )}
@@ -305,45 +311,45 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'trigger_webhook' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#0369a1', lineHeight: 1.5 }}>
-              Este flow dispara quando um sistema externo (Make, Zapier, formulário da Meta) faz um POST na URL abaixo.
+              {t('nodes.webhookInfo')}
             </div>
 
             {!webhookUrl ? (
               <div style={{ textAlign: 'center', padding: '16px', background: '#fafafa', borderRadius: '8px', border: '1px solid #f4f4f5' }}>
-                <p style={{ fontSize: '12px', color: '#71717a', marginBottom: '10px' }}>Salve o flow primeiro, depois gere a URL</p>
+                <p style={{ fontSize: '12px', color: '#71717a', marginBottom: '10px' }}>{t('nodes.saveFlowFirst')}</p>
                 <button onClick={generateToken} disabled={generatingToken || !d.flowId}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: '#0891b2', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: generatingToken ? 'not-allowed' : 'pointer', opacity: !d.flowId ? 0.5 : 1 }}>
                   {generatingToken ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={12} />}
-                  Gerar URL
+                  {t('nodes.generateUrl')}
                 </button>
               </div>
             ) : (
               <div>
-                <label style={labelStyle}>URL do webhook</label>
+                <label style={labelStyle}>{t('nodes.webhookUrlLabel')}</label>
                 <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '9px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <code style={{ flex: 1, fontSize: '10px', color: '#18181b', wordBreak: 'break-all' }}>{webhookUrl}</code>
-                  <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0891b2', display: 'flex', flexShrink: 0 }} title="Copiar URL">
+                  <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0891b2', display: 'flex', flexShrink: 0 }} title={t('nodes.copyUrl')}>
                     <Copy size={13} />
                   </button>
-                  <button onClick={generateToken} disabled={generatingToken} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }} title="Gerar nova URL">
+                  <button onClick={generateToken} disabled={generatingToken} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa', display: 'flex', flexShrink: 0 }} title={t('nodes.generateNewUrl')}>
                     <RefreshCw size={13} />
                   </button>
                 </div>
-                <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>Cole essa URL no Make, Zapier ou qualquer sistema externo</p>
+                <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.webhookPasteHint')}</p>
               </div>
             )}
 
             <div>
-              <label style={labelStyle}>Variáveis disponíveis no flow</label>
+              <label style={labelStyle}>{t('nodes.webhookVarsLabel')}</label>
               <p style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
-                Todos os campos recebidos viram variáveis automaticamente. Use o nó <strong>Mapear campos</strong> para renomear ou transformar.
+                {t('nodes.webhookVarsHint')}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {[
-                  ['{{webhook_phone}}', 'telefone recebido'],
-                  ['{{webhook_name}}', 'nome recebido'],
-                  ['{{webhook_email}}', 'email recebido'],
-                  ['{{webhook_CAMPO}}', 'qualquer outro campo'],
+                  ['{{webhook_phone}}', t('nodes.webhookPhoneVar')],
+                  ['{{webhook_name}}', t('nodes.webhookNameVar')],
+                  ['{{webhook_email}}', t('nodes.webhookEmailVar')],
+                  ['{{webhook_CAMPO}}', t('nodes.webhookAnyVar')],
                 ].map(([varName, desc]) => (
                   <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <code style={{ fontSize: '10px', background: '#f0f9ff', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>{varName}</code>
@@ -360,25 +366,25 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'create_contact' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#15803d', lineHeight: 1.5 }}>
-              Cria ou atualiza o contato com os dados do webhook. Campos extras aparecem no painel lateral do inbox.
+              {t('nodes.createContactInfo')}
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={labelStyle}>Campos</label>
+                <label style={labelStyle}>{t('nodes.fields')}</label>
                 <button
                   onClick={() => {
                     const fields = d.fields || []
                     onUpdate(node.id, { fields: [...fields, { label: '', variable: '', contactField: 'custom' }] })
                   }}
                   style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  + Adicionar campo
+                  {t('nodes.addField')}
                 </button>
               </div>
 
               {(d.fields || []).length === 0 ? (
                 <div style={{ background: '#fafafa', border: '1px dashed #e4e4e7', borderRadius: '8px', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#a1a1aa' }}>
-                  Adicione campos para criar o contato
+                  {t('nodes.addFieldsHint')}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -396,10 +402,10 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                           }}
                           style={{ ...inputStyle, flex: 1, fontSize: '11px', padding: '5px 8px', background: '#fff', marginRight: '6px' }}
                           onFocus={focusInput} onBlur={blurInput}>
-                          <option value="phone">📱 Telefone</option>
-                          <option value="name">👤 Nome</option>
-                          <option value="email">📧 Email</option>
-                          <option value="custom">✏️ Campo extra</option>
+                          <option value="phone">📱 {t('nodes.fieldPhone')}</option>
+                          <option value="name">👤 {t('nodes.fieldName')}</option>
+                          <option value="email">📧 {t('nodes.fieldEmail')}</option>
+                          <option value="custom">✏️ {t('nodes.fieldCustom')}</option>
                         </select>
                         <button
                           onClick={() => {
@@ -409,13 +415,13 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: '11px', flexShrink: 0 }}
                           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}>
-                          remover
+                          {t('nodes.remove')}
                         </button>
                       </div>
                       {field.contactField === 'custom' && (
                         <div style={{ marginBottom: '6px' }}>
                           <input
-                            placeholder="Nome do campo (ex: Cidade, Produto)"
+                            placeholder={t('nodes.fieldNamePlaceholder')}
                             value={field.label || ''}
                             onChange={e => {
                               const fields = [...(d.fields || [])]
@@ -428,7 +434,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                         </div>
                       )}
                       <input
-                        placeholder="Variável (ex: {{webhook_phone}})"
+                        placeholder={t('nodes.variablePlaceholder')}
                         value={field.variable || ''}
                         onChange={e => {
                           const fields = [...(d.fields || [])]
@@ -445,7 +451,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             </div>
 
             <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px', fontSize: '11px', color: '#71717a' }}>
-              <p style={{ fontWeight: 600, marginBottom: '4px' }}>Exemplo de configuração:</p>
+              <p style={{ fontWeight: 600, marginBottom: '4px' }}>{t('nodes.configExample')}</p>
               <p>📱 Telefone → <code style={{ color: '#0891b2' }}>{'{{webhook_phone}}'}</code></p>
               <p>👤 Nome → <code style={{ color: '#0891b2' }}>{'{{webhook_name}}'}</code></p>
               <p>✏️ Cidade → <code style={{ color: '#0891b2' }}>{'{{webhook_cidade}}'}</code></p>
@@ -456,32 +462,32 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         {d.type === 'map_fields' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#6d28d9', lineHeight: 1.5 }}>
-              Mapeie os campos recebidos pelo webhook para variáveis que você vai usar nos próximos nós.
+              {t('nodes.mapFieldsInfo')}
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={labelStyle}>Mapeamentos</label>
+                <label style={labelStyle}>{t('nodes.mappings')}</label>
                 <button
                   onClick={() => {
                     const mappings = d.mappings || []
                     onUpdate(node.id, { mappings: [...mappings, { from: '', to: '' }] })
                   }}
                   style={{ fontSize: '11px', fontWeight: 600, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  + Adicionar
+                  {t('nodes.add')}
                 </button>
               </div>
 
               {(d.mappings || []).length === 0 ? (
                 <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '7px', padding: '12px', fontSize: '12px', color: '#a1a1aa', textAlign: 'center' }}>
-                  Clique em + Adicionar para mapear os campos
+                  {t('nodes.addMappingHint')}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {(d.mappings || []).map((mapping: any, idx: number) => (
                     <div key={idx} style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#71717a' }}>Campo {idx + 1}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#71717a' }}>{t('nodes.fieldN')} {idx + 1}</span>
                         <button
                           onClick={() => {
                             const mappings = (d.mappings || []).filter((_: any, i: number) => i !== idx)
@@ -490,12 +496,12 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: '11px' }}
                           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
                           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5'}>
-                          remover
+                          {t('nodes.remove')}
                         </button>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <div>
-                          <label style={{ ...labelStyle, fontSize: '10px' }}>Variável de origem (ex: {'{{webhook_phone}}'})</label>
+                          <label style={{ ...labelStyle, fontSize: '10px' }}>{t('nodes.sourceVariable')} (ex: {'{{webhook_phone}}'})</label>
                           <input
                             placeholder="{{webhook_phone}}"
                             value={mapping.from || ''}
@@ -509,7 +515,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                           />
                         </div>
                         <div>
-                          <label style={{ ...labelStyle, fontSize: '10px' }}>Salvar como variável</label>
+                          <label style={{ ...labelStyle, fontSize: '10px' }}>{t('nodes.saveAsVariable')}</label>
                           <input
                             placeholder="telefone"
                             value={mapping.to || ''}
@@ -522,7 +528,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                             onFocus={focusInput} onBlur={blurInput}
                           />
                           <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>
-                            Use {'{{' }{mapping.to || 'variavel'}{'}}' } nos próximos nós
+                            {t('nodes.useVariableHint')}: {'{{' }{mapping.to || 'variavel'}{'}}' }
                           </p>
                         </div>
                       </div>
@@ -533,7 +539,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             </div>
 
             <div style={{ background: '#fafafa', border: '1px solid #f4f4f5', borderRadius: '8px', padding: '10px 12px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>Variáveis especiais:</p>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>{t('nodes.specialVarsLabel')}</p>
               <p style={{ fontSize: '11px', color: '#a1a1aa', lineHeight: 1.6 }}>
                 Se você salvar como <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>telefone</code>, <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>nome</code> ou <code style={{ background: '#f0fdf4', color: '#16a34a', padding: '1px 4px', borderRadius: '3px' }}>email</code>, o contato será atualizado automaticamente.
               </p>
@@ -545,9 +551,9 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <SubtypeSelector options={SEND_SUBTYPES} />
           {channels.length > 1 && (
             <div>
-              <label style={labelStyle}>Canal de envio</label>
+              <label style={labelStyle}>{t('nodes.sendChannel')}</label>
               <select style={{ ...inputStyle, background: '#fafafa' }} value={d.channelId || ''} onChange={e => onUpdate(node.id, { channelId: e.target.value || null })} onFocus={focusInput} onBlur={blurInput}>
-                <option value="">Canal padrão (da conversa)</option>
+                <option value="">{t('nodes.defaultChannel')}</option>
                 {channels.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}{ch.phone_number ? ` (${ch.phone_number})` : ''}</option>)}
               </select>
             </div>

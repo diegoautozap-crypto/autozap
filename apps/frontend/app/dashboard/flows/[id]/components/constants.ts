@@ -62,6 +62,7 @@ export const NODE_ICONS: Record<string, any> = {
   random_path:           Shuffle,
 }
 
+// Fallback hardcoded labels (used when t() is not available)
 export const NODE_LABELS: Record<string, string> = {
   trigger_keyword:       'Palavra-chave',
   trigger_first_message: 'Primeira mensagem',
@@ -89,6 +90,43 @@ export const NODE_LABELS: Record<string, string> = {
   random_path:           'Caminho aleatório',
 }
 
+const NODE_LABEL_KEYS: Record<string, string> = {
+  trigger_keyword:       'nodes.triggerKeyword',
+  trigger_first_message: 'nodes.triggerFirstMessage',
+  trigger_any_reply:     'nodes.triggerAnyReply',
+  trigger_outside_hours: 'nodes.triggerOutsideHours',
+  trigger_webhook:       'nodes.triggerWebhook',
+  trigger_manual:        'nodes.triggerManual',
+  map_fields:            'nodes.mapFields',
+  create_contact:        'nodes.createContact',
+  send_message:          'nodes.sendMessage',
+  input:                 'nodes.input',
+  condition:             'nodes.condition',
+  ai:                    'nodes.ai',
+  webhook:               'nodes.webhook',
+  wait:                  'nodes.wait',
+  tag_contact:           'nodes.tagContact',
+  update_contact:        'nodes.updateContact',
+  move_pipeline:         'nodes.movePipeline',
+  assign_agent:          'nodes.assignAgent',
+  go_to:                 'nodes.goTo',
+  end:                   'nodes.end',
+  loop:                  'nodes.loop',
+  transcribe_audio:      'nodes.transcribeAudio',
+  create_task:           'nodes.createTask',
+  send_notification:     'nodes.sendNotification',
+  split_ab:              'nodes.splitAb',
+  random_path:           'nodes.randomPath',
+}
+
+export function getNodeLabels(t: (key: string) => string): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [nodeType, i18nKey] of Object.entries(NODE_LABEL_KEYS)) {
+    result[nodeType] = t(i18nKey)
+  }
+  return result
+}
+
 export const SEND_SUBTYPES = [
   { value: 'text',     label: 'Texto',      emoji: '💬' },
   { value: 'image',    label: 'Imagem',     emoji: '🖼️' },
@@ -97,16 +135,41 @@ export const SEND_SUBTYPES = [
   { value: 'document', label: 'Documento',  emoji: '📄' },
 ]
 
+export function getSendSubtypes(t: (key: string) => string) {
+  return [
+    { value: 'text',     label: t('nodes.sendText'),     emoji: '💬' },
+    { value: 'image',    label: t('nodes.sendImage'),    emoji: '🖼️' },
+    { value: 'video',    label: t('nodes.sendVideo'),    emoji: '🎥' },
+    { value: 'audio',    label: t('nodes.sendAudio'),    emoji: '🎵' },
+    { value: 'document', label: t('nodes.sendDocument'), emoji: '📄' },
+  ]
+}
+
 export const TAG_SUBTYPES = [
   { value: 'add',    label: 'Adicionar tag', emoji: '➕' },
   { value: 'remove', label: 'Remover tag',   emoji: '➖' },
 ]
+
+export function getTagSubtypes(t: (key: string) => string) {
+  return [
+    { value: 'add',    label: t('nodes.tagAdd'),    emoji: '➕' },
+    { value: 'remove', label: t('nodes.tagRemove'), emoji: '➖' },
+  ]
+}
 
 export const LOOP_SUBTYPES = [
   { value: 'repeat', label: 'Repetição',   emoji: '🔁', desc: 'Repete N vezes' },
   { value: 'retry',  label: 'Tentativas',  emoji: '🔄', desc: 'Tenta até N vezes' },
   { value: 'while',  label: 'Enquanto',    emoji: '♾️', desc: 'Repete enquanto condição' },
 ]
+
+export function getLoopSubtypes(t: (key: string) => string) {
+  return [
+    { value: 'repeat', label: t('nodes.loopRepeat'), emoji: '🔁', desc: t('nodes.loopRepeatDesc') },
+    { value: 'retry',  label: t('nodes.loopRetry'),  emoji: '🔄', desc: t('nodes.loopRetryDesc') },
+    { value: 'while',  label: t('nodes.loopWhile'),  emoji: '♾️', desc: t('nodes.loopWhileDesc') },
+  ]
+}
 
 export const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
   send_image:    { type: 'send_message', subtype: 'image' },
@@ -129,6 +192,17 @@ export const DEFAULT_STAGES = [
   { key: 'perdido',      label: 'Perdido' },
 ]
 
+export function getDefaultStages(t: (key: string) => string) {
+  return [
+    { key: 'lead',         label: t('nodes.stageLead') },
+    { key: 'qualificacao', label: t('nodes.stageQualification') },
+    { key: 'proposta',     label: t('nodes.stageProposal') },
+    { key: 'negociacao',   label: t('nodes.stageNegotiation') },
+    { key: 'ganho',        label: t('nodes.stageWon') },
+    { key: 'perdido',      label: t('nodes.stageLost') },
+  ]
+}
+
 export const BRANCH_COLORS = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
 export const OPERATORS = [
@@ -145,6 +219,23 @@ export const OPERATORS = [
   { value: 'is_empty',      label: 'Está vazio' },
   { value: 'is_not_empty',  label: 'Não está vazio' },
 ]
+
+export function getOperators(t: (key: string) => string) {
+  return [
+    { value: 'contains',      label: t('nodes.opContains') },
+    { value: 'not_contains',  label: t('nodes.opNotContains') },
+    { value: 'equals',        label: t('nodes.opEquals') },
+    { value: 'not_equals',    label: t('nodes.opNotEquals') },
+    { value: 'starts_with',   label: t('nodes.opStartsWith') },
+    { value: 'ends_with',     label: t('nodes.opEndsWith') },
+    { value: 'greater_than',  label: t('nodes.opGreaterThan') },
+    { value: 'less_than',     label: t('nodes.opLessThan') },
+    { value: 'greater_equal', label: t('nodes.opGreaterEqual') },
+    { value: 'less_equal',    label: t('nodes.opLessEqual') },
+    { value: 'is_empty',      label: t('nodes.opIsEmpty') },
+    { value: 'is_not_empty',  label: t('nodes.opIsNotEmpty') },
+  ]
+}
 
 export interface ConditionRule {
   id: string

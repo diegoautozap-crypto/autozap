@@ -17,6 +17,7 @@ import { subscribeTenant } from '@/lib/pusher'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
 import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
+import { useT } from '@/lib/i18n'
 
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
@@ -53,37 +54,41 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 const nodeTypes = { flowNode: FlowNode }
 const edgeTypes = { custom: CustomEdge }
 
-const TRIGGER_NODES = [
-  { type: 'trigger_keyword',       label: 'Palavra-chave' },
-  { type: 'trigger_first_message', label: 'Primeira mensagem' },
-  { type: 'trigger_any_reply',     label: 'Qualquer resposta' },
-  { type: 'trigger_outside_hours', label: 'Fora do horário' },
-  { type: 'trigger_webhook',       label: 'Webhook de entrada' },
-  { type: 'trigger_manual',        label: 'Execução manual' },
-]
+function getTriggerNodes(t: (key: string) => string) {
+  return [
+    { type: 'trigger_keyword',       label: t('nodes.triggerKeyword') },
+    { type: 'trigger_first_message', label: t('nodes.triggerFirstMessage') },
+    { type: 'trigger_any_reply',     label: t('nodes.triggerAnyReply') },
+    { type: 'trigger_outside_hours', label: t('nodes.triggerOutsideHours') },
+    { type: 'trigger_webhook',       label: t('nodes.triggerWebhook') },
+    { type: 'trigger_manual',        label: t('nodes.triggerManual') },
+  ]
+}
 
-const ACTION_NODES = [
-  { type: 'map_fields',     label: 'Mapear campos' },
-  { type: 'create_contact', label: 'Criar contato' },
-  { type: 'send_message',   label: 'Enviar mensagem' },
-  { type: 'input',          label: 'Aguardar resposta' },
-  { type: 'condition',      label: 'Condição' },
-  { type: 'ai',             label: 'Inteligência Artificial' },
-  { type: 'webhook',        label: 'Webhook' },
-  { type: 'wait',           label: 'Espera' },
-  { type: 'tag_contact',    label: 'Tags' },
-  { type: 'update_contact', label: 'Atualizar contato' },
-  { type: 'move_pipeline',  label: 'Mover no funil' },
-  { type: 'transcribe_audio', label: 'Transcrever áudio' },
-  { type: 'create_task',    label: 'Criar tarefa' },
-  { type: 'send_notification', label: 'Notificar agente' },
-  { type: 'split_ab',       label: 'Teste A/B' },
-  { type: 'random_path',    label: 'Caminho aleatório' },
-  { type: 'assign_agent',   label: 'Atribuir agente' },
-  { type: 'go_to',          label: 'Ir para outro flow' },
-  { type: 'loop',           label: 'Loop' },
-  { type: 'end',            label: 'Finalizar flow' },
-]
+function getActionNodes(t: (key: string) => string) {
+  return [
+    { type: 'map_fields',        label: t('nodes.mapFields') },
+    { type: 'create_contact',    label: t('nodes.createContact') },
+    { type: 'send_message',      label: t('nodes.sendMessage') },
+    { type: 'input',             label: t('nodes.input') },
+    { type: 'condition',         label: t('nodes.condition') },
+    { type: 'ai',                label: t('nodes.ai') },
+    { type: 'webhook',           label: t('nodes.webhook') },
+    { type: 'wait',              label: t('nodes.wait') },
+    { type: 'tag_contact',       label: t('nodes.tagContact') },
+    { type: 'update_contact',    label: t('nodes.updateContact') },
+    { type: 'move_pipeline',     label: t('nodes.movePipeline') },
+    { type: 'transcribe_audio',  label: t('nodes.transcribeAudio') },
+    { type: 'create_task',       label: t('nodes.createTask') },
+    { type: 'send_notification', label: t('nodes.sendNotification') },
+    { type: 'split_ab',          label: t('nodes.splitAb') },
+    { type: 'random_path',       label: t('nodes.randomPath') },
+    { type: 'assign_agent',      label: t('nodes.assignAgent') },
+    { type: 'go_to',             label: t('nodes.goTo') },
+    { type: 'loop',              label: t('nodes.loop') },
+    { type: 'end',               label: t('nodes.end') },
+  ]
+}
 
 export default function FlowEditorPage() {
   const { id } = useParams()
@@ -91,6 +96,10 @@ export default function FlowEditorPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const tenantId = user?.tenantId || ''
+  const t = useT()
+
+  const TRIGGER_NODES = getTriggerNodes(t)
+  const ACTION_NODES = getActionNodes(t)
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -194,8 +203,8 @@ export default function FlowEditorPage() {
       })
       if (flowName) await messageApi.patch(`/flows/${id}`, { name: flowName })
     },
-    onSuccess: () => { toast.success('Flow salvo!'); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flow', id] }); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
-    onError: () => toast.error('Erro ao salvar'),
+    onSuccess: () => { toast.success(t('nodes.flowSaved')); setIsDirty(false); queryClient.invalidateQueries({ queryKey: ['flow', id] }); queryClient.invalidateQueries({ queryKey: ['flows'] }) },
+    onError: () => toast.error(t('nodes.flowSaveError')),
   })
 
   // Injeta contadores do analytics nos nós e edges
@@ -265,12 +274,12 @@ export default function FlowEditorPage() {
 
   const copySelected = () => {
     const sel = nodes.filter(n => n.selected)
-    if (sel.length === 0) { toast.error('Selecione pelo menos um nó (shift+click ou arraste)'); return }
+    if (sel.length === 0) { toast.error(t('nodes.selectAtLeastOne')); return }
     const ids = new Set(sel.map(n => n.id))
     const cb = { nodes: sel, edges: edges.filter(e => ids.has(e.source) && ids.has(e.target)) }
     setCopiedNodes(cb)
     try { sessionStorage.setItem('autozap_flow_clipboard', JSON.stringify(cb)) } catch { }
-    toast.success(`${sel.length} nó${sel.length > 1 ? 's' : ''} copiado${sel.length > 1 ? 's' : ''}!`)
+    toast.success(`${sel.length} ${t('nodes.nodesCopied')}!`)
   }
 
   const pasteNodes = () => {
@@ -291,7 +300,7 @@ export default function FlowEditorPage() {
     setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes])
     setEdges(eds => [...eds, ...newEdges])
     setIsDirty(true)
-    toast.success(`${newNodes.length} nó${newNodes.length > 1 ? 's' : ''} colado${newNodes.length > 1 ? 's' : ''}!`)
+    toast.success(`${newNodes.length} ${t('nodes.nodesPasted')}!`)
   }
 
   const nodesWithDelete = nodes.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onDelete: deleteNode } }))
@@ -316,26 +325,26 @@ export default function FlowEditorPage() {
         <Workflow size={16} color="#16a34a" />
         <input value={flowName} onChange={e => { setFlowName(e.target.value); setIsDirty(true) }}
           style={{ border: 'none', outline: 'none', fontSize: '15px', fontWeight: 600, color: '#111827', background: 'transparent', minWidth: '200px' }} />
-        {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● Não salvo</span>}
+        {isDirty && <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>● {t('nodes.notSaved')}</span>}
         <div style={{ flex: 1 }} />
         {copiedNodes && copiedNodes.nodes.length > 0 && (
           <button onClick={pasteNodes} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '13px', fontWeight: 600, color: '#16a34a', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#dcfce7'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Colar ({copiedNodes.nodes.length})
+            {t('nodes.pasteCount')} ({copiedNodes.nodes.length})
           </button>
         )}
         <button onClick={copySelected} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: '#6b7280', cursor: 'pointer' }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'}
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copiar selecionados
+          {t('nodes.copySelected')}
         </button>
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {saveMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-          Salvar
+          {t('nodes.save')}
         </button>
         <button onClick={() => setShowAnalytics(p => !p)}
           style={{ padding: '7px 14px', background: showAnalytics ? '#f5f3ff' : '#f9fafb', border: `1px solid ${showAnalytics ? '#ddd6fe' : '#e5e7eb'}`, borderRadius: '7px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: showAnalytics ? '#7c3aed' : '#6b7280' }}>
@@ -347,29 +356,29 @@ export default function FlowEditorPage() {
         <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '20px', alignItems: 'center', fontSize: '13px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
-            <span style={{ color: '#6d28d9' }}><strong>{analytics.totalFlowRuns}</strong> execuções</span>
+            <span style={{ color: '#6d28d9' }}><strong>{analytics.totalFlowRuns}</strong> {t('nodes.executions')}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
-            <span style={{ color: '#1d4ed8' }}><strong>{analytics.uniqueContacts}</strong> contatos</span>
+            <span style={{ color: '#1d4ed8' }}><strong>{analytics.uniqueContacts}</strong> {t('nodes.contacts')}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
-            <span style={{ color: '#15803d' }}><strong>{analytics.totalExecutions}</strong> nós processados</span>
+            <span style={{ color: '#15803d' }}><strong>{analytics.totalExecutions}</strong> {t('nodes.nodesProcessed')}</span>
           </div>
           {analytics.totalErrors > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-              <span style={{ color: '#dc2626' }}><strong>{analytics.totalErrors}</strong> erros</span>
+              <span style={{ color: '#dc2626' }}><strong>{analytics.totalErrors}</strong> {t('nodes.errors')}</span>
             </div>
           )}
-          <span style={{ fontSize: '11px', color: '#a78bfa', marginLeft: 'auto' }}>Últimos 7 dias</span>
+          <span style={{ fontSize: '11px', color: '#a78bfa', marginLeft: 'auto' }}>{t('nodes.last7days')}</span>
         </div>
       )}
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <div className="flow-sidebar mobile-hide" style={{ width: '200px', background: '#fff', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', flexShrink: 0, zIndex: 10 }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Gatilhos</p>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{t('nodes.sectionTriggers')}</p>
           {TRIGGER_NODES.map(n => {
             const Icon = NODE_ICONS[n.type]
             const color = NODE_COLORS[n.type]
@@ -382,7 +391,7 @@ export default function FlowEditorPage() {
               </button>
             )
           })}
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: '16px' }}>Ações</p>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: '16px' }}>{t('nodes.sectionActions')}</p>
           {ACTION_NODES.map(n => {
             const Icon = NODE_ICONS[n.type]
             const color = NODE_COLORS[n.type]
@@ -428,8 +437,8 @@ export default function FlowEditorPage() {
               <Panel position="top-center">
                 <div style={{ background: '#fff', border: '1px dashed #d1d5db', borderRadius: '12px', padding: '24px 40px', textAlign: 'center', marginTop: '60px' }}>
                   <Workflow size={32} color="#d1d5db" style={{ margin: '0 auto 10px' }} />
-                  <p style={{ color: '#9ca3af', fontSize: '14px', fontWeight: 500 }}>Canvas vazio</p>
-                  <p style={{ color: '#d1d5db', fontSize: '12px', marginTop: '4px' }}>Clique em um bloco na barra lateral para começar</p>
+                  <p style={{ color: '#9ca3af', fontSize: '14px', fontWeight: 500 }}>{t('nodes.emptyCanvas')}</p>
+                  <p style={{ color: '#d1d5db', fontSize: '12px', marginTop: '4px' }}>{t('nodes.emptyCanvasHint')}</p>
                 </div>
               </Panel>
             )}

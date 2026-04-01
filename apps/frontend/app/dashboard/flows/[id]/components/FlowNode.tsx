@@ -1,10 +1,16 @@
 'use client'
 import { useState } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import { NODE_COLORS, NODE_ICONS, NODE_LABELS, BRANCH_COLORS, SEND_SUBTYPES, TAG_SUBTYPES, LOOP_SUBTYPES } from './constants'
+import { NODE_COLORS, NODE_ICONS, BRANCH_COLORS, getNodeLabels, getSendSubtypes, getTagSubtypes, getLoopSubtypes } from './constants'
 import type { ConditionBranch } from './constants'
+import { useT } from '@/lib/i18n'
 
 export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
+  const t = useT()
+  const nodeLabels = getNodeLabels(t)
+  const sendSubtypes = getSendSubtypes(t)
+  const tagSubtypes = getTagSubtypes(t)
+  const loopSubtypes = getLoopSubtypes(t)
   const color = NODE_COLORS[data.type] || '#6b7280'
   const Icon = NODE_ICONS[data.type] || NODE_ICONS.trigger_keyword
   const isTrigger = data.type?.startsWith('trigger_')
@@ -16,66 +22,69 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
   // Label do subtipo para nodes consolidados
   const subtypeLabel = () => {
     if (data.type === 'send_message') {
-      const st = SEND_SUBTYPES.find(s => s.value === (data.subtype || 'text'))
-      return st ? `${st.emoji} ${st.label}` : '💬 Texto'
+      const st = sendSubtypes.find(s => s.value === (data.subtype || 'text'))
+      return st ? `${st.emoji} ${st.label}` : `💬 ${t('nodes.sendText')}`
     }
     if (data.type === 'tag_contact') {
-      const st = TAG_SUBTYPES.find(s => s.value === (data.subtype || 'add'))
-      return st ? `${st.emoji} ${st.label}` : '➕ Adicionar tag'
+      const st = tagSubtypes.find(s => s.value === (data.subtype || 'add'))
+      return st ? `${st.emoji} ${st.label}` : `➕ ${t('nodes.tagAdd')}`
     }
     if (data.type === 'loop') {
-      const st = LOOP_SUBTYPES.find(s => s.value === (data.subtype || 'repeat'))
-      return st ? `${st.emoji} ${st.label}` : '🔁 Repetição'
+      const st = loopSubtypes.find(s => s.value === (data.subtype || 'repeat'))
+      return st ? `${st.emoji} ${st.label}` : `🔁 ${t('nodes.loopRepeat')}`
     }
     return null
   }
 
   const subtitle = () => {
-    if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || 'Nenhuma palavra'
-    if (data.type === 'trigger_first_message') return 'Primeira mensagem do contato'
-    if (data.type === 'trigger_any_reply') return 'Qualquer mensagem recebida'
+    if (data.type === 'trigger_keyword') return (data.keywords || []).join(', ') || t('nodes.noKeyword')
+    if (data.type === 'trigger_first_message') return t('nodes.firstMessageSubtitle')
+    if (data.type === 'trigger_any_reply') return t('nodes.anyReplySubtitle')
     if (data.type === 'trigger_outside_hours') return `${data.start ?? 9}h – ${data.end ?? 18}h`
-    if (data.type === 'trigger_manual') return `${(data.tagIds || []).length} tag${(data.tagIds || []).length !== 1 ? 's' : ''} selecionada${(data.tagIds || []).length !== 1 ? 's' : ''}`
+    if (data.type === 'trigger_manual') {
+      const count = (data.tagIds || []).length
+      return `${count} tag${count !== 1 ? 's' : ''} ${count !== 1 ? t('nodes.tagsSelectedPlural') : t('nodes.tagsSelected')}`
+    }
     if (data.type === 'send_message') {
       const sub = data.subtype || 'text'
-      if (sub === 'text') return (data.message || '').slice(0, 50) || 'Sem mensagem'
-      if (sub === 'image') return data.mediaUrl ? '✓ Imagem carregada' : 'Nenhuma imagem'
-      if (sub === 'video') return data.mediaUrl ? '✓ Vídeo carregado' : 'Nenhum vídeo'
-      if (sub === 'audio') return data.mediaUrl ? '✓ Áudio carregado' : 'Nenhum áudio'
-      if (sub === 'document') return data.mediaUrl ? '✓ Documento carregado' : 'Nenhum documento'
+      if (sub === 'text') return (data.message || '').slice(0, 50) || t('nodes.noMessage')
+      if (sub === 'image') return data.mediaUrl ? `✓ ${t('nodes.imageLoaded')}` : t('nodes.noImage')
+      if (sub === 'video') return data.mediaUrl ? `✓ ${t('nodes.videoLoaded')}` : t('nodes.noVideo')
+      if (sub === 'audio') return data.mediaUrl ? `✓ ${t('nodes.audioLoaded')}` : t('nodes.noAudio')
+      if (sub === 'document') return data.mediaUrl ? `✓ ${t('nodes.documentLoaded')}` : t('nodes.noDocument')
     }
-    if (data.type === 'input') return data.question ? data.question.slice(0, 40) : 'Aguardando resposta...'
+    if (data.type === 'input') return data.question ? data.question.slice(0, 40) : t('nodes.waitingResponse')
     if (data.type === 'condition') {
-      if (branches.length > 0) return `${branches.length} condição${branches.length > 1 ? 'ões' : ''} + fallback`
-      return 'Configurar condições'
+      if (branches.length > 0) return `${branches.length} ${branches.length > 1 ? t('nodes.conditionsCountPlural') : t('nodes.conditionsCount')} ${t('nodes.plusFallback')}`
+      return t('nodes.configureConditions')
     }
-    if (data.type === 'ai') return data.mode === 'classify' ? 'Classificar intenção' : data.mode === 'extract' ? 'Extrair dados' : data.mode === 'summarize' ? 'Resumir' : 'Responder com IA'
-    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : 'URL não configurada'
+    if (data.type === 'ai') return data.mode === 'classify' ? t('nodes.classifyIntent') : data.mode === 'extract' ? t('nodes.extractData') : data.mode === 'summarize' ? t('nodes.summarize') : t('nodes.respondWithAi')
+    if (data.type === 'webhook') return data.url ? data.url.slice(0, 40) : t('nodes.urlNotConfigured')
     if (data.type === 'wait') {
       const parts: string[] = []
       if (data.days) parts.push(`${data.days}d`)
       if (data.hours) parts.push(`${data.hours}h`)
       if (data.minutes) parts.push(`${data.minutes}min`)
       if (data.seconds) parts.push(`${data.seconds}s`)
-      return parts.length > 0 ? `Aguardar ${parts.join(' ')}` : 'Aguardar 0s'
+      return parts.length > 0 ? `${t('nodes.waitPrefix')} ${parts.join(' ')}` : `${t('nodes.waitPrefix')} 0s`
     }
-    if (data.type === 'tag_contact') return data.tagName || 'Tag não selecionada'
+    if (data.type === 'tag_contact') return data.tagName || t('nodes.tagNotSelected')
     if (data.type === 'update_contact') {
       const uf = data.updateFields || (data.field ? [data] : [])
-      if (uf.length === 0) return 'Campo não definido'
+      if (uf.length === 0) return t('nodes.fieldNotDefined')
       const labels = uf.map((f: any) => f.field === 'custom' ? (f.customField || 'custom') : f.field).filter(Boolean)
-      return labels.length > 2 ? `${labels.slice(0, 2).join(', ')} +${labels.length - 2}` : labels.join(', ') || 'Campo não definido'
+      return labels.length > 2 ? `${labels.slice(0, 2).join(', ')} +${labels.length - 2}` : labels.join(', ') || t('nodes.fieldNotDefined')
     }
-    if (data.type === 'move_pipeline') return data.stageLabel || data.stage || 'Etapa não definida'
-    if (data.type === 'assign_agent') return 'Transferir para atendente'
-    if (data.type === 'go_to') return 'Ir para outro flow'
+    if (data.type === 'move_pipeline') return data.stageLabel || data.stage || t('nodes.stageNotDefined')
+    if (data.type === 'assign_agent') return t('nodes.transferToAgent')
+    if (data.type === 'go_to') return t('nodes.goToAnotherFlow')
     if (data.type === 'loop') {
       const sub = data.subtype || 'repeat'
-      if (sub === 'repeat') return `Repetir ${data.times ?? 1}x`
-      if (sub === 'retry') return `Até ${data.maxRetries ?? 3} tentativas`
-      if (sub === 'while') return data.conditionFieldName ? `Enquanto ${data.conditionFieldName}` : 'Configurar condição'
+      if (sub === 'repeat') return t('nodes.repeatTimes').replace('{n}', String(data.times ?? 1))
+      if (sub === 'retry') return t('nodes.upToRetries').replace('{n}', String(data.maxRetries ?? 3))
+      if (sub === 'while') return data.conditionFieldName ? `${t('nodes.whilePrefix')} ${data.conditionFieldName}` : t('nodes.configureCondition')
     }
-    if (data.type === 'end') return data.message ? data.message.slice(0, 40) : 'Finalizar'
+    if (data.type === 'end') return data.message ? data.message.slice(0, 40) : t('nodes.finalize')
     return ''
   }
 
@@ -102,7 +111,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       <div
         onMouseDown={e => e.stopPropagation()}
         onClick={e => { e.stopPropagation(); data.onDelete?.(data.nodeId) }}
-        title="Deletar nó"
+        title={t('nodes.deleteNode')}
         style={{
           position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
           width: '22px', height: '22px',
@@ -132,10 +141,10 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
         </div>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {isTrigger ? 'Gatilho' : data.type === 'end' ? 'Fim' : 'Ação'}
+            {isTrigger ? t('nodes.sectionTrigger') : data.type === 'end' ? t('nodes.sectionEnd') : t('nodes.sectionAction')}
           </div>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
-            {NODE_LABELS[data.type] || data.type}
+            {nodeLabels[data.type] || data.type}
           </div>
         </div>
       </div>
@@ -181,7 +190,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             {branches.map((branch, i) => (
               <span key={branch.id} style={{ fontSize: '10px', color: BRANCH_COLORS[i % BRANCH_COLORS.length], fontWeight: 600 }}>{branch.label}</span>
             ))}
-            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>· Fallback</span>
+            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>· {t('nodes.fallbackLabel')}</span>
           </div>
         </>
       )}
@@ -191,9 +200,9 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           <Handle type="source" position={Position.Right} id="true" style={{ background: '#16a34a', width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
           <Handle type="source" position={Position.Right} id="false" style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
-            <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Sim</span>
+            <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ {t('nodes.yesLabel')}</span>
             <span style={{ fontSize: '10px', color: '#6b7280' }}>·</span>
-            <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>✗ Não</span>
+            <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 600 }}>✗ {t('nodes.noLabel')}</span>
           </div>
         </>
       )}
@@ -206,9 +215,9 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
           <Handle type="source" position={Position.Right} id="done"
             style={{ background: '#9ca3af', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
-            <span style={{ fontSize: '10px', color, fontWeight: 600 }}>↺ Loop</span>
+            <span style={{ fontSize: '10px', color, fontWeight: 600 }}>↺ {t('nodes.loopLabel')}</span>
             <span style={{ fontSize: '10px', color: '#6b7280' }}>·</span>
-            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>✓ Concluído</span>
+            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 600 }}>✓ {t('nodes.doneLabel')}</span>
           </div>
         </>
       )}
@@ -220,8 +229,8 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             style={{ background: color, width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
           <Handle type="source" position={Position.Right} id="timeout"
             style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
-          <div style={{ position: 'absolute', right: -70, top: '28%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ resposta</div>
-          <div style={{ position: 'absolute', right: -62, top: '58%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ timeout</div>
+          <div style={{ position: 'absolute', right: -70, top: '28%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ {t('nodes.responseLabel')}</div>
+          <div style={{ position: 'absolute', right: -62, top: '58%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ {t('nodes.timeoutLabel')}</div>
         </>
       ) : (data.type === 'split_ab' || data.type === 'random_path') ? (
         <>
