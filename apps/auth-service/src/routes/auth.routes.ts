@@ -84,7 +84,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const { data: perms } = await db
       .from('user_permissions')
-      .select('allowed_pages, allowed_channels, campaign_access, conversation_access')
+      .select('allowed_pages, editable_pages, allowed_channels, campaign_access, conversation_access')
       .eq('user_id', req.auth.sub)
       .eq('tenant_id', req.auth.tid)
       .maybeSingle()
@@ -125,7 +125,7 @@ router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res,
       .from('users')
       .select(`
         id, name, email, role, is_active, created_at, last_login_at,
-        user_permissions (allowed_pages, allowed_channels, campaign_access, conversation_access)
+        user_permissions (allowed_pages, editable_pages, allowed_channels, campaign_access, conversation_access)
       `)
       .eq('tenant_id', req.auth.tid)
       .neq('id', req.auth.sub)
@@ -280,6 +280,7 @@ router.get('/team/:id/permissions', requireAuth, requireRole('admin', 'owner'), 
 
     res.json(ok(data || {
       allowed_pages: ['/dashboard/inbox'],
+      editable_pages: [],
       allowed_channels: [],
       campaign_access: 'none',
       conversation_access: 'assigned',
@@ -298,6 +299,7 @@ router.patch('/team/:id/permissions', requireAuth, requireRole('admin', 'owner')
 
     const update: any = { updated_at: new Date() }
     if (req.body.allowed_pages !== undefined) update.allowed_pages = req.body.allowed_pages
+    if (req.body.editable_pages !== undefined) update.editable_pages = req.body.editable_pages
     if (req.body.allowed_channels !== undefined) update.allowed_channels = req.body.allowed_channels
     if (req.body.campaign_access !== undefined) update.campaign_access = req.body.campaign_access
     if (req.body.conversation_access !== undefined) update.conversation_access = req.body.conversation_access

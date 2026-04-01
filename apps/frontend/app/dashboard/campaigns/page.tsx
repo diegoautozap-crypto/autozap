@@ -436,7 +436,7 @@ export default function CampaignsPage() {
                     <Download size={13} /> {t('campaigns.exportResults')}
                   </button>
 
-                  {canDelete() && ['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
+                  {canDelete('/dashboard/campaigns') && ['draft', 'paused', 'completed', 'failed', 'scheduled'].includes(selectedCamp.status) && (
                     <button onClick={() => { if (window.confirm(`${t('campaigns.deleteCampaign')} "${selectedCamp.name}"?`)) deleteMutation.mutate(selectedCamp.id) }}
                       disabled={deleteMutation.isPending}
                       style={{ width: '100%', padding: '9px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f87171', fontWeight: 500, opacity: deleteMutation.isPending ? 0.5 : 1 }}

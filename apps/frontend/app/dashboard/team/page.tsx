@@ -88,6 +88,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
   const [perms, setPerms] = useState<any>(null)
   const effectivePerms = perms || savedPerms || {
     allowed_pages: ['/dashboard/inbox'],
+    editable_pages: [],
     allowed_channels: [],
     campaign_access: 'none',
     conversation_access: 'assigned',
@@ -168,15 +169,27 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
             <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {ALL_PAGES_KEYS.map(page => {
                 const isChecked = (effectivePerms.allowed_pages || []).includes(page.href)
+                const isEditable = (effectivePerms.editable_pages || []).includes(page.href)
                 const isLocked = page.href === '/dashboard/inbox'
                 return (
-                  <div key={page.href} onClick={() => togglePage(page.href)}
-                    style={{ padding: '9px 12px', borderRadius: '8px', cursor: isLocked ? 'not-allowed' : 'pointer', border: `1.5px solid ${isChecked ? '#22c55e' : 'var(--border)'}`, background: isChecked ? '#f0fdf4' : 'var(--bg-input)', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.15s', opacity: isLocked ? 0.7 : 1 }}>
-                    <div style={{ width: '15px', height: '15px', borderRadius: '4px', flexShrink: 0, background: isChecked ? '#22c55e' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {isChecked && <Check size={9} color="#fff" strokeWidth={3} />}
+                  <div key={page.href} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div onClick={() => togglePage(page.href)}
+                      style={{ padding: '9px 12px', borderRadius: '8px', cursor: isLocked ? 'not-allowed' : 'pointer', border: `1.5px solid ${isChecked ? '#22c55e' : 'var(--border)'}`, background: isChecked ? '#f0fdf4' : 'var(--bg-input)', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.15s', opacity: isLocked ? 0.7 : 1 }}>
+                      <div style={{ width: '15px', height: '15px', borderRadius: '4px', flexShrink: 0, background: isChecked ? '#22c55e' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isChecked && <Check size={9} color="#fff" strokeWidth={3} />}
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: isChecked ? 600 : 400, color: isChecked ? '#15803d' : 'var(--text-muted)' }}>{t(page.i18nKey)}</span>
+                      {isLocked && <span style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{t('team.fixed')}</span>}
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: isChecked ? 600 : 400, color: isChecked ? '#15803d' : 'var(--text-muted)' }}>{t(page.i18nKey)}</span>
-                    {isLocked && <span style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{t('team.fixed')}</span>}
+                    {isChecked && (
+                      <div onClick={(e) => { e.stopPropagation(); const current = effectivePerms.editable_pages || []; const next = isEditable ? current.filter((p: string) => p !== page.href) : [...current, page.href]; update('editable_pages', next) }}
+                        style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ width: '13px', height: '13px', borderRadius: '3px', flexShrink: 0, background: isEditable ? '#2563eb' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {isEditable && <Check size={8} color="#fff" strokeWidth={3} />}
+                        </div>
+                        <span style={{ fontSize: '11px', color: isEditable ? '#2563eb' : 'var(--text-faint)' }}>✏️ Pode editar</span>
+                      </div>
+                    )}
                   </div>
                 )
               })}

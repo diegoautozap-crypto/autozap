@@ -7,6 +7,7 @@ interface Permissions {
   role: string
   isAdmin: boolean
   allowedPages: string[]
+  editablePages: string[]
   campaignAccess: 'none' | 'view' | 'create' | 'manage'
   conversationAccess: 'assigned' | 'all'
   allowedChannels: string[]
@@ -15,8 +16,9 @@ interface Permissions {
 
 interface PermissionsStore extends Permissions {
   load: () => Promise<void>
-  canEdit: () => boolean
-  canDelete: () => boolean
+  canEdit: (page?: string) => boolean
+  canDelete: (page?: string) => boolean
+  canEditPage: (page: string) => boolean
   canManageCampaigns: () => boolean
   canCreateCampaigns: () => boolean
   canViewCampaigns: () => boolean
@@ -26,6 +28,7 @@ export const usePermissionsStore = create<PermissionsStore>((set, get) => ({
   role: 'agent',
   isAdmin: false,
   allowedPages: [],
+  editablePages: [],
   campaignAccess: 'none',
   conversationAccess: 'assigned',
   allowedChannels: [],
@@ -42,6 +45,7 @@ export const usePermissionsStore = create<PermissionsStore>((set, get) => ({
       set({
         role, isAdmin, loaded: true,
         allowedPages: [],
+        editablePages: [],
         campaignAccess: 'manage',
         conversationAccess: 'all',
         allowedChannels: [],
@@ -63,6 +67,7 @@ export const usePermissionsStore = create<PermissionsStore>((set, get) => ({
         isAdmin: false,
         loaded: true,
         allowedPages: perms.allowed_pages || [],
+        editablePages: perms.editable_pages || [],
         campaignAccess: perms.campaign_access || 'none',
         conversationAccess: perms.conversation_access || 'assigned',
         allowedChannels: perms.allowed_channels || [],
@@ -72,14 +77,24 @@ export const usePermissionsStore = create<PermissionsStore>((set, get) => ({
     }
   },
 
-  canEdit: () => {
-    const { isAdmin, role } = get()
-    return isAdmin || role === 'supervisor'
+  canEdit: (page?: string) => {
+    const { isAdmin, editablePages } = get()
+    if (isAdmin) return true
+    if (!page) return editablePages.length > 0
+    return editablePages.some(p => page === p || page.startsWith(p + '/'))
   },
 
-  canDelete: () => {
-    const { isAdmin } = get()
-    return isAdmin
+  canDelete: (page?: string) => {
+    const { isAdmin, editablePages } = get()
+    if (isAdmin) return true
+    if (!page) return editablePages.length > 0
+    return editablePages.some(p => page === p || page.startsWith(p + '/'))
+  },
+
+  canEditPage: (page: string) => {
+    const { isAdmin, editablePages } = get()
+    if (isAdmin) return true
+    return editablePages.some(p => page === p || page.startsWith(p + '/'))
   },
 
   canManageCampaigns: () => {

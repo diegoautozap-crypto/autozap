@@ -593,7 +593,7 @@ export default function InboxPage() {
                 style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer' }}>
                 {bulkSelected.size === conversations.length ? t('inbox.noneSelected') : t('inbox.all')}
               </button>
-              {canEdit() && bulkSelected.size > 0 && (<>
+              {canEdit('/dashboard/inbox') && bulkSelected.size > 0 && (<>
                 <button onClick={async () => {
                   await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
                   toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
@@ -683,7 +683,7 @@ export default function InboxPage() {
                 </div>
               </div>
               <div className="mobile-header-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {canEdit() && selectedConv?.status !== 'closed' && (
+                {canEdit('/dashboard/inbox') && selectedConv?.status !== 'closed' && (
                   botActive
                     ? <button onClick={() => takeOverMutation.mutate()} disabled={takeOverMutation.isPending} style={{ padding: '5px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         {takeOverMutation.isPending ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={12} />} {t('inbox.takeOver')}
@@ -724,7 +724,7 @@ export default function InboxPage() {
             {!botActive && selectedConv?.status !== 'closed' && (
               <div style={{ padding: '8px 16px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><UserCheck size={14} color="#ea580c" /><span style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>{t('inbox.humanActiveWarning')}</span></div>
-                {canEdit() && <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending} style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>{t('inbox.reactivateBot')}</button>}
+                {canEdit('/dashboard/inbox') && <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending} style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>{t('inbox.reactivateBot')}</button>}
               </div>
             )}
 
@@ -924,7 +924,7 @@ export default function InboxPage() {
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><UserCheck size={13} color="var(--text-faint)" /><p style={{ fontSize: '10px', color: 'var(--text-faint)', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('inbox.agent')}</p></div>
-                <select value={selectedConv?.assigned_to || ''} onChange={e => assignMutation.mutate(e.target.value || null)} disabled={!canEdit() || assignMutation.isPending} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', color: 'var(--text)', outline: 'none', cursor: canEdit() ? 'pointer' : 'not-allowed', opacity: canEdit() ? 1 : 0.5 }}>
+                <select value={selectedConv?.assigned_to || ''} onChange={e => assignMutation.mutate(e.target.value || null)} disabled={!canEdit('/dashboard/inbox') || assignMutation.isPending} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', color: 'var(--text)', outline: 'none', cursor: canEdit('/dashboard/inbox') ? 'pointer' : 'not-allowed', opacity: canEdit('/dashboard/inbox') ? 1 : 0.5 }}>
                   <option value="">{t('inbox.noAgent')}</option>
                   {(teamMembers || []).map((m: any) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
                 </select>

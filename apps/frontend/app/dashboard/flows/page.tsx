@@ -523,13 +523,13 @@ export default function FlowsPage() {
           <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>{t('flows.subtitleAlt')}</p>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
-          {canEdit() && (
+          {canEdit('/dashboard/flows') && (
           <button onClick={() => setShowTemplates(true)}
             style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Copy size={14} /> {t('flows.templates')}
           </button>
           )}
-          {canEdit() && (
+          {canEdit('/dashboard/flows') && (
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
@@ -670,7 +670,7 @@ export default function FlowsPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                {canEdit() && (
+                {canEdit('/dashboard/flows') && (
                 <button onClick={() => toggleMutation.mutate({ id: f.id, isActive: f.is_active })} title={f.is_active ? t('flows.togglePause') : t('flows.toggleActivate')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: f.is_active ? '#22c55e' : 'var(--text-faintest)', borderRadius: '6px' }}
                   onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'}
@@ -678,7 +678,7 @@ export default function FlowsPage() {
                   {f.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                 </button>
                 )}
-                {canEdit() && (
+                {canEdit('/dashboard/flows') && (
                 <button onClick={e => openEdit(f, e)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
@@ -686,7 +686,7 @@ export default function FlowsPage() {
                   <Pencil size={14} />
                 </button>
                 )}
-                {canDelete() && (
+                {canDelete('/dashboard/flows') && (
                 <button onClick={() => { if (confirm(t('flows.confirmDelete').replace('{name}', f.name))) deleteMutation.mutate(f.id) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}

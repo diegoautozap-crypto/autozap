@@ -62,4 +62,7 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all" ON tasks TO service_role USING (true) WITH CHECK (true);
 
 -- Reload schema cache do PostgREST
+-- Permissão de edição por página
+ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS editable_pages TEXT[] DEFAULT '{}';
+
 NOTIFY pgrst, 'reload schema';
