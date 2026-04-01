@@ -525,6 +525,7 @@ router.post('/conversations/bulk/read', async (req, res, next) => {
   try {
     const { ids } = req.body
     if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
+    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     await db.from('conversations').update({ unread_count: 0 }).eq('tenant_id', req.auth.tid).in('id', ids)
     res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }
@@ -534,6 +535,7 @@ router.post('/conversations/bulk/close', async (req, res, next) => {
   try {
     const { ids } = req.body
     if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
+    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     await db.from('conversations').update({ status: 'closed' }).eq('tenant_id', req.auth.tid).in('id', ids)
     res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }
@@ -543,6 +545,7 @@ router.post('/conversations/bulk/assign', async (req, res, next) => {
   try {
     const { ids, userId } = req.body
     if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
+    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     if (userId) {
       const { data: user } = await db.from('users').select('id').eq('id', userId).eq('tenant_id', req.auth.tid).single()
       if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }

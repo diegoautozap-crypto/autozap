@@ -99,7 +99,7 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchPermissions()
-    const interval = setInterval(fetchPermissions, 5_000)
+    const interval = setInterval(fetchPermissions, 30_000)
     return () => clearInterval(interval)
   }, [fetchPermissions])
 

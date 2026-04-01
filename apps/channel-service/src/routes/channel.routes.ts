@@ -249,7 +249,7 @@ router.post('/webhook/gupshup/:apikey', rateLimit({ max: 120 }), async (req, res
     res.status(200).json({ success: true })
   } catch (err) {
     logger.error('Webhook processing error', { err })
-    res.status(200).json({ success: true })
+    res.status(500).json({ success: false, error: 'Internal processing error' })
   }
 })
 

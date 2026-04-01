@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import { initSentry, captureError } from '@autozap/utils'
+initSentry('message-service')
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'

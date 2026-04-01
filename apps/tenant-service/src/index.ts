@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import { initSentry } from '@autozap/utils'
+initSentry('tenant-service')
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
