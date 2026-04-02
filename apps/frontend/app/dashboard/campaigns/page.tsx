@@ -239,7 +239,7 @@ export default function CampaignsPage() {
           </button>
           {campaignLimitReached && (
             <span style={{ fontSize: '12px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '6px 12px', fontWeight: 600 }}>
-              Limite de campanhas/mes atingido. Faca upgrade.
+              Limite de campanhas/mês atingido.<a href="/dashboard/settings#planos" style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'underline', marginLeft: '4px' }}>Fazer upgrade</a>
             </span>
           )}
           {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !campaignLimitReached && (

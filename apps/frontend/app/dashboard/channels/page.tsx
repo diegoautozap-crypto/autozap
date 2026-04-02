@@ -139,7 +139,7 @@ export default function ChannelsPage() {
           </div>
           {canEdit('/dashboard/channels') && (
           <button
-            onClick={() => { if (atLimit) { toast.error(`${t('channels.toast.planLimit')} ${channelLimit} ${channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}.`); return }; closeForm(); setShowForm(true) }}
+            onClick={() => { if (atLimit) { toast.error(`${t('channels.toast.planLimit')} ${channelLimit} ${channelLimit > 1 ? t('channels.channelsPlural') : t('channels.channelSingular')}. Fazer upgrade: /dashboard/settings#planos`); return }; closeForm(); setShowForm(true) }}
             style={{ padding: '8px 16px', background: atLimit ? 'var(--border)' : '#22c55e', color: atLimit ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: atLimit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: atLimit ? 'none' : '0 1px 3px rgba(34,197,94,0.3)', transition: 'all 0.12s' }}
             onMouseEnter={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
             onMouseLeave={e => { if (!atLimit) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>

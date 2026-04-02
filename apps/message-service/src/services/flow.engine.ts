@@ -726,6 +726,8 @@ export class FlowEngine {
             const currentAiCount = await this.getMonthlyAiCount(ctx.tenantId)
             if (currentAiCount >= aiLimits.aiResponses) {
               logger.warn('AI node blocked — monthly AI limit reached', { tenantId: ctx.tenantId, limit: aiLimits.aiResponses, used: currentAiCount })
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Nosso atendimento automático está temporariamente indisponível. Um atendente vai te responder em breve!' })
+              await db.from('conversations').update({ bot_active: false }).eq('id', ctx.conversationId).eq('tenant_id', ctx.tenantId)
               break
             }
           }
