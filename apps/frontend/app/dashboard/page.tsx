@@ -178,7 +178,6 @@ export default function DashboardPage() {
         <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
       </div>
 
-      <OnboardingBanner channels={channels || []} templates={templates || []} campaigns={campaigns || []} />
 
       {/* Cards principais */}
       {(loadingCampaigns && loadingContacts) ? (
