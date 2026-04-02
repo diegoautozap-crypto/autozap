@@ -148,7 +148,7 @@ export default function LoginPage() {
 
         <p style={{ textAlign: 'center', color: '#a1a1aa', fontSize: '13px', marginTop: '24px' }}>
           Não tem conta?{' '}
-          <a href="/register" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>Criar conta</a>
+          <a href="/#planos" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>Criar conta</a>
         </p>
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
