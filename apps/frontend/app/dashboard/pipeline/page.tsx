@@ -47,72 +47,6 @@ function formatCurrency(val: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val)
 }
 
-function parseCurrency(s: string): number | null {
-  const cleaned = s.replace(/[^\d,\.]/g, '').replace(',', '.')
-  const n = parseFloat(cleaned)
-  return isNaN(n) ? null : n
-}
-
-// ── Inline value editor no card ───────────────────────────────────────────────
-function DealValueEditor({ convId, value, onSaved, t }: { convId: string; value: number | null; onSaved: (v: number | null) => void; t: (key: string) => string }) {
-  const [editing, setEditing] = useState(false)
-  const [inputVal, setInputVal] = useState('')
-
-  const startEdit = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setInputVal(value ? String(value) : '')
-    setEditing(true)
-  }
-
-  const commit = async (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    const parsed = parseCurrency(inputVal)
-    setEditing(false)
-    if (parsed !== value) {
-      try {
-        await conversationApi.patch(`/conversations/${convId}/deal-value`, { dealValue: parsed })
-        onSaved(parsed)
-      } catch { toast.error(t('pipeline.toastSaveValueError')) }
-    }
-  }
-
-  if (editing) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}
-        onClick={e => e.stopPropagation()}
-        onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
-        draggable={false}>
-        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>R$</span>
-        <input
-          autoFocus
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value)}
-          onBlur={() => commit()}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
-          placeholder="0"
-          style={{ width: '80px', fontSize: '12px', fontWeight: 600, border: 'none', borderBottom: '1.5px solid #22c55e', outline: 'none', background: 'transparent', color: 'var(--text)', padding: '1px 0' }}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div
-      onClick={startEdit}
-      onMouseDown={e => { e.stopPropagation(); e.preventDefault() }}
-      draggable={false}
-      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', cursor: 'pointer' }}
-      title={t('pipeline.clickToSetValue')}>
-      {value ? (
-        <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(value)}</span>
-      ) : (
-        <span style={{ fontSize: '11px', color: 'var(--text-faintest)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-          <DollarSign size={10} /> {t('pipeline.valuePlaceholder')}
-        </span>
-      )}
-    </div>
-  )
-}
 
 function ContactTagBadges({ contact }: { contact: any }) {
   const tags = (contact?.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
@@ -350,8 +284,6 @@ export default function PipelinePage() {
   const [newPipelineName, setNewPipelineName] = useState('')
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null)
   const [editingPipelineName, setEditingPipelineName] = useState('')
-  // Cache local de valores para atualização otimista
-  const [dealValues, setDealValues] = useState<Record<string, number | null>>({})
   const [purchaseConvId, setPurchaseConvId] = useState<string | null>(null)
   const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
   const [purchaseProductId, setPurchaseProductId] = useState('')
@@ -477,13 +409,16 @@ export default function PipelinePage() {
 
   const displayBoard = localBoardRef.current ?? board
 
-  // Calcula totais por coluna incluindo cache local de valores
+  // Calcula totais por coluna baseado nas compras do contato
+  const getContactPurchaseTotal = (contactId: string): number => {
+    const purchases = (purchasesByContact as any)[contactId] || []
+    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
+  }
   const getColumnTotal = (stageKey: string): number => {
     const cards = displayBoard?.[stageKey] || []
     return cards.reduce((sum: number, conv: any) => {
-      const localVal = dealValues[conv.id]
-      const val = localVal !== undefined ? localVal : (conv.deal_value || 0)
-      return sum + (val || 0)
+      const cId = conv.contacts?.id || conv.contact_id
+      return sum + (cId ? getContactPurchaseTotal(cId) : 0)
     }, 0)
   }
 
@@ -782,7 +717,7 @@ export default function PipelinePage() {
                       const name = conv.contacts?.name || conv.contacts?.phone || '??'
                       const av = getAvatarColor(name)
                       const isDragging = draggingId === conv.id
-                      const currentValue = dealValues[conv.id] !== undefined ? dealValues[conv.id] : conv.deal_value
+
                       return (
                         <div key={conv.id} draggable={canEdit('/dashboard/pipeline')} data-card onDragStart={e => { if (canEdit('/dashboard/pipeline')) handleDragStart(e, conv.id) }} onDragEnd={handleDragEnd} onClick={() => router.push('/dashboard/inbox')}
                           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '11px 12px', cursor: 'grab', opacity: isDragging ? 0.4 : 1, boxShadow: isDragging ? 'none' : 'var(--shadow)', transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s', userSelect: 'none' }}
@@ -860,22 +795,18 @@ export default function PipelinePage() {
                             )
                           })()}
 
-                          {/* ── Valor do negócio ── */}
-                          {canEdit('/dashboard/pipeline') ? (
-                          <DealValueEditor
-                            convId={conv.id}
-                            value={currentValue ?? null}
-                            t={t}
-                            onSaved={(v) => {
-                              setDealValues(prev => ({ ...prev, [conv.id]: v }))
-                              forceRender(n => n + 1)
-                            }}
-                          />
-                          ) : currentValue ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(currentValue)}</span>
-                            </div>
-                          ) : null}
+                          {/* ── Total de compras ── */}
+                          {(() => {
+                            const cId = conv.contacts?.id || conv.contact_id
+                            const total = cId ? getContactPurchaseTotal(cId) : 0
+                            if (!total) return null
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+                                <DollarSign size={11} color="#16a34a" />
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(total)}</span>
+                              </div>
+                            )
+                          })()}
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                             {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}
