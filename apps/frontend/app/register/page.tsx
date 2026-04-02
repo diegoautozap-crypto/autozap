@@ -26,7 +26,7 @@ function RegisterPage() {
   const searchParams = useSearchParams()
   const selectedPlan = searchParams.get('plan') || ''
   const { register, isLoading } = useAuthStore()
-  const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '', cpfCnpj: '' })
   const [step, setStep] = useState<'form' | 'payment' | 'verify'>('form')
 
   const [creating, setCreating] = useState(false)
@@ -54,7 +54,7 @@ function RegisterPage() {
       const { tenantApi } = await import('@/lib/api')
       const { data: subData } = await tenantApi.post('/tenant/billing/subscribe', {
         planSlug: selectedPlan,
-        cpfCnpj: '',
+        cpfCnpj: form.cpfCnpj.replace(/\D/g, ''),
       })
       const paymentUrl = subData?.data?.paymentUrl
       if (paymentUrl) {
@@ -196,6 +196,10 @@ function RegisterPage() {
               <div style={{ marginBottom: '24px' }}>
                 <label style={labelStyle}>Senha *</label>
                 <input type="password" style={inputStyle} placeholder="Mínimo 8 caracteres" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={8} onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
+              </div>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={labelStyle}>CPF ou CNPJ *</label>
+                <input style={inputStyle} placeholder="000.000.000-00" value={form.cpfCnpj} onChange={e => setForm({ ...form, cpfCnpj: e.target.value })} required onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
               <button type="submit" disabled={isLoading || creating}
                 style={{ width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: (isLoading || creating) ? 'not-allowed' : 'pointer', opacity: (isLoading || creating) ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
