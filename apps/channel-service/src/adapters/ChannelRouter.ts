@@ -1,5 +1,6 @@
 import type { IChannelAdapter, ChannelType } from './IChannelAdapter'
 import { gupshupAdapter } from './GupshupAdapter'
+import { evolutionAdapter } from './EvolutionAdapter'
 import { AppError } from '@autozap/utils'
 
 // ─── ChannelRouter ────────────────────────────────────────────────────────────
@@ -11,8 +12,8 @@ class ChannelRouter {
 
   constructor() {
     this.register(gupshupAdapter)
+    this.register(evolutionAdapter)
     // Future: this.register(metaCloudAdapter)
-    // Future: this.register(evolutionAdapter)
     // Future: this.register(instagramAdapter)
   }
 

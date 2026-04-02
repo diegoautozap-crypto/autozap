@@ -32,6 +32,9 @@ function safeChannel(channel: any) {
     hasMetaToken: !!(credentials?.metaToken),
     srcName: credentials?.srcName || '',
     source: credentials?.source || '',
+    // Evolution-specific
+    baseUrl: credentials?.baseUrl || '',
+    instanceName: credentials?.instanceName || '',
   }
 }
 
@@ -249,6 +252,87 @@ router.post('/webhook/gupshup/:apikey', rateLimit({ max: 120 }), async (req, res
     res.status(200).json({ success: true })
   } catch (err) {
     logger.error('Webhook processing error', { err })
+    res.status(500).json({ success: false, error: 'Internal processing error' })
+  }
+})
+
+// ─── Evolution: QR Code / connection status (protected) ──────────────────────
+router.get('/channels/:id/evolution/qrcode', requireAuth, async (req, res, next) => {
+  try {
+    const channel = await channelService.getChannel(req.params.id, req.auth.tid)
+    if (channel.type !== 'evolution') {
+      res.status(400).json({ success: false, error: { message: 'Not an Evolution channel' } })
+      return
+    }
+    const creds = channel.credentials
+    const baseUrl = (creds.baseUrl || '').replace(/\/+$/, '')
+    const response = await fetch(`${baseUrl}/instance/connect/${creds.instanceName}`, {
+      headers: { apikey: creds.apiKey! },
+    })
+    const data = await response.json()
+    res.json({ success: true, data })
+  } catch (err) { next(err) }
+})
+
+router.get('/channels/:id/evolution/status', requireAuth, async (req, res, next) => {
+  try {
+    const channel = await channelService.getChannel(req.params.id, req.auth.tid)
+    if (channel.type !== 'evolution') {
+      res.status(400).json({ success: false, error: { message: 'Not an Evolution channel' } })
+      return
+    }
+    const creds = channel.credentials
+    const baseUrl = (creds.baseUrl || '').replace(/\/+$/, '')
+    const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
+      headers: { apikey: creds.apiKey! },
+    })
+    const data = await response.json() as any[]
+    const instance = Array.isArray(data) ? data.find((i: any) => i.instance?.instanceName === creds.instanceName) : null
+    res.json({ success: true, data: instance || null })
+  } catch (err) { next(err) }
+})
+
+// ─── Evolution Webhook (public) ───────────────────────────────────────────────
+router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (req, res, next) => {
+  try {
+    const { instanceName } = req.params
+    const payload = req.body
+
+    logger.debug('Evolution webhook received', { instanceName, event: payload?.event })
+
+    const channel = await channelService.getChannelByInstanceName(instanceName)
+    if (!channel) {
+      logger.warn('Evolution webhook for unknown instance', { instanceName })
+      res.status(200).json({ success: true })
+      return
+    }
+
+    const event = payload?.event
+
+    if (event === 'messages.upsert') {
+      const normalized = await channelService.parseInbound('evolution', payload)
+      if (normalized) {
+        normalized.channelId = channel.id
+        await notifyMessageService('inbound', {
+          tenantId: channel.tenantId,
+          channelId: channel.id,
+          message: normalized,
+        })
+      }
+    } else if (event === 'messages.update') {
+      const statusUpdate = await channelService.parseStatusUpdate('evolution', payload)
+      if (statusUpdate) {
+        await notifyMessageService('status_update', {
+          tenantId: channel.tenantId,
+          channelId: channel.id,
+          statusUpdate,
+        })
+      }
+    }
+
+    res.status(200).json({ success: true })
+  } catch (err) {
+    logger.error('Evolution webhook processing error', { err })
     res.status(500).json({ success: false, error: 'Internal processing error' })
   }
 })

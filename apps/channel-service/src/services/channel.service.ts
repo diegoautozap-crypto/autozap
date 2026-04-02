@@ -185,6 +185,25 @@ export class ChannelService {
     return channel ? this.mapRow(channel) : null
   }
 
+  // ── Get Evolution channel by instanceName ────────────────────────────────
+
+  async getChannelByInstanceName(instanceName: string): Promise<Channel | null> {
+    const { data } = await db
+      .from('channels')
+      .select('*')
+      .eq('type', 'evolution')
+      .eq('status', 'active')
+
+    if (!data) return null
+
+    const channel = data.find(row => {
+      const creds = this.mapRow(row).credentials
+      return creds.instanceName === instanceName
+    })
+
+    return channel ? this.mapRow(channel) : null
+  }
+
   // ── Delete channel ───────────────────────────────────────────────────────
 
   async deleteChannel(channelId: string, tenantId: string): Promise<void> {
