@@ -11,6 +11,7 @@ router.use(requireAuth)
 const flowSchema = z.object({
   name: z.string().min(1).max(255),
   channelId: z.string().uuid().nullable().optional(),
+  campaignId: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional().default(true),
   cooldown_type: z.enum(['24h', 'once', 'always']).optional().default('always'),
 })
@@ -64,7 +65,7 @@ router.post('/flows', validate(flowSchema), async (req, res, next) => {
       throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.flows} flows`, 403)
     }
 
-    const { name, channelId, is_active, cooldown_type } = req.body
+    const { name, channelId, campaignId, is_active, cooldown_type } = req.body
 
     const { data: last } = await db
       .from('flows')
@@ -81,6 +82,7 @@ router.post('/flows', validate(flowSchema), async (req, res, next) => {
       .insert({
         tenant_id: req.auth.tid,
         channel_id: channelId || null,
+        campaign_id: campaignId || null,
         name,
         is_active: is_active ?? true,
         sort_order: nextOrder,
@@ -127,6 +129,7 @@ router.patch('/flows/:id', async (req, res, next) => {
       if (req.body[key] !== undefined) update[key] = req.body[key]
     }
     if (req.body.channelId !== undefined) update.channel_id = req.body.channelId || null
+    if (req.body.campaignId !== undefined) update.campaign_id = req.body.campaignId || null
     update.updated_at = new Date()
 
     const { data, error } = await db

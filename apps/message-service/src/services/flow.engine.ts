@@ -229,7 +229,14 @@ export class FlowEngine {
 
       if (!flows || flows.length === 0) return
 
+      // Busca campaign_id da conversa pra filtrar flows por campanha
+      const { data: convData } = await db.from('conversations').select('campaign_id').eq('id', ctx.conversationId).single()
+      const conversationCampaignId = convData?.campaign_id || null
+
       for (const flow of flows) {
+        // Se flow tem campanha vinculada, só dispara pra contatos daquela campanha
+        if (flow.campaign_id && flow.campaign_id !== conversationCampaignId) continue
+
         const triggered = await this.checkFlowTrigger(flow, ctx)
         if (!triggered) continue
         const onCooldown = await this.isOnCooldown(flow, ctx)

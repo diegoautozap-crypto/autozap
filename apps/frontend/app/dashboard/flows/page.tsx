@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { messageApi, channelApi, tenantApi } from '@/lib/api'
+import { messageApi, channelApi, tenantApi, campaignApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
@@ -450,10 +450,12 @@ export default function FlowsPage() {
   const [creatingTemplate, setCreatingTemplate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
+  const [newCampaignId, setNewCampaignId] = useState('')
   const [newCooldown, setNewCooldown] = useState('24h')
   const [editingFlow, setEditingFlow] = useState<any | null>(null)
   const [editName, setEditName] = useState('')
   const [editChannelId, setEditChannelId] = useState('')
+  const [editCampaignId, setEditCampaignId] = useState('')
   const [editCooldown, setEditCooldown] = useState('24h')
 
   const { data: flows = [], isLoading } = useQuery({
@@ -464,6 +466,11 @@ export default function FlowsPage() {
   const { data: channels = [] } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
+  })
+
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns-for-flows'],
+    queryFn: async () => { const { data } = await campaignApi.get('/campaigns'); return data.data || [] },
   })
 
   const { data: limitsData } = useQuery({
@@ -478,7 +485,7 @@ export default function FlowsPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await messageApi.post('/flows', { name: newName, channelId: newChannelId || null, cooldown_type: newCooldown })
+      const { data } = await messageApi.post('/flows', { name: newName, channelId: newChannelId || null, campaignId: newCampaignId || null, cooldown_type: newCooldown })
       return data.data
     },
     onSuccess: (flow) => {
@@ -492,7 +499,7 @@ export default function FlowsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      await messageApi.patch(`/flows/${editingFlow.id}`, { name: editName, channelId: editChannelId || null, cooldown_type: editCooldown })
+      await messageApi.patch(`/flows/${editingFlow.id}`, { name: editName, channelId: editChannelId || null, campaignId: editCampaignId || null, cooldown_type: editCooldown })
     },
     onSuccess: () => { toast.success(t('flows.toastUpdated')); queryClient.invalidateQueries({ queryKey: ['flows'] }); setEditingFlow(null) },
     onError: () => toast.error(t('flows.toastUpdateError')),
@@ -514,7 +521,7 @@ export default function FlowsPage() {
 
   const openEdit = (f: any, e: React.MouseEvent) => {
     e.stopPropagation()
-    setEditingFlow(f); setEditName(f.name); setEditChannelId(f.channel_id || ''); setEditCooldown(f.cooldown_type || '24h')
+    setEditingFlow(f); setEditName(f.name); setEditChannelId(f.channel_id || ''); setEditCampaignId(f.campaign_id || ''); setEditCooldown(f.cooldown_type || '24h')
   }
 
   const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || t('flows.allChannels')
@@ -570,6 +577,13 @@ export default function FlowsPage() {
                 {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            <div>
+              <label style={labelStyle}>Campanha (opcional)</label>
+              <select style={{ ...inputStyle }} value={newCampaignId} onChange={e => setNewCampaignId(e.target.value)}>
+                <option value="">Todas as campanhas</option>
+                {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
           <div style={{ marginBottom: '16px' }}>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -615,6 +629,13 @@ export default function FlowsPage() {
                 <select style={{ ...inputStyle }} value={editChannelId} onChange={e => setEditChannelId(e.target.value)}>
                   <option value="">{t('flows.allChannels')}</option>
                   {channels.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Campanha (opcional)</label>
+                <select style={{ ...inputStyle }} value={editCampaignId} onChange={e => setEditCampaignId(e.target.value)}>
+                  <option value="">Todas as campanhas</option>
+                  {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
