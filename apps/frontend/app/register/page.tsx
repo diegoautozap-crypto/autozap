@@ -30,6 +30,7 @@ function RegisterPage() {
   const [step, setStep] = useState<'form' | 'payment' | 'verify'>('form')
 
   const [creating, setCreating] = useState(false)
+  const [savedPaymentUrl, setSavedPaymentUrl] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,9 +59,10 @@ function RegisterPage() {
       })
       const paymentUrl = subData?.data?.paymentUrl
       if (paymentUrl) {
-        // 4. Redireciona pro Asaas
+        // 4. Abre Asaas em nova aba e mostra tela de aguardando
+        setSavedPaymentUrl(paymentUrl)
+        window.open(paymentUrl, '_blank')
         setStep('payment')
-        window.location.href = paymentUrl
       } else {
         toast.error('Erro ao gerar link de pagamento')
       }
@@ -86,11 +88,40 @@ function RegisterPage() {
   }
 
   if (step === 'payment') {
+    // Polling: checa a cada 5s se o plano foi ativado
+    const checkPayment = async () => {
+      try {
+        const { tenantApi } = await import('@/lib/api')
+        const { data } = await tenantApi.get('/tenant')
+        const plan = data?.data?.planSlug || data?.data?.plan_slug
+        if (plan && plan !== 'pending') {
+          window.location.href = '/dashboard'
+        }
+      } catch {}
+    }
+    setTimeout(() => {
+      const interval = setInterval(checkPayment, 5000)
+      checkPayment()
+      setTimeout(() => clearInterval(interval), 600000) // para depois de 10min
+    }, 3000)
+
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>Redirecionando pro pagamento...</p>
+        <div style={{ width: '100%', maxWidth: '440px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 16px rgba(0,0,0,.06)', textAlign: 'center' }}>
+          <div style={{ width: '48px', height: '48px', border: '3px solid #e4e4e7', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 20px' }} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Aguardando pagamento</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
+            Uma aba foi aberta com a página de pagamento.<br/>
+            Após pagar, você será redirecionado automaticamente.
+          </p>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+            <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, margin: 0 }}>
+              Plano: {PLAN_NAMES[selectedPlan]} — {PLAN_PRICES[selectedPlan]}/mês
+            </p>
+          </div>
+          <p style={{ fontSize: '12px', color: '#9ca3af' }}>
+            Se a aba não abriu, <a href={savedPaymentUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#16a34a', textDecoration: 'underline' }}>clique aqui</a>.
+          </p>
           <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
