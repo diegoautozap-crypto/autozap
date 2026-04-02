@@ -26,10 +26,10 @@ const features = [
 
 /* ─── Plans data ─── */
 const plans = [
-  { slug: 'starter', name: 'Starter', price: '147', msgs: '10.000 msgs/mês', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automação', '10.000 contatos', '10.000 respostas IA/mês', '5 campanhas/mês'] },
-  { slug: 'pro', name: 'Pro', price: '297', msgs: '50.000 msgs/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automação', '50.000 contatos', '50.000 respostas IA/mês', 'Transcrição de áudio', 'Relatórios avançados'] },
-  { slug: 'enterprise', name: 'Enterprise', price: '597', msgs: '150.000 msgs/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mês', 'Campanhas ilimitadas', 'Suporte prioritário'] },
-  { slug: 'unlimited', name: 'Unlimited', price: '997', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
+  { slug: 'starter', name: 'Starter', price: '149,99', msgs: '10.000 msgs/mês', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automação', '10.000 contatos', '10.000 respostas IA/mês', '5 campanhas/mês'] },
+  { slug: 'pro', name: 'Pro', price: '299,99', msgs: '50.000 msgs/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automação', '50.000 contatos', '50.000 respostas IA/mês', 'Transcrição de áudio', 'Relatórios avançados'] },
+  { slug: 'enterprise', name: 'Enterprise', price: '599,99', msgs: '150.000 msgs/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mês', 'Campanhas ilimitadas', 'Suporte prioritário'] },
+  { slug: 'unlimited', name: 'Unlimited', price: '999,99', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
 ]
 
 /* ─── Steps data ─── */

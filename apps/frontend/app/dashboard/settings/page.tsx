@@ -448,7 +448,7 @@ export default function SettingsPage() {
 
   const getPlanPrice = (slug: string) => {
     if (!plans) {
-      const prices: Record<string, string> = { starter: 'R$ 147', pro: 'R$ 297', enterprise: 'R$ 597', unlimited: 'R$ 997' }
+      const prices: Record<string, string> = { starter: 'R$ 149,99', pro: 'R$ 299,99', enterprise: 'R$ 599,99', unlimited: 'R$ 999,99' }
       return prices[slug] || ''
     }
     const plan = plans.find((p: any) => p.slug === slug)
