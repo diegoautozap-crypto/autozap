@@ -128,10 +128,10 @@ export default function LandingPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {[
-              { name: 'Starter', price: 'R$ 97', period: '/mês', msgs: '10.000 msgs', features: ['1 canal', 'Flow builder', 'IA incluída', 'Campanhas', 'CRM'], highlight: false },
-              { name: 'Pro', price: 'R$ 197', period: '/mês', msgs: '50.000 msgs', features: ['5 canais', 'Tudo do Starter', 'Gestão de equipe', 'Webhooks', 'Suporte prioritário'], highlight: true },
-              { name: 'Enterprise', price: 'R$ 397', period: '/mês', msgs: '100.000 msgs', features: ['10 canais', 'Tudo do Pro', 'SLA dedicado', 'API dedicada', 'Onboarding guiado'], highlight: false },
-              { name: 'Unlimited', price: 'R$ 697', period: '/mês', msgs: 'Ilimitado', features: ['Canais ilimitados', 'Tudo do Enterprise', 'Suporte 24/7', 'Onboarding dedicado'], highlight: false },
+              { name: 'Starter', price: 'R$ 149,99', period: '/mês', msgs: '10.000 msgs', features: ['1 canal', 'Flow builder', 'IA incluída', 'Campanhas', 'CRM'], highlight: false },
+              { name: 'Pro', price: 'R$ 299,99', period: '/mês', msgs: '50.000 msgs', features: ['5 canais', 'Tudo do Starter', 'Gestão de equipe', 'Webhooks', 'Suporte prioritário'], highlight: true },
+              { name: 'Enterprise', price: 'R$ 599,99', period: '/mês', msgs: '150.000 msgs', features: ['10 canais', 'Tudo do Pro', 'SLA dedicado', 'API dedicada', 'Onboarding guiado'], highlight: false },
+              { name: 'Unlimited', price: 'R$ 999,99', period: '/mês', msgs: 'Ilimitado', features: ['Canais ilimitados', 'Tudo do Enterprise', 'Suporte 24/7', 'Onboarding dedicado'], highlight: false },
             ].map((p, i) => (
               <div key={i} style={{ background: p.highlight ? '#0a1f0a' : '#141414', border: `1px solid ${p.highlight ? '#16a34a' : '#1e1e1e'}`, borderRadius: '12px', padding: '28px 24px', position: 'relative' }}>
                 {p.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '99px', whiteSpace: 'nowrap' }}>Mais popular</div>}

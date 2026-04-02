@@ -180,10 +180,10 @@ FUNCIONALIDADES:
 • Multi-idioma — português, inglês, espanhol
 
 PLANOS:
-• Starter — R$97/mês — 10.000 mensagens — inbox, campanhas, CRM, flows
-• Pro — R$197/mês — 50.000 mensagens — tudo do Starter + multi-usuários + suporte prioritário
-• Enterprise — R$397/mês — 100.000 mensagens — tudo do Pro + API dedicada + SLA
-• Unlimited — R$697/mês — mensagens ilimitadas
+• Starter — R$149,99/mês — 10.000 mensagens — inbox, campanhas, CRM, flows
+• Pro — R$299,99/mês — 50.000 mensagens — tudo do Starter + multi-usuários + suporte prioritário
+• Enterprise — R$599,99/mês — 150.000 mensagens — tudo do Pro + API dedicada + SLA
+• Unlimited — R$999,99/mês — mensagens ilimitadas
 • Pagamento mensal, cancela quando quiser
 • Pagamento: PIX ou cartão, cancela quando quiser
 
@@ -232,21 +232,21 @@ REGRAS:
         { id: 'n7', type: 'move_pipeline', position_x: 1750, position_y: 50, data: { type: 'move_pipeline', stage: 'qualificacao' } },
         { id: 'n8', type: 'input', position_x: 2000, position_y: 50, data: { type: 'input', question: 'Perfeito! 🎯 Pra te recomendar o plano ideal: quantas mensagens você envia por mês aproximadamente?\n\n(pode ser um número aproximado, tipo 5000, 20000, etc)', saveAs: 'volume', timeoutHours: 24 } },
         // Timeout
-        { id: 'n9', type: 'send_message', position_x: 2350, position_y: -50, data: { type: 'send_message', subtype: 'text', message: 'Oi! 😊 Vi que não respondeu sobre o volume.\n\nSe quiser, posso te apresentar nossos planos:\n• Starter R$97/mês (10k msgs)\n• Pro R$197/mês (50k msgs)\n• Enterprise R$397/mês (100k msgs)\n\nQual te interessa?' } },
+        { id: 'n9', type: 'send_message', position_x: 2350, position_y: -50, data: { type: 'send_message', subtype: 'text', message: 'Oi! 😊 Vi que não respondeu sobre o volume.\n\nSe quiser, posso te apresentar nossos planos:\n• Starter R$149,99/mês (10k msgs)\n• Pro R$299,99/mês (50k msgs)\n• Enterprise R$599,99/mês (150k msgs)\n\nQual te interessa?' } },
         // Condição volume
         { id: 'n10', type: 'condition', position_x: 2350, position_y: 100, data: { type: 'condition', branches: [
           { id: 'bv1', label: '🏢 Enterprise', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '50000' }] },
           { id: 'bv2', label: '🚀 Pro', logic: 'AND', rules: [{ id: 'rv2', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '5000' }] },
         ] } },
         // Enterprise
-        { id: 'n11', type: 'send_message', position_x: 2700, position_y: 0, data: { type: 'send_message', subtype: 'text', message: 'Com esse volume, o Enterprise é ideal pra você! 🏢\n\n✅ 100.000 msgs/mês — R$397\n✅ API dedicada + SLA garantido\n✅ Atendentes ilimitados\n\nVou te passar pro nosso gerente pra uma proposta personalizada!' } },
+        { id: 'n11', type: 'send_message', position_x: 2700, position_y: 0, data: { type: 'send_message', subtype: 'text', message: 'Com esse volume, o Enterprise é ideal pra você! 🏢\n\n✅ 150.000 msgs/mês — R$599,99\n✅ API dedicada + SLA garantido\n✅ Atendentes ilimitados\n\nVou te passar pro nosso gerente pra uma proposta personalizada!' } },
         { id: 'n12', type: 'move_pipeline', position_x: 3000, position_y: 0, data: { type: 'move_pipeline', stage: 'negociacao' } },
         { id: 'n13', type: 'assign_agent', position_x: 3250, position_y: 0, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Um gerente comercial vai te atender agora! 🚀' } },
         // Pro
-        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 150, data: { type: 'send_message', subtype: 'text', message: 'O Pro é perfeito pra esse volume! 🚀\n\n✅ 50.000 msgs/mês — R$197\n✅ Multi-usuários (até 10)\n✅ Suporte prioritário\n\nQuer criar sua conta?' } },
+        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 150, data: { type: 'send_message', subtype: 'text', message: 'O Pro é perfeito pra esse volume! 🚀\n\n✅ 50.000 msgs/mês — R$299,99\n✅ Multi-usuários (até 10)\n✅ Suporte prioritário\n\nQuer criar sua conta?' } },
         { id: 'n15', type: 'move_pipeline', position_x: 3000, position_y: 150, data: { type: 'move_pipeline', stage: 'qualificacao' } },
         // Starter (fallback)
-        { id: 'n16', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'O Starter é ideal pra começar! 💡\n\n✅ 10.000 msgs/mês — R$97\n✅ Inbox + Campanhas + CRM + Flows\n✅ IA integrada\n\nQuer começar agora?' } },
+        { id: 'n16', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'O Starter é ideal pra começar! 💡\n\n✅ 10.000 msgs/mês — R$149,99\n✅ Inbox + Campanhas + CRM + Flows\n✅ IA integrada\n\nQuer começar agora?' } },
         { id: 'n17', type: 'move_pipeline', position_x: 3000, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
 
         // === TESTAR ===

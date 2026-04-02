@@ -215,7 +215,7 @@ export default function LandingPage() {
                     Oi, quero saber sobre os planos 😊
                   </div>
                   <div style={{ alignSelf: 'flex-end', background: '#22c55e', color: '#fff', padding: '8px 14px', borderRadius: '12px 12px 4px 12px', fontSize: 13, maxWidth: '70%' }}>
-                    Olá João! Temos planos a partir de R$97/mês. Posso te ajudar a escolher o melhor? 🤖
+                    Olá João! Temos planos a partir de R$149,99/mês. Posso te ajudar a escolher o melhor? 🤖
                   </div>
                   <div style={{ alignSelf: 'flex-start', background: '#374151', color: '#e5e7eb', padding: '8px 14px', borderRadius: '12px 12px 12px 4px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>🎤</span> <span style={{ color: '#22c55e', fontSize: 11 }}>Áudio transcrito pela IA</span>

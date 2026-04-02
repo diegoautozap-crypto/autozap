@@ -14,7 +14,7 @@ const benefits = [
 ]
 
 const PLAN_NAMES: Record<string, string> = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited' }
-const PLAN_PRICES: Record<string, string> = { starter: 'R$97', pro: 'R$197', enterprise: 'R$397', unlimited: 'R$697' }
+const PLAN_PRICES: Record<string, string> = { starter: 'R$149,99', pro: 'R$299,99', enterprise: 'R$599,99', unlimited: 'R$999,99' }
 
 export default function RegisterPageWrapper() {
   return <Suspense><RegisterPage /></Suspense>
