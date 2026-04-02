@@ -119,9 +119,9 @@ export function startMessageWorker(): Worker {
     },
     {
       connection,
-      concurrency: 5,
+      concurrency: 20,
       limiter: {
-        max: 20,
+        max: 100,
         duration: 60_000,
       },
     },

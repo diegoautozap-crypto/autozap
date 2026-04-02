@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
@@ -58,15 +59,19 @@ function resolveField(body: any, contactField: string, fieldMap: any[]): string 
 
 // ─── Internal Routes ──────────────────────────────────────────────────────────
 
-router.post('/internal/inbound', requireInternal, async (req, res, next) => {
-  try {
-    const { tenantId, channelId, message } = req.body
-    await messageService.processInbound(tenantId, channelId, {
-      ...message,
-      timestamp: parseTimestamp(message.timestamp),
-    })
-    res.json(ok({ message: 'Inbound message processed' }))
-  } catch (err) { next(err) }
+router.post('/internal/inbound', requireInternal, async (req, res, _next) => {
+  const { tenantId, channelId, message } = req.body
+
+  // Respond 200 immediately — process flow execution in the background
+  res.json(ok({ message: 'Inbound message accepted' }))
+
+  // Background processing (errors are logged, not sent to the client)
+  messageService.processInbound(tenantId, channelId, {
+    ...message,
+    timestamp: parseTimestamp(message.timestamp),
+  }).catch(err => {
+    logger.error('Background inbound processing failed', { tenantId, channelId, error: (err as Error).message })
+  })
 })
 
 router.post('/internal/status_update', requireInternal, async (req, res, next) => {

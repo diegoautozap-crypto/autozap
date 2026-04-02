@@ -4,6 +4,22 @@ import { decryptCredentials } from '../lib/crypto'
 import { generateId, normalizeBRPhone } from '@autozap/utils'
 import { ensureContact, ensureConversation } from './contact.helper'
 
+// ─── In-memory cache to avoid hitting DB on every message ─────────────────────
+const cache = new Map<string, { data: any; expires: number }>()
+function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+  const entry = cache.get(key)
+  if (entry && entry.expires > Date.now()) return Promise.resolve(entry.data as T)
+  return fetcher().then(data => {
+    cache.set(key, { data, expires: Date.now() + ttlMs })
+    // Cleanup old entries every 100 sets
+    if (cache.size > 500) {
+      const now = Date.now()
+      for (const [k, v] of cache) { if (v.expires < now) cache.delete(k) }
+    }
+    return data
+  })
+}
+
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
@@ -176,14 +192,18 @@ export class FlowEngine {
       const resumed = await this.resumeWaitingFlow(ctx)
       if (resumed) return
 
-      const { data: flows } = await db
-        .from('flows')
-        .select('*')
-        .eq('tenant_id', ctx.tenantId)
-        .eq('is_active', true)
-        .or(`channel_id.eq.${ctx.channelId},channel_id.is.null`)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true })
+      const { data: flows } = await cached(
+        `flows:${ctx.channelId}:${ctx.tenantId}`,
+        30_000,
+        () => db
+          .from('flows')
+          .select('*')
+          .eq('tenant_id', ctx.tenantId)
+          .eq('is_active', true)
+          .or(`channel_id.eq.${ctx.channelId},channel_id.is.null`)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true }),
+      )
 
       if (!flows || flows.length === 0) return
 
@@ -257,12 +277,12 @@ export class FlowEngine {
         if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
           // Tenta transcrever
           try {
-            const { data: channel } = await db.from('channels').select('credentials').eq('id', ctx.channelId).single()
+            const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
             const creds = channel?.credentials || {}
             const metaToken = (typeof creds === 'object' && creds.metaToken?.startsWith('EAA')) ? creds.metaToken : (typeof creds === 'object' ? decryptCredentials(creds).metaToken : null)
             let openaiKey = process.env.OPENAI_API_KEY
             if (!openaiKey) {
-              const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
               openaiKey = tenant?.metadata?.openai_api_key
             }
             if (metaToken && openaiKey && /^\d+$/.test(lastMsg.media_url)) {
@@ -595,7 +615,7 @@ export class FlowEngine {
             // Busca chave OpenAI
             let whisperKey = data?.apiKey
             if (!whisperKey) {
-              const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
               whisperKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
             }
             if (!whisperKey) { logger.warn('Transcribe node: no OpenAI API key'); variables[saveVar] = lastMsg.body || ''; break }
@@ -605,7 +625,7 @@ export class FlowEngine {
               const mediaId = lastMsg.media_url
 
               // Busca credenciais do canal (podem estar em texto puro ou criptografadas)
-              const { data: channel } = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single()
+              const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
               const rawCreds = channel?.credentials || {}
               const creds = typeof rawCreds === 'string' ? JSON.parse(rawCreds) : rawCreds
               // Tenta descriptografar — se já estiver em texto puro, retorna como está
@@ -672,7 +692,7 @@ export class FlowEngine {
         case 'ai': {
           let openaiKey = data?.apiKey
           if (!openaiKey) {
-            const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+            const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
             openaiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
           }
           if (!openaiKey) { logger.warn('AI node: no OpenAI API key'); break }
@@ -801,7 +821,7 @@ export class FlowEngine {
             email: email || undefined, origin: 'webhook', metadata, mergeMetadata: true,
           })
 
-          const { data: channel } = await db.from('channels').select('type').eq('id', ctx.channelId).single()
+          const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
           const { conversationId } = await ensureConversation({
             tenantId: ctx.tenantId, contactId, channelId: ctx.channelId,
             channelType: channel?.type || 'whatsapp', lastMessage: notePreview,
