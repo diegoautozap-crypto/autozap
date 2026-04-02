@@ -139,10 +139,11 @@ router.get('/limits', async (req, res, next) => {
     // Messages sent this period (already tracked on tenant)
     const messagesSent = tenant.messagesSentThisPeriod ?? 0
 
-    // Channels count
+    // Channels count (only active, not deleted/inactive)
     const { count: channelsCount } = await db
       .from('channels').select('id', { count: 'exact', head: true })
       .eq('tenant_id', req.auth.tid)
+      .neq('status', 'inactive')
 
     // Members count
     const { count: membersCount } = await db
