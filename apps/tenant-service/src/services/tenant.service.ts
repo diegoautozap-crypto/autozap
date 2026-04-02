@@ -322,9 +322,13 @@ export class TenantService {
       const [tenantId, planSlug] = externalRef.split(':')
       if (!tenantId || !planSlug) return
 
-      // Atualiza plano do tenant
+      // Atualiza plano do tenant + renova período (reset contador)
       await db.from('tenants')
-        .update({ plan_slug: planSlug })
+        .update({
+          plan_slug: planSlug,
+          messages_sent_this_period: 0,
+          current_period_start: new Date(),
+        })
         .eq('id', tenantId)
 
       // Atualiza subscription para active
@@ -349,7 +353,7 @@ export class TenantService {
             starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited'
           }
           const planPrices: Record<string, string> = {
-            starter: 'R$ 97', pro: 'R$ 197', enterprise: 'R$ 397', unlimited: 'R$ 697'
+            starter: 'R$ 149,99', pro: 'R$ 299,99', enterprise: 'R$ 599,99', unlimited: 'R$ 999,99'
           }
           await resend.emails.send({
             from: RESEND_FROM,
@@ -368,7 +372,7 @@ export class TenantService {
                   <p style="margin: 0; color: #374151;">Plano: <strong>${planNames[planSlug]}</strong></p>
                   <p style="margin: 4px 0 0; color: #374151;">Valor: <strong>${planPrices[planSlug]}/mês</strong></p>
                 </div>
-                <a href="https://frontend-production-795a.up.railway.app/dashboard" 
+                <a href="https://useautozap.app/dashboard" 
                    style="display: inline-block; background: #16a34a; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
                   Acessar AutoZap
                 </a>
@@ -386,17 +390,21 @@ export class TenantService {
       }
     }
 
-    // Pagamento atrasado → avisa mas não bloqueia imediatamente
+    // Pagamento atrasado → bloqueia acesso (volta pra pending)
     if (event === 'PAYMENT_OVERDUE') {
       const externalRef = payload.payment?.externalReference
       if (!externalRef) return
       const [tenantId] = externalRef.split(':')
 
+      await db.from('tenants')
+        .update({ plan_slug: 'pending' })
+        .eq('id', tenantId)
+
       await db.from('subscriptions')
         .update({ status: 'past_due' })
         .eq('tenant_id', tenantId)
 
-      logger.warn('Payment overdue', { tenantId })
+      logger.warn('Payment overdue — tenant blocked', { tenantId })
     }
 
     // Assinatura cancelada → volta para pending
