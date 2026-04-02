@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
@@ -16,7 +16,11 @@ const benefits = [
 const PLAN_NAMES: Record<string, string> = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited' }
 const PLAN_PRICES: Record<string, string> = { starter: 'R$97', pro: 'R$197', enterprise: 'R$397', unlimited: 'R$697' }
 
-export default function RegisterPage() {
+export default function RegisterPageWrapper() {
+  return <Suspense><RegisterPage /></Suspense>
+}
+
+function RegisterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const selectedPlan = searchParams.get('plan') || ''
