@@ -419,7 +419,7 @@ export default function PipelinePage() {
   const getContactPurchaseTotal = (contactId: string): number => {
     const purchases = (purchasesByContact as any)[contactId]
     if (!purchases || !Array.isArray(purchases)) return 0
-    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
+    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
   }
   const getColumnTotal = (stageKey: string): number => {
     const cards = displayBoard?.[stageKey] || []
@@ -868,7 +868,7 @@ export default function PipelinePage() {
       )}
 
       {purchaseConvId && (() => {
-        const grandTotal = contactPurchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
+        const grandTotal = contactPurchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
         const smallInput = { padding: '4px 6px', border: '1px solid var(--border)', borderRadius: '5px', fontSize: '12px', width: '70px', textAlign: 'right' as const, background: 'var(--bg-input)', color: 'var(--text)' }
 
         return (
@@ -1046,11 +1046,27 @@ export default function PipelinePage() {
                 {/* Resumo */}
                 {(() => {
                   const sub = cart.reduce((s, i) => s + i.price * i.qty, 0)
-                  const total = Math.max(0, sub - newDiscount + newSurcharge + newShipping)
+                  const receita = Math.max(0, sub - newDiscount + newSurcharge)
+                  const totalComFrete = receita + newShipping
                   return (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '6px 0', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{cart.length} {cart.length === 1 ? 'produto' : 'produtos'} · Subtotal R$ {sub.toFixed(2)}</span>
-                      <strong style={{ fontSize: '14px', color: '#16a34a' }}>R$ {total.toFixed(2)}</strong>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '2px' }}>
+                        <span>Produtos ({cart.length})</span><span>R$ {sub.toFixed(2)}</span>
+                      </div>
+                      {(newDiscount > 0 || newSurcharge > 0) && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-faint)', marginBottom: '2px' }}>
+                          <span>Ajustes</span><span>{newDiscount > 0 ? `−R$ ${newDiscount.toFixed(2)} ` : ''}{newSurcharge > 0 ? `+R$ ${newSurcharge.toFixed(2)}` : ''}</span>
+                        </div>
+                      )}
+                      {newShipping > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#0891b2', marginBottom: '2px' }}>
+                          <span>Frete</span><span>R$ {newShipping.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                        <strong style={{ fontSize: '13px', color: 'var(--text)' }}>Total</strong>
+                        <strong style={{ fontSize: '14px', color: '#16a34a' }}>R$ {totalComFrete.toFixed(2)}</strong>
+                      </div>
                     </div>
                   )
                 })()}

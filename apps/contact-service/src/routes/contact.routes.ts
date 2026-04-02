@@ -317,7 +317,7 @@ router.post('/purchases/batch', async (req, res, next) => {
       const itemDisc = Math.round(disc * proportion * 100) / 100
       const itemSur = Math.round(sur * proportion * 100) / 100
       const itemShip = Math.round(ship * proportion * 100) / 100
-      const itemTotal = Math.max(0, subtotal - itemDisc + itemSur + itemShip)
+      const itemTotal = Math.max(0, subtotal - itemDisc + itemSur)
       const { data, error } = await db.from('purchases').insert({
         tenant_id: req.auth.tid, contact_id: contactId, product_id: item.productId,
         conversation_id: conversationId || null, quantity: qty,
@@ -345,7 +345,7 @@ router.post('/purchases', async (req, res, next) => {
     const disc = Number(discount) || 0
     const sur = Number(surcharge) || 0
     const ship = Number(shipping) || 0
-    const totalPrice = Math.max(0, subtotal - disc + sur + ship)
+    const totalPrice = Math.max(0, subtotal - disc + sur)
     const { data, error } = await db.from('purchases').insert({
       tenant_id: req.auth.tid, contact_id: contactId, product_id: productId,
       conversation_id: conversationId || null, quantity: qty,
@@ -375,7 +375,7 @@ router.patch('/purchases/:id', async (req, res, next) => {
       const disc = update.discount ?? current.discount ?? 0
       const sur = update.surcharge ?? current.surcharge ?? 0
       const ship = update.shipping ?? current.shipping ?? 0
-      update.total_price = Math.max(0, (current.unit_price * qty) - disc + sur + ship)
+      update.total_price = Math.max(0, (current.unit_price * qty) - disc + sur)
     }
     const { data, error } = await db.from('purchases').update(update)
       .eq('id', req.params.id).eq('tenant_id', req.auth.tid)
