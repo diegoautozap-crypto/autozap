@@ -156,11 +156,23 @@ export class TenantService {
   async checkMessageLimit(tenantId: string): Promise<void> {
     const { data: tenant } = await db
       .from('tenants')
-      .select('plan_slug, messages_sent_this_period')
+      .select('plan_slug, messages_sent_this_period, current_period_start')
       .eq('id', tenantId)
       .single()
 
     if (!tenant) throw new NotFoundError('Tenant')
+
+    // Auto-reset se virou o mês
+    const periodStart = tenant.current_period_start ? new Date(tenant.current_period_start) : null
+    const now = new Date()
+    if (!periodStart || periodStart.getMonth() !== now.getMonth() || periodStart.getFullYear() !== now.getFullYear()) {
+      await db.from('tenants').update({
+        messages_sent_this_period: 0,
+        current_period_start: new Date(now.getFullYear(), now.getMonth(), 1),
+      }).eq('id', tenantId)
+      logger.info('Auto-reset message count for new month', { tenantId })
+      return // contador zerado, pode enviar
+    }
 
     const limit = PLAN_LIMITS[tenant.plan_slug as PlanSlug]
     if (limit !== null && tenant.messages_sent_this_period >= limit) {

@@ -111,6 +111,8 @@ router.get('/subscription', async (req, res, next) => {
 
 router.get('/usage', async (req, res, next) => {
   try {
+    // Checa se precisa resetar (virou o mês)
+    await tenantService.checkMessageLimit(req.auth.tid).catch(() => {})
     const tenant = await tenantService.getTenant(req.auth.tid)
     const planLimits = PLAN_LIMITS[tenant.planSlug as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.pending
     const limit = planLimits.messages
