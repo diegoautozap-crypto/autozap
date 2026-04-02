@@ -194,7 +194,7 @@ export class CampaignService {
       .from('campaigns')
       .select('id, name, status, total_contacts, sent_count, delivered_count, read_count, failed_count, created_at, started_at, completed_at, channels(name)', { count: 'exact' })
       .eq('tenant_id', tenantId)
-      .neq('status', 'deleted')
+      .in('status', ['draft', 'running', 'paused', 'completed', 'failed', 'scheduled'])
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
