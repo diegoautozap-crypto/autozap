@@ -292,6 +292,7 @@ export default function PipelinePage() {
   const [newSurcharge, setNewSurcharge] = useState(0)
   const [newShipping, setNewShipping] = useState(0)
   const [newCoupon, setNewCoupon] = useState('')
+  const [cart, setCart] = useState<{ productId: string; name: string; price: number; qty: number }[]>([])
   const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null)
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
@@ -470,11 +471,10 @@ export default function PipelinePage() {
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {
-      await contactApi.post('/purchases', {
+      await contactApi.post('/purchases/batch', {
         contactId: purchaseContactId,
-        productId: purchaseProductId,
-        quantity: purchaseQty,
         conversationId: purchaseConvId,
+        items: cart,
         discount: newDiscount,
         surcharge: newSurcharge,
         shipping: newShipping,
@@ -482,13 +482,13 @@ export default function PipelinePage() {
       })
     },
     onSuccess: () => {
-      toast.success('Compra registrada!');
-      setPurchaseProductId(''); setPurchaseQty(1)
+      toast.success('Pedido registrado!');
+      setCart([]); setPurchaseProductId(''); setPurchaseQty(1)
       setNewDiscount(0); setNewSurcharge(0); setNewShipping(0); setNewCoupon('')
       refetchPurchases()
       queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
-    onError: () => toast.error('Erro ao registrar compra'),
+    onError: () => toast.error('Erro ao registrar pedido'),
   })
 
   const deletePurchaseMutation = useMutation({
@@ -972,51 +972,89 @@ export default function PipelinePage() {
             {/* ── Novo pedido ── */}
             <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '10px' }}>Novo pedido</div>
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+
+              {/* Itens no carrinho */}
+              {cart.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                  {cart.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                      <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{item.qty}x R$ {item.price.toFixed(2)}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>R$ {(item.price * item.qty).toFixed(2)}</span>
+                      <button onClick={() => setCart(c => c.filter((_, i) => i !== idx))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-faintest)', display: 'flex' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Adicionar item ao carrinho */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: cart.length > 0 ? '10px' : '10px' }}>
                 <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)}
                   style={{ flex: 1, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)' }}>
-                  <option value="">Selecione produto...</option>
+                  <option value="">Adicionar produto...</option>
                   {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
                 </select>
-                <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} placeholder="Qtd"
+                <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))}
                   style={{ width: '48px', padding: '7px 4px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
+                <button onClick={() => {
+                  if (!purchaseProductId) return
+                  const prod = products.find((p: any) => p.id === purchaseProductId)
+                  if (!prod) return
+                  setCart(c => [...c, { productId: purchaseProductId, name: (prod as any).name, price: Number((prod as any).price), qty: purchaseQty }])
+                  setPurchaseProductId(''); setPurchaseQty(1)
+                }} disabled={!purchaseProductId}
+                  style={{ padding: '7px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                  +
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Cupom</label>
-                  <input value={newCoupon} onChange={e => setNewCoupon(e.target.value)} placeholder="—"
-                    style={{ ...smallInput, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Desconto (−)</label>
-                  <input type="number" min="0" step="0.01" value={newDiscount || ''} onChange={e => setNewDiscount(Number(e.target.value) || 0)} placeholder="0"
-                    style={{ ...smallInput, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Acréscimo (+)</label>
-                  <input type="number" min="0" step="0.01" value={newSurcharge || ''} onChange={e => setNewSurcharge(Number(e.target.value) || 0)} placeholder="0"
-                    style={{ ...smallInput, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Frete (+)</label>
-                  <input type="number" min="0" step="0.01" value={newShipping || ''} onChange={e => setNewShipping(Number(e.target.value) || 0)} placeholder="0"
-                    style={{ ...smallInput, width: '100%' }} />
-                </div>
-              </div>
-              {purchaseProductId && (() => {
-                const selProduct = products.find((p: any) => p.id === purchaseProductId)
-                const sub = (selProduct ? Number(selProduct.price) : 0) * purchaseQty
-                const total = Math.max(0, sub - newDiscount + newSurcharge + newShipping)
-                return (
-                  <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '10px', textAlign: 'right' }}>
-                    Subtotal: R$ {sub.toFixed(2)} → <strong style={{ color: '#16a34a' }}>R$ {total.toFixed(2)}</strong>
+
+              {/* Ajustes do pedido */}
+              {cart.length > 0 && (<>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Cupom</label>
+                    <input value={newCoupon} onChange={e => setNewCoupon(e.target.value)} placeholder="—"
+                      style={{ ...smallInput, width: '100%' }} />
                   </div>
-                )
-              })()}
-              <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
-                style={{ width: '100%', padding: '8px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1 }}>
-                {purchaseMutation.isPending ? 'Registrando...' : 'Adicionar pedido'}
-              </button>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Desconto (−)</label>
+                    <input type="number" min="0" step="0.01" value={newDiscount || ''} onChange={e => setNewDiscount(Number(e.target.value) || 0)} placeholder="0"
+                      style={{ ...smallInput, width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Acréscimo (+)</label>
+                    <input type="number" min="0" step="0.01" value={newSurcharge || ''} onChange={e => setNewSurcharge(Number(e.target.value) || 0)} placeholder="0"
+                      style={{ ...smallInput, width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Frete (+)</label>
+                    <input type="number" min="0" step="0.01" value={newShipping || ''} onChange={e => setNewShipping(Number(e.target.value) || 0)} placeholder="0"
+                      style={{ ...smallInput, width: '100%' }} />
+                  </div>
+                </div>
+
+                {/* Resumo */}
+                {(() => {
+                  const sub = cart.reduce((s, i) => s + i.price * i.qty, 0)
+                  const total = Math.max(0, sub - newDiscount + newSurcharge + newShipping)
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '6px 0', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{cart.length} {cart.length === 1 ? 'produto' : 'produtos'} · Subtotal R$ {sub.toFixed(2)}</span>
+                      <strong style={{ fontSize: '14px', color: '#16a34a' }}>R$ {total.toFixed(2)}</strong>
+                    </div>
+                  )
+                })()}
+
+                <button onClick={() => purchaseMutation.mutate()} disabled={purchaseMutation.isPending}
+                  style={{ width: '100%', padding: '9px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  {purchaseMutation.isPending ? 'Registrando...' : 'Confirmar pedido'}
+                </button>
+              </>)}
             </div>
 
             {/* ── Total geral ── */}

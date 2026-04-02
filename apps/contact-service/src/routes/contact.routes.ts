@@ -282,6 +282,50 @@ router.get('/contacts/:contactId/purchases', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// POST /purchases/batch — pedido com múltiplos produtos
+router.post('/purchases/batch', async (req, res, next) => {
+  try {
+    const { contactId, conversationId, items, discount, surcharge, shipping, coupon } = req.body
+    if (!contactId || !items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: 'contactId and items[] required' }); return
+    }
+    // Busca preços de todos os produtos
+    const productIds = items.map((i: any) => i.productId)
+    const { data: productsData } = await db.from('products').select('id, price').in('id', productIds).eq('tenant_id', req.auth.tid)
+    const priceMap: Record<string, number> = {}
+    for (const p of (productsData || [])) priceMap[p.id] = Number(p.price)
+
+    const disc = Number(discount) || 0
+    const sur = Number(surcharge) || 0
+    const ship = Number(shipping) || 0
+    const created = []
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx]
+      const unitPrice = priceMap[item.productId] || 0
+      const qty = item.qty || 1
+      const subtotal = unitPrice * qty
+      // Ajustes só no primeiro item do pedido pra não duplicar
+      const isFirst = idx === 0
+      const itemTotal = isFirst
+        ? Math.max(0, subtotal - disc + sur + ship)
+        : subtotal
+      const { data, error } = await db.from('purchases').insert({
+        tenant_id: req.auth.tid, contact_id: contactId, product_id: item.productId,
+        conversation_id: conversationId || null, quantity: qty,
+        unit_price: unitPrice, total_price: itemTotal,
+        discount: isFirst ? disc : 0,
+        surcharge: isFirst ? sur : 0,
+        shipping: isFirst ? ship : 0,
+        coupon: isFirst ? (coupon || null) : null,
+      }).select('*, products(name, price, sku)').single()
+      if (error) throw error
+      created.push(data)
+    }
+    res.status(201).json(ok(created))
+  } catch (err) { next(err) }
+})
+
 router.post('/purchases', async (req, res, next) => {
   try {
     const { contactId, productId, quantity, notes, conversationId, discount, surcharge, shipping, coupon } = req.body
