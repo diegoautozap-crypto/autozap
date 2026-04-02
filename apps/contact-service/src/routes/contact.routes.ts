@@ -298,6 +298,7 @@ router.post('/purchases/batch', async (req, res, next) => {
     const disc = Number(discount) || 0
     const sur = Number(surcharge) || 0
     const ship = Number(shipping) || 0
+    const orderId = crypto.randomUUID()
     const created = []
 
     // Calcula subtotal geral pra distribuir ajustes proporcionalmente
@@ -325,6 +326,7 @@ router.post('/purchases/batch', async (req, res, next) => {
         discount: itemDisc, surcharge: itemSur,
         shipping: isFirst ? ship : 0,
         coupon: isFirst ? (coupon || null) : null,
+        order_id: orderId,
       }).select('*, products(name, price, sku)').single()
       if (error) throw error
       created.push(data)
@@ -351,6 +353,7 @@ router.post('/purchases', async (req, res, next) => {
       tenant_id: req.auth.tid, contact_id: contactId, product_id: productId,
       conversation_id: conversationId || null, quantity: qty,
       unit_price: unitPrice, total_price: totalPrice, notes,
+      order_id: crypto.randomUUID(),
       discount: disc, surcharge: sur, shipping: ship, coupon: coupon || null,
     }).select('*, products(name, price, sku)').single()
     if (error) throw error
@@ -398,7 +401,7 @@ router.delete('/purchases/:id', async (req, res, next) => {
 router.get('/purchases/by-contact', async (req, res, next) => {
   try {
     const { data, error } = await db.from('purchases')
-      .select('id, contact_id, quantity, unit_price, total_price, discount, surcharge, shipping, coupon, products(name, price, sku)')
+      .select('id, contact_id, order_id, quantity, unit_price, total_price, discount, surcharge, shipping, coupon, created_at, products(name, price, sku)')
       .eq('tenant_id', req.auth.tid)
       .order('created_at', { ascending: false })
     if (error) throw error

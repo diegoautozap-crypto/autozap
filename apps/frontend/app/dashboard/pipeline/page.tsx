@@ -881,91 +881,83 @@ export default function PipelinePage() {
               </button>
             </div>
 
-            {/* ── Lista de pedidos ── */}
+            {/* ── Lista de pedidos agrupados ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              {contactPurchases.map((p: any) => {
-                const subtotal = Number(p.unit_price || 0) * (p.quantity || 1)
-                const disc = Number(p.discount || 0)
-                const sur = Number(p.surcharge || 0)
-                const ship = Number(p.shipping || 0)
-                const hasAdjustments = disc > 0 || sur > 0 || ship > 0 || p.coupon
-                const isExpanded = expandedPurchase === p.id
-
-                return (
-                  <div key={p.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-                    {/* Linha principal */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', cursor: 'pointer' }}
-                      onClick={() => setExpandedPurchase(isExpanded ? null : p.id)}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.products?.name || 'Produto'}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <span>{p.quantity}x R$ {Number(p.unit_price || 0).toFixed(2)}</span>
-                          {hasAdjustments && (
-                            <span style={{ color: disc > 0 ? '#dc2626' : '#7c3aed', fontSize: '10px' }}>
-                              {disc > 0 && `−R$${disc.toFixed(2)} `}{sur > 0 && `+R$${sur.toFixed(2)} `}{ship > 0 && `frete R$${ship.toFixed(2)}`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
-                        R$ {Number(p.total_price).toFixed(2)}
-                      </span>
-                      <button onClick={(e) => { e.stopPropagation(); deletePurchaseMutation.mutate(p.id) }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faintest)', borderRadius: '4px', flexShrink: 0 }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-
-                    {/* Ajustes expandidos */}
-                    {isExpanded && (
-                      <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Cupom</label>
-                            <input defaultValue={p.coupon || ''} onBlur={e => updatePurchaseMutation.mutate({ id: p.id, coupon: e.target.value })}
-                              placeholder="—" style={{ ...smallInput, width: '100%' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Qtd</label>
-                            <input type="number" min="1" defaultValue={p.quantity} onBlur={e => updatePurchaseMutation.mutate({ id: p.id, quantity: Number(e.target.value) || 1 })}
-                              style={{ ...smallInput, width: '100%' }} />
-                          </div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Desconto (−)</label>
-                            <input type="number" min="0" step="0.01" defaultValue={disc || ''} placeholder="0"
-                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, discount: Number(e.target.value) || 0 })}
-                              style={{ ...smallInput, width: '100%' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Acréscimo (+)</label>
-                            <input type="number" min="0" step="0.01" defaultValue={sur || ''} placeholder="0"
-                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, surcharge: Number(e.target.value) || 0 })}
-                              style={{ ...smallInput, width: '100%' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Frete (+)</label>
-                            <input type="number" min="0" step="0.01" defaultValue={ship || ''} placeholder="0"
-                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, shipping: Number(e.target.value) || 0 })}
-                              style={{ ...smallInput, width: '100%' }} />
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right', marginTop: '8px', fontSize: '11px', color: 'var(--text-faint)' }}>
-                          Subtotal: R$ {subtotal.toFixed(2)} → <strong style={{ color: '#16a34a' }}>R$ {Number(p.total_price).toFixed(2)}</strong>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              {(() => {
+                // Agrupa por order_id (purchases sem order_id ficam cada um como pedido solo)
+                const orders: Record<string, any[]> = {}
+                for (const p of contactPurchases) {
+                  const key = p.order_id || p.id
+                  if (!orders[key]) orders[key] = []
+                  orders[key].push(p)
+                }
+                const orderList = Object.entries(orders)
+                if (orderList.length === 0) return (
+                  <p style={{ fontSize: '13px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Nenhum pedido registrado</p>
                 )
-              })}
+                return orderList.map(([orderId, items]) => {
+                  const orderTotal = items.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
+                  const orderShipping = items.reduce((s: number, p: any) => s + Number(p.shipping || 0), 0)
+                  const orderDiscount = items.reduce((s: number, p: any) => s + Number(p.discount || 0), 0)
+                  const names = items.map((p: any) => p.products?.name || 'Produto')
+                  const label = names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`
+                  const isExpanded = expandedPurchase === orderId
 
-              {contactPurchases.length === 0 && (
-                <p style={{ fontSize: '13px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Nenhum pedido registrado</p>
+                  return (
+                    <div key={orderId} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                      {/* Card do pedido */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', cursor: 'pointer' }}
+                        onClick={() => setExpandedPurchase(isExpanded ? null : orderId)}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <span>{items.reduce((s: number, p: any) => s + (p.quantity || 1), 0)} itens</span>
+                            {orderShipping > 0 && <span style={{ color: '#0891b2', fontSize: '10px' }}>frete R${orderShipping.toFixed(2)}</span>}
+                            {orderDiscount > 0 && <span style={{ color: '#dc2626', fontSize: '10px' }}>−R${orderDiscount.toFixed(2)}</span>}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                          R$ {(orderTotal + orderShipping).toFixed(2)}
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); items.forEach((p: any) => deletePurchaseMutation.mutate(p.id)) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faintest)', borderRadius: '4px', flexShrink: 0 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {/* Resumo expandido */}
+                      {isExpanded && (
+                        <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                          {items.map((p: any) => (
+                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: '12px' }}>
+                              <span style={{ color: 'var(--text)' }}>{p.products?.name || 'Produto'} <span style={{ color: 'var(--text-faint)' }}>×{p.quantity}</span></span>
+                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>R$ {Number(p.total_price).toFixed(2)}</span>
+                            </div>
+                          ))}
+                          {orderDiscount > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px', color: '#dc2626' }}>
+                              <span>Desconto</span><span>−R$ {orderDiscount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {orderShipping > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px', color: '#0891b2' }}>
+                              <span>Frete</span><span>R$ {orderShipping.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0', borderTop: '1px solid var(--border)', marginTop: '4px', fontSize: '13px', fontWeight: 700 }}>
+                            <span style={{ color: 'var(--text)' }}>Total</span>
+                            <span style={{ color: '#16a34a' }}>R$ {(orderTotal + orderShipping).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
               )}
             </div>
 
