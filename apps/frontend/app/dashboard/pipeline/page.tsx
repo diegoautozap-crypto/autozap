@@ -352,6 +352,10 @@ export default function PipelinePage() {
   const [editingPipelineName, setEditingPipelineName] = useState('')
   // Cache local de valores para atualização otimista
   const [dealValues, setDealValues] = useState<Record<string, number | null>>({})
+  const [purchaseConvId, setPurchaseConvId] = useState<string | null>(null)
+  const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
+  const [purchaseProductId, setPurchaseProductId] = useState('')
+  const [purchaseQty, setPurchaseQty] = useState(1)
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
   const DEFAULT_COLUMNS = getDefaultColumns(t)
@@ -397,6 +401,11 @@ export default function PipelinePage() {
     staleTime: 60000,
   })
   const reportsAllowed = limitsData?.limits?.reports !== false
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-pipeline'],
+    queryFn: async () => { const { data } = await contactApi.get('/products'); return data.data || [] },
+  })
 
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
@@ -499,6 +508,25 @@ export default function PipelinePage() {
     mutationFn: async ({ id, name }: { id: string; name: string }) => { await conversationApi.patch(`/pipelines/${id}`, { name }) },
     onSuccess: () => { refetchPipelines(); setEditingPipelineId(null) },
     onError: () => toast.error(t('pipeline.toastPipelineRenameError')),
+  })
+
+  const purchaseMutation = useMutation({
+    mutationFn: async () => {
+      await contactApi.post('/purchases', {
+        contactId: purchaseContactId,
+        productId: purchaseProductId,
+        quantity: purchaseQty,
+        conversationId: purchaseConvId
+      })
+    },
+    onSuccess: () => {
+      toast.success('Compra registrada!');
+      setPurchaseConvId(null);
+      setPurchaseProductId('');
+      setPurchaseQty(1)
+      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+    },
+    onError: () => toast.error('Erro ao registrar compra'),
   })
 
   const handleDragStart = (e: React.DragEvent, convId: string) => { setDraggingId(convId); e.dataTransfer.effectAllowed = 'move' }
@@ -758,6 +786,16 @@ export default function PipelinePage() {
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
+                          {canEdit('/dashboard/pipeline') && (
+                            <button onClick={(e) => {
+                              e.stopPropagation();
+                              setPurchaseConvId(conv.id);
+                              setPurchaseContactId(conv.contacts?.id || conv.contact_id)
+                            }}
+                              style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              + Compra
+                            </button>
+                          )}
                           {conv.last_message && <p style={{ fontSize: '11px', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
 
                           {/* ── Tarefas pendentes ── */}
@@ -849,6 +887,32 @@ export default function PipelinePage() {
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 16px' }}>
               <ContactSearchResults search={addSearch} stage={addToStage} pipelineId={selectedPipelineId} onDone={() => { setAddToStage(null); refetch() }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {purchaseConvId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', marginBottom: '16px' }}>Registrar compra</h3>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Produto</label>
+              <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}>
+                <option value="">Selecione...</option>
+                {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Quantidade</label>
+              <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
+                style={{ flex: 1, padding: '8px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1 }}>
+                Registrar
+              </button>
+              <button onClick={() => setPurchaseConvId(null)} style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
             </div>
           </div>
         </div>
