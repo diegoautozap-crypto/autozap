@@ -106,13 +106,15 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
       ? (req.body.tenantId || req.auth?.tid)
       : req.auth.tid
 
-    // ── Hard message limit check ──
-    const { data: tenant } = await db.from('tenants').select('plan_slug, messages_sent_this_period').eq('id', tenantId).single()
-    if (tenant) {
-      const planSlug = (tenant.plan_slug || 'pending') as PlanSlug
-      const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
-      if (limits.messages !== null && (tenant.messages_sent_this_period ?? 0) >= limits.messages) {
-        throw new AppError('PLAN_LIMIT', `Limite de ${limits.messages} mensagens atingido no seu plano`, 403)
+    // ── Hard message limit check (só pra campanhas) ──
+    if (campaignId) {
+      const { data: tenant } = await db.from('tenants').select('plan_slug, messages_sent_this_period').eq('id', tenantId).single()
+      if (tenant) {
+        const planSlug = (tenant.plan_slug || 'pending') as PlanSlug
+        const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+        if (limits.messages !== null && (tenant.messages_sent_this_period ?? 0) >= limits.messages) {
+          throw new AppError('PLAN_LIMIT', `Limite de ${limits.messages} mensagens de campanha atingido no seu plano`, 403)
+        }
       }
     }
 
