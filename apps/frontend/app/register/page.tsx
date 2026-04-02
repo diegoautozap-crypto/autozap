@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
@@ -90,29 +90,30 @@ function RegisterPage() {
     fontSize: '12px', fontWeight: 500, marginBottom: '6px',
   }
 
-  if (step === 'payment') {
-    const [paid, setPaid] = useState(false)
+  const [paid, setPaid] = useState(false)
 
-    // Polling: checa a cada 5s se o plano foi ativado
-    useEffect(() => {
-      const check = async () => {
-        try {
-          const { default: axios } = await import('axios')
-          const tenantUrl = process.env.NEXT_PUBLIC_TENANT_SERVICE_URL
-          // Usa tempToken que foi salvo
-          const token = sessionStorage.getItem('tempToken')
-          if (!token) return
-          const { data } = await axios.get(`${tenantUrl}/tenant`, { headers: { Authorization: `Bearer ${token}` } })
-          const plan = data?.data?.planSlug || data?.data?.plan_slug
-          if (plan && plan !== 'pending') {
-            setPaid(true)
-          }
-        } catch {}
-      }
-      const interval = setInterval(check, 5000)
-      check()
-      return () => clearInterval(interval)
-    }, [])
+  // Polling: checa a cada 5s se o plano foi ativado (só quando step=payment)
+  useEffect(() => {
+    if (step !== 'payment') return
+    const check = async () => {
+      try {
+        const { default: axios } = await import('axios')
+        const tenantUrl = process.env.NEXT_PUBLIC_TENANT_SERVICE_URL
+        const token = sessionStorage.getItem('tempToken')
+        if (!token) return
+        const { data } = await axios.get(`${tenantUrl}/tenant`, { headers: { Authorization: `Bearer ${token}` } })
+        const plan = data?.data?.planSlug || data?.data?.plan_slug
+        if (plan && plan !== 'pending') {
+          setPaid(true)
+        }
+      } catch {}
+    }
+    const interval = setInterval(check, 5000)
+    check()
+    return () => clearInterval(interval)
+  }, [step])
+
+  if (step === 'payment') {
 
     if (paid) {
       return (
