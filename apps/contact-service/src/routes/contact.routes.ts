@@ -363,16 +363,33 @@ router.get('/purchases/by-contact', async (req, res, next) => {
 router.get('/purchases/summary', async (req, res, next) => {
   try {
     const { data, error } = await db.from('purchases')
-      .select('product_id, products(name), quantity, total_price')
+      .select('product_id, products(name, price), quantity, unit_price, total_price, discount, surcharge, shipping')
       .eq('tenant_id', req.auth.tid)
     if (error) throw error
-    // Aggregate by product
-    const summary: Record<string, { name: string; totalQty: number; totalRevenue: number }> = {}
+    const summary: Record<string, {
+      productId: string; name: string; unitPrice: number;
+      totalQty: number; totalSales: number; // nº de pedidos
+      subtotal: number; totalDiscount: number; totalSurcharge: number; totalShipping: number; totalRevenue: number;
+      avgTicket: number;
+    }> = {}
     for (const p of (data || [])) {
       const pid = p.product_id
-      if (!summary[pid]) summary[pid] = { name: (p as any).products?.name || '', totalQty: 0, totalRevenue: 0 }
+      if (!summary[pid]) summary[pid] = {
+        productId: pid, name: (p as any).products?.name || '', unitPrice: (p as any).products?.price || 0,
+        totalQty: 0, totalSales: 0, subtotal: 0,
+        totalDiscount: 0, totalSurcharge: 0, totalShipping: 0, totalRevenue: 0, avgTicket: 0,
+      }
       summary[pid].totalQty += p.quantity
-      summary[pid].totalRevenue += Number(p.total_price)
+      summary[pid].totalSales += 1
+      summary[pid].subtotal += Number(p.unit_price || 0) * p.quantity
+      summary[pid].totalDiscount += Number(p.discount || 0)
+      summary[pid].totalSurcharge += Number(p.surcharge || 0)
+      summary[pid].totalShipping += Number(p.shipping || 0)
+      summary[pid].totalRevenue += Number(p.total_price || 0)
+    }
+    // Calcula ticket médio
+    for (const s of Object.values(summary)) {
+      s.avgTicket = s.totalSales > 0 ? s.totalRevenue / s.totalSales : 0
     }
     res.json(ok(Object.values(summary)))
   } catch (err) { next(err) }
