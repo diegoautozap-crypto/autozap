@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import crypto from 'crypto'
 import { verifyAccessToken } from '../lib/jwt'
 import { AppError, fail } from '@autozap/utils'
 import type { JwtPayload, UserRole } from '@autozap/types'
@@ -58,9 +59,12 @@ export async function requireSuperAdmin(req: Request, res: Response, next: NextF
       return
     }
 
-    const adminSecret = req.headers['x-admin-secret']
+    const adminSecret = req.headers['x-admin-secret'] as string | undefined
     const expectedSecret = process.env.ADMIN_SECRET
-    if (!expectedSecret || adminSecret !== expectedSecret) {
+    const match = adminSecret && expectedSecret &&
+      adminSecret.length === expectedSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(adminSecret), Buffer.from(expectedSecret))
+    if (!match) {
       res.status(403).json(fail('FORBIDDEN', 'Invalid admin secret'))
       return
     }

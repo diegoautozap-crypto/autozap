@@ -132,7 +132,10 @@ router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res,
       .neq('id', req.auth.sub)
       .order('created_at', { ascending: true })
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) {
+      logger.error('DB operation failed', { error: error.message })
+      throw new AppError('DB_ERROR', 'Database operation failed', 500)
+    }
 
     const members = (data || []).map((m: any) => ({
       ...m,
@@ -162,7 +165,10 @@ router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate
       email: email.toLowerCase(), password_hash: passwordHash,
       role, is_active: true, email_verified: true,
     })
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) {
+      logger.error('DB operation failed', { error: error.message })
+      throw new AppError('DB_ERROR', 'Database operation failed', 500)
+    }
 
     const defaultPages = role === 'agent'
       ? ['/dashboard/inbox']
@@ -200,7 +206,10 @@ router.patch('/team/:id', requireAuth, requireRole('admin', 'owner'), validate(u
     const { data, error } = await db
       .from('users').update(update).eq('id', req.params.id).eq('tenant_id', req.auth.tid)
       .select('id, name, email, role, is_active').single()
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) {
+      logger.error('DB operation failed', { error: error.message })
+      throw new AppError('DB_ERROR', 'Database operation failed', 500)
+    }
 
     if (req.body.role !== undefined && req.body.role !== member.role) {
       const newRole = req.body.role
@@ -309,7 +318,10 @@ router.patch('/team/:id/permissions', requireAuth, requireRole('admin', 'owner')
       .from('user_permissions')
       .upsert({ user_id: req.params.id, tenant_id: req.auth.tid, ...update }, { onConflict: 'user_id,tenant_id' })
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) {
+      logger.error('DB operation failed', { error: error.message })
+      throw new AppError('DB_ERROR', 'Database operation failed', 500)
+    }
 
     // Não revoga sessão — permissões são buscadas dinamicamente pelo frontend a cada 5s
     res.json(ok({ message: 'Permissões salvas com sucesso.' }))

@@ -6,6 +6,17 @@ import { ok, paginationSchema, rateLimit } from '@autozap/utils'
 
 const router = Router()
 
+// ─── SSRF protection ─────────────────────────────────────────────────────────
+function validateWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    const blocked = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', '::1', 'metadata.google', '10.', '172.16.', '192.168.']
+    if (blocked.some(b => parsed.hostname.includes(b) || parsed.hostname.startsWith(b))) return false
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false
+    return true
+  } catch { return false }
+}
+
 // ─── Limites por plano ────────────────────────────────────────────────────────
 const PLAN_LIMITS: Record<string, number | null> = {
   trial:      100,
@@ -41,14 +52,14 @@ const permissionsSchema = z.object({
 })
 
 const webhookSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().refine(u => u.startsWith('http://') || u.startsWith('https://'), 'URL must use http or https'),
   events: z.array(z.string()).min(1),
   secret: z.string().nullable().optional(),
 })
 
 const webhookUpdateSchema = z.object({
   active: z.boolean().optional(),
-  url: z.string().url().optional(),
+  url: z.string().url().refine(u => u.startsWith('http://') || u.startsWith('https://'), 'URL must use http or https').optional(),
   events: z.array(z.string()).optional(),
   secret: z.string().nullable().optional(),
 })
@@ -61,7 +72,7 @@ asaasWebhookRouter.post('/billing/webhook/asaas', rateLimit({ max: 30 }), async 
     // Verifica token de autenticação do webhook Asaas
     const asaasToken = process.env.ASAAS_WEBHOOK_TOKEN
     if (asaasToken) {
-      const provided = req.headers['asaas-access-token'] || req.query.token
+      const provided = req.headers['asaas-access-token']
       if (provided !== asaasToken) { res.status(401).json({ error: 'Invalid webhook token' }); return }
     }
     const { event, payment, subscription } = req.body
@@ -174,6 +185,7 @@ router.post('/webhooks', validate(webhookSchema), async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
     const { url, events, secret } = req.body
+    if (!validateWebhookUrl(url)) { res.status(400).json({ error: 'Webhook URL is not allowed (blocked destination)' }); return }
     const { data, error } = await db
       .from('webhook_configs')
       .insert({ tenant_id: req.auth.tid, url, events, secret: secret || null, active: true })
@@ -187,6 +199,7 @@ router.post('/webhooks', validate(webhookSchema), async (req, res, next) => {
 router.patch('/webhooks/:id', validate(webhookUpdateSchema), async (req, res, next) => {
   try {
     const { db } = await import('../lib/db')
+    if (req.body.url && !validateWebhookUrl(req.body.url)) { res.status(400).json({ error: 'Webhook URL is not allowed (blocked destination)' }); return }
     const { data, error } = await db
       .from('webhook_configs')
       .update(req.body)
@@ -222,6 +235,7 @@ router.post('/webhooks/:id/test', async (req, res, next) => {
       .eq('tenant_id', req.auth.tid)
       .single()
     if (error || !wh) { res.status(404).json({ error: 'Webhook not found' }); return }
+    if (!validateWebhookUrl(wh.url)) { res.status(400).json({ error: 'Webhook URL is not allowed (blocked destination)' }); return }
 
     const body = JSON.stringify({
       event: 'test',

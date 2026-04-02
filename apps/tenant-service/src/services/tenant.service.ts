@@ -77,7 +77,7 @@ export class TenantService {
       .select()
       .single()
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) { logger.error('DB operation failed', { error: error.message }); throw new AppError('DB_ERROR', 'Database operation failed', 500) }
     logger.info('Tenant settings updated', { tenantId })
     return this.mapRow(data)
   }
@@ -92,7 +92,7 @@ export class TenantService {
       .select()
       .single()
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) { logger.error('DB operation failed', { error: error.message }); throw new AppError('DB_ERROR', 'Database operation failed', 500) }
     return this.mapRow(data)
   }
 
@@ -109,7 +109,7 @@ export class TenantService {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) { logger.error('DB operation failed', { error: error.message }); throw new AppError('DB_ERROR', 'Database operation failed', 500) }
     return {
       users: data || [],
       meta: paginationMeta(count || 0, page, limit),
@@ -125,7 +125,7 @@ export class TenantService {
       .eq('id', userId)
       .eq('tenant_id', tenantId)
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) { logger.error('DB operation failed', { error: error.message }); throw new AppError('DB_ERROR', 'Database operation failed', 500) }
     logger.info('User role updated', { tenantId, userId, role })
   }
 
@@ -136,7 +136,7 @@ export class TenantService {
       .eq('id', userId)
       .eq('tenant_id', tenantId)
 
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    if (error) { logger.error('DB operation failed', { error: error.message }); throw new AppError('DB_ERROR', 'Database operation failed', 500) }
   }
 
   // ── Plan & limits ─────────────────────────────────────────────────────────
