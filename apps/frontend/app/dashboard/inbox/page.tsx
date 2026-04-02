@@ -723,12 +723,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {!botActive && selectedConv?.status !== 'closed' && (
-              <div style={{ padding: '8px 16px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><UserCheck size={14} color="#ea580c" /><span style={{ fontSize: '13px', color: '#9a3412', fontWeight: 500 }}>{t('inbox.humanActiveWarning')}</span></div>
-                {canEdit('/dashboard/inbox') && <button onClick={() => releaseBotMutation.mutate()} disabled={releaseBotMutation.isPending} style={{ fontSize: '12px', color: '#ea580c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>{t('inbox.reactivateBot')}</button>}
-              </div>
-            )}
 
             {showChatSearch && (
               <div style={{ padding: '6px 16px', background: '#f0f9ff', borderBottom: '1px solid #bae6fd', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
