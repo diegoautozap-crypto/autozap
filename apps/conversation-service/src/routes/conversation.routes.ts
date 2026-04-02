@@ -539,6 +539,22 @@ router.post('/conversations', async (req, res, next) => {
     const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).limit(1).single()
     if (!channel) { res.status(400).json({ error: 'Nenhum canal configurado. Crie um canal primeiro.' }); return }
 
+    // Verifica se já existe conversa pra esse contato+canal
+    const { data: existing } = await db.from('conversations').select('id')
+      .eq('tenant_id', req.auth.tid).eq('contact_id', contactId).eq('channel_id', channel.id).maybeSingle()
+
+    if (existing) {
+      // Atualiza pipeline da conversa existente
+      const { data: updated } = await db.from('conversations').update({
+        pipeline_stage: pipelineStage || 'lead',
+        pipeline_id: pipelineId || null,
+        status: 'open',
+        updated_at: new Date(),
+      }).eq('id', existing.id).select().single()
+      res.json(ok(updated))
+      return
+    }
+
     const id = require('crypto').randomUUID()
     const { data, error } = await db.from('conversations').insert({
       id, tenant_id: req.auth.tid, contact_id: contactId,
