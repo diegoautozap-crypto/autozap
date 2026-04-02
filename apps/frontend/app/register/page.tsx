@@ -29,8 +29,7 @@ function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
   const [step, setStep] = useState<'form' | 'payment' | 'verify'>('form')
 
-  const [paymentUrl, setPaymentUrl] = useState('')
-  const [creatingPayment, setCreatingPayment] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,32 +41,33 @@ function RegisterPage() {
       toast.error('Selecione um plano na página anterior')
       return
     }
+    setCreating(true)
     try {
-      // 1. Cria conta
+      // 1. Cria conta (email_verified=true, plano=pending)
       await register(form.name, form.email, form.password, form.tenantName)
 
-      // 2. Faz login automático pra pegar token
+      // 2. Login automático pra pegar token
       const { login } = useAuthStore.getState()
       await login(form.email, form.password)
 
-      // 3. Cria assinatura no Asaas e pega link de pagamento
-      setCreatingPayment(true)
+      // 3. Cria assinatura e redireciona pro pagamento
       const { tenantApi } = await import('@/lib/api')
       const { data: subData } = await tenantApi.post('/billing/subscribe', {
         planSlug: selectedPlan,
         cpfCnpj: '',
       })
-      const url = subData?.data?.paymentUrl
-      if (url) {
-        setPaymentUrl(url)
-        setStep('payment' as any)
+      const paymentUrl = subData?.data?.paymentUrl
+      if (paymentUrl) {
+        // 4. Redireciona pro Asaas
+        setStep('payment')
+        window.location.href = paymentUrl
       } else {
-        setStep('verify')
+        toast.error('Erro ao gerar link de pagamento')
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Erro ao criar conta')
     } finally {
-      setCreatingPayment(false)
+      setCreating(false)
     }
   }
 
@@ -86,35 +86,10 @@ function RegisterPage() {
   if (step === 'payment') {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
-        <div style={{ width: '100%', maxWidth: '480px' }}>
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 16px rgba(0,0,0,.06)', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', background: '#f0fdf4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <span style={{ fontSize: '28px' }}>💳</span>
-            </div>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Confirme seu pagamento</h2>
-            <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '8px' }}>
-              Sua conta foi criada com sucesso! Agora finalize o pagamento do plano <strong>{PLAN_NAMES[selectedPlan] || selectedPlan}</strong> para liberar o acesso.
-            </p>
-            <p style={{ fontSize: '24px', fontWeight: 800, color: '#111827', marginBottom: '24px' }}>{PLAN_PRICES[selectedPlan] || ''}/mês</p>
-
-            <a href={paymentUrl} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'block', width: '100%', padding: '14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', textAlign: 'center', marginBottom: '16px' }}>
-              Pagar agora (PIX ou cartão)
-            </a>
-
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 16px', marginBottom: '24px', textAlign: 'left' }}>
-              <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, marginBottom: '6px' }}>Após o pagamento:</p>
-              <ol style={{ fontSize: '13px', color: '#374151', paddingLeft: '18px', lineHeight: 1.8, margin: 0 }}>
-                <li>O pagamento é confirmado automaticamente</li>
-                <li>Você recebe um email pra verificar sua conta</li>
-                <li>Confirma o email e faz login</li>
-              </ol>
-            </div>
-
-            <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-              Pagamento seguro via Asaas. Cancele quando quiser.
-            </p>
-          </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>Redirecionando pro pagamento...</p>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     )
@@ -220,12 +195,12 @@ function RegisterPage() {
                 <label style={labelStyle}>Senha *</label>
                 <input type="password" style={inputStyle} placeholder="Mínimo 8 caracteres" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={8} onFocus={e => (e.currentTarget.style.borderColor = '#16a34a')} onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')} />
               </div>
-              <button type="submit" disabled={isLoading || creatingPayment}
-                style={{ width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: (isLoading || creatingPayment) ? 'not-allowed' : 'pointer', opacity: (isLoading || creatingPayment) ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                onMouseEnter={e => { if (!isLoading && !creatingPayment) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
+              <button type="submit" disabled={isLoading || creating}
+                style={{ width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: (isLoading || creating) ? 'not-allowed' : 'pointer', opacity: (isLoading || creating) ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                onMouseEnter={e => { if (!isLoading && !creating) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
-                {(isLoading || creatingPayment) ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
-                {creatingPayment ? 'Preparando pagamento...' : 'Criar conta e pagar'}
+                {(isLoading || creating) ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
+                {creating ? 'Criando conta...' : 'Criar conta e pagar'}
               </button>
               <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
                 Ao criar uma conta você concorda com nossos{' '}
