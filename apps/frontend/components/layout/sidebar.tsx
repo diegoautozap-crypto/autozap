@@ -140,11 +140,11 @@ export function Sidebar() {
       flexShrink: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: '24px 16px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <AutoZapLogo variant="dark" size="lg" showText={false} />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px' }}>
-          <span style={{ fontSize: '20px', fontWeight: 500, color: '#fff', letterSpacing: '-0.3px' }}>AutoZap</span>
-          <span style={{ fontSize: '11px', fontWeight: 400, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', marginTop: '2px' }}>WhatsApp CRM</span>
+      <div style={{ padding: '18px 16px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <AutoZapLogo variant="dark" size="md" showText={false} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6px' }}>
+          <span style={{ fontSize: '16px', fontWeight: 500, color: '#fff', letterSpacing: '-0.3px' }}>AutoZap</span>
+          <span style={{ fontSize: '10px', fontWeight: 400, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', marginTop: '1px' }}>WhatsApp CRM</span>
         </div>
       </div>
 
