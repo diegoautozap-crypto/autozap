@@ -280,14 +280,17 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
 }
 
 function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: string; stage: string; pipelineId: string | null; onDone: () => void }) {
-  const { data: contacts = [], isLoading } = useQuery({
+  const { data: contacts = [], isLoading, isError } = useQuery({
     queryKey: ['pipeline-contact-search', search],
     queryFn: async () => {
       if (search.length < 2) return []
-      const { data } = await contactApi.get(`/contacts?search=${encodeURIComponent(search)}&limit=10`)
-      return data.data || []
+      try {
+        const { data } = await contactApi.get(`/contacts?search=${encodeURIComponent(search)}&limit=10`)
+        return data.data || []
+      } catch { return [] }
     },
     enabled: search.length >= 2,
+    retry: false,
   })
 
   const addMutation = useMutation({
@@ -300,6 +303,7 @@ function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: s
 
   if (search.length < 2) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Digite pelo menos 2 caracteres</p>
   if (isLoading) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Buscando...</p>
+  if (isError) return <p style={{ fontSize: '12px', color: '#ef4444', textAlign: 'center', padding: '16px 0' }}>Erro ao buscar contatos</p>
   if (contacts.length === 0) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Nenhum contato encontrado</p>
 
   return (
