@@ -312,18 +312,19 @@ router.post('/purchases/batch', async (req, res, next) => {
       const unitPrice = priceMap[item.productId] || 0
       const qty = item.qty || 1
       const subtotal = unitPrice * qty
-      // Distribui ajustes proporcionalmente pelo peso de cada item
+      // Desconto e acréscimo proporcionais, frete inteiro só no primeiro item
       const proportion = orderSubtotal > 0 ? subtotal / orderSubtotal : (1 / items.length)
       const itemDisc = Math.round(disc * proportion * 100) / 100
       const itemSur = Math.round(sur * proportion * 100) / 100
-      const itemShip = Math.round(ship * proportion * 100) / 100
+      const isFirst = idx === 0
       const itemTotal = Math.max(0, subtotal - itemDisc + itemSur)
       const { data, error } = await db.from('purchases').insert({
         tenant_id: req.auth.tid, contact_id: contactId, product_id: item.productId,
         conversation_id: conversationId || null, quantity: qty,
         unit_price: unitPrice, total_price: itemTotal,
-        discount: itemDisc, surcharge: itemSur, shipping: itemShip,
-        coupon: idx === 0 ? (coupon || null) : null,
+        discount: itemDisc, surcharge: itemSur,
+        shipping: isFirst ? ship : 0,
+        coupon: isFirst ? (coupon || null) : null,
       }).select('*, products(name, price, sku)').single()
       if (error) throw error
       created.push(data)
