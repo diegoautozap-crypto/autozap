@@ -979,7 +979,11 @@ export default function PipelinePage() {
                   {cart.map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px' }}>
                       <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{item.qty}x R$ {item.price.toFixed(2)}</span>
+                      <input type="number" min="1" value={item.qty} onChange={e => {
+                        const q = Math.max(1, Number(e.target.value) || 1)
+                        setCart(c => c.map((it, i) => i === idx ? { ...it, qty: q } : it))
+                      }} style={{ width: '36px', padding: '2px 4px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '11px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>× R$ {item.price.toFixed(2)}</span>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>R$ {(item.price * item.qty).toFixed(2)}</span>
                       <button onClick={() => setCart(c => c.filter((_, i) => i !== idx))}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-faintest)', display: 'flex' }}
@@ -992,26 +996,27 @@ export default function PipelinePage() {
                 </div>
               )}
 
-              {/* Adicionar item ao carrinho */}
-              <div style={{ display: 'flex', gap: '6px', marginBottom: cart.length > 0 ? '10px' : '10px' }}>
-                <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)}
-                  style={{ flex: 1, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)' }}>
-                  <option value="">Adicionar produto...</option>
-                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
-                </select>
-                <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))}
-                  style={{ width: '48px', padding: '7px 4px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
-                <button onClick={() => {
-                  if (!purchaseProductId) return
-                  const prod = products.find((p: any) => p.id === purchaseProductId)
-                  if (!prod) return
-                  setCart(c => [...c, { productId: purchaseProductId, name: (prod as any).name, price: Number((prod as any).price), qty: purchaseQty }])
-                  setPurchaseProductId(''); setPurchaseQty(1)
-                }} disabled={!purchaseProductId}
-                  style={{ padding: '7px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-                  +
-                </button>
-              </div>
+              {/* Adicionar item ao carrinho — selecionar já adiciona */}
+              <select value="" onChange={e => {
+                const id = e.target.value
+                if (!id) return
+                const prod = products.find((p: any) => p.id === id)
+                if (!prod) return
+                // Se já tem no carrinho, incrementa a quantidade
+                setCart(c => {
+                  const existing = c.findIndex(i => i.productId === id)
+                  if (existing >= 0) {
+                    const updated = [...c]
+                    updated[existing] = { ...updated[existing], qty: updated[existing].qty + 1 }
+                    return updated
+                  }
+                  return [...c, { productId: id, name: (prod as any).name, price: Number((prod as any).price), qty: 1 }]
+                })
+              }}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-input)', color: 'var(--text)', marginBottom: '10px', cursor: 'pointer' }}>
+                <option value="">+ Adicionar produto...</option>
+                {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
+              </select>
 
               {/* Ajustes do pedido */}
               {cart.length > 0 && (<>
