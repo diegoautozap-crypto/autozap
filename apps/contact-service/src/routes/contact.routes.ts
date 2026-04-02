@@ -183,4 +183,119 @@ router.post('/contacts/import', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Products ─────────────────────────────────────────────────────────────────
+
+router.get('/products', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('products').select('*')
+      .eq('tenant_id', req.auth.tid).eq('is_active', true)
+      .order('name', { ascending: true })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.post('/products', async (req, res, next) => {
+  try {
+    const { name, description, price, sku, category } = req.body
+    if (!name) { res.status(400).json({ error: 'name required' }); return }
+    // Plan limit: products (active only)
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planLimits = PLAN_LIMITS[(tenantData?.plan_slug || 'pending') as PlanSlug] ?? PLAN_LIMITS.pending
+    const { count: productCount } = await db.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).eq('is_active', true)
+    if (planLimits.products !== null && (productCount ?? 0) >= planLimits.products) {
+      throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.products} produtos`, 403)
+    }
+    const { data, error } = await db.from('products').insert({
+      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category,
+    }).select().single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/products/:id', async (req, res, next) => {
+  try {
+    const update: any = { updated_at: new Date() }
+    if (req.body.name !== undefined) update.name = req.body.name
+    if (req.body.description !== undefined) update.description = req.body.description
+    if (req.body.price !== undefined) update.price = req.body.price
+    if (req.body.sku !== undefined) update.sku = req.body.sku
+    if (req.body.category !== undefined) update.category = req.body.category
+    if (req.body.is_active !== undefined) update.is_active = req.body.is_active
+    const { data, error } = await db.from('products').update(update)
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
+    if (error || !data) { res.status(404).json({ error: 'Product not found' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/products/:id', async (req, res, next) => {
+  try {
+    await db.from('products').update({ is_active: false })
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+    res.json(ok({ message: 'Product deleted' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Purchases ────────────────────────────────────────────────────────────────
+
+router.get('/contacts/:contactId/purchases', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('purchases')
+      .select('*, products(name, price, sku)')
+      .eq('tenant_id', req.auth.tid).eq('contact_id', req.params.contactId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.post('/purchases', async (req, res, next) => {
+  try {
+    const { contactId, productId, quantity, notes, conversationId } = req.body
+    if (!contactId || !productId) { res.status(400).json({ error: 'contactId and productId required' }); return }
+    // Get product price
+    const { data: product } = await db.from('products').select('price')
+      .eq('id', productId).eq('tenant_id', req.auth.tid).single()
+    if (!product) { res.status(404).json({ error: 'Product not found' }); return }
+    const qty = quantity || 1
+    const unitPrice = product.price
+    const totalPrice = unitPrice * qty
+    const { data, error } = await db.from('purchases').insert({
+      tenant_id: req.auth.tid, contact_id: contactId, product_id: productId,
+      conversation_id: conversationId || null, quantity: qty,
+      unit_price: unitPrice, total_price: totalPrice, notes,
+    }).select('*, products(name, price, sku)').single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/purchases/:id', async (req, res, next) => {
+  try {
+    await db.from('purchases').delete()
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+    res.json(ok({ message: 'Purchase deleted' }))
+  } catch (err) { next(err) }
+})
+
+router.get('/purchases/summary', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('purchases')
+      .select('product_id, products(name), quantity, total_price')
+      .eq('tenant_id', req.auth.tid)
+    if (error) throw error
+    // Aggregate by product
+    const summary: Record<string, { name: string; totalQty: number; totalRevenue: number }> = {}
+    for (const p of (data || [])) {
+      const pid = p.product_id
+      if (!summary[pid]) summary[pid] = { name: (p as any).products?.name || '', totalQty: 0, totalRevenue: 0 }
+      summary[pid].totalQty += p.quantity
+      summary[pid].totalRevenue += Number(p.total_price)
+    }
+    res.json(ok(Object.values(summary)))
+  } catch (err) { next(err) }
+})
+
 export default router

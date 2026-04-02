@@ -27,10 +27,10 @@ function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
 
 function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes'],
-    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', 'Transcricao'],
-    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', 'Relatorios'],
-    unlimited:  ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
+    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes', '15 produtos'],
+    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', '100 produtos', 'Transcricao'],
+    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', '500 produtos', 'Relatorios'],
+    unlimited:  ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
   }
 }
 

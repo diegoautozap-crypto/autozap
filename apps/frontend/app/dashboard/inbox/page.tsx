@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText,
   User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot,
-  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft,
+  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft, ShoppingBag,
 } from 'lucide-react'
 import { subscribeTenant } from '@/lib/pusher'
 import { createClient } from '@supabase/supabase-js'
@@ -375,6 +375,45 @@ export default function InboxPage() {
     queryFn: async () => { const { data } = await conversationApi.get(`/tasks?conversationId=${selectedConvId}`); return data.data || [] },
     enabled: !!selectedConvId,
   })
+  // ── Purchases ──
+  const [showAddPurchase, setShowAddPurchase] = useState(false)
+  const [purchaseProductId, setPurchaseProductId] = useState('')
+  const [purchaseQty, setPurchaseQty] = useState('1')
+  const contactIdForPurchases = selectedConv?.contact_id
+  const { data: contactPurchases = [] } = useQuery<any[]>({
+    queryKey: ['purchases', contactIdForPurchases],
+    queryFn: async () => { const { data } = await contactApi.get(`/contacts/${contactIdForPurchases}/purchases`); return data.data || [] },
+    enabled: !!contactIdForPurchases,
+  })
+  const { data: allProducts = [] } = useQuery<any[]>({
+    queryKey: ['products-list'],
+    queryFn: async () => { const { data } = await contactApi.get('/products'); return data.data || [] },
+    staleTime: 60000,
+  })
+  const addPurchaseMutation = useMutation({
+    mutationFn: async () => {
+      await contactApi.post('/purchases', {
+        contactId: contactIdForPurchases, productId: purchaseProductId,
+        quantity: parseInt(purchaseQty) || 1, conversationId: selectedConvId,
+      })
+    },
+    onSuccess: () => {
+      toast.success('Compra registrada!')
+      setPurchaseProductId(''); setPurchaseQty('1'); setShowAddPurchase(false)
+      queryClient.invalidateQueries({ queryKey: ['purchases', contactIdForPurchases] })
+      queryClient.invalidateQueries({ queryKey: ['purchases-summary'] })
+    },
+    onError: () => toast.error('Erro ao registrar compra'),
+  })
+  const deletePurchaseMutation = useMutation({
+    mutationFn: async (purchaseId: string) => { await contactApi.delete(`/purchases/${purchaseId}`) },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases', contactIdForPurchases] })
+      queryClient.invalidateQueries({ queryKey: ['purchases-summary'] })
+    },
+    onError: () => toast.error('Erro ao remover compra'),
+  })
+  const contactTotalSpent = contactPurchases.reduce((acc: number, p: any) => acc + Number(p.total_price || 0), 0)
   const saveNoteMutation = useMutation({
     mutationFn: async () => { await conversationApi.post(`/conversations/${selectedConvId}/notes`, { body: noteText }) },
     onSuccess: () => { toast.success('Nota salva!'); setNoteText(''); queryClient.invalidateQueries({ queryKey: ['notes', selectedConvId] }) },
@@ -995,6 +1034,54 @@ export default function InboxPage() {
                         )
                       })}
                     </div>
+              }
+            </div>
+
+            {/* Compras */}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ShoppingBag size={13} color="#22c55e" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Compras</p></div>
+                {canEdit('/dashboard/inbox') && <button onClick={() => setShowAddPurchase(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#22c55e', fontWeight: 600 }}>{showAddPurchase ? 'Fechar' : '+ Adicionar'}</button>}
+              </div>
+              {contactTotalSpent > 0 && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', padding: '6px 10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>Total gasto</span>
+                  <span style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contactTotalSpent)}</span>
+                </div>
+              )}
+              {showAddPurchase && (
+                <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                  <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', color: 'var(--text)', outline: 'none', marginBottom: '6px', cursor: 'pointer' }}>
+                    <option value="">Selecione um produto</option>
+                    {allProducts.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
+                  </select>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} placeholder="Qtd" style={{ width: '60px', padding: '6px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', color: 'var(--text)', outline: 'none' }} />
+                    <button onClick={() => { if (!purchaseProductId) { toast.error('Selecione um produto'); return }; addPurchaseMutation.mutate() }} disabled={addPurchaseMutation.isPending} style={{ flex: 1, padding: '6px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      {addPurchaseMutation.isPending ? 'Salvando...' : 'Registrar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {contactPurchases.length === 0
+                ? <p style={{ fontSize: '12px', color: 'var(--text-faintest)', textAlign: 'center', padding: '4px 0' }}>Nenhuma compra</p>
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {contactPurchases.map((purchase: any) => (
+                      <div key={purchase.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{purchase.products?.name || 'Produto'}</p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>
+                            {purchase.quantity}x R$ {Number(purchase.unit_price).toFixed(2)} = <strong>R$ {Number(purchase.total_price).toFixed(2)}</strong>
+                          </p>
+                        </div>
+                        {canEdit('/dashboard/inbox') && <button onClick={() => deletePurchaseMutation.mutate(purchase.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#bbf7d0', display: 'flex' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
+                          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = '#bbf7d0'}>
+                          <Trash2 size={12} />
+                        </button>}
+                      </div>
+                    ))}
+                  </div>
               }
             </div>
 

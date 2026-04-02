@@ -19,16 +19,17 @@ export interface PlanLimits {
   contacts: number | null
   campaigns: number | null
   aiResponses: number | null
+  products: number | null
   transcription: boolean
   reports: boolean
 }
 
 export const PLAN_LIMITS: Record<PlanSlug, PlanLimits> = {
-  pending:    { messages: 0, channels: 0, members: 0, flows: 0, contacts: 0, campaigns: 0, aiResponses: 0, transcription: false, reports: false },
-  starter:    { messages: 10_000, channels: 5, members: 5, flows: 3, contacts: 10_000, campaigns: 5, aiResponses: 10_000, transcription: false, reports: false },
-  pro:        { messages: 50_000, channels: 10, members: 10, flows: 15, contacts: 50_000, campaigns: 30, aiResponses: 50_000, transcription: true, reports: true },
-  enterprise: { messages: 150_000, channels: 30, members: 30, flows: null, contacts: 150_000, campaigns: null, aiResponses: 150_000, transcription: true, reports: true },
-  unlimited:  { messages: null, channels: 999, members: 999, flows: null, contacts: null, campaigns: null, aiResponses: null, transcription: true, reports: true },
+  pending:    { messages: 0, channels: 0, members: 0, flows: 0, contacts: 0, campaigns: 0, aiResponses: 0, products: 0, transcription: false, reports: false },
+  starter:    { messages: 10_000, channels: 5, members: 5, flows: 3, contacts: 10_000, campaigns: 5, aiResponses: 10_000, products: 15, transcription: false, reports: false },
+  pro:        { messages: 50_000, channels: 10, members: 10, flows: 15, contacts: 50_000, campaigns: 30, aiResponses: 50_000, products: 100, transcription: true, reports: true },
+  enterprise: { messages: 150_000, channels: 30, members: 30, flows: null, contacts: 150_000, campaigns: null, aiResponses: 150_000, products: 500, transcription: true, reports: true },
+  unlimited:  { messages: null, channels: 999, members: 999, flows: null, contacts: null, campaigns: null, aiResponses: null, products: null, transcription: true, reports: true },
 }
 
 /** @deprecated Use PLAN_LIMITS[slug].channels instead */

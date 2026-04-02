@@ -28,7 +28,10 @@
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
       "Bash(git stash:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(find /c/Users/Adm/Desktop/autozap/packages/database -type f -name *.sql)",
+      "Bash(find /c/Users/Adm/Desktop/autozap -type f -name *.sql)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

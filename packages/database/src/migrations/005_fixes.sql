@@ -88,4 +88,40 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_cards_contact ON pipeline_cards(contact_
 ALTER TABLE pipeline_cards ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all" ON pipeline_cards TO service_role USING (true) WITH CHECK (true);
 
+-- Products catalog
+CREATE TABLE IF NOT EXISTS products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0,
+  sku TEXT,
+  category TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id);
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON products TO service_role USING (true) WITH CHECK (true);
+
+-- Purchases (contact bought product)
+CREATE TABLE IF NOT EXISTS purchases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  unit_price NUMERIC(12,2) NOT NULL,
+  total_price NUMERIC(12,2) NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_purchases_tenant ON purchases(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_contact ON purchases(contact_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_product ON purchases(product_id);
+ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON purchases TO service_role USING (true) WITH CHECK (true);
+
 NOTIFY pgrst, 'reload schema';
