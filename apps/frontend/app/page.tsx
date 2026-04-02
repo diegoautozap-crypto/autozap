@@ -6,37 +6,37 @@ import { useAuthStore } from '@/store/auth.store'
 
 /* ─── FAQ data ─── */
 const faqs = [
-  { q: 'Preciso de CNPJ para usar?', a: 'Não! Qualquer pessoa física ou jurídica pode criar uma conta e começar a usar o AutoZap imediatamente.' },
-  { q: 'Como posso começar?', a: 'Crie sua conta, escolha um plano e comece a usar imediatamente. O setup leva menos de 15 minutos.' },
-  { q: 'Como funciona a IA?', a: 'Nossa IA responde automaticamente às mensagens dos seus clientes, classifica leads, transcreve áudios e sugere respostas. Tudo integrado ao WhatsApp.' },
-  { q: 'Integra com Zapier?', a: 'Sim! Oferecemos integração nativa com Zapier, além de webhooks e API aberta para conectar com qualquer sistema.' },
-  { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa e sem burocracia. Cancele a qualquer momento direto no painel.' },
-  { q: 'Quantos atendentes posso ter?', a: 'Depende do plano. O Starter permite 5 membros, o Pro 10, o Enterprise 30 e o Unlimited é ilimitado.' },
+  { q: 'Preciso de CNPJ para usar?', a: 'Nao precisa. Pessoa fisica usa normal.' },
+  { q: 'Quanto tempo leva pra configurar?', a: 'Conecta o WhatsApp por QR code, configura uns flows e ja esta rodando. Uns 15 minutos se voce for rapido.' },
+  { q: 'O que a IA faz exatamente?', a: 'Responde mensagens automaticamente, transcreve audios, classifica leads por intencao de compra e sugere respostas pros atendentes.' },
+  { q: 'Integra com outros sistemas?', a: 'Tem integracao com Zapier, webhooks e API aberta. Da pra conectar com praticamente qualquer coisa.' },
+  { q: 'Posso cancelar quando quiser?', a: 'Sim. Sem multa, sem fidelidade. Cancela direto no painel.' },
+  { q: 'Quantos atendentes posso ter?', a: 'Depende do plano: Starter 5, Pro 10, Enterprise 30, Unlimited sem limite.' },
 ]
 
 /* ─── Features data ─── */
 const features = [
-  { icon: '📬', title: 'Inbox unificado', desc: 'Todas as conversas do WhatsApp num só lugar. Atribuição, filtros e respostas rápidas.' },
-  { icon: '👥', title: 'CRM completo', desc: 'Contatos, tags, campos personalizados, importação em massa e timeline completa.' },
-  { icon: '📊', title: 'Pipeline de vendas', desc: 'Funil kanban com arrasta e solta, tarefas, follow-up automático e previsão de receita.' },
-  { icon: '🚀', title: 'Campanhas em massa', desc: 'Dispare para milhares com segmentação inteligente, agendamento e métricas em tempo real.' },
-  { icon: '🤖', title: 'IA integrada', desc: 'Responde, classifica, transcreve áudio automaticamente. Seu assistente de vendas 24h.' },
-  { icon: '⚡', title: 'Automações visuais', desc: '28 tipos de nós, editor visual drag-and-drop. Crie flows sem programar.' },
+  { title: 'Inbox', desc: 'Conversas em tempo real com busca, atribuicao por atendente, notas internas e respostas rapidas.' },
+  { title: 'CRM', desc: 'Contatos com tags, campos personalizados, importacao em massa e historico completo de interacoes.' },
+  { title: 'Pipeline de vendas', desc: 'Kanban com drag-and-drop, tarefas por deal, follow-up automatico e previsao de receita.' },
+  { title: 'Campanhas', desc: 'Disparo em massa com segmentacao por tags, agendamento e metricas de entrega e leitura.' },
+  { title: 'IA', desc: 'Respostas automaticas, transcricao de audio, classificacao de leads e sugestao de respostas.' },
+  { title: 'Automacoes', desc: '28 tipos de nos, editor visual drag-and-drop. Monta flows de atendimento e vendas sem codigo.' },
 ]
 
 /* ─── Plans data ─── */
 const plans = [
-  { slug: 'starter', name: 'Starter', price: '149,99', msgs: '10.000 msgs/mês', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automação', '10.000 contatos', '10.000 respostas IA/mês', '5 campanhas/mês'] },
-  { slug: 'pro', name: 'Pro', price: '299,99', msgs: '50.000 msgs/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automação', '50.000 contatos', '50.000 respostas IA/mês', 'Transcrição de áudio', 'Relatórios avançados'] },
-  { slug: 'enterprise', name: 'Enterprise', price: '599,99', msgs: '150.000 msgs/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mês', 'Campanhas ilimitadas', 'Suporte prioritário'] },
-  { slug: 'unlimited', name: 'Unlimited', price: '999,99', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
+  { slug: 'starter', name: 'Starter', price: '149,99', msgs: '10.000 msgs/mes', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automacao', '10.000 contatos', '10.000 respostas IA/mes', '5 campanhas/mes'] },
+  { slug: 'pro', name: 'Pro', price: '299,99', msgs: '50.000 msgs/mes', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automacao', '50.000 contatos', '50.000 respostas IA/mes', 'Transcricao de audio', 'Relatorios avancados'] },
+  { slug: 'enterprise', name: 'Enterprise', price: '599,99', msgs: '150.000 msgs/mes', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mes', 'Campanhas ilimitadas', 'Suporte prioritario'] },
+  { slug: 'unlimited', name: 'Unlimited', price: '999,99', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integracoes custom'] },
 ]
 
 /* ─── Steps data ─── */
 const steps = [
-  { num: '1', title: 'Conecte seu WhatsApp', desc: 'Escaneie o QR Code ou use a API oficial Gupshup. Em menos de 2 minutos.' },
-  { num: '2', title: 'Configure automações', desc: 'Use nosso editor visual para criar flows de atendimento, vendas e follow-up.' },
-  { num: '3', title: 'Venda no piloto automático', desc: 'A IA cuida do atendimento enquanto você foca no que importa: crescer.' },
+  { num: '1', title: 'Conecte o WhatsApp', desc: 'Escaneie o QR Code ou use a API oficial Gupshup. Leva 2 minutos.' },
+  { num: '2', title: 'Monte seus flows', desc: 'Use o editor visual pra criar automacoes de atendimento, vendas e follow-up.' },
+  { num: '3', title: 'Deixe rodar', desc: 'A IA atende, qualifica e responde. Voce acompanha pelo painel.' },
 ]
 
 export default function LandingPage() {
@@ -91,6 +91,8 @@ export default function LandingPage() {
         .card-hover { transition: transform .2s, box-shadow .2s }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,.1) }
         .faq-answer { overflow: hidden; transition: max-height .3s ease, padding .3s ease }
+        .check-icon { display: inline-block; width: 16px; height: 16px; background: #22c55e; border-radius: 50%; position: relative; flex-shrink: 0 }
+        .check-icon::after { content: ''; position: absolute; left: 5px; top: 3px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) }
       `}</style>
 
       {/* ═══ NAVBAR ═══ */}
@@ -103,7 +105,7 @@ export default function LandingPage() {
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 22, color: '#18181b' }}>
-            <span style={{ fontSize: 26 }}>⚡</span> AutoZap
+            AutoZap
           </div>
 
           {/* Desktop links */}
@@ -112,7 +114,7 @@ export default function LandingPage() {
             <span onClick={() => scrollTo('planos')} style={{ cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#71717a' }}>Planos</span>
             <span onClick={() => scrollTo('faq')} style={{ cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#71717a' }}>FAQ</span>
             <a href="/login" className="btn-outline" style={{ padding: '8px 20px', fontSize: 14 }}>Entrar</a>
-            <a href="/register" className="btn-green" style={{ padding: '8px 20px', fontSize: 14 }}>Começar agora</a>
+            <a href="/register" className="btn-green" style={{ padding: '8px 20px', fontSize: 14 }}>Criar conta</a>
           </div>
 
           {/* Mobile hamburger */}
@@ -135,7 +137,7 @@ export default function LandingPage() {
             <span onClick={() => scrollTo('faq')} style={{ cursor: 'pointer', fontSize: 15, fontWeight: 500, color: '#18181b' }}>FAQ</span>
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               <a href="/login" className="btn-outline" style={{ flex: 1, textAlign: 'center' }}>Entrar</a>
-              <a href="/register" className="btn-green" style={{ flex: 1, textAlign: 'center' }}>Começar agora</a>
+              <a href="/register" className="btn-green" style={{ flex: 1, textAlign: 'center' }}>Criar conta</a>
             </div>
           </div>
         )}
@@ -155,25 +157,19 @@ export default function LandingPage() {
         textAlign: 'center', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 2 }}>
-          <div className="fade-up" style={{
-            display: 'inline-block', background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600,
-            padding: '6px 16px', borderRadius: 20, marginBottom: 24,
-          }}>
-            🚀 Configure em menos de 15 minutos
-          </div>
           <h1 className="fade-up fade-up-d1" style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, color: '#18181b', marginBottom: 20, letterSpacing: '-0.02em' }}>
-            O CRM com WhatsApp<br />que <span style={{ color: '#22c55e' }}>vende por você</span>
+            CRM com WhatsApp<br /><span style={{ color: '#22c55e' }}>integrado</span>
           </h1>
-          <p className="fade-up fade-up-d2" style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: '#71717a', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.6 }}>
-            Automatize atendimento, vendas e campanhas com IA que entende até áudio. Tudo em um só lugar.
+          <p className="fade-up fade-up-d2" style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: '#71717a', maxWidth: 560, margin: '0 auto 36px', lineHeight: 1.6 }}>
+            Inbox, pipeline, campanhas e IA num unico painel. Conecta o WhatsApp e gerencia vendas de ponta a ponta.
           </p>
           <div className="fade-up fade-up-d3" style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/register" className="btn-green btn-green-lg">Começar agora</a>
-            <button onClick={() => scrollTo('funcionalidades')} className="btn-outline" style={{ padding: '16px 36px', fontSize: 17 }}>Ver demonstração</button>
+            <a href="/register" className="btn-green btn-green-lg">Criar conta</a>
+            <button onClick={() => scrollTo('planos')} className="btn-outline" style={{ padding: '16px 36px', fontSize: 17 }}>Ver planos</button>
           </div>
         </div>
 
-        {/* Hero mockup placeholder */}
+        {/* App preview */}
         <div className="fade-up fade-up-d3" style={{ maxWidth: 900, margin: '60px auto 0', padding: '0 24px' }}>
           <div style={{
             background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
@@ -185,7 +181,7 @@ export default function LandingPage() {
               borderRadius: 14, padding: '20px 24px 24px', minHeight: 340,
               display: 'flex', flexDirection: 'column', gap: 12,
             }}>
-              {/* Fake browser bar */}
+              {/* Browser bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#eab308' }} />
@@ -194,10 +190,10 @@ export default function LandingPage() {
                   <span style={{ color: '#9ca3af', fontSize: 12 }}>app.autozap.com/inbox</span>
                 </div>
               </div>
-              {/* Fake inbox UI */}
+              {/* Inbox preview */}
               <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 260 }}>
                 <div style={{ width: '30%', background: '#1f2937', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {['João Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa'].map((name, i) => (
+                  {['Joao Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa'].map((name, i) => (
                     <div key={i} style={{
                       background: i === 0 ? 'rgba(34,197,94,.15)' : '#374151',
                       borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
@@ -205,23 +201,23 @@ export default function LandingPage() {
                       <div style={{ width: 32, height: 32, borderRadius: '50%', background: `hsl(${i * 80}, 60%, 50%)`, flexShrink: 0 }} />
                       <div>
                         <div style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600 }}>{name}</div>
-                        <div style={{ color: '#9ca3af', fontSize: 11 }}>Última mensagem...</div>
+                        <div style={{ color: '#9ca3af', fontSize: 11 }}>Ultima mensagem...</div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div style={{ flex: 1, background: '#111827', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8 }}>
                   <div style={{ alignSelf: 'flex-start', background: '#374151', color: '#e5e7eb', padding: '8px 14px', borderRadius: '12px 12px 12px 4px', fontSize: 13, maxWidth: '70%' }}>
-                    Oi, quero saber sobre os planos 😊
+                    Oi, quero saber sobre os planos
                   </div>
                   <div style={{ alignSelf: 'flex-end', background: '#22c55e', color: '#fff', padding: '8px 14px', borderRadius: '12px 12px 4px 12px', fontSize: 13, maxWidth: '70%' }}>
-                    Olá João! Temos planos a partir de R$149,99/mês. Posso te ajudar a escolher o melhor? 🤖
+                    Ola Joao! Temos planos a partir de R$149,99/mes. Posso te ajudar a escolher?
                   </div>
-                  <div style={{ alignSelf: 'flex-start', background: '#374151', color: '#e5e7eb', padding: '8px 14px', borderRadius: '12px 12px 12px 4px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>🎤</span> <span style={{ color: '#22c55e', fontSize: 11 }}>Áudio transcrito pela IA</span>
+                  <div style={{ alignSelf: 'flex-start', background: '#374151', color: '#e5e7eb', padding: '8px 14px', borderRadius: '12px 12px 12px 4px', fontSize: 13, maxWidth: '70%' }}>
+                    Quero o mais completo, manda o link
                   </div>
                   <div style={{ alignSelf: 'flex-end', background: '#22c55e', color: '#fff', padding: '8px 14px', borderRadius: '12px 12px 4px 12px', fontSize: 13, maxWidth: '70%' }}>
-                    Entendi! Você quer o plano Pro. Vou te enviar o link 🚀
+                    Pronto, enviei o link do plano Pro no seu email.
                   </div>
                 </div>
               </div>
@@ -230,40 +226,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══ SOCIAL PROOF BAR ═══ */}
-      <section style={{ padding: '48px 24px', background: '#fafafa', borderTop: '1px solid #f4f4f5', borderBottom: '1px solid #f4f4f5' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ color: '#a1a1aa', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 32 }}>
-            Usado por empresas que querem vender mais
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(32px, 6vw, 80px)', flexWrap: 'wrap', alignItems: 'center' }}>
-            {[
-              { value: '+500', label: 'Empresas' },
-              { value: '+1M', label: 'Mensagens enviadas' },
-              { value: '+50K', label: 'Leads convertidos' },
-              { value: '4.9★', label: 'Avaliação média' },
-            ].map((s, i) => (
-              <div key={i} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: 800, color: '#18181b' }}>{s.value}</div>
-                <div style={{ fontSize: 13, color: '#71717a', marginTop: 4 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ═══ FEATURES ═══ */}
       <section id="funcionalidades" style={{ padding: '96px 24px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block', marginBottom: 16 }}>
-              Funcionalidades
-            </span>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-              Tudo que você precisa para vender mais
+              O que tem dentro
             </h2>
             <p style={{ color: '#71717a', fontSize: 17, maxWidth: 560, margin: '0 auto' }}>
-              Uma plataforma completa para transformar WhatsApp em máquina de vendas.
+              Seis modulos que cobrem do primeiro contato ao pos-venda.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
@@ -272,7 +243,6 @@ export default function LandingPage() {
                 background: '#fff', border: '1px solid #e4e4e7', borderRadius: 12,
                 padding: 28, cursor: 'default',
               }}>
-                <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{f.title}</h3>
                 <p style={{ color: '#71717a', fontSize: 15, lineHeight: 1.6 }}>{f.desc}</p>
               </div>
@@ -285,11 +255,8 @@ export default function LandingPage() {
       <section style={{ padding: '96px 24px', background: '#fafafa' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block', marginBottom: 16 }}>
-              Como funciona
-            </span>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              Comece a vender em 3 passos
+              Como funciona
             </h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 32 }}>
@@ -314,19 +281,19 @@ export default function LandingPage() {
       <section style={{ padding: '96px 24px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 64, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 400px' }}>
-            <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block', marginBottom: 20 }}>
-              🤖 Inteligência Artificial
-            </span>
+            <p style={{ color: '#22c55e', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 20 }}>
+              Inteligencia Artificial
+            </p>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-              IA que entende <span style={{ color: '#22c55e' }}>áudio</span>
+              Entende texto e <span style={{ color: '#22c55e' }}>audio</span>
             </h2>
             <p style={{ color: '#71717a', fontSize: 17, lineHeight: 1.7, marginBottom: 24 }}>
-              Seu cliente manda áudio? A IA transcreve e responde como se fosse texto. <strong style={{ color: '#18181b' }}>Único CRM do mercado com essa tecnologia.</strong>
+              Cliente mandou audio? A IA transcreve, entende o contexto e responde. Funciona igual a texto.
             </p>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {['Transcrição automática de áudios', 'Respostas inteligentes com contexto', 'Classificação automática de leads', 'Sugestão de respostas para atendentes'].map((item, i) => (
+              {['Transcricao automatica de audios', 'Respostas com contexto da conversa', 'Classificacao de leads por intencao', 'Sugestao de respostas para atendentes'].map((item, i) => (
                 <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 15, color: '#3f3f46' }}>
-                  <span style={{ color: '#22c55e', fontSize: 18, fontWeight: 700 }}>✓</span> {item}
+                  <span className="check-icon" /> {item}
                 </li>
               ))}
             </ul>
@@ -342,10 +309,10 @@ export default function LandingPage() {
                   borderRadius: '14px 14px 14px 4px', display: 'flex', alignItems: 'center', gap: 10,
                 }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 18 }}>🎤</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                   </div>
                   <div>
-                    <div style={{ color: '#9ca3af', fontSize: 11 }}>Áudio • 0:34</div>
+                    <div style={{ color: '#9ca3af', fontSize: 11 }}>Audio -- 0:34</div>
                     <div style={{ display: 'flex', gap: 2, marginTop: 4 }}>
                       {Array.from({ length: 24 }).map((_, i) => (
                         <div key={i} style={{ width: 3, height: 4 + Math.random() * 16, background: '#6b7280', borderRadius: 2 }} />
@@ -358,8 +325,8 @@ export default function LandingPage() {
                   alignSelf: 'flex-start', background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)',
                   padding: '10px 16px', borderRadius: 12, maxWidth: '90%',
                 }}>
-                  <div style={{ color: '#22c55e', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>🤖 Transcrição automática</div>
-                  <div style={{ color: '#d1d5db', fontSize: 13 }}>"Olá, quero comprar 50 camisetas personalizadas pra semana que vem, vocês conseguem?"</div>
+                  <div style={{ color: '#22c55e', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Transcricao automatica</div>
+                  <div style={{ color: '#d1d5db', fontSize: 13 }}>"Ola, quero comprar 50 camisetas personalizadas pra semana que vem, voces conseguem?"</div>
                 </div>
 
                 <div style={{
@@ -367,7 +334,7 @@ export default function LandingPage() {
                   borderRadius: '14px 14px 4px 14px', maxWidth: '90%',
                 }}>
                   <div style={{ color: '#fff', fontSize: 13, lineHeight: 1.5 }}>
-                    Claro! Temos capacidade para 50 camisetas personalizadas. Vou te enviar nosso catálogo e preços. Qual seria a arte? 🎨
+                    Conseguimos sim. Vou te enviar o catalogo com precos e opcoes de arte.
                   </div>
                 </div>
               </div>
@@ -380,14 +347,11 @@ export default function LandingPage() {
       <section id="planos" style={{ padding: '96px 24px', background: '#fafafa' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block', marginBottom: 16 }}>
-              Planos
-            </span>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-              Escolha o plano ideal
+              Planos
             </h2>
             <p style={{ color: '#71717a', fontSize: 17, maxWidth: 500, margin: '0 auto' }}>
-              Pagamento seguro via PIX ou cartão. Cancele quando quiser.
+              PIX ou cartao. Sem fidelidade.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
@@ -414,12 +378,12 @@ export default function LandingPage() {
                 <div style={{ marginBottom: 24 }}>
                   <span style={{ fontSize: 14, color: '#71717a', verticalAlign: 'top' }}>R$</span>
                   <span style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.03em' }}>{p.price}</span>
-                  <span style={{ fontSize: 14, color: '#71717a' }}>/mês</span>
+                  <span style={{ fontSize: 14, color: '#71717a' }}>/mes</span>
                 </div>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, flex: 1 }}>
                   {p.features.map((f, j) => (
                     <li key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#3f3f46' }}>
-                      <span style={{ color: '#22c55e', fontWeight: 700 }}>✓</span> {f}
+                      <span className="check-icon" /> {f}
                     </li>
                   ))}
                 </ul>
@@ -440,9 +404,6 @@ export default function LandingPage() {
       <section id="faq" style={{ padding: '96px 24px' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block', marginBottom: 16 }}>
-              FAQ
-            </span>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
               Perguntas frequentes
             </h2>
@@ -495,13 +456,13 @@ export default function LandingPage() {
       }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', marginBottom: 16 }}>
-            Pronto pra automatizar suas vendas?
+            Teste o AutoZap
           </h2>
           <p style={{ color: '#a1a1aa', fontSize: 17, marginBottom: 36, lineHeight: 1.6 }}>
-            Junte-se a mais de 500 empresas que já vendem no piloto automático com AutoZap.
+            Cria a conta, conecta o WhatsApp e ve se faz sentido pro seu negocio.
           </p>
           <a href="/register" className="btn-green btn-green-lg">
-            Começar agora agora
+            Criar conta
           </a>
           <p style={{ color: '#71717a', fontSize: 13, marginTop: 16 }}>
             Setup em 15 minutos &middot; Suporte incluso &middot; Cancele quando quiser
@@ -513,7 +474,7 @@ export default function LandingPage() {
       <footer style={{ padding: '48px 24px', borderTop: '1px solid #e4e4e7', background: '#fff' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 18, color: '#18181b' }}>
-            <span style={{ fontSize: 22 }}>⚡</span> AutoZap
+            AutoZap
           </div>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             <span onClick={() => scrollTo('funcionalidades')} style={{ cursor: 'pointer', fontSize: 13, color: '#71717a' }}>Funcionalidades</span>
