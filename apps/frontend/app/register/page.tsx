@@ -52,6 +52,7 @@ function RegisterPage() {
       })
       const tempToken = regData?.data?.tempToken
       if (!tempToken) throw new Error('Erro ao criar conta')
+      sessionStorage.setItem('tempToken', tempToken)
 
       // 2. Usa token temporário pra criar assinatura
       const tenantUrl = process.env.NEXT_PUBLIC_TENANT_SERVICE_URL
@@ -90,6 +91,54 @@ function RegisterPage() {
   }
 
   if (step === 'payment') {
+    const [paid, setPaid] = useState(false)
+
+    // Polling: checa a cada 5s se o plano foi ativado
+    useEffect(() => {
+      const check = async () => {
+        try {
+          const { default: axios } = await import('axios')
+          const tenantUrl = process.env.NEXT_PUBLIC_TENANT_SERVICE_URL
+          // Usa tempToken que foi salvo
+          const token = sessionStorage.getItem('tempToken')
+          if (!token) return
+          const { data } = await axios.get(`${tenantUrl}/tenant`, { headers: { Authorization: `Bearer ${token}` } })
+          const plan = data?.data?.planSlug || data?.data?.plan_slug
+          if (plan && plan !== 'pending') {
+            setPaid(true)
+          }
+        } catch {}
+      }
+      const interval = setInterval(check, 5000)
+      check()
+      return () => clearInterval(interval)
+    }, [])
+
+    if (paid) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '440px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 16px rgba(0,0,0,.06)', textAlign: 'center' }}>
+            <div style={{ width: '64px', height: '64px', background: '#f0fdf4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '28px' }}>✅</div>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Pagamento confirmado!</h2>
+            <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
+              Enviamos um email de verificação pra <strong>{form.email}</strong>.<br/>
+              Confirme seu email pra ativar sua conta.
+            </p>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px', textAlign: 'left' }}>
+              <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, marginBottom: '6px' }}>Próximos passos:</p>
+              <ol style={{ fontSize: '13px', color: '#374151', paddingLeft: '18px', lineHeight: 1.8, margin: 0 }}>
+                <li>Abra seu email</li>
+                <li>Clique em "Confirmar email"</li>
+                <li>Faça login e comece a usar</li>
+              </ol>
+            </div>
+            <a href="/login" style={{ display: 'block', width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+              Ir para o login
+            </a>
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
@@ -98,7 +147,7 @@ function RegisterPage() {
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Aguardando pagamento</h2>
           <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
             Uma aba foi aberta com a página de pagamento.<br/>
-            Após pagar, você receberá um email pra confirmar sua conta.
+            Após pagar, esta tela atualiza automaticamente.
           </p>
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, margin: 0 }}>
