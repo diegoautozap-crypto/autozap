@@ -160,6 +160,17 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
       throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
     }
 
+    // ── Plan feature check for premium nodes ──
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planLimits = PLAN_LIMITS[(tenantData?.plan_slug || 'pending') as PlanSlug] ?? PLAN_LIMITS.pending
+    const nodeTypes = nodes.map((n: any) => n.type)
+    if (!planLimits.transcription && nodeTypes.includes('transcribe_audio')) {
+      throw new AppError('PLAN_LIMIT', 'Transcrição de áudio não disponível no seu plano', 403)
+    }
+    if (planLimits.aiResponses === 0 && nodeTypes.includes('ai_response')) {
+      throw new AppError('PLAN_LIMIT', 'Respostas de IA não disponíveis no seu plano', 403)
+    }
+
     const { error: delEdgesError } = await db.from('flow_edges').delete().eq('flow_id', req.params.id)
     if (delEdgesError) throw new AppError('DB_ERROR', `Erro ao limpar edges: ${delEdgesError.message}`, 500)
 

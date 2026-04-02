@@ -4,7 +4,8 @@ import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
-import { ok, generateId, normalizeBRPhone, rateLimit } from '@autozap/utils'
+import { ok, generateId, normalizeBRPhone, rateLimit, AppError } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 import { ensureContact, ensureConversation } from '../services/contact.helper'
 
@@ -104,6 +105,16 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
     const tenantId = secret === INTERNAL_SECRET
       ? (req.body.tenantId || req.auth?.tid)
       : req.auth.tid
+
+    // ── Hard message limit check ──
+    const { data: tenant } = await db.from('tenants').select('plan_slug, messages_sent_this_period').eq('id', tenantId).single()
+    if (tenant) {
+      const planSlug = (tenant.plan_slug || 'pending') as PlanSlug
+      const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+      if (limits.messages !== null && (tenant.messages_sent_this_period ?? 0) >= limits.messages) {
+        throw new AppError('PLAN_LIMIT', `Limite de ${limits.messages} mensagens atingido no seu plano`, 403)
+      }
+    }
 
     const messageUuid = await messageService.queueMessage({
       tenantId, channelId, contactId, conversationId,

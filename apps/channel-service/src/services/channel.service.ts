@@ -3,7 +3,7 @@ import { logger } from '../lib/logger'
 import { encryptCredentials, decryptCredentials } from '../lib/crypto'
 import { channelRouter } from '../adapters/ChannelRouter'
 import { AppError, NotFoundError, generateId } from '@autozap/utils'
-import { PLAN_CHANNEL_LIMITS } from '@autozap/types'
+import { PLAN_LIMITS } from '@autozap/types'
 import type { ChannelType, SendMessageInput, SendMessageResult, NormalizedMessage } from '../adapters/IChannelAdapter'
 import type { PlanSlug } from '@autozap/types'
 
@@ -54,7 +54,7 @@ export class ChannelService {
       .single()
 
     if (tenant) {
-      const limit = PLAN_CHANNEL_LIMITS[tenant.plan_slug as PlanSlug] ?? 1
+      const limit = PLAN_LIMITS[tenant.plan_slug as PlanSlug]?.channels ?? 0
       const { count } = await db
         .from('channels')
         .select('id', { count: 'exact', head: true })
