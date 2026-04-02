@@ -539,9 +539,14 @@ router.post('/conversations', async (req, res, next) => {
       return
     }
 
+    // Pega o primeiro canal do tenant pra associar a conversa
+    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).limit(1).single()
+    if (!channel) { res.status(400).json({ error: 'Nenhum canal configurado. Crie um canal primeiro.' }); return }
+
     const id = require('crypto').randomUUID()
     const { data, error } = await db.from('conversations').insert({
       id, tenant_id: req.auth.tid, contact_id: contactId,
+      channel_id: channel.id, channel_type: channel.type,
       status, pipeline_stage: pipelineStage || 'lead', pipeline_id: pipelineId || null,
       bot_active: false, unread_count: 0,
       last_message: 'Adicionado manualmente', last_message_at: new Date(),

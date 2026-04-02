@@ -292,20 +292,10 @@ function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: s
 
   const addMutation = useMutation({
     mutationFn: async (contactId: string) => {
-      // Busca conversa existente do contato ou cria uma
-      const { data: convs } = await conversationApi.get(`/conversations?contactId=${contactId}&limit=1`)
-      let convId = convs?.data?.[0]?.id
-      if (!convId) {
-        // Cria conversa mínima pra esse contato
-        const { data: newConv } = await conversationApi.post('/conversations', { contactId, status: 'open', pipelineStage: stage, pipelineId })
-        convId = newConv?.data?.id
-      } else {
-        // Atualiza pipeline da conversa existente
-        await conversationApi.patch(`/conversations/${convId}/pipeline`, { stage, pipelineId })
-      }
+      await conversationApi.post('/conversations', { contactId, status: 'open', pipelineStage: stage, pipelineId })
     },
     onSuccess: () => { toast.success('Contato adicionado à pipeline!'); onDone() },
-    onError: () => toast.error('Erro ao adicionar contato'),
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Erro ao adicionar contato'),
   })
 
   if (search.length < 2) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Digite pelo menos 2 caracteres</p>
