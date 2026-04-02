@@ -23,7 +23,7 @@ const lbl: React.CSSProperties = {
 }
 
 const CHANNEL_LIMITS: Record<string, number> = {
-  trial: 1, starter: 1, pro: 5, enterprise: 10, unlimited: 999,
+  pending: 0, starter: 1, pro: 5, enterprise: 10, unlimited: 999,
 }
 
 type ChannelFormType = 'gupshup' | 'evolution'
@@ -49,7 +49,7 @@ export default function ChannelsPage() {
     queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
   })
 
-  const channelLimit = CHANNEL_LIMITS[tenant?.planSlug || 'trial'] ?? 1
+  const channelLimit = CHANNEL_LIMITS[tenant?.planSlug || 'pending'] ?? 0
   const channelCount = channels?.length ?? 0
   const atLimit      = channelCount >= channelLimit
 

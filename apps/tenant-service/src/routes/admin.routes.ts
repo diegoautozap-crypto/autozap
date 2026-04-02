@@ -41,7 +41,7 @@ router.get('/tenants', async (req, res, next) => {
       contactCount: contactCount[t.id] || 0,
       lastCampaign: lastCampaign[t.id] || null,
       subscription: subMap[t.id] || null,
-      mrr: t.plan_slug !== 'trial' ? (PLAN_PRICES[t.plan_slug] || 0) : 0,
+      mrr: t.plan_slug !== 'pending' ? (PLAN_PRICES[t.plan_slug] || 0) : 0,
     }))
 
     res.json(ok(result))
@@ -58,7 +58,7 @@ router.get('/stats', async (req, res, next) => {
       db.from('tenants').select('id', { count: 'exact', head: true }).eq('is_active', true),
       db.from('tenants').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
       db.from('tenants').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo.toISOString()),
-      db.from('tenants').select('id', { count: 'exact', head: true }).eq('plan_slug', 'trial'),
+      db.from('tenants').select('id', { count: 'exact', head: true }).eq('plan_slug', 'pending'),
       db.from('messages').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()).eq('direction', 'outbound'),
       db.from('subscriptions').select('tenant_id').eq('status', 'active'),
     ])
@@ -75,7 +75,7 @@ router.get('/stats', async (req, res, next) => {
       totalTenants: totalRes.count || 0,
       newToday: newTodayRes.count || 0,
       newThisWeek: newWeekRes.count || 0,
-      trialCount: trialRes.count || 0,
+      pendingCount: trialRes.count || 0,
       messagesTODAY: msgsRes.count || 0,
       activePaying: (subsRes.data || []).length,
       mrr,
@@ -109,18 +109,6 @@ router.patch('/tenants/:id/plan', async (req, res, next) => {
     await db.from('tenants').update({ plan_slug: planSlug }).eq('id', req.params.id)
     logger.info('Tenant plan changed', { tenantId: req.params.id, planSlug })
     res.json(ok({ message: 'Plano atualizado' }))
-  } catch (err) { next(err) }
-})
-
-// PATCH /admin/tenants/:id/extend-trial
-router.patch('/tenants/:id/extend-trial', async (req, res, next) => {
-  try {
-    const { days = 7 } = req.body
-    await db.from('tenants').update({
-      trial_ends_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
-      messages_sent_this_period: 0,
-    }).eq('id', req.params.id)
-    res.json(ok({ message: `Trial estendido por ${days} dias` }))
   } catch (err) { next(err) }
 })
 

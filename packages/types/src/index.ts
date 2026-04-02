@@ -1,6 +1,6 @@
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
-export type PlanSlug = 'trial' | 'starter' | 'pro' | 'enterprise' | 'unlimited'
+export type PlanSlug = 'pending' | 'starter' | 'pro' | 'enterprise' | 'unlimited'
 
 export interface Plan {
   id: string
@@ -12,7 +12,7 @@ export interface Plan {
 }
 
 export const PLAN_LIMITS: Record<PlanSlug, number | null> = {
-  trial:      100,
+  pending:    0,
   starter:    10_000,
   pro:        50_000,
   enterprise: 100_000,
@@ -20,9 +20,9 @@ export const PLAN_LIMITS: Record<PlanSlug, number | null> = {
 }
 
 export const PLAN_CHANNEL_LIMITS: Record<PlanSlug, number> = {
-  trial:      1,
+  pending:    0,
   starter:    1,
-  pro:        3,
+  pro:        5,
   enterprise: 10,
   unlimited:  999,
 }
@@ -98,7 +98,7 @@ export interface RegisterRequest {
 
 // ─── Subscription ─────────────────────────────────────────────────────────────
 
-export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'trialing'
+export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'pending'
 
 export interface Subscription {
   id: string

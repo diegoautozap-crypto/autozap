@@ -19,7 +19,7 @@ function validateWebhookUrl(url: string): boolean {
 
 // ─── Limites por plano ────────────────────────────────────────────────────────
 const PLAN_LIMITS: Record<string, number | null> = {
-  trial:      100,
+  pending:    0,
   starter:    10_000,
   pro:        50_000,
   enterprise: 100_000,
@@ -444,6 +444,7 @@ router.get('/billing/plans', async (_req, res, next) => {
     const { data: plans } = await db
       .from('plans')
       .select('id, name, slug, price_monthly, message_limit, features')
+      .neq('slug', 'pending')
       .neq('slug', 'trial')
       .order('price_monthly', { ascending: true })
     res.json(ok(plans || []))

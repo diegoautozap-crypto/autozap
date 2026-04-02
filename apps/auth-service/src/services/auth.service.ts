@@ -60,7 +60,7 @@ export class AuthService {
 
     if (existingUser) throw new ConflictError('Email already registered')
 
-    // 2. Create tenant com plano trial
+    // 2. Create tenant com plano pending (precisa assinar)
     const tenantId = generateId()
     const tenantSlug = await this.uniqueSlug(slugify(tenantName))
 
@@ -68,32 +68,9 @@ export class AuthService {
       id: tenantId,
       name: tenantName,
       slug: tenantSlug,
-      plan_slug: 'trial',
+      plan_slug: 'pending',
     })
     if (tenantError) throw new AppError('DB_ERROR', tenantError.message, 500)
-
-    // 3. Cria subscription trial — 7 dias, 100 mensagens
-    const { data: trialPlan } = await db
-      .from('plans')
-      .select('id')
-      .eq('slug', 'trial')
-      .maybeSingle()
-
-    // Se não tiver plano trial, usa starter como fallback
-    const planToUse = trialPlan || (await db.from('plans').select('id').eq('slug', 'starter').single()).data
-
-    if (planToUse) {
-      await db.from('subscriptions').insert({
-        id: generateId(),
-        tenant_id: tenantId,
-        plan_id: planToUse.id,
-        status: 'trialing',
-        current_period_start: new Date(),
-        current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        cancel_at_period_end: false,
-      })
-    }
 
     // 4. Create user (owner)
     const userId = generateId()
@@ -120,7 +97,7 @@ export class AuthService {
       logger.error('Failed to send verification email', { err }),
     )
 
-    logger.info('User registered with trial', { userId, tenantId, email })
+    logger.info('User registered', { userId, tenantId, email })
     return { userId, tenantId }
   }
 

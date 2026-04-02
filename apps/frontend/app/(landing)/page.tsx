@@ -22,7 +22,7 @@ export default function LandingPage() {
             <a href="#how" style={{ color: '#9ca3af', fontSize: '14px', textDecoration: 'none' }}>Como funciona</a>
             <a href="#plans" style={{ color: '#9ca3af', fontSize: '14px', textDecoration: 'none' }}>Planos</a>
             <Link href="/login" style={{ color: '#9ca3af', fontSize: '14px', textDecoration: 'none' }}>Entrar</Link>
-            <Link href="/register" style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 700, textDecoration: 'none' }}>Começar grátis</Link>
+            <Link href="/register" style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 700, textDecoration: 'none' }}>Começar agora</Link>
           </div>
         </nav>
 
@@ -39,13 +39,13 @@ export default function LandingPage() {
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/register" style={{ padding: '14px 32px', background: '#16a34a', color: '#fff', borderRadius: '10px', fontSize: '15px', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              Começar grátis — 7 dias
+              Começar agora
             </Link>
             <a href="#how" style={{ padding: '14px 32px', background: 'transparent', color: '#e5e7eb', borderRadius: '10px', fontSize: '15px', fontWeight: 600, textDecoration: 'none', border: '1px solid #2d2d2d' }}>
               Ver como funciona
             </a>
           </div>
-          <p style={{ marginTop: '16px', fontSize: '13px', color: '#4b5563' }}>Sem cartão de crédito · 100 mensagens grátis no trial</p>
+          <p style={{ marginTop: '16px', fontSize: '13px', color: '#4b5563' }}>API oficial Meta · Gupshup v3 · Setup em 5 minutos</p>
         </section>
 
         {/* STATS */}
@@ -123,15 +123,15 @@ export default function LandingPage() {
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px', fontFamily: 'monospace' }}>Planos</p>
             <h2 style={{ fontSize: '42px', fontWeight: 800, letterSpacing: '-0.03em', color: '#f0f0f0' }}>Simples e transparente</h2>
-            <p style={{ fontSize: '15px', color: '#6b7280', marginTop: '12px' }}>Comece grátis, escale quando precisar</p>
+            <p style={{ fontSize: '15px', color: '#6b7280', marginTop: '12px' }}>Escolha o plano ideal para o seu negócio</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {[
-              { name: 'Trial', price: 'Grátis', period: '7 dias', msgs: '100 msgs', features: ['1 canal', 'Flow builder', 'Inbox', 'Campanhas'], highlight: false },
-              { name: 'Starter', price: 'R$ —', period: '/mês', msgs: '10.000 msgs', features: ['1 canal', 'Flow builder', 'IA incluída', 'Campanhas', 'CRM'], highlight: false },
-              { name: 'Pro', price: 'R$ —', period: '/mês', msgs: '50.000 msgs', features: ['3 canais', 'Tudo do Starter', 'Gestão de equipe', 'Webhooks', 'Suporte prioritário'], highlight: true },
-              { name: 'Enterprise', price: 'Sob consulta', period: '', msgs: 'Ilimitado', features: ['Canais ilimitados', 'Tudo do Pro', 'SLA dedicado', 'Onboarding guiado', 'API access'], highlight: false },
+              { name: 'Starter', price: 'R$ 97', period: '/mês', msgs: '10.000 msgs', features: ['1 canal', 'Flow builder', 'IA incluída', 'Campanhas', 'CRM'], highlight: false },
+              { name: 'Pro', price: 'R$ 197', period: '/mês', msgs: '50.000 msgs', features: ['5 canais', 'Tudo do Starter', 'Gestão de equipe', 'Webhooks', 'Suporte prioritário'], highlight: true },
+              { name: 'Enterprise', price: 'R$ 397', period: '/mês', msgs: '100.000 msgs', features: ['10 canais', 'Tudo do Pro', 'SLA dedicado', 'API dedicada', 'Onboarding guiado'], highlight: false },
+              { name: 'Unlimited', price: 'R$ 697', period: '/mês', msgs: 'Ilimitado', features: ['Canais ilimitados', 'Tudo do Enterprise', 'Suporte 24/7', 'Onboarding dedicado'], highlight: false },
             ].map((p, i) => (
               <div key={i} style={{ background: p.highlight ? '#0a1f0a' : '#141414', border: `1px solid ${p.highlight ? '#16a34a' : '#1e1e1e'}`, borderRadius: '12px', padding: '28px 24px', position: 'relative' }}>
                 {p.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '99px', whiteSpace: 'nowrap' }}>Mais popular</div>}
@@ -187,9 +187,9 @@ export default function LandingPage() {
             <h2 style={{ fontSize: '48px', fontWeight: 800, letterSpacing: '-0.04em', color: '#f0f0f0', marginBottom: '16px' }}>
               Pronto para automatizar<br />seu WhatsApp?
             </h2>
-            <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '36px' }}>Comece grátis hoje. Sem cartão de crédito.</p>
+            <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '36px' }}>Crie sua conta e escolha o plano ideal.</p>
             <Link href="/register" style={{ display: 'inline-block', padding: '16px 40px', background: '#16a34a', color: '#fff', borderRadius: '12px', fontSize: '16px', fontWeight: 700, textDecoration: 'none' }}>
-              Criar conta grátis →
+              Criar conta agora →
             </Link>
           </div>
         </section>

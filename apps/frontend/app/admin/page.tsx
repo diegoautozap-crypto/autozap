@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Users, DollarSign, TrendingUp, MessageSquare, Shield, Ban, Play, RefreshCw, ChevronDown, Loader2, LogIn, Clock } from 'lucide-react'
 
 const PLAN_COLORS: Record<string, { color: string; bg: string }> = {
-  trial:      { color: '#d97706', bg: '#fffbeb' },
+  pending:    { color: '#d97706', bg: '#fffbeb' },
   starter:    { color: '#2563eb', bg: '#eff6ff' },
   pro:        { color: '#7c3aed', bg: '#f5f3ff' },
   enterprise: { color: '#059669', bg: '#ecfdf5' },
@@ -62,14 +62,6 @@ export default function AdminPage() {
     onError: () => toast.error('Erro ao atualizar plano'),
   })
 
-  const extendMutation = useMutation({
-    mutationFn: async ({ id, days }: { id: string; days: number }) => {
-      await adminApi().patch(`/admin/tenants/${id}/extend-trial`, { days })
-    },
-    onSuccess: () => { toast.success('Trial estendido'); queryClient.invalidateQueries({ queryKey: ['admin-tenants'] }) },
-    onError: () => toast.error('Erro ao estender trial'),
-  })
-
   const impersonateMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data } = await adminApi().post(`/admin/tenants/${id}/impersonate`)
@@ -117,7 +109,7 @@ export default function AdminPage() {
           { label: 'Novos hoje', value: stats?.newToday ?? '—', icon: TrendingUp, color: '#16a34a' },
           { label: 'Novos semana', value: stats?.newThisWeek ?? '—', icon: TrendingUp, color: '#7c3aed' },
           { label: 'Pagantes', value: stats?.activePaying ?? '—', icon: DollarSign, color: '#059669' },
-          { label: 'Em trial', value: stats?.trialCount ?? '—', icon: Clock, color: '#d97706' },
+          { label: 'Pendentes', value: stats?.pendingCount ?? '—', icon: Clock, color: '#d97706' },
           { label: 'Msgs hoje', value: stats?.messagesTODAY ?? '—', icon: MessageSquare, color: '#0891b2' },
           { label: 'MRR', value: stats?.mrr ? `R$ ${stats.mrr.toLocaleString()}` : '—', icon: DollarSign, color: '#16a34a' },
         ].map(({ label, value, icon: Icon, color }) => (
@@ -145,7 +137,7 @@ export default function AdminPage() {
           style={{ padding: '8px 12px', background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9', fontSize: '13px', outline: 'none' }}
         >
           <option value="all">Todos os planos</option>
-          <option value="trial">Trial</option>
+          <option value="pending">Pendente</option>
           <option value="starter">Starter</option>
           <option value="pro">Pro</option>
           <option value="enterprise">Enterprise</option>
@@ -168,7 +160,7 @@ export default function AdminPage() {
         ) : filtered.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>Nenhum tenant encontrado</div>
         ) : filtered.map((t: any) => {
-          const planStyle = PLAN_COLORS[t.plan_slug] || PLAN_COLORS.trial
+          const planStyle = PLAN_COLORS[t.plan_slug] || PLAN_COLORS.pending
           const isSelected = selectedTenant?.id === t.id
           return (
             <div key={t.id}>
@@ -242,25 +234,12 @@ export default function AdminPage() {
                       onChange={e => planMutation.mutate({ id: t.id, planSlug: e.target.value })}
                       style={{ padding: '6px 10px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#f1f5f9', fontSize: '12px', outline: 'none', width: '100%' }}
                     >
-                      <option value="trial">Trial</option>
+                      <option value="pending">Pendente</option>
                       <option value="starter">Starter</option>
                       <option value="pro">Pro</option>
                       <option value="enterprise">Enterprise</option>
                       <option value="unlimited">Unlimited</option>
                     </select>
-                  </div>
-
-                  {/* Estender trial */}
-                  <div style={{ minWidth: '160px' }}>
-                    <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase' }}>Estender trial</p>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {[7, 14, 30].map(d => (
-                        <button key={d} onClick={() => extendMutation.mutate({ id: t.id, days: d })}
-                          style={{ padding: '5px 10px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#94a3b8', fontSize: '12px', cursor: 'pointer' }}>
-                          +{d}d
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               )}

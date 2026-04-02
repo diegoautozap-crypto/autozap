@@ -157,7 +157,7 @@ function getFlowTemplates(t: (key: string) => string) {
 
 IMPORTANTE: No FINAL de TODA resposta, adicione numa linha separada uma dessas tags (invisível pro cliente, é pra classificação interna):
 [INTENT:comprar] - quando demonstrou interesse claro em assinar/comprar
-[INTENT:testar] - quando quer experimentar/trial/teste grátis
+[INTENT:testar] - quando quer experimentar/conhecer a plataforma
 [INTENT:suporte] - quando é cliente com problema técnico
 [INTENT:cancelar] - quando quer cancelar assinatura
 [INTENT:humano] - quando pede pra falar com humano/atendente
@@ -184,7 +184,7 @@ PLANOS:
 • Pro — R$197/mês — 50.000 mensagens — tudo do Starter + multi-usuários + suporte prioritário
 • Enterprise — R$397/mês — 100.000 mensagens — tudo do Pro + API dedicada + SLA
 • Unlimited — R$697/mês — mensagens ilimitadas
-• Todos têm 7 dias de trial grátis
+• Pagamento mensal, cancela quando quiser
 • Pagamento: PIX ou cartão, cancela quando quiser
 
 DIFERENCIAIS (use quando comparar com concorrentes):
@@ -197,7 +197,7 @@ DIFERENCIAIS (use quando comparar com concorrentes):
 PERGUNTAS FREQUENTES:
 • "Funciona com meu número?" → Sim, via Gupshup (parceiro oficial do WhatsApp)
 • "Precisa de CNPJ?" → Não, pessoa física também pode
-• "Posso testar grátis?" → Sim, 7 dias com acesso total
+• "Posso testar?" → Sim, crie sua conta e escolha um plano para começar
 • "Quantos atendentes?" → Starter 1, Pro até 10, Enterprise ilimitado
 • "Tem API?" → Sim, webhooks de entrada/saída + REST API
 • "É seguro?" → Dados criptografados, LGPD compliant
@@ -232,7 +232,7 @@ REGRAS:
         { id: 'n7', type: 'move_pipeline', position_x: 1750, position_y: 50, data: { type: 'move_pipeline', stage: 'qualificacao' } },
         { id: 'n8', type: 'input', position_x: 2000, position_y: 50, data: { type: 'input', question: 'Perfeito! 🎯 Pra te recomendar o plano ideal: quantas mensagens você envia por mês aproximadamente?\n\n(pode ser um número aproximado, tipo 5000, 20000, etc)', saveAs: 'volume', timeoutHours: 24 } },
         // Timeout
-        { id: 'n9', type: 'send_message', position_x: 2350, position_y: -50, data: { type: 'send_message', subtype: 'text', message: 'Oi! 😊 Vi que não respondeu sobre o volume.\n\nSe quiser, posso te apresentar nossos planos:\n• Starter R$97/mês (10k msgs)\n• Pro R$197/mês (50k msgs)\n• Enterprise R$397/mês (100k msgs)\n\nTodos com 7 dias grátis! Qual te interessa?' } },
+        { id: 'n9', type: 'send_message', position_x: 2350, position_y: -50, data: { type: 'send_message', subtype: 'text', message: 'Oi! 😊 Vi que não respondeu sobre o volume.\n\nSe quiser, posso te apresentar nossos planos:\n• Starter R$97/mês (10k msgs)\n• Pro R$197/mês (50k msgs)\n• Enterprise R$397/mês (100k msgs)\n\nQual te interessa?' } },
         // Condição volume
         { id: 'n10', type: 'condition', position_x: 2350, position_y: 100, data: { type: 'condition', branches: [
           { id: 'bv1', label: '🏢 Enterprise', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'volume', operator: 'greater_than', value: '50000' }] },
@@ -243,15 +243,15 @@ REGRAS:
         { id: 'n12', type: 'move_pipeline', position_x: 3000, position_y: 0, data: { type: 'move_pipeline', stage: 'negociacao' } },
         { id: 'n13', type: 'assign_agent', position_x: 3250, position_y: 0, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Um gerente comercial vai te atender agora! 🚀' } },
         // Pro
-        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 150, data: { type: 'send_message', subtype: 'text', message: 'O Pro é perfeito pra esse volume! 🚀\n\n✅ 50.000 msgs/mês — R$197\n✅ Multi-usuários (até 10)\n✅ Suporte prioritário\n\n7 dias grátis pra testar! Quer criar sua conta?' } },
+        { id: 'n14', type: 'send_message', position_x: 2700, position_y: 150, data: { type: 'send_message', subtype: 'text', message: 'O Pro é perfeito pra esse volume! 🚀\n\n✅ 50.000 msgs/mês — R$197\n✅ Multi-usuários (até 10)\n✅ Suporte prioritário\n\nQuer criar sua conta?' } },
         { id: 'n15', type: 'move_pipeline', position_x: 3000, position_y: 150, data: { type: 'move_pipeline', stage: 'qualificacao' } },
         // Starter (fallback)
-        { id: 'n16', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'O Starter é ideal pra começar! 💡\n\n✅ 10.000 msgs/mês — R$97\n✅ Inbox + Campanhas + CRM + Flows\n✅ IA integrada\n\n7 dias grátis! Quer testar agora?' } },
+        { id: 'n16', type: 'send_message', position_x: 2700, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'O Starter é ideal pra começar! 💡\n\n✅ 10.000 msgs/mês — R$97\n✅ Inbox + Campanhas + CRM + Flows\n✅ IA integrada\n\nQuer começar agora?' } },
         { id: 'n17', type: 'move_pipeline', position_x: 3000, position_y: 300, data: { type: 'move_pipeline', stage: 'lead' } },
 
         // === TESTAR ===
         { id: 'n18', type: 'tag_contact', position_x: 1500, position_y: 250, data: { type: 'tag_contact', subtype: 'add' } },
-        { id: 'n19', type: 'send_message', position_x: 1750, position_y: 250, data: { type: 'send_message', subtype: 'text', message: '🎉 Ótima escolha! Cria sua conta grátis aqui:\n\n👉 https://app.autozap.com/register\n\nSão 7 dias com acesso total a tudo.\nSe precisar de ajuda pra configurar, é só chamar aqui!' } },
+        { id: 'n19', type: 'send_message', position_x: 1750, position_y: 250, data: { type: 'send_message', subtype: 'text', message: 'Ótima escolha! Cria sua conta aqui:\n\n👉 https://app.autozap.com/register\n\nÉ só criar a conta, escolher o plano e já pode começar.\nSe precisar de ajuda pra configurar, é só chamar aqui!' } },
         { id: 'n20', type: 'move_pipeline', position_x: 2000, position_y: 250, data: { type: 'move_pipeline', stage: 'qualificacao' } },
 
         // === SUPORTE ===

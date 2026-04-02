@@ -94,31 +94,3 @@ export async function sendCampaignCompletedEmail(opts: {
   logger.info('Campaign completed email sent', { to, campaignName })
 }
 
-// ─── Trial expirando ──────────────────────────────────────────────────────────
-export async function sendTrialExpiringEmail(opts: {
-  to: string
-  name: string
-  daysLeft: number
-}): Promise<void> {
-  const { to, name, daysLeft } = opts
-  const isToday = daysLeft === 0
-
-  const html = baseLayout(`
-    <p>Olá, <strong>${name}</strong>!</p>
-    ${isToday
-      ? `<p>Seu período de trial do AutoZap <strong>expira hoje</strong>. Após isso você perderá acesso ao sistema.</p>`
-      : `<p>Seu período de trial do AutoZap expira em <strong>${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}</strong>.</p>`
-    }
-    <p>Para continuar usando o AutoZap sem interrupção, assine agora:</p>
-    <a href="${APP_URL}/dashboard/settings" class="btn">${isToday ? 'Assinar agora' : 'Ver planos'}</a>
-    <p style="color:#6b7280; font-size:13px;">Dúvidas? Responda este email e te ajudamos.</p>
-  `)
-
-  const subject = isToday
-    ? '⚠️ Seu trial expira hoje — AutoZap'
-    : `⏰ Seu trial expira em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} — AutoZap`
-
-  const { error } = await getResend().emails.send({ from: FROM, to, subject, html })
-  if (error) throw new Error(error.message)
-  logger.info('Trial expiring email sent', { to, daysLeft })
-}

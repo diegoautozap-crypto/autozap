@@ -7,10 +7,10 @@ import { toast } from 'sonner'
 import { Loader2, MessageSquareMore, ArrowRight, Check, Mail } from 'lucide-react'
 
 const benefits = [
-  '7 dias grátis, sem cartão',
-  '100 mensagens para testar',
   'Inbox em tempo real',
   'Campanhas em massa',
+  'CRM integrado',
+  'Flows de automação',
 ]
 
 export default function RegisterPage() {
@@ -116,8 +116,8 @@ export default function RegisterPage() {
             <div style={{ width: '48px', height: '48px', background: '#16a34a', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(22,163,74,0.3)' }}>
               <MessageSquareMore size={24} color="#fff" />
             </div>
-            <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>Crie sua conta grátis</h1>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>7 dias grátis · 100 mensagens · Sem cartão</p>
+            <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>Crie sua conta</h1>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>Comece a automatizar seu WhatsApp agora</p>
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
@@ -143,7 +143,7 @@ export default function RegisterPage() {
                 onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.background = '#15803d' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}>
                 {isLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
-                Criar conta grátis
+                Criar conta
               </button>
               <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '14px' }}>
                 Ao criar uma conta você concorda com nossos{' '}

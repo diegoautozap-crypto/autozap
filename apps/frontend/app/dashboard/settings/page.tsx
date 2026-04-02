@@ -9,7 +9,7 @@ import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
 const PLAN_NAMES: Record<string, string> = {
-  trial:      'Trial',
+  pending:    'Pendente',
   starter:    'Starter',
   pro:        'Pro',
   enterprise: 'Enterprise',
@@ -417,13 +417,10 @@ export default function SettingsPage() {
   const sent = usage?.sent ?? 0
   const limit = usage?.limit ?? 0
   const pct = usage?.percentUsed ?? 0
-  const planSlug = tenant?.planSlug ?? 'trial'
+  const planSlug = tenant?.planSlug ?? 'pending'
   const planName = PLAN_NAMES[planSlug] ?? planSlug
   const isWarning = pct > 80
-  const isTrial = planSlug === 'trial'
-  const trialEndsAt = subscription?.trial_ends_at || subscription?.current_period_end
-  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null
-  const trialExpired = (isTrial && pct >= 100) || (trialDaysLeft !== null && trialDaysLeft === 0)
+  const isPending = planSlug === 'pending'
 
   const handleSubscribe = async (slug: string) => {
     const digits = cpfCnpj.replace(/\D/g, '')
@@ -453,7 +450,7 @@ export default function SettingsPage() {
     return plan ? `R$ ${Number(plan.price_monthly).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : ''
   }
 
-  const barColor = trialExpired ? '#ef4444' : isWarning ? '#f97316' : '#22c55e'
+  const barColor = isWarning ? '#f97316' : '#22c55e'
 
   return (
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '700px' }}>
@@ -464,15 +461,15 @@ export default function SettingsPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-        {/* Banner trial expirado */}
-        {canEdit('/dashboard/settings') && isTrial && trialExpired && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <AlertTriangle size={18} color="#ef4444" />
+        {/* Banner sem plano ativo */}
+        {canEdit('/dashboard/settings') && isPending && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertTriangle size={18} color="#d97706" />
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 700, color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>{t('settings.trialExpired')}</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>{t('settings.trialExpiredDesc')}</p>
+              <p style={{ fontWeight: 700, color: '#92400e', fontSize: '14px', marginBottom: '4px' }}>{t('settings.noPlanActive')}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>{t('settings.choosePlanNotice')}</p>
               <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}>
                 <Zap size={13} /> {t('settings.viewPlans')}
               </a>
@@ -480,23 +477,8 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Banner trial ativo */}
-        {canEdit('/dashboard/settings') && isTrial && !trialExpired && (
-          <div style={{ background: trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fffbeb' : '#f0fdf4', border: `1px solid ${trialDaysLeft !== null && trialDaysLeft <= 2 ? '#fde68a' : '#bbf7d0'}`, borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
-                {trialDaysLeft !== null && trialDaysLeft <= 2 ? `⚠️ ${t('settings.trialExpiresSoon')} ${trialDaysLeft} ${trialDaysLeft !== 1 ? t('settings.days') : t('settings.day')}!` : `🎉 ${t('settings.trialActive')} — ${usage?.remaining ?? 0} ${t('settings.messagesRemaining')}`}
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('settings.choosePlanNotice')}</p>
-            </div>
-            <a href="#planos" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#22c55e', color: '#fff', borderRadius: '7px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
-              <Zap size={13} /> {t('settings.upgrade')}
-            </a>
-          </div>
-        )}
-
         {/* Banner plano ativo */}
-        {canEdit('/dashboard/settings') && !isTrial && (
+        {canEdit('/dashboard/settings') && !isPending && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontWeight: 600, color: '#15803d', fontSize: '14px', marginBottom: '2px' }}>✅ {t('settings.plan')} {planName} {t('settings.planActive')}</p>
@@ -516,8 +498,8 @@ export default function SettingsPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('settings.currentPlan')}</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: isTrial ? '#d97706' : '#16a34a', background: isTrial ? '#fffbeb' : '#f0fdf4', border: `1px solid ${isTrial ? '#fde68a' : '#bbf7d0'}`, padding: '2px 10px', borderRadius: '99px' }}>
-                {isTrial ? `🎯 Trial (7 ${t('settings.days')})` : planName}
+              <span style={{ fontSize: '12px', fontWeight: 600, color: isPending ? '#d97706' : '#16a34a', background: isPending ? '#fffbeb' : '#f0fdf4', border: `1px solid ${isPending ? '#fde68a' : '#bbf7d0'}`, padding: '2px 10px', borderRadius: '99px' }}>
+                {isPending ? t('settings.noPlanActive') : planName}
               </span>
             </div>
           </div>
@@ -534,7 +516,7 @@ export default function SettingsPage() {
             <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: barColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-            <span style={{ fontSize: '12px', color: trialExpired ? '#ef4444' : isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% {t('settings.used')}</span>
+            <span style={{ fontSize: '12px', color: isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% {t('settings.used')}</span>
             {limit !== null && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{Math.max(0, limit - sent).toLocaleString()} {t('settings.remaining')}</span>}
           </div>
         </div>
@@ -548,7 +530,7 @@ export default function SettingsPage() {
         {/* Planos */}
         {canEdit('/dashboard/settings') && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px', display: 'block' }}>
-            {isTrial ? `🚀 ${t('settings.choosePlan')}` : t('settings.availablePlans')}
+            {isPending ? t('settings.choosePlan') : t('settings.availablePlans')}
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {(['starter', 'pro', 'enterprise', 'unlimited'] as const).map((slug) => {
@@ -582,7 +564,7 @@ export default function SettingsPage() {
                       {t('settings.subscribe')} {PLAN_NAMES[slug]}
                     </button>
                   )}
-                  {isActive && !isTrial && <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '6px 0' }}>✓ {t('settings.activePlan')}</div>}
+                  {isActive && !isPending && <div style={{ textAlign: 'center', fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '6px 0' }}>✓ {t('settings.activePlan')}</div>}
                 </div>
               )
             })}

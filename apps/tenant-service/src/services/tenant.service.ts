@@ -386,21 +386,21 @@ export class TenantService {
       logger.warn('Payment overdue', { tenantId })
     }
 
-    // Assinatura cancelada → volta para trial
+    // Assinatura cancelada → volta para pending
     if (event === 'SUBSCRIPTION_CANCELLED' || event === 'PAYMENT_DELETED') {
       const externalRef = payload.subscription?.externalReference || payload.payment?.externalReference
       if (!externalRef) return
       const [tenantId] = externalRef.split(':')
 
       await db.from('tenants')
-        .update({ plan_slug: 'trial' })
+        .update({ plan_slug: 'pending' })
         .eq('id', tenantId)
 
       await db.from('subscriptions')
         .update({ status: 'cancelled', canceled_at: new Date() })
         .eq('tenant_id', tenantId)
 
-      logger.info('Subscription cancelled, tenant downgraded to trial', { tenantId })
+      logger.info('Subscription cancelled, tenant downgraded to pending', { tenantId })
     }
   }
 
@@ -419,7 +419,7 @@ export class TenantService {
     }
 
     await db.from('tenants')
-      .update({ plan_slug: 'trial' })
+      .update({ plan_slug: 'pending' })
       .eq('id', tenantId)
 
     await db.from('subscriptions')
