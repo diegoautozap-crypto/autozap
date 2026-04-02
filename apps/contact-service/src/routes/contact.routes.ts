@@ -280,6 +280,23 @@ router.delete('/purchases/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+router.get('/purchases/by-contact', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('purchases')
+      .select('id, contact_id, quantity, total_price, products(name, price, sku)')
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    // Agrupa por contact_id
+    const grouped: Record<string, any[]> = {}
+    for (const p of (data || [])) {
+      if (!grouped[p.contact_id]) grouped[p.contact_id] = []
+      grouped[p.contact_id].push(p)
+    }
+    res.json(ok(grouped))
+  } catch (err) { next(err) }
+})
+
 router.get('/purchases/summary', async (req, res, next) => {
   try {
     const { data, error } = await db.from('purchases')

@@ -407,6 +407,13 @@ export default function PipelinePage() {
     queryFn: async () => { const { data } = await contactApi.get('/products'); return data.data || [] },
   })
 
+  // Compras agrupadas por contact_id para exibir nos cards
+  const { data: purchasesByContact = {} } = useQuery<Record<string, any[]>>({
+    queryKey: ['purchases-by-contact'],
+    queryFn: async () => { const { data } = await contactApi.get('/purchases/by-contact'); return data.data || {} },
+    staleTime: 10000, refetchInterval: 30000,
+  })
+
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
     queryFn: async () => {
@@ -510,6 +517,16 @@ export default function PipelinePage() {
     onError: () => toast.error(t('pipeline.toastPipelineRenameError')),
   })
 
+  const { data: contactPurchases = [], refetch: refetchPurchases } = useQuery({
+    queryKey: ['contact-purchases', purchaseContactId],
+    queryFn: async () => {
+      if (!purchaseContactId) return []
+      const { data } = await contactApi.get(`/contacts/${purchaseContactId}/purchases`)
+      return data.data || []
+    },
+    enabled: !!purchaseContactId,
+  })
+
   const purchaseMutation = useMutation({
     mutationFn: async () => {
       await contactApi.post('/purchases', {
@@ -521,12 +538,19 @@ export default function PipelinePage() {
     },
     onSuccess: () => {
       toast.success('Compra registrada!');
-      setPurchaseConvId(null);
       setPurchaseProductId('');
       setPurchaseQty(1)
+      refetchPurchases()
       queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
     onError: () => toast.error('Erro ao registrar compra'),
+  })
+
+  const deletePurchaseMutation = useMutation({
+    mutationFn: async (id: string) => { await contactApi.delete(`/purchases/${id}`) },
+    onSuccess: () => { toast.success('Compra removida'); refetchPurchases(); queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] }) },
+    onError: () => toast.error('Erro ao remover compra'),
   })
 
   const handleDragStart = (e: React.DragEvent, convId: string) => { setDraggingId(convId); e.dataTransfer.effectAllowed = 'move' }
@@ -786,6 +810,24 @@ export default function PipelinePage() {
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
+                          {/* ── Compras do contato ── */}
+                          {(() => {
+                            const cId = conv.contacts?.id || conv.contact_id
+                            const cPurchases = cId ? (purchasesByContact as any)[cId] : null
+                            if (!cPurchases || cPurchases.length === 0) return null
+                            return (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                                {cPurchases.slice(0, 3).map((p: any) => (
+                                  <span key={p.id} style={{ fontSize: '10px', fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '99px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                    {p.products?.name || 'Produto'} × {p.quantity}
+                                  </span>
+                                ))}
+                                {cPurchases.length > 3 && (
+                                  <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>+{cPurchases.length - 3}</span>
+                                )}
+                              </div>
+                            )
+                          })()}
                           {canEdit('/dashboard/pipeline') && (
                             <button onClick={(e) => {
                               e.stopPropagation();
@@ -894,25 +936,56 @@ export default function PipelinePage() {
 
       {purchaseConvId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', marginBottom: '16px' }}>Registrar compra</h3>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Produto</label>
-              <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}>
-                <option value="">Selecione...</option>
-                {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Quantidade</label>
-              <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
-                style={{ flex: 1, padding: '8px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1 }}>
-                Registrar
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '400px', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Compras do contato</h3>
+              <button onClick={() => setPurchaseConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faint)' }}>
+                <X size={16} />
               </button>
-              <button onClick={() => setPurchaseConvId(null)} style={{ padding: '8px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+            </div>
+
+            {/* ── Compras já registradas ── */}
+            {contactPurchases.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Registradas ({contactPurchases.length})</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {contactPurchases.map((p: any) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{p.products?.name || 'Produto'}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginLeft: '6px' }}>× {p.quantity}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a', marginLeft: '8px' }}>R$ {Number(p.total_price).toFixed(2)}</span>
+                      </div>
+                      <button onClick={() => deletePurchaseMutation.mutate(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faintest)', borderRadius: '4px' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 700, color: '#16a34a', marginTop: '2px' }}>
+                    Total: R$ {contactPurchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Nova compra ── */}
+            <div style={{ borderTop: contactPurchases.length > 0 ? '1px solid var(--border)' : 'none', paddingTop: contactPurchases.length > 0 ? '16px' : 0 }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Nova compra</label>
+              <div style={{ marginBottom: '10px' }}>
+                <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-input)', color: 'var(--text)' }}>
+                  <option value="">Selecione um produto...</option>
+                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} placeholder="Quantidade" style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-input)', color: 'var(--text)' }} />
+              </div>
+              <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
+                style={{ width: '100%', padding: '9px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1 }}>
+                {purchaseMutation.isPending ? 'Registrando...' : 'Registrar compra'}
+              </button>
             </div>
           </div>
         </div>
