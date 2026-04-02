@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { messageApi, channelApi } from '@/lib/api'
+import { messageApi, channelApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
@@ -466,6 +466,13 @@ export default function FlowsPage() {
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
 
+  const { data: limitsData } = useQuery({
+    queryKey: ['limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+    staleTime: 60000,
+  })
+  const flowLimitReached = limitsData?.limits?.flows !== null && limitsData?.limits?.flows !== undefined && (limitsData?.usage?.flows ?? 0) >= limitsData?.limits?.flows
+
   const FLOW_TEMPLATES = getFlowTemplates(t)
   const COOLDOWN_OPTIONS = getCooldownOptions(t)
 
@@ -522,14 +529,19 @@ export default function FlowsPage() {
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('flows.title')}</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '3px' }}>{t('flows.subtitleAlt')}</p>
         </div>
-        <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px' }}>
-          {canEdit('/dashboard/flows') && (
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {flowLimitReached && (
+            <span style={{ fontSize: '12px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '6px 12px', fontWeight: 600 }}>
+              Limite de flows atingido. Faca upgrade.
+            </span>
+          )}
+          {canEdit('/dashboard/flows') && !flowLimitReached && (
           <button onClick={() => setShowTemplates(true)}
             style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Copy size={14} /> {t('flows.templates')}
           </button>
           )}
-          {canEdit('/dashboard/flows') && (
+          {canEdit('/dashboard/flows') && !flowLimitReached && (
           <button onClick={() => setShowNew(true)}
             style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.1s' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}

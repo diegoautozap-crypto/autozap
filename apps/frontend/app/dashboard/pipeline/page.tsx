@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, channelApi, campaignApi, contactApi } from '@/lib/api'
+import { conversationApi, channelApi, campaignApi, contactApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
@@ -391,6 +391,13 @@ export default function PipelinePage() {
     queryFn: async () => { const { data } = await campaignApi.get('/campaigns?limit=100'); return data.data || [] },
   })
 
+  const { data: limitsData } = useQuery({
+    queryKey: ['limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+    staleTime: 60000,
+  })
+  const reportsAllowed = limitsData?.limits?.reports !== false
+
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
     queryFn: async () => {
@@ -598,7 +605,7 @@ export default function PipelinePage() {
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'}>
               <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> {t('pipeline.refresh')}
             </button>
-            {canEdit('/dashboard/pipeline') && <button onClick={async () => {
+            {canEdit('/dashboard/pipeline') && reportsAllowed && <button onClick={async () => {
               if (!board) { toast.error(t('pipeline.noData')); return }
               const rows: any[] = []
               for (const [stage, convs] of Object.entries(board as Record<string, any[]>)) {

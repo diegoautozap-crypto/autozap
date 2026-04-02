@@ -2,7 +2,8 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { contactService } from '../services/contact.service'
 import { requireAuth, requireRole, validate } from '../middleware/contact.middleware'
-import { ok, paginationSchema } from '@autozap/utils'
+import { ok, paginationSchema, AppError } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 
 const router = Router()
@@ -54,6 +55,15 @@ router.get('/contacts', async (req, res, next) => {
 // POST /contacts
 router.post('/contacts', validate(createContactSchema), async (req, res, next) => {
   try {
+    // ── Plan limit check ──
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+    const { count } = await db.from('contacts').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
+    if (planLimits.contacts !== null && (count ?? 0) >= planLimits.contacts) {
+      throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.contacts} contatos`, 403)
+    }
+
     const contact = await contactService.createContact({ tenantId: req.auth.tid, ...req.body })
     res.status(201).json(ok(contact))
   } catch (err) { next(err) }
@@ -62,6 +72,14 @@ router.post('/contacts', validate(createContactSchema), async (req, res, next) =
 // GET /contacts/export — download CSV
 router.get('/contacts/export', async (req, res, next) => {
   try {
+    // ── Plan limit check: reports ──
+    const { data: tenantExport } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const exportPlanSlug = (tenantExport?.plan_slug || 'pending') as PlanSlug
+    const exportPlanLimits = PLAN_LIMITS[exportPlanSlug] ?? PLAN_LIMITS.pending
+    if (!exportPlanLimits.reports) {
+      throw new AppError('PLAN_LIMIT', 'Exportação de relatórios não disponível no seu plano', 403)
+    }
+
     const csv = await contactService.exportContacts(req.auth.tid)
     res.setHeader('Content-Type', 'text/csv')
     res.setHeader('Content-Disposition', 'attachment; filename=contacts.csv')
@@ -149,6 +167,15 @@ router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next)
 
 router.post('/contacts/import', async (req, res, next) => {
   try {
+    // ── Plan limit check ──
+    const { data: tenantImport } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const importPlanSlug = (tenantImport?.plan_slug || 'pending') as PlanSlug
+    const importPlanLimits = PLAN_LIMITS[importPlanSlug] ?? PLAN_LIMITS.pending
+    const { count: importCount } = await db.from('contacts').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
+    if (importPlanLimits.contacts !== null && (importCount ?? 0) >= importPlanLimits.contacts) {
+      throw new AppError('PLAN_LIMIT', `Seu plano permite ${importPlanLimits.contacts} contatos`, 403)
+    }
+
     const { rows, tagId } = req.body
     if (!Array.isArray(rows)) throw new Error('rows must be an array')
     const result = await contactService.importContacts(req.auth.tid, rows, tagId)

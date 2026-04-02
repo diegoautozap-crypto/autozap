@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { contactApi } from '@/lib/api'
+import { contactApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
@@ -359,6 +359,9 @@ export default function ContactsPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
   const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] } })
+  const { data: limitsData } = useQuery({ queryKey: ['limits'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data }, staleTime: 60000 })
+  const contactLimitReached = limitsData?.limits?.contacts !== null && limitsData?.limits?.contacts !== undefined && (limitsData?.usage?.contacts ?? 0) >= limitsData?.limits?.contacts
+  const reportsAllowed = limitsData?.limits?.reports !== false
 
   const createTagMutation = useMutation({ mutationFn: async () => { await contactApi.post('/tags', { name: newTagName, color: newTagColor }) }, onSuccess: () => { toast.success(t('contacts.tagCreated')); queryClient.invalidateQueries({ queryKey: ['tags'] }); setNewTagName(''); setNewTagColor(TAG_COLORS[0]) }, onError: () => toast.error(t('contacts.errorCreateTag')) })
   const deleteTagMutation = useMutation({ mutationFn: async (id: string) => { await contactApi.delete(`/tags/${id}`) }, onSuccess: () => { toast.success(t('contacts.tagDeleted')); queryClient.invalidateQueries({ queryKey: ['tags'] }) }, onError: () => toast.error(t('contacts.errorDeleteTag')) })
@@ -428,17 +431,17 @@ export default function ContactsPage() {
               {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} {t('contacts.deleteAll')}
             </button>
           )}
-          {canEdit('/dashboard/contacts') && (
+          {canEdit('/dashboard/contacts') && reportsAllowed && (
           <button onClick={handleExport} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
             <Download size={13} /> {t('contacts.csv')}
           </button>
           )}
-          {canEdit('/dashboard/contacts') && (
+          {canEdit('/dashboard/contacts') && reportsAllowed && (
           <button onClick={handleExportExcel} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
             <FileSpreadsheet size={13} /> {t('contacts.excel')}
           </button>
           )}
-          {canEdit('/dashboard/contacts') && (
+          {canEdit('/dashboard/contacts') && !contactLimitReached && (
           <button onClick={() => setShowImport(true)} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Upload size={13} /> {t('contacts.import')}
           </button>
@@ -455,7 +458,12 @@ export default function ContactsPage() {
             <Tag size={13} /> {t('contacts.tags')} {(tags as any[]).length > 0 && `(${(tags as any[]).length})`}
           </button>
           )}
-          {canEdit('/dashboard/contacts') && (
+          {contactLimitReached && (
+            <span style={{ fontSize: '12px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '6px 12px', fontWeight: 600 }}>
+              Limite de contatos atingido. Faca upgrade.
+            </span>
+          )}
+          {canEdit('/dashboard/contacts') && !contactLimitReached && (
           <button onClick={() => setShowCreate(!showCreate)}
             style={{ padding: '8px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 3px rgba(34,197,94,0.3)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}

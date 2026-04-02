@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { campaignApi, channelApi, contactApi } from '@/lib/api'
+import { campaignApi, channelApi, contactApi, tenantApi } from '@/lib/api'
 import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
@@ -91,6 +91,13 @@ export default function CampaignsPage() {
     enabled: !!selectedCamp?.id,
     refetchInterval: 3000,
   })
+
+  const { data: limitsData } = useQuery({
+    queryKey: ['limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+    staleTime: 60000,
+  })
+  const campaignLimitReached = limitsData?.limits?.campaigns !== null && limitsData?.limits?.campaigns !== undefined && (limitsData?.usage?.campaigns ?? 0) >= limitsData?.limits?.campaigns
 
   const totalCampaigns     = campaigns?.length ?? 0
   const totalPages         = Math.ceil(totalCampaigns / PAGE_SIZE)
@@ -230,7 +237,12 @@ export default function CampaignsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
-          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
+          {campaignLimitReached && (
+            <span style={{ fontSize: '12px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '6px 12px', fontWeight: 600 }}>
+              Limite de campanhas/mes atingido. Faca upgrade.
+            </span>
+          )}
+          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !campaignLimitReached && (
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
@@ -258,7 +270,7 @@ export default function CampaignsPage() {
                   <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('campaigns.noCampaigns')}</p>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('campaigns.createFirst')}</p>
                 </div>
-                {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
+                {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !campaignLimitReached && (
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   + {t('campaigns.createCampaign')}
                 </button>

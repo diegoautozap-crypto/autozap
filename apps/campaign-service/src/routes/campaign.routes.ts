@@ -4,6 +4,7 @@ import { campaignService } from '../services/campaign.service'
 import { campaignQueue } from '../workers/campaign.worker'
 import { requireAuth, requireRole, validate } from '../middleware/campaign.middleware'
 import { ok, paginationSchema, AppError } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 import { decryptCredentials } from '../lib/crypto'
 import { logger } from '../lib/logger'
@@ -134,6 +135,16 @@ router.get('/campaigns', async (req, res, next) => {
 
 router.post('/campaigns', async (req, res, next) => {
   try {
+    // ── Plan limit check: campaigns/month ──
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+    const { count: campaignCount } = await db.from('campaigns').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).gte('created_at', startOfMonth)
+    if (planLimits.campaigns !== null && (campaignCount ?? 0) >= planLimits.campaigns) {
+      throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.campaigns} campanhas/mes`, 403)
+    }
+
     const role = req.auth.role
 
     // Verifica permissão de criar campanhas

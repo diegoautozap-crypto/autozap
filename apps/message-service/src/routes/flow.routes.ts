@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth, validate } from '../middleware/message.middleware'
 import { ok, AppError } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 
 const router = Router()
@@ -54,6 +55,15 @@ router.get('/flows', async (req, res, next) => {
 // POST /flows
 router.post('/flows', validate(flowSchema), async (req, res, next) => {
   try {
+    // ── Plan limit check ──
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+    const { count: flowCount } = await db.from('flows').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
+    if (planLimits.flows !== null && (flowCount ?? 0) >= planLimits.flows) {
+      throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.flows} flows`, 403)
+    }
+
     const { name, channelId, is_active, cooldown_type } = req.body
 
     const { data: last } = await db
