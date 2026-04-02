@@ -789,46 +789,47 @@ export default function PipelinePage() {
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
-                          {/* ── Compras do contato ── */}
-                          {(() => {
-                            const cId = conv.contacts?.id || conv.contact_id
-                            const entry = cId ? (purchasesByContact as any)[cId] : null
-                            const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
-                            if (!cPurchases || cPurchases.length === 0) return null
-                            return (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
-                                {cPurchases.slice(0, 3).map((p: any) => (
-                                  <span key={p.id} style={{ fontSize: '10px', fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '99px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                    {p.products?.name || 'Produto'} × {p.quantity}
-                                  </span>
-                                ))}
-                                {cPurchases.length > 3 && (
-                                  <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>+{cPurchases.length - 3}</span>
-                                )}
-                              </div>
-                            )
-                          })()}
-                          {canEdit('/dashboard/pipeline') && (
-                            <button onClick={(e) => {
-                              e.stopPropagation();
-                              setPurchaseConvId(conv.id);
-                              setPurchaseContactId(conv.contacts?.id || conv.contact_id)
-                            }}
-                              style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              + Compra
-                            </button>
-                          )}
-                          {conv.last_message && <p style={{ fontSize: '11px', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '6px' }}>{conv.last_message}</p>}
+                          {conv.last_message && <p style={{ fontSize: '11px', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '4px' }}>{conv.last_message}</p>}
 
-                          {/* ── Tarefas pendentes ── */}
-                          {tasksByConv[conv.id] && (() => {
-                            const tasks = tasksByConv[conv.id]
-                            const overdue = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < new Date())
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          {/* ── Compras resumo + tarefas ── */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                            {/* Compras */}
+                            {(() => {
+                              const cId = conv.contacts?.id || conv.contact_id
+                              const entry = cId ? (purchasesByContact as any)[cId] : null
+                              const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
+                              const total = cId ? getContactPurchaseTotal(cId) : 0
+                              const itemCount = cPurchases ? cPurchases.reduce((s: number, p: any) => s + (p.quantity || 1), 0) : 0
+                              if (!total && !itemCount) return null
+                              return (
+                                <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
+                                  style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  {itemCount} {itemCount === 1 ? 'item' : 'itens'} · R$ {total.toFixed(2)}
+                                </button>
+                              )
+                            })()}
+                            {/* Botão adicionar compra (só se não tem compras ainda) */}
+                            {(() => {
+                              const cId = conv.contacts?.id || conv.contact_id
+                              const entry = cId ? (purchasesByContact as any)[cId] : null
+                              const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
+                              if (cPurchases && cPurchases.length > 0) return null
+                              if (!canEdit('/dashboard/pipeline')) return null
+                              return (
+                                <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
+                                  style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  + Compra
+                                </button>
+                              )
+                            })()}
+                            {/* Tarefas */}
+                            {tasksByConv[conv.id] && (() => {
+                              const tasks = tasksByConv[conv.id]
+                              const overdue = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < new Date())
+                              return <>
                                 {overdue.length > 0 && (
                                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '1px 6px', borderRadius: '99px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    <AlertTriangle size={9} /> {overdue.length} {overdue.length > 1 ? t('pipeline.overdueCountPlural') : t('pipeline.overdueCount')}
+                                    <AlertTriangle size={9} /> {overdue.length}
                                   </span>
                                 )}
                                 {tasks.length > overdue.length && (
@@ -836,22 +837,9 @@ export default function PipelinePage() {
                                     {tasks.length - overdue.length} {(tasks.length - overdue.length) > 1 ? t('pipeline.taskCountPlural') : t('pipeline.taskCount')}
                                   </span>
                                 )}
-                              </div>
-                            )
-                          })()}
-
-                          {/* ── Total de compras ── */}
-                          {(() => {
-                            const cId = conv.contacts?.id || conv.contact_id
-                            const total = cId ? getContactPurchaseTotal(cId) : 0
-                            if (!total) return null
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-                                <DollarSign size={11} color="#16a34a" />
-                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(total)}</span>
-                              </div>
-                            )
-                          })()}
+                              </>
+                            })()}
+                          </div>
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                             {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}
