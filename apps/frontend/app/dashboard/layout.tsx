@@ -27,6 +27,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const { validateSession } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
+  const [planChecked, setPlanChecked] = useState(false)
+  const [isPending, setIsPending] = useState(false)
 
   useEffect(() => { setHydrated(true) }, [])
 
@@ -35,15 +37,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     validateSession()
     if (!useAuthStore.getState().isAuthenticated) {
       router.replace('/login')
+      return
     }
+    // Checa se o plano é pending
+    tenantApi.get('/').then(({ data }) => {
+      const plan = data?.data?.planSlug || data?.data?.plan_slug
+      if (plan === 'pending') {
+        setIsPending(true)
+      }
+      setPlanChecked(true)
+    }).catch(() => setPlanChecked(true))
   }, [hydrated])
 
-  // Middleware já protege no server-side. Aqui é fallback client-side.
-  if (!hydrated || !isAuthenticated) return (
+  // Loading
+  if (!hydrated || !isAuthenticated || !planChecked) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f4f4f5' }}>
-      <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #4ADE80', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
+
+  // Plano pending — força escolher plano antes de usar
+  if (isPending && !window.location.pathname.includes('/dashboard/settings')) {
+    router.replace('/dashboard/settings#planos')
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f4f4f5' }}>
+        <div style={{ width: '32px', height: '32px', border: '3px solid #e4e4e7', borderTop: '3px solid #4ADE80', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
