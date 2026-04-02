@@ -300,24 +300,30 @@ router.post('/purchases/batch', async (req, res, next) => {
     const ship = Number(shipping) || 0
     const created = []
 
+    // Calcula subtotal geral pra distribuir ajustes proporcionalmente
+    const itemSubs = items.map((item: any) => {
+      const unitPrice = priceMap[item.productId] || 0
+      return unitPrice * (item.qty || 1)
+    })
+    const orderSubtotal = itemSubs.reduce((a: number, b: number) => a + b, 0)
+
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx]
       const unitPrice = priceMap[item.productId] || 0
       const qty = item.qty || 1
       const subtotal = unitPrice * qty
-      // Ajustes só no primeiro item do pedido pra não duplicar
-      const isFirst = idx === 0
-      const itemTotal = isFirst
-        ? Math.max(0, subtotal - disc + sur + ship)
-        : subtotal
+      // Distribui ajustes proporcionalmente pelo peso de cada item
+      const proportion = orderSubtotal > 0 ? subtotal / orderSubtotal : (1 / items.length)
+      const itemDisc = Math.round(disc * proportion * 100) / 100
+      const itemSur = Math.round(sur * proportion * 100) / 100
+      const itemShip = Math.round(ship * proportion * 100) / 100
+      const itemTotal = Math.max(0, subtotal - itemDisc + itemSur + itemShip)
       const { data, error } = await db.from('purchases').insert({
         tenant_id: req.auth.tid, contact_id: contactId, product_id: item.productId,
         conversation_id: conversationId || null, quantity: qty,
         unit_price: unitPrice, total_price: itemTotal,
-        discount: isFirst ? disc : 0,
-        surcharge: isFirst ? sur : 0,
-        shipping: isFirst ? ship : 0,
-        coupon: isFirst ? (coupon || null) : null,
+        discount: itemDisc, surcharge: itemSur, shipping: itemShip,
+        coupon: idx === 0 ? (coupon || null) : null,
       }).select('*, products(name, price, sku)').single()
       if (error) throw error
       created.push(data)
