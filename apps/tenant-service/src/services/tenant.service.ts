@@ -162,15 +162,16 @@ export class TenantService {
 
     if (!tenant) throw new NotFoundError('Tenant')
 
-    // Auto-reset se virou o mês
+    // Auto-reset a cada 30 dias a partir do current_period_start
     const periodStart = tenant.current_period_start ? new Date(tenant.current_period_start) : null
     const now = new Date()
-    if (!periodStart || periodStart.getMonth() !== now.getMonth() || periodStart.getFullYear() !== now.getFullYear()) {
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+    if (!periodStart || (now.getTime() - periodStart.getTime()) >= thirtyDaysMs) {
       await db.from('tenants').update({
         messages_sent_this_period: 0,
-        current_period_start: new Date(now.getFullYear(), now.getMonth(), 1),
+        current_period_start: now,
       }).eq('id', tenantId)
-      logger.info('Auto-reset message count for new month', { tenantId })
+      logger.info('Auto-reset message count — new 30-day period', { tenantId })
       return // contador zerado, pode enviar
     }
 
