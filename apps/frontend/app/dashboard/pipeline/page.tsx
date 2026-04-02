@@ -288,6 +288,10 @@ export default function PipelinePage() {
   const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
   const [purchaseProductId, setPurchaseProductId] = useState('')
   const [purchaseQty, setPurchaseQty] = useState(1)
+  const [newDiscount, setNewDiscount] = useState(0)
+  const [newSurcharge, setNewSurcharge] = useState(0)
+  const [newShipping, setNewShipping] = useState(0)
+  const [newCoupon, setNewCoupon] = useState('')
   const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null)
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
@@ -471,12 +475,16 @@ export default function PipelinePage() {
         productId: purchaseProductId,
         quantity: purchaseQty,
         conversationId: purchaseConvId,
+        discount: newDiscount,
+        surcharge: newSurcharge,
+        shipping: newShipping,
+        coupon: newCoupon || null,
       })
     },
     onSuccess: () => {
       toast.success('Compra registrada!');
-      setPurchaseProductId('');
-      setPurchaseQty(1)
+      setPurchaseProductId(''); setPurchaseQty(1)
+      setNewDiscount(0); setNewSurcharge(0); setNewShipping(0); setNewCoupon('')
       refetchPurchases()
       queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
@@ -961,18 +969,53 @@ export default function PipelinePage() {
               )}
             </div>
 
-            {/* ── Adicionar produto ── */}
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-              <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)}
-                style={{ flex: 1, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)' }}>
-                <option value="">Adicionar produto...</option>
-                {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
-              </select>
-              <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))}
-                style={{ width: '48px', padding: '7px 4px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
+            {/* ── Novo pedido ── */}
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '10px' }}>Novo pedido</div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)}
+                  style={{ flex: 1, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)' }}>
+                  <option value="">Selecione produto...</option>
+                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
+                </select>
+                <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} placeholder="Qtd"
+                  style={{ width: '48px', padding: '7px 4px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Cupom</label>
+                  <input value={newCoupon} onChange={e => setNewCoupon(e.target.value)} placeholder="—"
+                    style={{ ...smallInput, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Desconto (−)</label>
+                  <input type="number" min="0" step="0.01" value={newDiscount || ''} onChange={e => setNewDiscount(Number(e.target.value) || 0)} placeholder="0"
+                    style={{ ...smallInput, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Acréscimo (+)</label>
+                  <input type="number" min="0" step="0.01" value={newSurcharge || ''} onChange={e => setNewSurcharge(Number(e.target.value) || 0)} placeholder="0"
+                    style={{ ...smallInput, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Frete (+)</label>
+                  <input type="number" min="0" step="0.01" value={newShipping || ''} onChange={e => setNewShipping(Number(e.target.value) || 0)} placeholder="0"
+                    style={{ ...smallInput, width: '100%' }} />
+                </div>
+              </div>
+              {purchaseProductId && (() => {
+                const selProduct = products.find((p: any) => p.id === purchaseProductId)
+                const sub = (selProduct ? Number(selProduct.price) : 0) * purchaseQty
+                const total = Math.max(0, sub - newDiscount + newSurcharge + newShipping)
+                return (
+                  <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '10px', textAlign: 'right' }}>
+                    Subtotal: R$ {sub.toFixed(2)} → <strong style={{ color: '#16a34a' }}>R$ {total.toFixed(2)}</strong>
+                  </div>
+                )
+              })()}
               <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
-                style={{ padding: '7px 12px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-                +
+                style={{ width: '100%', padding: '8px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1 }}>
+                {purchaseMutation.isPending ? 'Registrando...' : 'Adicionar pedido'}
               </button>
             </div>
 
