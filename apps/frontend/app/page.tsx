@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 /* ─── FAQ data ─── */
 const faqs = [
   { q: 'Preciso de CNPJ para usar?', a: 'Não! Qualquer pessoa física ou jurídica pode criar uma conta e começar a usar o AutoZap imediatamente.' },
-  { q: 'Posso testar grátis?', a: 'Sim. Todos os planos têm 7 dias de teste grátis, sem precisar de cartão de crédito.' },
+  { q: 'Como posso começar?', a: 'Crie sua conta, escolha um plano e comece a usar imediatamente. O setup leva menos de 15 minutos.' },
   { q: 'Como funciona a IA?', a: 'Nossa IA responde automaticamente às mensagens dos seus clientes, classifica leads, transcreve áudios e sugere respostas. Tudo integrado ao WhatsApp.' },
   { q: 'Integra com Zapier?', a: 'Sim! Oferecemos integração nativa com Zapier, além de webhooks e API aberta para conectar com qualquer sistema.' },
   { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa e sem burocracia. Cancele a qualquer momento direto no painel.' },
@@ -112,7 +112,7 @@ export default function LandingPage() {
             <span onClick={() => scrollTo('planos')} style={{ cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#71717a' }}>Planos</span>
             <span onClick={() => scrollTo('faq')} style={{ cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#71717a' }}>FAQ</span>
             <a href="/login" className="btn-outline" style={{ padding: '8px 20px', fontSize: 14 }}>Entrar</a>
-            <a href="/register" className="btn-green" style={{ padding: '8px 20px', fontSize: 14 }}>Começar grátis</a>
+            <a href="/register" className="btn-green" style={{ padding: '8px 20px', fontSize: 14 }}>Começar agora</a>
           </div>
 
           {/* Mobile hamburger */}
@@ -135,7 +135,7 @@ export default function LandingPage() {
             <span onClick={() => scrollTo('faq')} style={{ cursor: 'pointer', fontSize: 15, fontWeight: 500, color: '#18181b' }}>FAQ</span>
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               <a href="/login" className="btn-outline" style={{ flex: 1, textAlign: 'center' }}>Entrar</a>
-              <a href="/register" className="btn-green" style={{ flex: 1, textAlign: 'center' }}>Começar grátis</a>
+              <a href="/register" className="btn-green" style={{ flex: 1, textAlign: 'center' }}>Começar agora</a>
             </div>
           </div>
         )}
@@ -159,7 +159,7 @@ export default function LandingPage() {
             display: 'inline-block', background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 600,
             padding: '6px 16px', borderRadius: 20, marginBottom: 24,
           }}>
-            🚀 7 dias grátis — sem cartão de crédito
+            🚀 Configure em menos de 15 minutos
           </div>
           <h1 className="fade-up fade-up-d1" style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, color: '#18181b', marginBottom: 20, letterSpacing: '-0.02em' }}>
             O CRM com WhatsApp<br />que <span style={{ color: '#22c55e' }}>vende por você</span>
@@ -168,7 +168,7 @@ export default function LandingPage() {
             Automatize atendimento, vendas e campanhas com IA que entende até áudio. Tudo em um só lugar.
           </p>
           <div className="fade-up fade-up-d3" style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/register" className="btn-green btn-green-lg">Teste grátis por 7 dias</a>
+            <a href="/register" className="btn-green btn-green-lg">Começar agora</a>
             <button onClick={() => scrollTo('funcionalidades')} className="btn-outline" style={{ padding: '16px 36px', fontSize: 17 }}>Ver demonstração</button>
           </div>
         </div>
@@ -387,7 +387,7 @@ export default function LandingPage() {
               Escolha o plano ideal
             </h2>
             <p style={{ color: '#71717a', fontSize: 17, maxWidth: 500, margin: '0 auto' }}>
-              Todos com 7 dias grátis. Cancele quando quiser.
+              Pagamento seguro via PIX ou cartão. Cancele quando quiser.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
@@ -428,7 +428,7 @@ export default function LandingPage() {
                   className={p.popular ? 'btn-green' : 'btn-outline'}
                   style={{ textAlign: 'center', width: '100%', padding: '12px 0' }}
                 >
-                  Começar grátis
+                  Começar agora
                 </a>
               </div>
             ))}
@@ -501,10 +501,10 @@ export default function LandingPage() {
             Junte-se a mais de 500 empresas que já vendem no piloto automático com AutoZap.
           </p>
           <a href="/register" className="btn-green btn-green-lg">
-            Começar grátis agora
+            Começar agora agora
           </a>
           <p style={{ color: '#71717a', fontSize: 13, marginTop: 16 }}>
-            7 dias grátis &middot; Sem cartão de crédito &middot; Cancele quando quiser
+            Setup em 15 minutos &middot; Suporte incluso &middot; Cancele quando quiser
           </p>
         </div>
       </section>
