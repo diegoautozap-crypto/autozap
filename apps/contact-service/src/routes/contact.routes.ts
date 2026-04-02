@@ -116,6 +116,37 @@ router.patch('/contacts/:id', validate(updateContactSchema), async (req, res, ne
   } catch (err) { next(err) }
 })
 
+// PATCH /contacts/:id/deal-adjustments
+router.patch('/contacts/:id/deal-adjustments', async (req, res, next) => {
+  try {
+    const { discount, surcharge, shipping, coupon } = req.body
+    const adjustments = {
+      discount: Number(discount) || 0,
+      surcharge: Number(surcharge) || 0,
+      shipping: Number(shipping) || 0,
+      coupon: coupon || '',
+    }
+    const { data, error } = await db.from('contacts').update({
+      deal_adjustments: adjustments,
+      updated_at: new Date(),
+    }).eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
+    if (error) throw error
+    if (!data) { res.status(404).json({ error: 'Contact not found' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// GET /contacts/:id/deal-adjustments
+router.get('/contacts/:id/deal-adjustments', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('contacts')
+      .select('deal_adjustments')
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+    if (error) throw error
+    res.json(ok(data?.deal_adjustments || { discount: 0, surcharge: 0, shipping: 0, coupon: '' }))
+  } catch (err) { next(err) }
+})
+
 // DELETE /contacts/:id
 router.delete('/contacts/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
@@ -287,11 +318,25 @@ router.get('/purchases/by-contact', async (req, res, next) => {
       .eq('tenant_id', req.auth.tid)
       .order('created_at', { ascending: false })
     if (error) throw error
+    // Busca ajustes de todos os contatos que têm compras
+    const contactIds = [...new Set((data || []).map(p => p.contact_id))]
+    let adjustmentsMap: Record<string, any> = {}
+    if (contactIds.length > 0) {
+      const { data: contacts } = await db.from('contacts')
+        .select('id, deal_adjustments')
+        .in('id', contactIds)
+      for (const c of (contacts || [])) {
+        if (c.deal_adjustments) adjustmentsMap[c.id] = c.deal_adjustments
+      }
+    }
     // Agrupa por contact_id
-    const grouped: Record<string, any[]> = {}
+    const grouped: Record<string, { purchases: any[]; adjustments: any }> = {}
     for (const p of (data || [])) {
-      if (!grouped[p.contact_id]) grouped[p.contact_id] = []
-      grouped[p.contact_id].push(p)
+      if (!grouped[p.contact_id]) grouped[p.contact_id] = {
+        purchases: [],
+        adjustments: adjustmentsMap[p.contact_id] || { discount: 0, surcharge: 0, shipping: 0, coupon: '' },
+      }
+      grouped[p.contact_id].purchases.push(p)
     }
     res.json(ok(grouped))
   } catch (err) { next(err) }
