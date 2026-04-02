@@ -65,7 +65,9 @@ function RegisterPage() {
         toast.error('Erro ao gerar link de pagamento')
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Erro ao criar conta')
+      const msg = err?.response?.data?.error?.message || err?.message || 'Erro ao criar conta'
+      toast.error(msg)
+      console.error('Register error:', err?.response?.data || err)
     } finally {
       setCreating(false)
     }
