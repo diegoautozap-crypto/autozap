@@ -958,7 +958,6 @@ export default function PipelinePage() {
                   )
                 })
               })()}
-              )}
             </div>
 
             {/* ── Novo pedido ── */}
