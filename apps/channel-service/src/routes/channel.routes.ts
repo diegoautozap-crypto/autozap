@@ -261,7 +261,7 @@ async function notifyMessageService(event: string, data: unknown): Promise<void>
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-internal-secret': process.env.INTERNAL_SECRET || 'autozap_internal',
+        'x-internal-secret': process.env.INTERNAL_SECRET!,
       },
       body: JSON.stringify(data),
     })
@@ -275,7 +275,7 @@ async function notifyMessageService(event: string, data: unknown): Promise<void>
 router.post('/internal/send', async (req, res, next) => {
   try {
     const secret = req.headers['x-internal-secret']
-    if (secret !== (process.env.INTERNAL_SECRET || 'autozap_internal')) {
+    if (secret !== (process.env.INTERNAL_SECRET!)) {
       res.status(401).json({ success: false, error: { message: 'Unauthorized' } })
       return
     }

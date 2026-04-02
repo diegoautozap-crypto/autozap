@@ -21,7 +21,7 @@ function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promi
 }
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
 const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET

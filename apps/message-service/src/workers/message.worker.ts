@@ -7,7 +7,7 @@ import type { SendMessageJob } from '../services/types'
 
 const REDIS_URL = process.env.REDIS_URL!
 const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 function getRedisConnection() {
   try {

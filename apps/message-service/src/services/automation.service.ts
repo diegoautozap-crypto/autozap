@@ -3,7 +3,7 @@ import { logger } from '../lib/logger'
 import { generateId } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 interface AutomationContext {
   tenantId: string

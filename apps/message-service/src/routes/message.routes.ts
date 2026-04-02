@@ -10,7 +10,7 @@ import { ensureContact, ensureConversation } from '../services/contact.helper'
 
 const router = Router()
 
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'autozap_internal'
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 function requireAuthOrInternal(req: any, res: any, next: any): void {
   const secret = req.headers['x-internal-secret']
