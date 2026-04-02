@@ -27,9 +27,9 @@ function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
 
 function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '2k contatos', '500 IA/mes'],
-    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '15k contatos', '5k IA/mes', 'Transcricao'],
-    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '50k contatos', '20k IA/mes', 'Relatorios'],
+    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes'],
+    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', 'Transcricao'],
+    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', 'Relatorios'],
     unlimited:  ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
   }
 }
@@ -447,12 +447,8 @@ export default function SettingsPage() {
   }
 
   const getPlanPrice = (slug: string) => {
-    if (!plans) {
-      const prices: Record<string, string> = { starter: 'R$ 149,99', pro: 'R$ 299,99', enterprise: 'R$ 599,99', unlimited: 'R$ 999,99' }
-      return prices[slug] || ''
-    }
-    const plan = plans.find((p: any) => p.slug === slug)
-    return plan ? `R$ ${Number(plan.price_monthly).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : ''
+    const prices: Record<string, string> = { starter: 'R$ 149,99', pro: 'R$ 299,99', enterprise: 'R$ 599,99', unlimited: 'R$ 999,99' }
+    return prices[slug] || ''
   }
 
   const barColor = isWarning ? '#f97316' : '#22c55e'
