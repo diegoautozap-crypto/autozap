@@ -72,8 +72,7 @@ export class AuthService {
     })
     if (tenantError) throw new AppError('DB_ERROR', tenantError.message, 500)
 
-    // 4. Create user (owner) — email_verified=true pra permitir login imediato
-    // O acesso ao CRM é bloqueado pelo plano 'pending' até pagar
+    // 4. Create user (owner) — email_verified=false, verifica após pagar
     const userId = generateId()
     const passwordHash = await hashPassword(password)
 
@@ -84,7 +83,7 @@ export class AuthService {
       name,
       password_hash: passwordHash,
       role: 'owner' as UserRole,
-      email_verified: true,
+      email_verified: false,
     })
 
     if (userError) {
@@ -92,8 +91,11 @@ export class AuthService {
       throw new AppError('DB_ERROR', userError.message, 500)
     }
 
+    // Gera token temporário pra criar assinatura sem precisar de login
+    const tempToken = signAccessToken({ sub: userId, tid: tenantId, role: 'owner' as UserRole, email: email.toLowerCase() })
+
     logger.info('User registered', { userId, tenantId, email })
-    return { userId, tenantId }
+    return { userId, tenantId, tempToken }
   }
 
   async login(input: LoginInput): Promise<TokenPair> {

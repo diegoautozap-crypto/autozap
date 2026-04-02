@@ -44,19 +44,21 @@ function RegisterPage() {
     }
     setCreating(true)
     try {
-      // 1. Cria conta (email_verified=true, plano=pending)
-      await register(form.name, form.email, form.password, form.tenantName)
+      // 1. Cria conta (email_verified=false, plano=pending)
+      const { default: axios } = await import('axios')
+      const authUrl = process.env.NEXT_PUBLIC_API_URL
+      const { data: regData } = await axios.post(`${authUrl}/auth/register`, {
+        name: form.name, email: form.email, password: form.password, tenantName: form.tenantName,
+      })
+      const tempToken = regData?.data?.tempToken
+      if (!tempToken) throw new Error('Erro ao criar conta')
 
-      // 2. Login automático pra pegar token
-      const { login } = useAuthStore.getState()
-      await login(form.email, form.password)
-
-      // 3. Cria assinatura e redireciona pro pagamento
-      const { tenantApi } = await import('@/lib/api')
-      const { data: subData } = await tenantApi.post('/tenant/billing/subscribe', {
+      // 2. Usa token temporário pra criar assinatura
+      const tenantUrl = process.env.NEXT_PUBLIC_TENANT_SERVICE_URL
+      const { data: subData } = await axios.post(`${tenantUrl}/tenant/billing/subscribe`, {
         planSlug: selectedPlan,
         cpfCnpj: form.cpfCnpj.replace(/\D/g, ''),
-      })
+      }, { headers: { Authorization: `Bearer ${tempToken}` } })
       const paymentUrl = subData?.data?.paymentUrl
       if (paymentUrl) {
         // 4. Abre Asaas em nova aba e mostra tela de aguardando
@@ -88,22 +90,6 @@ function RegisterPage() {
   }
 
   if (step === 'payment') {
-    // Polling: checa a cada 5s se o plano foi ativado
-    const checkPayment = async () => {
-      try {
-        const { tenantApi } = await import('@/lib/api')
-        const { data } = await tenantApi.get('/tenant')
-        const plan = data?.data?.planSlug || data?.data?.plan_slug
-        if (plan && plan !== 'pending') {
-          window.location.href = '/dashboard'
-        }
-      } catch {}
-    }
-    setTimeout(() => {
-      const interval = setInterval(checkPayment, 5000)
-      checkPayment()
-      setTimeout(() => clearInterval(interval), 600000) // para depois de 10min
-    }, 3000)
 
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6f8fa', padding: '24px' }}>
@@ -112,7 +98,7 @@ function RegisterPage() {
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '10px' }}>Aguardando pagamento</h2>
           <p style={{ color: '#6b7280', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
             Uma aba foi aberta com a página de pagamento.<br/>
-            Após pagar, você será redirecionado automaticamente.
+            Após pagar, você receberá um email pra confirmar sua conta.
           </p>
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 500, margin: 0 }}>

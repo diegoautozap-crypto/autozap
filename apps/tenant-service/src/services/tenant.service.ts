@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import {
@@ -338,6 +339,34 @@ export class TenantService {
         .eq('asaas_subscription_id', payload.subscription?.id || payload.payment?.subscription)
 
       logger.info('Plan activated via Asaas webhook', { tenantId, planSlug })
+
+      // Envia email de verificação se usuário ainda não verificou
+      try {
+        const { data: owner } = await db.from('users')
+          .select('id, email, name, email_verified')
+          .eq('tenant_id', tenantId).eq('role', 'owner').single()
+        if (owner && !owner.email_verified) {
+          const emailVerifyToken = randomBytes(32).toString('hex')
+          await db.from('users').update({ email_verify_token: emailVerifyToken }).eq('id', owner.id)
+          const verifyUrl = `${process.env.APP_URL || 'https://useautozap.app'}/verify-email?token=${emailVerifyToken}`
+          await resend.emails.send({
+            from: RESEND_FROM,
+            to: owner.email,
+            subject: 'Confirme seu email — AutoZap',
+            html: `
+              <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+                <h1 style="color: #16a34a; font-size: 24px;">Pagamento confirmado!</h1>
+                <p>Olá, ${owner.name || 'cliente'}!</p>
+                <p>Seu pagamento do plano <strong>${PLAN_NAMES[planSlug]}</strong> foi confirmado. Agora confirme seu email pra ativar sua conta:</p>
+                <a href="${verifyUrl}" style="display: inline-block; background: #16a34a; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Confirmar email</a>
+                <p style="color: #9ca3af; font-size: 13px; margin-top: 24px;">Se você não criou essa conta, ignore este email.</p>
+              </div>`,
+          })
+          logger.info('Verification email sent after payment', { tenantId, email: owner.email })
+        }
+      } catch (err) {
+        logger.error('Failed to send verification email after payment', { tenantId, err })
+      }
 
       // ✅ Envia email de confirmação de assinatura
       try {
