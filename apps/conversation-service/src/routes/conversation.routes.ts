@@ -526,45 +526,64 @@ router.delete('/tasks/:id', async (req, res, next) => {
 
 // ─── Criar conversa manualmente (pra adicionar contato à pipeline) ────────────
 
-router.post('/conversations', async (req, res, next) => {
+// ─── Pipeline Cards (negócios independentes) ─────────────────────────────────
+
+router.get('/pipeline-cards', async (req, res, next) => {
   try {
-    const { contactId, status = 'open', pipelineStage, pipelineId } = req.body
+    const { pipelineId } = req.query as any
+    let query = db.from('pipeline_cards')
+      .select('*, contacts(id, name, phone, email, metadata, contact_tags(tags(id, name, color)))')
+      .eq('tenant_id', req.auth.tid)
+      .order('sort_order', { ascending: true })
+    if (pipelineId) query = query.eq('pipeline_id', pipelineId)
+    const { data, error } = await query
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+router.post('/pipeline-cards', async (req, res, next) => {
+  try {
+    const { contactId, pipelineId, columnKey, title, dealValue } = req.body
     if (!contactId) { res.status(400).json({ error: 'contactId required' }); return }
 
-    // Verifica se contato pertence ao tenant
-    const { data: contact } = await db.from('contacts').select('id, name, phone').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
+    const { data: contact } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
     if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
 
-    // Pega o primeiro canal do tenant pra associar a conversa
-    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).limit(1).single()
-    if (!channel) { res.status(400).json({ error: 'Nenhum canal configurado. Crie um canal primeiro.' }); return }
-
-    // Verifica se já existe conversa pra esse contato+canal
-    const { data: existing } = await db.from('conversations').select('id')
-      .eq('tenant_id', req.auth.tid).eq('contact_id', contactId).eq('channel_id', channel.id).maybeSingle()
-
-    if (existing) {
-      // Atualiza pipeline da conversa existente
-      const { data: updated } = await db.from('conversations').update({
-        pipeline_stage: pipelineStage || 'lead',
-        pipeline_id: pipelineId || null,
-        status: 'open',
-        updated_at: new Date(),
-      }).eq('id', existing.id).select().single()
-      res.json(ok(updated))
-      return
-    }
-
-    const id = require('crypto').randomUUID()
-    const { data, error } = await db.from('conversations').insert({
-      id, tenant_id: req.auth.tid, contact_id: contactId,
-      channel_id: channel.id, channel_type: channel.type,
-      status, pipeline_stage: pipelineStage || 'lead', pipeline_id: pipelineId || null,
-      bot_active: false, unread_count: 0,
-      last_message: 'Adicionado manualmente', last_message_at: new Date(),
-    }).select().single()
+    const { data, error } = await db.from('pipeline_cards').insert({
+      tenant_id: req.auth.tid,
+      contact_id: contactId,
+      pipeline_id: pipelineId || null,
+      column_key: columnKey || 'lead',
+      title: title || null,
+      deal_value: dealValue || null,
+    }).select('*, contacts(id, name, phone)').single()
     if (error) throw error
     res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/pipeline-cards/:id', async (req, res, next) => {
+  try {
+    const update: any = { updated_at: new Date() }
+    if (req.body.columnKey !== undefined) update.column_key = req.body.columnKey
+    if (req.body.pipelineId !== undefined) update.pipeline_id = req.body.pipelineId
+    if (req.body.dealValue !== undefined) update.deal_value = req.body.dealValue
+    if (req.body.title !== undefined) update.title = req.body.title
+    if (req.body.sortOrder !== undefined) update.sort_order = req.body.sortOrder
+    if (req.body.assignedTo !== undefined) update.assigned_to = req.body.assignedTo
+
+    const { data, error } = await db.from('pipeline_cards').update(update)
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
+    if (error || !data) { res.status(404).json({ error: 'Card não encontrado' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.delete('/pipeline-cards/:id', async (req, res, next) => {
+  try {
+    await db.from('pipeline_cards').delete().eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+    res.json(ok({ message: 'Card removido' }))
   } catch (err) { next(err) }
 })
 

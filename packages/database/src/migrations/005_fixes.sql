@@ -65,4 +65,27 @@ CREATE POLICY "service_role_all" ON tasks TO service_role USING (true) WITH CHEC
 -- Permissão de edição por página
 ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS editable_pages TEXT[] DEFAULT '{}';
 
+-- Cards da pipeline (independentes de conversas)
+CREATE TABLE IF NOT EXISTS pipeline_cards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  pipeline_id UUID REFERENCES pipelines(id) ON DELETE CASCADE,
+  column_key VARCHAR(100) NOT NULL DEFAULT 'lead',
+  deal_value NUMERIC(12,2),
+  title TEXT,
+  notes TEXT,
+  assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_cards_tenant ON pipeline_cards(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_cards_pipeline ON pipeline_cards(pipeline_id, column_key);
+CREATE INDEX IF NOT EXISTS idx_pipeline_cards_contact ON pipeline_cards(contact_id);
+
+ALTER TABLE pipeline_cards ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON pipeline_cards TO service_role USING (true) WITH CHECK (true);
+
 NOTIFY pgrst, 'reload schema';

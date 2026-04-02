@@ -295,7 +295,7 @@ function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: s
 
   const addMutation = useMutation({
     mutationFn: async (contactId: string) => {
-      await conversationApi.post('/conversations', { contactId, status: 'open', pipelineStage: stage, pipelineId })
+      await conversationApi.post('/pipeline-cards', { contactId, columnKey: stage, pipelineId })
     },
     onSuccess: () => { toast.success('Contato adicionado à pipeline!'); onDone() },
     onError: (err: any) => toast.error(err?.response?.data?.error || 'Erro ao adicionar contato'),
@@ -400,8 +400,31 @@ export default function PipelinePage() {
       if (selectedPipelineId) params.set('pipelineId', selectedPipelineId)
       const url = `/conversations/pipeline${params.toString() ? '?' + params.toString() : ''}`
       const { data } = await conversationApi.get(url)
+      const boardData = data.data as Record<string, any[]>
+
+      // Carrega pipeline cards (negócios manuais) e adiciona ao board
+      try {
+        const cardsParams = selectedPipelineId ? `?pipelineId=${selectedPipelineId}` : ''
+        const { data: cardsRes } = await conversationApi.get(`/pipeline-cards${cardsParams}`)
+        const cards = cardsRes.data || []
+        for (const card of cards) {
+          const col = card.column_key || 'lead'
+          if (!boardData[col]) boardData[col] = []
+          boardData[col].push({
+            id: `card_${card.id}`,
+            _cardId: card.id,
+            contacts: card.contacts,
+            deal_value: card.deal_value,
+            last_message: card.title || 'Negócio manual',
+            last_message_at: card.created_at,
+            status: 'open',
+            pipeline_stage: col,
+          })
+        }
+      } catch {}
+
       localBoardRef.current = null
-      return data.data as Record<string, any[]>
+      return boardData
     },
     staleTime: 8000, refetchInterval: 10000, refetchIntervalInBackground: false,
     placeholderData: (prev) => prev,
@@ -711,7 +734,11 @@ export default function PipelinePage() {
                               e.stopPropagation()
                               if (!confirm(`Remover "${name}" da pipeline?`)) return
                               try {
-                                await conversationApi.patch(`/conversations/${conv.id}/status`, { status: 'closed' })
+                                if (conv._cardId) {
+                                  await conversationApi.delete(`/pipeline-cards/${conv._cardId}`)
+                                } else {
+                                  await conversationApi.patch(`/conversations/${conv.id}/status`, { status: 'closed' })
+                                }
                                 refetch()
                                 toast.success('Removido da pipeline')
                               } catch { toast.error('Erro ao remover') }
