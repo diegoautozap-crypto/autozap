@@ -2,6 +2,7 @@ import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { decryptCredentials } from '../lib/crypto'
 import { generateId, normalizeBRPhone } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { ensureContact, ensureConversation } from './contact.helper'
 
 // ─── In-memory cache to avoid hitting DB on every message ─────────────────────
@@ -186,6 +187,27 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
 }
 
 export class FlowEngine {
+
+  /** Check tenant plan limits for a specific resource */
+  private async getTenantPlanLimits(tenantId: string): Promise<{ planSlug: PlanSlug; limits: typeof PLAN_LIMITS[PlanSlug] }> {
+    const { data: tenant } = await cached(`tenant-plan:${tenantId}`, 60_000, () =>
+      db.from('tenants').select('plan_slug').eq('id', tenantId).single().then(r => r)
+    )
+    const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
+    const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+    return { planSlug, limits }
+  }
+
+  private async getMonthlyAiCount(tenantId: string): Promise<number> {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const { count } = await db
+      .from('flow_logs').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'ai_response')
+      .gte('created_at', monthStart)
+    return count ?? 0
+  }
 
   async processFlows(ctx: FlowContext): Promise<void> {
     try {
@@ -604,6 +626,14 @@ export class FlowEngine {
         case 'transcribe_audio': {
           const saveVar = data?.transcribeSaveAs || 'transcricao'
 
+          // Check if plan allows transcription
+          const { limits: transcribeLimits } = await this.getTenantPlanLimits(ctx.tenantId)
+          if (!transcribeLimits.transcription) {
+            logger.warn('Transcribe node blocked — plan does not allow transcription', { tenantId: ctx.tenantId })
+            variables[saveVar] = ctx.messageBody || ''
+            break
+          }
+
           // Busca última mensagem pra saber o tipo
           const { data: lastMsg } = await db.from('messages').select('content_type, media_url, body')
             .eq('conversation_id', ctx.conversationId).eq('direction', 'inbound')
@@ -690,6 +720,16 @@ export class FlowEngine {
         }
 
         case 'ai': {
+          // Check AI response limit
+          const { limits: aiLimits } = await this.getTenantPlanLimits(ctx.tenantId)
+          if (aiLimits.aiResponses !== null) {
+            const currentAiCount = await this.getMonthlyAiCount(ctx.tenantId)
+            if (currentAiCount >= aiLimits.aiResponses) {
+              logger.warn('AI node blocked — monthly AI limit reached', { tenantId: ctx.tenantId, limit: aiLimits.aiResponses, used: currentAiCount })
+              break
+            }
+          }
+
           let openaiKey = data?.apiKey
           if (!openaiKey) {
             const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
@@ -724,6 +764,8 @@ export class FlowEngine {
           const aiResponse = completion.choices[0]?.message?.content?.trim() || ''
           if (data?.saveAs) variables[data.saveAs] = aiResponse
           if (aiMode === 'respond' && aiResponse) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: aiResponse })
+          // Log AI usage for plan limit tracking
+          await this.logNode(flowId, node.id, ctx, 'ai_response', `AI ${aiMode}: ${aiResponse.slice(0, 100)}`)
           break
         }
 

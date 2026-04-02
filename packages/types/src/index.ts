@@ -11,19 +11,32 @@ export interface Plan {
   features: string[]
 }
 
-export const PLAN_LIMITS: Record<PlanSlug, number | null> = {
-  pending:    0,
-  starter:    10_000,
-  pro:        50_000,
-  enterprise: 100_000,
-  unlimited:  null,
+export interface PlanLimits {
+  messages: number | null
+  channels: number
+  members: number
+  flows: number | null
+  contacts: number | null
+  campaigns: number | null
+  aiResponses: number | null
+  transcription: boolean
+  reports: boolean
 }
 
+export const PLAN_LIMITS: Record<PlanSlug, PlanLimits> = {
+  pending:    { messages: 0, channels: 0, members: 0, flows: 0, contacts: 0, campaigns: 0, aiResponses: 0, transcription: false, reports: false },
+  starter:    { messages: 10_000, channels: 5, members: 5, flows: 3, contacts: 10_000, campaigns: 5, aiResponses: 10_000, transcription: false, reports: false },
+  pro:        { messages: 50_000, channels: 10, members: 10, flows: 15, contacts: 50_000, campaigns: 30, aiResponses: 50_000, transcription: true, reports: true },
+  enterprise: { messages: 150_000, channels: 30, members: 30, flows: null, contacts: 150_000, campaigns: null, aiResponses: 150_000, transcription: true, reports: true },
+  unlimited:  { messages: null, channels: 999, members: 999, flows: null, contacts: null, campaigns: null, aiResponses: null, transcription: true, reports: true },
+}
+
+/** @deprecated Use PLAN_LIMITS[slug].channels instead */
 export const PLAN_CHANNEL_LIMITS: Record<PlanSlug, number> = {
   pending:    0,
-  starter:    1,
-  pro:        5,
-  enterprise: 10,
+  starter:    5,
+  pro:        10,
+  enterprise: 30,
   unlimited:  999,
 }
 

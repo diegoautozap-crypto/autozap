@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { tenantService } from '../services/tenant.service'
 import { requireAuth, requireRole, validate } from '../middleware/tenant.middleware'
 import { ok, paginationSchema, rateLimit } from '@autozap/utils'
+import { PLAN_LIMITS } from '@autozap/types'
 
 const router = Router()
 
@@ -15,15 +16,6 @@ function validateWebhookUrl(url: string): boolean {
     if (!['http:', 'https:'].includes(parsed.protocol)) return false
     return true
   } catch { return false }
-}
-
-// ─── Limites por plano ────────────────────────────────────────────────────────
-const PLAN_LIMITS: Record<string, number | null> = {
-  pending:    0,
-  starter:    10_000,
-  pro:        50_000,
-  enterprise: 100_000,
-  unlimited:  null,
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -120,12 +112,80 @@ router.get('/subscription', async (req, res, next) => {
 router.get('/usage', async (req, res, next) => {
   try {
     const tenant = await tenantService.getTenant(req.auth.tid)
-    const limit = PLAN_LIMITS[tenant.planSlug] ?? null
+    const planLimits = PLAN_LIMITS[tenant.planSlug as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.pending
+    const limit = planLimits.messages
     res.json(ok({
       sent: tenant.messagesSentThisPeriod,
       limit,
       remaining: limit === null ? null : Math.max(0, limit - tenant.messagesSentThisPeriod),
       percentUsed: limit === null ? 0 : Math.round((tenant.messagesSentThisPeriod / limit) * 100),
+    }))
+  } catch (err) { next(err) }
+})
+
+router.get('/limits', async (req, res, next) => {
+  try {
+    const { db } = await import('../lib/db')
+    const tenant = await tenantService.getTenant(req.auth.tid)
+    const planLimits = PLAN_LIMITS[tenant.planSlug as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.pending
+
+    // Current month boundaries
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
+    // Messages sent this period (already tracked on tenant)
+    const messagesSent = tenant.messagesSentThisPeriod ?? 0
+
+    // Channels count
+    const { count: channelsCount } = await db
+      .from('channels').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+
+    // Members count
+    const { count: membersCount } = await db
+      .from('users').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+      .eq('is_active', true)
+
+    // Active flows count
+    const { count: flowsCount } = await db
+      .from('flows').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+      .eq('is_active', true)
+
+    // Contacts count
+    const { count: contactsCount } = await db
+      .from('contacts').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+
+    // Campaigns sent this month
+    const { count: campaignsCount } = await db
+      .from('campaigns').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+      .gte('created_at', monthStart)
+      .lt('created_at', monthEnd)
+
+    // AI responses this month (count flow_logs with ai node executions)
+    const { count: aiCount } = await db
+      .from('flow_logs').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+      .eq('status', 'ai_response')
+      .gte('created_at', monthStart)
+      .lt('created_at', monthEnd)
+
+    res.json(ok({
+      plan: tenant.planSlug,
+      limits: planLimits,
+      usage: {
+        messages: messagesSent,
+        channels: channelsCount ?? 0,
+        members: membersCount ?? 0,
+        flows: flowsCount ?? 0,
+        contacts: contactsCount ?? 0,
+        campaigns: campaignsCount ?? 0,
+        aiResponses: aiCount ?? 0,
+      },
     }))
   } catch (err) { next(err) }
 })

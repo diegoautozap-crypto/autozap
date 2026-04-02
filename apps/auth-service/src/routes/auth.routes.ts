@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { authService } from '../services/auth.service'
 import { requireAuth, validate, requireRole } from '../middleware/auth.middleware'
 import { ok, registerSchema, loginSchema, passwordSchema, AppError, generateId } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { hashPassword } from '../lib/jwt'
@@ -152,6 +153,18 @@ router.get('/team', requireAuth, requireRole('admin', 'owner'), async (req, res,
 router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate(inviteSchema), async (req, res, next) => {
   try {
     const { name, email, role, password } = req.body
+
+    // Check member limit
+    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+    const { count: currentMembers } = await db
+      .from('users').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', req.auth.tid)
+      .eq('is_active', true)
+    if (planLimits.members > 0 && (currentMembers ?? 0) >= planLimits.members) {
+      throw new AppError('PLAN_LIMIT', `Limite de ${planLimits.members} membros atingido no plano ${planSlug}. Faça upgrade para adicionar mais.`, 403)
+    }
 
     const { data: existing } = await db
       .from('users').select('id').eq('email', email.toLowerCase()).maybeSingle()

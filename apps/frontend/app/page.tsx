@@ -11,7 +11,7 @@ const faqs = [
   { q: 'Como funciona a IA?', a: 'Nossa IA responde automaticamente às mensagens dos seus clientes, classifica leads, transcreve áudios e sugere respostas. Tudo integrado ao WhatsApp.' },
   { q: 'Integra com Zapier?', a: 'Sim! Oferecemos integração nativa com Zapier, além de webhooks e API aberta para conectar com qualquer sistema.' },
   { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa e sem burocracia. Cancele a qualquer momento direto no painel.' },
-  { q: 'Quantos atendentes posso ter?', a: 'Depende do plano. O Starter permite 3 atendentes, o Pro 10, o Enterprise 25 e o Unlimited é ilimitado.' },
+  { q: 'Quantos atendentes posso ter?', a: 'Depende do plano. O Starter permite 5 membros, o Pro 10, o Enterprise 30 e o Unlimited é ilimitado.' },
 ]
 
 /* ─── Features data ─── */
@@ -26,10 +26,10 @@ const features = [
 
 /* ─── Plans data ─── */
 const plans = [
-  { slug: 'starter', name: 'Starter', price: '97', msgs: '10.000 msgs/mês', agents: '3 atendentes', popular: false, features: ['Inbox unificado', 'CRM básico', 'Pipeline kanban', '1 flow de automação', 'IA — respostas automáticas'] },
-  { slug: 'pro', name: 'Pro', price: '197', msgs: '50.000 msgs/mês', agents: '10 atendentes', popular: true, features: ['Tudo do Starter', 'Campanhas em massa', 'Flows ilimitados', 'IA — transcrição de áudio', 'Webhooks e API'] },
-  { slug: 'enterprise', name: 'Enterprise', price: '397', msgs: '100.000 msgs/mês', agents: '25 atendentes', popular: false, features: ['Tudo do Pro', 'Multi-número WhatsApp', 'Relatórios avançados', 'Suporte prioritário', 'Onboarding dedicado'] },
-  { slug: 'unlimited', name: 'Unlimited', price: '697', msgs: 'Msgs ilimitadas', agents: 'Atendentes ilimitados', popular: false, features: ['Tudo do Enterprise', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
+  { slug: 'starter', name: 'Starter', price: '147', msgs: '10.000 msgs/mês', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automação', '10.000 contatos', '10.000 respostas IA/mês', '5 campanhas/mês'] },
+  { slug: 'pro', name: 'Pro', price: '297', msgs: '50.000 msgs/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automação', '50.000 contatos', '50.000 respostas IA/mês', 'Transcrição de áudio', 'Relatórios avançados'] },
+  { slug: 'enterprise', name: 'Enterprise', price: '597', msgs: '150.000 msgs/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mês', 'Campanhas ilimitadas', 'Suporte prioritário'] },
+  { slug: 'unlimited', name: 'Unlimited', price: '997', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
 ]
 
 /* ─── Steps data ─── */

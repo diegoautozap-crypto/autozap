@@ -16,21 +16,21 @@ const PLAN_NAMES: Record<string, string> = {
   unlimited:  'Unlimited',
 }
 
-function getPlanMsgs(t: (key: string) => string): Record<string, string> {
+function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
   return {
     starter:    '10.000 msgs',
     pro:        '50.000 msgs',
-    enterprise: '100.000 msgs',
-    unlimited:  t('settings.unlimited'),
+    enterprise: '150.000 msgs',
+    unlimited:  'Ilimitado',
   }
 }
 
-function getPlanFeatures(t: (key: string) => string): Record<string, string[]> {
+function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    [t('settings.feat.10kMonth'), t('settings.feat.realtimeInbox'), t('settings.feat.massCampaigns'), t('settings.feat.contactCrm')],
-    pro:        [t('settings.feat.50kMonth'), t('settings.feat.allStarter'), t('settings.feat.multiUsers'), t('settings.feat.prioritySupport')],
-    enterprise: [t('settings.feat.100kMonth'), t('settings.feat.allPro'), t('settings.feat.dedicatedApi'), t('settings.feat.slaGuaranteed')],
-    unlimited:  [t('settings.feat.unlimitedMsgs'), t('settings.feat.allEnterprise'), t('settings.feat.dedicatedOnboarding'), t('settings.feat.support247')],
+    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '2k contatos', '500 IA/mes'],
+    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '15k contatos', '5k IA/mes', 'Transcricao'],
+    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '50k contatos', '20k IA/mes', 'Relatorios'],
+    unlimited:  ['Tudo ilimitado', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
   }
 }
 
@@ -401,6 +401,11 @@ export default function SettingsPage() {
     queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data },
     refetchInterval: 30000,
   })
+  const { data: limitsData } = useQuery({
+    queryKey: ['limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+    refetchInterval: 60000,
+  })
   const { data: tenant } = useQuery({
     queryKey: ['tenant'],
     queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
@@ -443,7 +448,7 @@ export default function SettingsPage() {
 
   const getPlanPrice = (slug: string) => {
     if (!plans) {
-      const prices: Record<string, string> = { starter: 'R$ 97', pro: 'R$ 197', enterprise: 'R$ 397', unlimited: 'R$ 697' }
+      const prices: Record<string, string> = { starter: 'R$ 147', pro: 'R$ 297', enterprise: 'R$ 597', unlimited: 'R$ 997' }
       return prices[slug] || ''
     }
     const plan = plans.find((p: any) => p.slug === slug)
@@ -519,6 +524,49 @@ export default function SettingsPage() {
             <span style={{ fontSize: '12px', color: isWarning ? '#f97316' : 'var(--text-faint)', fontWeight: isWarning ? 600 : 400 }}>{pct}% {t('settings.used')}</span>
             {limit !== null && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{Math.max(0, limit - sent).toLocaleString()} {t('settings.remaining')}</span>}
           </div>
+
+          {/* Detailed limits breakdown */}
+          {limitsData && (
+            <div style={{ marginTop: '16px', borderTop: '1px solid var(--divider)', paddingTop: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {([
+                ['Canais', limitsData.usage?.channels, limitsData.limits?.channels],
+                ['Membros', limitsData.usage?.members, limitsData.limits?.members],
+                ['Flows ativos', limitsData.usage?.flows, limitsData.limits?.flows],
+                ['Contatos', limitsData.usage?.contacts, limitsData.limits?.contacts],
+                ['Campanhas/mes', limitsData.usage?.campaigns, limitsData.limits?.campaigns],
+                ['Respostas IA/mes', limitsData.usage?.aiResponses, limitsData.limits?.aiResponses],
+              ] as [string, number, number | null][]).map(([label, used, max]) => {
+                const usedVal = used ?? 0
+                const pctUsed = max === null || max === undefined ? 0 : max > 0 ? Math.round((usedVal / max) * 100) : (usedVal > 0 ? 100 : 0)
+                const warn = pctUsed > 80
+                return (
+                  <div key={label} style={{ padding: '8px 10px', background: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--divider)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{label}</span>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: warn ? '#f97316' : 'var(--text)' }}>
+                        {usedVal.toLocaleString()} / {max === null || max === undefined ? '∞' : max.toLocaleString()}
+                      </span>
+                    </div>
+                    {max !== null && max !== undefined && max > 0 && (
+                      <div style={{ height: '3px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(pctUsed, 100)}%`, height: '100%', background: warn ? '#f97316' : '#22c55e', borderRadius: '99px', transition: 'width 0.4s ease' }} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {limitsData.limits && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: limitsData.limits.transcription ? '#f0fdf4' : '#fef2f2', color: limitsData.limits.transcription ? '#16a34a' : '#ef4444', border: `1px solid ${limitsData.limits.transcription ? '#bbf7d0' : '#fecaca'}` }}>
+                    {limitsData.limits.transcription ? '✓' : '✗'} Transcricao
+                  </span>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: limitsData.limits.reports ? '#f0fdf4' : '#fef2f2', color: limitsData.limits.reports ? '#16a34a' : '#ef4444', border: `1px solid ${limitsData.limits.reports ? '#bbf7d0' : '#fecaca'}` }}>
+                    {limitsData.limits.reports ? '✓' : '✗'} Relatorios
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Webhook de Entrada ── */}

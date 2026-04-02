@@ -23,7 +23,7 @@ const lbl: React.CSSProperties = {
 }
 
 const CHANNEL_LIMITS: Record<string, number> = {
-  pending: 0, starter: 1, pro: 5, enterprise: 10, unlimited: 999,
+  pending: 0, starter: 5, pro: 10, enterprise: 30, unlimited: 999,
 }
 
 type ChannelFormType = 'gupshup' | 'evolution'
