@@ -17,6 +17,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) { res.status(err.statusCode).json(fail(err.code, err.message, err.details)); return }
   if ((err as any)?.name === 'ZodError') { res.status(422).json(fail('VALIDATION_ERROR', 'Validation failed', (err as any).issues)); return }
+  console.error('Unhandled error:', err instanceof Error ? err.message : err, err instanceof Error ? err.stack : '')
   res.status(500).json(fail('INTERNAL_ERROR', 'Internal server error'))
 }
 
