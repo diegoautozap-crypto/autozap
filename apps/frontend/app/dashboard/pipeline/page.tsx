@@ -288,10 +288,7 @@ export default function PipelinePage() {
   const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
   const [purchaseProductId, setPurchaseProductId] = useState('')
   const [purchaseQty, setPurchaseQty] = useState(1)
-  const [dealDiscount, setDealDiscount] = useState(0)
-  const [dealSurcharge, setDealSurcharge] = useState(0)
-  const [dealShipping, setDealShipping] = useState(0)
-  const [dealCoupon, setDealCoupon] = useState('')
+  const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null)
   const localBoardRef = useRef<Record<string, any[]> | null>(null)
   const [, forceRender] = useState(0)
   const DEFAULT_COLUMNS = getDefaultColumns(t)
@@ -413,15 +410,11 @@ export default function PipelinePage() {
 
   const displayBoard = localBoardRef.current ?? board
 
-  // Calcula totais por coluna baseado nas compras + ajustes do contato
+  // Calcula total por contato — total_price de cada purchase já inclui ajustes
   const getContactPurchaseTotal = (contactId: string): number => {
-    const entry = (purchasesByContact as any)[contactId]
-    if (!entry) return 0
-    const purchases = entry.purchases || entry || []
-    const arr = Array.isArray(purchases) ? purchases : []
-    const subtotal = arr.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
-    const adj = entry.adjustments || { discount: 0, surcharge: 0, shipping: 0 }
-    return Math.max(0, subtotal - Number(adj.discount || 0) + Number(adj.surcharge || 0) + Number(adj.shipping || 0))
+    const purchases = (purchasesByContact as any)[contactId]
+    if (!purchases || !Array.isArray(purchases)) return 0
+    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
   }
   const getColumnTotal = (stageKey: string): number => {
     const cards = displayBoard?.[stageKey] || []
@@ -471,33 +464,13 @@ export default function PipelinePage() {
     enabled: !!purchaseContactId,
   })
 
-  const { data: dealAdjustments } = useQuery({
-    queryKey: ['deal-adjustments', purchaseContactId],
-    queryFn: async () => {
-      if (!purchaseContactId) return { discount: 0, surcharge: 0, shipping: 0, coupon: '' }
-      const { data } = await contactApi.get(`/contacts/${purchaseContactId}/deal-adjustments`)
-      return data.data || { discount: 0, surcharge: 0, shipping: 0, coupon: '' }
-    },
-    enabled: !!purchaseContactId,
-  })
-
-  // Quando carrega os ajustes, preenche os states
-  useEffect(() => {
-    if (dealAdjustments) {
-      setDealDiscount(dealAdjustments.discount || 0)
-      setDealSurcharge(dealAdjustments.surcharge || 0)
-      setDealShipping(dealAdjustments.shipping || 0)
-      setDealCoupon(dealAdjustments.coupon || '')
-    }
-  }, [dealAdjustments])
-
   const purchaseMutation = useMutation({
     mutationFn: async () => {
       await contactApi.post('/purchases', {
         contactId: purchaseContactId,
         productId: purchaseProductId,
         quantity: purchaseQty,
-        conversationId: purchaseConvId
+        conversationId: purchaseConvId,
       })
     },
     onSuccess: () => {
@@ -505,7 +478,6 @@ export default function PipelinePage() {
       setPurchaseProductId('');
       setPurchaseQty(1)
       refetchPurchases()
-      queryClient.invalidateQueries({ queryKey: ['pipeline-board'] })
       queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
     onError: () => toast.error('Erro ao registrar compra'),
@@ -517,19 +489,12 @@ export default function PipelinePage() {
     onError: () => toast.error('Erro ao remover compra'),
   })
 
-  const saveAdjustmentsMutation = useMutation({
-    mutationFn: async () => {
-      await contactApi.patch(`/contacts/${purchaseContactId}/deal-adjustments`, {
-        discount: dealDiscount, surcharge: dealSurcharge, shipping: dealShipping, coupon: dealCoupon,
-      })
+  const updatePurchaseMutation = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; [key: string]: any }) => {
+      await contactApi.patch(`/purchases/${id}`, body)
     },
-    onSuccess: () => {
-      toast.success('Ajustes salvos!')
-      queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
-      queryClient.invalidateQueries({ queryKey: ['deal-adjustments'] })
-      setPurchaseConvId(null)
-    },
-    onError: () => toast.error('Erro ao salvar ajustes'),
+    onSuccess: () => { toast.success('Pedido atualizado'); refetchPurchases(); queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] }) },
+    onError: () => toast.error('Erro ao atualizar'),
   })
 
   const handleDragStart = (e: React.DragEvent, convId: string) => { setDraggingId(convId); e.dataTransfer.effectAllowed = 'move' }
@@ -796,10 +761,9 @@ export default function PipelinePage() {
                             {/* Compras */}
                             {(() => {
                               const cId = conv.contacts?.id || conv.contact_id
-                              const entry = cId ? (purchasesByContact as any)[cId] : null
-                              const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
+                              const cPurchases = cId ? (purchasesByContact as any)[cId] : null
                               const total = cId ? getContactPurchaseTotal(cId) : 0
-                              if (!cPurchases || cPurchases.length === 0) {
+                              if (!cPurchases || !Array.isArray(cPurchases) || cPurchases.length === 0) {
                                 if (!canEdit('/dashboard/pipeline')) return null
                                 return (
                                   <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
@@ -896,117 +860,129 @@ export default function PipelinePage() {
       )}
 
       {purchaseConvId && (() => {
-        const subtotal = contactPurchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
-        const totalFinal = Math.max(0, subtotal - dealDiscount + dealSurcharge + dealShipping)
-        const inputStyle = { width: '90px', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', textAlign: 'right' as const, background: 'var(--bg-input)', color: 'var(--text)' }
-        const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }
-        const labelStyle = { fontSize: '13px', color: 'var(--text-muted)' }
+        const grandTotal = contactPurchases.reduce((s: number, p: any) => s + Number(p.total_price || 0), 0)
+        const smallInput = { padding: '4px 6px', border: '1px solid var(--border)', borderRadius: '5px', fontSize: '12px', width: '70px', textAlign: 'right' as const, background: 'var(--bg-input)', color: 'var(--text)' }
 
         return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '420px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
-            {/* Header */}
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '440px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Compras</h3>
-              <button onClick={() => setPurchaseConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faint)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Pedidos</h3>
+              <button onClick={() => { setPurchaseConvId(null); setExpandedPurchase(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faint)' }}>
                 <X size={16} />
               </button>
             </div>
 
-            {/* ── Lista de produtos ── */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-              {contactPurchases.map((p: any) => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.products?.name || 'Produto'}
+            {/* ── Lista de pedidos ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              {contactPurchases.map((p: any) => {
+                const subtotal = Number(p.unit_price || 0) * (p.quantity || 1)
+                const disc = Number(p.discount || 0)
+                const sur = Number(p.surcharge || 0)
+                const ship = Number(p.shipping || 0)
+                const hasAdjustments = disc > 0 || sur > 0 || ship > 0 || p.coupon
+                const isExpanded = expandedPurchase === p.id
+
+                return (
+                  <div key={p.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                    {/* Linha principal */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', cursor: 'pointer' }}
+                      onClick={() => setExpandedPurchase(isExpanded ? null : p.id)}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.products?.name || 'Produto'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{p.quantity}x R$ {Number(p.unit_price || 0).toFixed(2)}</span>
+                          {hasAdjustments && (
+                            <span style={{ color: disc > 0 ? '#dc2626' : '#7c3aed', fontSize: '10px' }}>
+                              {disc > 0 && `−R$${disc.toFixed(2)} `}{sur > 0 && `+R$${sur.toFixed(2)} `}{ship > 0 && `frete R$${ship.toFixed(2)}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                        R$ {Number(p.total_price).toFixed(2)}
+                      </span>
+                      <button onClick={(e) => { e.stopPropagation(); deletePurchaseMutation.mutate(p.id) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faintest)', borderRadius: '4px', flexShrink: 0 }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>
-                      {p.quantity}x R$ {Number(p.unit_price || p.total_price / p.quantity).toFixed(2)}
-                    </div>
+
+                    {/* Ajustes expandidos */}
+                    {isExpanded && (
+                      <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Cupom</label>
+                            <input defaultValue={p.coupon || ''} onBlur={e => updatePurchaseMutation.mutate({ id: p.id, coupon: e.target.value })}
+                              placeholder="—" style={{ ...smallInput, width: '100%' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Qtd</label>
+                            <input type="number" min="1" defaultValue={p.quantity} onBlur={e => updatePurchaseMutation.mutate({ id: p.id, quantity: Number(e.target.value) || 1 })}
+                              style={{ ...smallInput, width: '100%' }} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Desconto (−)</label>
+                            <input type="number" min="0" step="0.01" defaultValue={disc || ''} placeholder="0"
+                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, discount: Number(e.target.value) || 0 })}
+                              style={{ ...smallInput, width: '100%' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Acréscimo (+)</label>
+                            <input type="number" min="0" step="0.01" defaultValue={sur || ''} placeholder="0"
+                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, surcharge: Number(e.target.value) || 0 })}
+                              style={{ ...smallInput, width: '100%' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginBottom: '2px' }}>Frete (+)</label>
+                            <input type="number" min="0" step="0.01" defaultValue={ship || ''} placeholder="0"
+                              onBlur={e => updatePurchaseMutation.mutate({ id: p.id, shipping: Number(e.target.value) || 0 })}
+                              style={{ ...smallInput, width: '100%' }} />
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', marginTop: '8px', fontSize: '11px', color: 'var(--text-faint)' }}>
+                          Subtotal: R$ {subtotal.toFixed(2)} → <strong style={{ color: '#16a34a' }}>R$ {Number(p.total_price).toFixed(2)}</strong>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                    R$ {Number(p.total_price).toFixed(2)}
-                  </span>
-                  <button onClick={() => deletePurchaseMutation.mutate(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faintest)', borderRadius: '4px', flexShrink: 0 }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+                )
+              })}
 
               {contactPurchases.length === 0 && (
-                <p style={{ fontSize: '13px', color: 'var(--text-faint)', textAlign: 'center', padding: '12px 0' }}>Nenhum produto adicionado</p>
+                <p style={{ fontSize: '13px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Nenhum pedido registrado</p>
               )}
             </div>
 
             {/* ── Adicionar produto ── */}
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
               <select value={purchaseProductId} onChange={e => setPurchaseProductId(e.target.value)}
                 style={{ flex: 1, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)' }}>
-                <option value="">Selecione produto...</option>
+                <option value="">Adicionar produto...</option>
                 {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</option>)}
               </select>
               <input type="number" min="1" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))}
-                style={{ width: '50px', padding: '7px 6px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
+                style={{ width: '48px', padding: '7px 4px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', textAlign: 'center', background: 'var(--bg-input)', color: 'var(--text)' }} />
               <button onClick={() => purchaseMutation.mutate()} disabled={!purchaseProductId || purchaseMutation.isPending}
-                style={{ padding: '7px 12px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-                + Adicionar
+                style={{ padding: '7px 12px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !purchaseProductId ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                +
               </button>
             </div>
 
-            {/* ── Resumo financeiro ── */}
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
-              <div style={rowStyle}>
-                <span style={labelStyle}>Total dos produtos</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>R$ {subtotal.toFixed(2)}</span>
-              </div>
-
-              <div style={rowStyle}>
-                <span style={labelStyle}>Cupom</span>
-                <input value={dealCoupon} onChange={e => setDealCoupon(e.target.value)} placeholder="—"
-                  style={{ ...inputStyle, width: '100px' }} />
-              </div>
-
-              <div style={rowStyle}>
-                <span style={labelStyle}>Desconto (−)</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>R$</span>
-                  <input type="number" min="0" step="0.01" value={dealDiscount || ''} onChange={e => setDealDiscount(Number(e.target.value) || 0)}
-                    placeholder="0" style={inputStyle} />
-                </div>
-              </div>
-
-              <div style={rowStyle}>
-                <span style={labelStyle}>Acréscimo (+)</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>R$</span>
-                  <input type="number" min="0" step="0.01" value={dealSurcharge || ''} onChange={e => setDealSurcharge(Number(e.target.value) || 0)}
-                    placeholder="0" style={inputStyle} />
-                </div>
-              </div>
-
-              <div style={rowStyle}>
-                <span style={labelStyle}>Frete (+)</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>R$</span>
-                  <input type="number" min="0" step="0.01" value={dealShipping || ''} onChange={e => setDealShipping(Number(e.target.value) || 0)}
-                    placeholder="0" style={inputStyle} />
-                </div>
-              </div>
-
-              <div style={{ ...rowStyle, borderTop: '2px solid var(--border)', marginTop: '8px', paddingTop: '12px' }}>
+            {/* ── Total geral ── */}
+            {contactPurchases.length > 0 && (
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>Total</span>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: '#16a34a' }}>R$ {totalFinal.toFixed(2)}</span>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#16a34a' }}>R$ {grandTotal.toFixed(2)}</span>
               </div>
-            </div>
-
-            {/* ── Salvar ── */}
-            <button onClick={() => saveAdjustmentsMutation.mutate()} disabled={saveAdjustmentsMutation.isPending}
-              style={{ width: '100%', padding: '12px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginTop: '16px' }}>
-              {saveAdjustmentsMutation.isPending ? 'Salvando...' : 'Salvar'}
-            </button>
+            )}
           </div>
         </div>
         )

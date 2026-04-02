@@ -284,22 +284,55 @@ router.get('/contacts/:contactId/purchases', async (req, res, next) => {
 
 router.post('/purchases', async (req, res, next) => {
   try {
-    const { contactId, productId, quantity, notes, conversationId } = req.body
+    const { contactId, productId, quantity, notes, conversationId, discount, surcharge, shipping, coupon } = req.body
     if (!contactId || !productId) { res.status(400).json({ error: 'contactId and productId required' }); return }
-    // Get product price
     const { data: product } = await db.from('products').select('price')
       .eq('id', productId).eq('tenant_id', req.auth.tid).single()
     if (!product) { res.status(404).json({ error: 'Product not found' }); return }
     const qty = quantity || 1
     const unitPrice = product.price
-    const totalPrice = unitPrice * qty
+    const subtotal = unitPrice * qty
+    const disc = Number(discount) || 0
+    const sur = Number(surcharge) || 0
+    const ship = Number(shipping) || 0
+    const totalPrice = Math.max(0, subtotal - disc + sur + ship)
     const { data, error } = await db.from('purchases').insert({
       tenant_id: req.auth.tid, contact_id: contactId, product_id: productId,
       conversation_id: conversationId || null, quantity: qty,
       unit_price: unitPrice, total_price: totalPrice, notes,
+      discount: disc, surcharge: sur, shipping: ship, coupon: coupon || null,
     }).select('*, products(name, price, sku)').single()
     if (error) throw error
     res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/purchases/:id', async (req, res, next) => {
+  try {
+    const update: any = {}
+    if (req.body.quantity !== undefined) update.quantity = req.body.quantity
+    if (req.body.discount !== undefined) update.discount = Number(req.body.discount) || 0
+    if (req.body.surcharge !== undefined) update.surcharge = Number(req.body.surcharge) || 0
+    if (req.body.shipping !== undefined) update.shipping = Number(req.body.shipping) || 0
+    if (req.body.coupon !== undefined) update.coupon = req.body.coupon || null
+    if (req.body.notes !== undefined) update.notes = req.body.notes
+    // Recalcular total se necessário
+    if (Object.keys(update).length > 0) {
+      const { data: current } = await db.from('purchases').select('unit_price, quantity, discount, surcharge, shipping')
+        .eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+      if (!current) { res.status(404).json({ error: 'Purchase not found' }); return }
+      const qty = update.quantity ?? current.quantity
+      const disc = update.discount ?? current.discount ?? 0
+      const sur = update.surcharge ?? current.surcharge ?? 0
+      const ship = update.shipping ?? current.shipping ?? 0
+      update.total_price = Math.max(0, (current.unit_price * qty) - disc + sur + ship)
+    }
+    const { data, error } = await db.from('purchases').update(update)
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+      .select('*, products(name, price, sku)').single()
+    if (error) throw error
+    if (!data) { res.status(404).json({ error: 'Purchase not found' }); return }
+    res.json(ok(data))
   } catch (err) { next(err) }
 })
 
@@ -314,29 +347,14 @@ router.delete('/purchases/:id', async (req, res, next) => {
 router.get('/purchases/by-contact', async (req, res, next) => {
   try {
     const { data, error } = await db.from('purchases')
-      .select('id, contact_id, quantity, total_price, products(name, price, sku)')
+      .select('id, contact_id, quantity, unit_price, total_price, discount, surcharge, shipping, coupon, products(name, price, sku)')
       .eq('tenant_id', req.auth.tid)
       .order('created_at', { ascending: false })
     if (error) throw error
-    // Busca ajustes de todos os contatos que têm compras
-    const contactIds = [...new Set((data || []).map(p => p.contact_id))]
-    let adjustmentsMap: Record<string, any> = {}
-    if (contactIds.length > 0) {
-      const { data: contacts } = await db.from('contacts')
-        .select('id, deal_adjustments')
-        .in('id', contactIds)
-      for (const c of (contacts || [])) {
-        if (c.deal_adjustments) adjustmentsMap[c.id] = c.deal_adjustments
-      }
-    }
-    // Agrupa por contact_id
-    const grouped: Record<string, { purchases: any[]; adjustments: any }> = {}
+    const grouped: Record<string, any[]> = {}
     for (const p of (data || [])) {
-      if (!grouped[p.contact_id]) grouped[p.contact_id] = {
-        purchases: [],
-        adjustments: adjustmentsMap[p.contact_id] || { discount: 0, surcharge: 0, shipping: 0, coupon: '' },
-      }
-      grouped[p.contact_id].purchases.push(p)
+      if (!grouped[p.contact_id]) grouped[p.contact_id] = []
+      grouped[p.contact_id].push(p)
     }
     res.json(ok(grouped))
   } catch (err) { next(err) }
