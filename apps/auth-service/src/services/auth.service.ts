@@ -72,10 +72,10 @@ export class AuthService {
     })
     if (tenantError) throw new AppError('DB_ERROR', tenantError.message, 500)
 
-    // 4. Create user (owner)
+    // 4. Create user (owner) — email_verified=true pra permitir login imediato
+    // O acesso ao CRM é bloqueado pelo plano 'pending' até pagar
     const userId = generateId()
     const passwordHash = await hashPassword(password)
-    const emailVerifyToken = randomBytes(32).toString('hex')
 
     const { error: userError } = await db.from('users').insert({
       id: userId,
@@ -84,18 +84,13 @@ export class AuthService {
       name,
       password_hash: passwordHash,
       role: 'owner' as UserRole,
-      email_verify_token: emailVerifyToken,
+      email_verified: true,
     })
 
     if (userError) {
       await db.from('tenants').delete().eq('id', tenantId)
       throw new AppError('DB_ERROR', userError.message, 500)
     }
-
-    // 5. Send verification email (non-blocking)
-    sendVerificationEmail({ to: email, name, token: emailVerifyToken }).catch((err) =>
-      logger.error('Failed to send verification email', { err }),
-    )
 
     logger.info('User registered', { userId, tenantId, email })
     return { userId, tenantId }
