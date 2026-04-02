@@ -62,6 +62,16 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Scroll pra seção se URL tem hash (#planos)
+  useEffect(() => {
+    if (authChecked && window.location.hash) {
+      const id = window.location.hash.replace('#', '')
+      setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
+    }
+  }, [authChecked])
+
   const scrollTo = (id: string) => {
     setMobileMenu(false)
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
