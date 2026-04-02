@@ -158,13 +158,11 @@ export default function ProductsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 80px', gap: '12px', padding: '8px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr 80px', gap: '12px', padding: '8px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             <span>Produto</span>
             <span style={{ textAlign: 'right' }}>Preço</span>
             <span style={{ textAlign: 'right' }}>Vendas</span>
             <span style={{ textAlign: 'right' }}>Receita</span>
-            <span style={{ textAlign: 'right' }}>Frete</span>
-            <span style={{ textAlign: 'right' }}>Descontos</span>
             <span></span>
           </div>
 
@@ -177,7 +175,7 @@ export default function ProductsPage() {
                 {/* Row principal */}
                 <div
                   onClick={() => setExpandedId(isExpanded ? null : product.id)}
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 80px', gap: '12px', padding: '14px 16px', alignItems: 'center', cursor: 'pointer' }}
+                  style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr 80px', gap: '12px', padding: '14px 16px', alignItems: 'center', cursor: 'pointer' }}
                 >
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -196,12 +194,6 @@ export default function ProductsPage() {
                     <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{s?.totalSales || 0} pedidos</div>
                   </div>
                   <span style={{ textAlign: 'right', fontSize: '14px', fontWeight: 700, color: '#22c55e' }}>{fmt(s?.totalRevenue || 0)}</span>
-                  <span style={{ textAlign: 'right', fontSize: '13px', color: s?.totalShipping ? '#0891b2' : 'var(--text-faintest)' }}>
-                    {s?.totalShipping ? fmt(s.totalShipping) : '—'}
-                  </span>
-                  <span style={{ textAlign: 'right', fontSize: '13px', color: s?.totalDiscount ? '#ef4444' : 'var(--text-faintest)' }}>
-                    {s?.totalDiscount ? `−${fmt(s.totalDiscount)}` : '—'}
-                  </span>
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     <button onClick={(e) => { e.stopPropagation(); openEditModal(product) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-faint)', display: 'flex', borderRadius: '6px' }}
