@@ -20,10 +20,10 @@ const RESEND_FROM = process.env.RESEND_FROM || 'onboarding@resend.dev'
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!
 
 const PLAN_PRICES: Record<string, number> = {
-  starter:    97,
-  pro:        197,
-  enterprise: 397,
-  unlimited:  697,
+  starter:    149.99,
+  pro:        299.99,
+  enterprise: 599.99,
+  unlimited:  999.99,
 }
 
 const PLAN_NAMES: Record<string, string> = {
