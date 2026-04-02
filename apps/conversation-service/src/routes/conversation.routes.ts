@@ -552,18 +552,6 @@ router.post('/conversations', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/conversations/:id/pipeline', async (req, res, next) => {
-  try {
-    const { stage, pipelineId } = req.body
-    const update: any = {}
-    if (stage) update.pipeline_stage = stage
-    if (pipelineId !== undefined) update.pipeline_id = pipelineId
-    const { data, error } = await db.from('conversations').update(update).eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
-    if (error || !data) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
-    res.json(ok(data))
-  } catch (err) { next(err) }
-})
-
 // ─── Ações em massa ───────────────────────────────────────────────────────────
 
 router.post('/conversations/bulk/read', async (req, res, next) => {
