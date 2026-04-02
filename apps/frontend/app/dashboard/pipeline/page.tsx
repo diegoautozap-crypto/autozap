@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, channelApi, campaignApi } from '@/lib/api'
+import { conversationApi, channelApi, campaignApi, contactApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
@@ -279,6 +279,60 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
   )
 }
 
+function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: string; stage: string; pipelineId: string | null; onDone: () => void }) {
+  const { data: contacts = [], isLoading } = useQuery({
+    queryKey: ['pipeline-contact-search', search],
+    queryFn: async () => {
+      if (search.length < 2) return []
+      const { data } = await contactApi.get(`/contacts?search=${encodeURIComponent(search)}&limit=10`)
+      return data.data || []
+    },
+    enabled: search.length >= 2,
+  })
+
+  const addMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      // Busca conversa existente do contato ou cria uma
+      const { data: convs } = await conversationApi.get(`/conversations?contactId=${contactId}&limit=1`)
+      let convId = convs?.data?.[0]?.id
+      if (!convId) {
+        // Cria conversa mínima pra esse contato
+        const { data: newConv } = await conversationApi.post('/conversations', { contactId, status: 'open', pipelineStage: stage, pipelineId })
+        convId = newConv?.data?.id
+      } else {
+        // Atualiza pipeline da conversa existente
+        await conversationApi.patch(`/conversations/${convId}/pipeline`, { stage, pipelineId })
+      }
+    },
+    onSuccess: () => { toast.success('Contato adicionado à pipeline!'); onDone() },
+    onError: () => toast.error('Erro ao adicionar contato'),
+  })
+
+  if (search.length < 2) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Digite pelo menos 2 caracteres</p>
+  if (isLoading) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Buscando...</p>
+  if (contacts.length === 0) return <p style={{ fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Nenhum contato encontrado</p>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {contacts.map((c: any) => (
+        <div key={c.id} onClick={() => addMutation.mutate(c.id)}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--border)', transition: 'all 0.1s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#22c55e' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+            {(c.name || c.phone || '?').slice(0, 2).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || c.phone}</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>{c.phone}</p>
+          </div>
+          {addMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#22c55e' }} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function PipelinePage() {
   const t = useT()
   const { isAdmin, canEdit, canDelete } = usePermissions()
@@ -297,6 +351,8 @@ export default function PipelinePage() {
   const [localStages, setLocalStages] = useState<any[] | null>(null)
   const [showManage, setShowManage] = useState(false)
   const [showNewPipeline, setShowNewPipeline] = useState(false)
+  const [addToStage, setAddToStage] = useState<string | null>(null)
+  const [addSearch, setAddSearch] = useState('')
   const [newPipelineName, setNewPipelineName] = useState('')
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null)
   const [editingPipelineName, setEditingPipelineName] = useState('')
@@ -625,7 +681,12 @@ export default function PipelinePage() {
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
                         <span style={{ fontSize: '13px', fontWeight: 700, color: stage.color, letterSpacing: '-0.01em' }}>{stage.label}</span>
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: stage.color, background: `${stage.color}18`, border: `1px solid ${stage.color}25`, padding: '1px 8px', borderRadius: '99px' }}>{cards.length}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: stage.color, background: `${stage.color}18`, border: `1px solid ${stage.color}25`, padding: '1px 8px', borderRadius: '99px' }}>{cards.length}</span>
+                        {canEdit('/dashboard/pipeline') && <button onClick={() => { setAddToStage(stage.key); setAddSearch('') }}
+                          style={{ width: '20px', height: '20px', borderRadius: '5px', border: `1px solid ${stage.color}30`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: stage.color, fontSize: '14px', fontWeight: 700, lineHeight: 1 }}
+                          title="Adicionar contato">+</button>}
+                      </div>
                     </div>
                     {/* Total monetário da coluna */}
                     {colTotal > 0 && (
@@ -728,6 +789,28 @@ export default function PipelinePage() {
           onSaved={handleColumnsSaved}
           board={displayBoard ?? undefined}
         />
+      )}
+
+      {/* Modal: Adicionar contato à pipeline */}
+      {addToStage && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '440px', maxHeight: '70vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Adicionar contato</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>Busque um contato pra adicionar à coluna</p>
+              </div>
+              <button onClick={() => setAddToStage(null)} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex' }}>✕</button>
+            </div>
+            <div style={{ padding: '12px 20px' }}>
+              <input autoFocus style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', background: 'var(--bg-input)', color: 'var(--text)' }}
+                placeholder="Buscar por nome ou telefone..." value={addSearch} onChange={e => setAddSearch(e.target.value)} />
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 16px' }}>
+              <ContactSearchResults search={addSearch} stage={addToStage} pipelineId={selectedPipelineId} onDone={() => { setAddToStage(null); refetch() }} />
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

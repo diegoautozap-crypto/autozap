@@ -519,6 +519,50 @@ router.delete('/tasks/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Criar conversa manualmente (pra adicionar contato à pipeline) ────────────
+
+router.post('/conversations', async (req, res, next) => {
+  try {
+    const { contactId, status = 'open', pipelineStage, pipelineId } = req.body
+    if (!contactId) { res.status(400).json({ error: 'contactId required' }); return }
+
+    // Verifica se contato pertence ao tenant
+    const { data: contact } = await db.from('contacts').select('id, name, phone').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
+    if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
+
+    // Verifica se já tem conversa aberta
+    const { data: existing } = await db.from('conversations').select('id').eq('contact_id', contactId).eq('tenant_id', req.auth.tid).in('status', ['open', 'waiting']).maybeSingle()
+    if (existing) {
+      // Atualiza pipeline da conversa existente
+      await db.from('conversations').update({ pipeline_stage: pipelineStage || 'lead', pipeline_id: pipelineId || null }).eq('id', existing.id)
+      res.json(ok({ id: existing.id, updated: true }))
+      return
+    }
+
+    const id = require('crypto').randomUUID()
+    const { data, error } = await db.from('conversations').insert({
+      id, tenant_id: req.auth.tid, contact_id: contactId,
+      status, pipeline_stage: pipelineStage || 'lead', pipeline_id: pipelineId || null,
+      bot_active: false, unread_count: 0,
+      last_message: 'Adicionado manualmente', last_message_at: new Date(),
+    }).select().single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.patch('/conversations/:id/pipeline', async (req, res, next) => {
+  try {
+    const { stage, pipelineId } = req.body
+    const update: any = {}
+    if (stage) update.pipeline_stage = stage
+    if (pipelineId !== undefined) update.pipeline_id = pipelineId
+    const { data, error } = await db.from('conversations').update(update).eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
+    if (error || !data) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
 // ─── Ações em massa ───────────────────────────────────────────────────────────
 
 router.post('/conversations/bulk/read', async (req, res, next) => {
