@@ -9,7 +9,7 @@ import {
   Panel, BackgroundVariant, MarkerType, getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { messageApi, contactApi, channelApi } from '@/lib/api'
+import { messageApi, contactApi, channelApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Save, ArrowLeft, Loader2, Workflow, BarChart2 } from 'lucide-react'
@@ -101,8 +101,18 @@ export default function FlowEditorPage() {
   const { canEdit } = usePermissions()
   const canEditFlows = canEdit('/dashboard/flows')
 
+  const { data: planLimits } = useQuery({
+    queryKey: ['flow-plan-limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+  })
+
   const TRIGGER_NODES = getTriggerNodes(t)
-  const ACTION_NODES = getActionNodes(t)
+  const allActionNodes = getActionNodes(t)
+  // Filtra nós baseado no plano
+  const ACTION_NODES = allActionNodes.filter(n => {
+    if (n.type === 'transcribe_audio' && planLimits?.limits?.transcription === false) return false
+    return true
+  })
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
