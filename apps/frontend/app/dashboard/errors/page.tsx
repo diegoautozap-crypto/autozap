@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RefreshCw, AlertCircle, Trash2 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { useT } from '@/lib/i18n'
+import { useAuthStore } from '@/store/auth.store'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,18 +25,23 @@ const ERROR_LABELS: Record<string, string> = {
 export default function ErrorDashboard() {
   const t = useT()
   const [clearing, setClearing] = useState(false)
+  const { user } = useAuthStore()
+  const tenantId = (user as any)?.tenantId || (user as any)?.tid
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['message_errors'],
+    queryKey: ['message_errors', tenantId],
     queryFn: async () => {
+      if (!tenantId) return []
       const { data, error } = await supabase
         .from('message_errors')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(500)
       if (error) throw error
       return data || []
     },
+    enabled: !!tenantId,
     refetchInterval: 30000,
   })
 
@@ -60,7 +66,7 @@ export default function ErrorDashboard() {
   async function clearErrors() {
     if (!confirm(t('errors.confirmClear'))) return
     setClearing(true)
-    await supabase.from('message_errors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('message_errors').delete().eq('tenant_id', tenantId)
     await refetch()
     setClearing(false)
   }
