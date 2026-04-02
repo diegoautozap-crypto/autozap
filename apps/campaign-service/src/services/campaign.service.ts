@@ -194,6 +194,7 @@ export class CampaignService {
       .from('campaigns')
       .select('id, name, status, total_contacts, sent_count, delivered_count, read_count, failed_count, created_at, started_at, completed_at, channels(name)', { count: 'exact' })
       .eq('tenant_id', tenantId)
+      .neq('status', 'deleted')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -248,12 +249,9 @@ export class CampaignService {
     if (campaign.status === 'running') {
       throw new AppError('INVALID_STATUS', 'Pause a campanha antes de deletar.', 400)
     }
-    await db.from('campaign_contacts').delete().eq('campaign_id', campaignId)
-    await db.from('campaign_status_events').delete().eq('campaign_id', campaignId)
-    await db.from('messages').update({ campaign_id: null }).eq('campaign_id', campaignId).eq('tenant_id', tenantId)
-    await db.from('conversations').update({ campaign_id: null }).eq('campaign_id', campaignId).eq('tenant_id', tenantId)
-    const { error } = await db.from('campaigns').delete().eq('id', campaignId).eq('tenant_id', tenantId)
-    if (error) throw new AppError('DB_ERROR', error.message, 500)
+    // Soft delete — marca como deleted mas mantém no banco pra contagem de limites
+    const { error } = await db.from('campaigns').update({ status: 'deleted' }).eq('id', campaignId).eq('tenant_id', tenantId)
+    if (error) throw new AppError('DB_ERROR', 'Database operation failed', 500)
     logger.info('Campaign deleted', { campaignId, tenantId })
   }
 
