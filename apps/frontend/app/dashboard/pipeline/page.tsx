@@ -799,26 +799,23 @@ export default function PipelinePage() {
                               const entry = cId ? (purchasesByContact as any)[cId] : null
                               const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
                               const total = cId ? getContactPurchaseTotal(cId) : 0
-                              const itemCount = cPurchases ? cPurchases.reduce((s: number, p: any) => s + (p.quantity || 1), 0) : 0
-                              if (!total && !itemCount) return null
+                              if (!cPurchases || cPurchases.length === 0) {
+                                if (!canEdit('/dashboard/pipeline')) return null
+                                return (
+                                  <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
+                                    style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    + Compra
+                                  </button>
+                                )
+                              }
+                              // Nomes dos produtos (únicos), max 2 visíveis
+                              const names = [...new Set(cPurchases.map((p: any) => p.products?.name || 'Produto'))]
+                              const visible = names.slice(0, 2).join(', ')
+                              const extra = names.length > 2 ? ` +${names.length - 2}` : ''
                               return (
                                 <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
-                                  style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  {itemCount} {itemCount === 1 ? 'item' : 'itens'} · R$ {total.toFixed(2)}
-                                </button>
-                              )
-                            })()}
-                            {/* Botão adicionar compra (só se não tem compras ainda) */}
-                            {(() => {
-                              const cId = conv.contacts?.id || conv.contact_id
-                              const entry = cId ? (purchasesByContact as any)[cId] : null
-                              const cPurchases = entry?.purchases || (Array.isArray(entry) ? entry : null)
-                              if (cPurchases && cPurchases.length > 0) return null
-                              if (!canEdit('/dashboard/pipeline')) return null
-                              return (
-                                <button onClick={(e) => { e.stopPropagation(); setPurchaseConvId(conv.id); setPurchaseContactId(cId) }}
-                                  style={{ fontSize: '10px', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                  + Compra
+                                  style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {visible}{extra} · R$ {total.toFixed(2)}
                                 </button>
                               )
                             })()}
