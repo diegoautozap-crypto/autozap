@@ -711,7 +711,7 @@ export default function PipelinePage() {
                               e.stopPropagation()
                               if (!confirm(`Remover "${name}" da pipeline?`)) return
                               try {
-                                await conversationApi.patch(`/conversations/${conv.id}/pipeline`, { stage: null, pipelineId: null })
+                                await conversationApi.patch(`/conversations/${conv.id}/status`, { status: 'closed' })
                                 refetch()
                                 toast.success('Removido da pipeline')
                               } catch { toast.error('Erro ao remover') }
