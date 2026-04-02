@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import { Loader2, MessageSquareMore, ArrowRight, Check, Mail } from 'lucide-react'
@@ -13,8 +13,13 @@ const benefits = [
   'Flows de automação',
 ]
 
+const PLAN_NAMES: Record<string, string> = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited' }
+const PLAN_PRICES: Record<string, string> = { starter: 'R$97', pro: 'R$197', enterprise: 'R$397', unlimited: 'R$697' }
+
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const selectedPlan = searchParams.get('plan') || ''
   const { register, isLoading } = useAuthStore()
   const [form, setForm] = useState({ name: '', email: '', password: '', tenantName: '' })
   const [step, setStep] = useState<'form' | 'verify'>('form')
@@ -70,7 +75,7 @@ export default function RegisterPage() {
               Não recebeu? Verifique a caixa de spam ou{' '}
               <a href="/register" style={{ color: '#16a34a', textDecoration: 'none', fontWeight: 500 }}>tente novamente</a>
             </p>
-            <a href="/login" style={{ display: 'block', width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
+            <a href={selectedPlan ? `/login?plan=${selectedPlan}` : '/login'} style={{ display: 'block', width: '100%', padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
               Ir para o login
             </a>
           </div>
@@ -119,6 +124,16 @@ export default function RegisterPage() {
             <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>Crie sua conta</h1>
             <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>Comece a automatizar seu WhatsApp agora</p>
           </div>
+
+          {selectedPlan && PLAN_NAMES[selectedPlan] && (
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #22c55e', borderRadius: '12px', padding: '14px 18px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontSize: '13px', color: '#15803d', fontWeight: 600, margin: 0 }}>Plano selecionado</p>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: '#111827', margin: '2px 0 0' }}>{PLAN_NAMES[selectedPlan]} — {PLAN_PRICES[selectedPlan]}/mês</p>
+              </div>
+              <span style={{ fontSize: '20px' }}>✅</span>
+            </div>
+          )}
 
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,.06)' }}>
             <form onSubmit={handleSubmit}>

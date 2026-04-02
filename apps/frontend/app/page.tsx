@@ -26,10 +26,10 @@ const features = [
 
 /* ─── Plans data ─── */
 const plans = [
-  { name: 'Starter', price: '97', msgs: '10.000 msgs/mês', agents: '3 atendentes', popular: false, features: ['Inbox unificado', 'CRM básico', 'Pipeline kanban', '1 flow de automação', 'IA — respostas automáticas'] },
-  { name: 'Pro', price: '197', msgs: '50.000 msgs/mês', agents: '10 atendentes', popular: true, features: ['Tudo do Starter', 'Campanhas em massa', 'Flows ilimitados', 'IA — transcrição de áudio', 'Webhooks e API'] },
-  { name: 'Enterprise', price: '397', msgs: '100.000 msgs/mês', agents: '25 atendentes', popular: false, features: ['Tudo do Pro', 'Multi-número WhatsApp', 'Relatórios avançados', 'Suporte prioritário', 'Onboarding dedicado'] },
-  { name: 'Unlimited', price: '697', msgs: 'Msgs ilimitadas', agents: 'Atendentes ilimitados', popular: false, features: ['Tudo do Enterprise', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
+  { slug: 'starter', name: 'Starter', price: '97', msgs: '10.000 msgs/mês', agents: '3 atendentes', popular: false, features: ['Inbox unificado', 'CRM básico', 'Pipeline kanban', '1 flow de automação', 'IA — respostas automáticas'] },
+  { slug: 'pro', name: 'Pro', price: '197', msgs: '50.000 msgs/mês', agents: '10 atendentes', popular: true, features: ['Tudo do Starter', 'Campanhas em massa', 'Flows ilimitados', 'IA — transcrição de áudio', 'Webhooks e API'] },
+  { slug: 'enterprise', name: 'Enterprise', price: '397', msgs: '100.000 msgs/mês', agents: '25 atendentes', popular: false, features: ['Tudo do Pro', 'Multi-número WhatsApp', 'Relatórios avançados', 'Suporte prioritário', 'Onboarding dedicado'] },
+  { slug: 'unlimited', name: 'Unlimited', price: '697', msgs: 'Msgs ilimitadas', agents: 'Atendentes ilimitados', popular: false, features: ['Tudo do Enterprise', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
 ]
 
 /* ─── Steps data ─── */
@@ -424,11 +424,11 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <a
-                  href="/register"
+                  href={`/register?plan=${p.slug}`}
                   className={p.popular ? 'btn-green' : 'btn-outline'}
                   style={{ textAlign: 'center', width: '100%', padding: '12px 0' }}
                 >
-                  Começar agora
+                  Assinar {p.name}
                 </a>
               </div>
             ))}
