@@ -530,15 +530,6 @@ router.post('/conversations', async (req, res, next) => {
     const { data: contact } = await db.from('contacts').select('id, name, phone').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
     if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
 
-    // Verifica se já tem conversa aberta
-    const { data: existing } = await db.from('conversations').select('id').eq('contact_id', contactId).eq('tenant_id', req.auth.tid).in('status', ['open', 'waiting']).maybeSingle()
-    if (existing) {
-      // Atualiza pipeline da conversa existente
-      await db.from('conversations').update({ pipeline_stage: pipelineStage || 'lead', pipeline_id: pipelineId || null }).eq('id', existing.id)
-      res.json(ok({ id: existing.id, updated: true }))
-      return
-    }
-
     // Pega o primeiro canal do tenant pra associar a conversa
     const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).limit(1).single()
     if (!channel) { res.status(400).json({ error: 'Nenhum canal configurado. Crie um canal primeiro.' }); return }
