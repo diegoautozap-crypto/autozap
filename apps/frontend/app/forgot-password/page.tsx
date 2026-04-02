@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { authApi } from '@/lib/api'
-import { Loader2, CheckCircle, MessageSquareMore } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
+import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 import { toast } from 'sonner'
 
 export default function ForgotPasswordPage() {
@@ -27,10 +28,9 @@ export default function ForgotPasswordPage() {
       <div style={{ width: '100%', maxWidth: '400px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ width: '52px', height: '52px', background: 'linear-gradient(135deg, #25d366, #128c7e)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px #25d36630' }}>
-            <MessageSquareMore size={26} color="#000" />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <AutoZapLogo variant="white" size="lg" />
           </div>
-          <h1 style={{ color: 'var(--text)', fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px' }}>AutoZap</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '6px' }}>Recuperar senha</p>
         </div>
 

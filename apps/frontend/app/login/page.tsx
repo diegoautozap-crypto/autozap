@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { authApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Loader2, MessageSquareMore, ArrowRight, Mail } from 'lucide-react'
+import { Loader2, ArrowRight, Mail } from 'lucide-react'
+import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 14px', background: '#fafafa',
@@ -89,10 +90,9 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{ width: '52px', height: '52px', background: '#22c55e', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(34,197,94,0.3)' }}>
-            <MessageSquareMore size={26} color="#fff" />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <AutoZapLogo variant="white" size="lg" />
           </div>
-          <h1 style={{ color: '#18181b', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em' }}>AutoZap</h1>
           <p style={{ color: '#a1a1aa', fontSize: '14px', marginTop: '6px' }}>
             {requiresTwoFactor ? 'Digite seu código de autenticação' : 'Entre na sua conta'}
           </p>

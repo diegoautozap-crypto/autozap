@@ -7,8 +7,9 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Zap as ZapIcon, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon,
+  LogOut, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon,
 } from 'lucide-react'
+import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 import { useI18nStore, useT, LOCALES } from '@/lib/i18n'
 
 const ALL_NAV = [
@@ -141,20 +142,9 @@ export function Sidebar() {
       {/* Logo */}
       <div style={{ padding: '20px 16px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px', height: '32px',
-            background: '#22c55e',
-            borderRadius: '8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <ZapIcon size={16} color="#fff" fill="#fff" />
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '15px', color: '#fff', letterSpacing: '-0.02em' }}>AutoZap</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>
-              {ROLE_LABEL[currentRole] || 'WhatsApp CRM'}
-            </div>
+          <AutoZapLogo variant="dark" size="sm" />
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>
+            {ROLE_LABEL[currentRole] || 'WhatsApp CRM'}
           </div>
         </div>
       </div>

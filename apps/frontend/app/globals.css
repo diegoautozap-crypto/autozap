@@ -14,10 +14,16 @@
   --text-faint:    #a1a1aa;
   --text-faintest: #d4d4d8;
 
-  --accent:        #22c55e;
-  --accent-hover:  #16a34a;
+  --accent:        #4ADE80;
+  --accent-hover:  #16A34A;
   --accent-light:  #f0fdf4;
   --accent-fg:     #ffffff;
+
+  --color-brand:        #4ADE80;
+  --color-brand-dark:   #16A34A;
+  --color-brand-darker: #14532D;
+  --color-brand-tint:   #F6FBF7;
+  --color-brand-surface:#0D0D0D;
 
   --border:        #e4e4e7;
   --divider:       #f4f4f5;

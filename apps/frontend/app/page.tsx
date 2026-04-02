@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
+import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 
 /* ─── FAQ data ─── */
 const faqs = [
@@ -102,9 +103,7 @@ export default function LandingPage() {
         transition: 'all .3s',
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 22, color: '#18181b' }}>
-            <span style={{ fontSize: 26 }}>⚡</span> AutoZap
-          </div>
+          <AutoZapLogo variant="white" size="md" />
 
           {/* Desktop links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 32 }} className="nav-desktop">
@@ -512,9 +511,7 @@ export default function LandingPage() {
       {/* ═══ FOOTER ═══ */}
       <footer style={{ padding: '48px 24px', borderTop: '1px solid #e4e4e7', background: '#fff' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 18, color: '#18181b' }}>
-            <span style={{ fontSize: 22 }}>⚡</span> AutoZap
-          </div>
+          <AutoZapLogo variant="white" size="sm" />
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             <span onClick={() => scrollTo('funcionalidades')} style={{ cursor: 'pointer', fontSize: 13, color: '#71717a' }}>Funcionalidades</span>
             <span onClick={() => scrollTo('planos')} style={{ cursor: 'pointer', fontSize: 13, color: '#71717a' }}>Planos</span>

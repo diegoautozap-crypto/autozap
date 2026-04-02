@@ -4,7 +4,8 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Loader2, MessageSquareMore, ArrowRight, Check, Mail } from 'lucide-react'
+import { Loader2, ArrowRight, Check, Mail } from 'lucide-react'
+import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 
 const benefits = [
   'Inbox em tempo real',
@@ -93,11 +94,8 @@ function RegisterPage() {
       {/* Left — benefits */}
       <div style={{ display: 'none', width: '45%', background: '#16a34a', padding: '48px', flexDirection: 'column', justifyContent: 'center' }} className="register-left">
         <div style={{ marginBottom: '48px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-            <div style={{ width: '36px', height: '36px', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MessageSquareMore size={20} color="#fff" />
-            </div>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: '18px' }}>AutoZap</span>
+          <div style={{ marginBottom: '32px' }}>
+            <AutoZapLogo variant="dark" size="md" />
           </div>
           <h2 style={{ color: '#fff', fontSize: '32px', fontWeight: 700, lineHeight: 1.2, marginBottom: '16px' }}>
             WhatsApp CRM para escalar suas vendas
@@ -122,8 +120,8 @@ function RegisterPage() {
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ width: '100%', maxWidth: '420px' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ width: '48px', height: '48px', background: '#16a34a', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(22,163,74,0.3)' }}>
-              <MessageSquareMore size={24} color="#fff" />
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+              <AutoZapLogo variant="white" size="lg" />
             </div>
             <h1 style={{ color: '#111827', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>Crie sua conta</h1>
             <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>Comece a automatizar seu WhatsApp agora</p>
