@@ -52,7 +52,7 @@ function RegisterPage() {
 
       // 3. Cria assinatura e redireciona pro pagamento
       const { tenantApi } = await import('@/lib/api')
-      const { data: subData } = await tenantApi.post('/billing/subscribe', {
+      const { data: subData } = await tenantApi.post('/tenant/billing/subscribe', {
         planSlug: selectedPlan,
         cpfCnpj: '',
       })
