@@ -273,6 +273,8 @@ export default function PipelinePage() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
   const [channelFilter, setChannelFilter] = useState('all')
   const [campaignFilter, setCampaignFilter] = useState('all')
+  const [valueMin, setValueMin] = useState('')
+  const [valueMax, setValueMax] = useState('')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
   const [draggingColKey, setDraggingColKey] = useState<string | null>(null)
@@ -414,14 +416,33 @@ export default function PipelinePage() {
     return () => { channel.unbind('inbound.message', onInbound); channel.unbind('conversation.updated', onConvUpdated) }
   }, [user, queryClient, tenantId])
 
-  const displayBoard = localBoardRef.current ?? board
-
   // Calcula total por contato — total_price de cada purchase já inclui ajustes
   const getContactPurchaseTotal = (contactId: string): number => {
     const purchases = (purchasesByContact as any)[contactId]
     if (!purchases || !Array.isArray(purchases)) return 0
     return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
   }
+
+  const rawDisplayBoard = localBoardRef.current ?? board
+
+  // Frontend-only value filter
+  const displayBoard = (() => {
+    if (!rawDisplayBoard) return rawDisplayBoard
+    const minVal = valueMin !== '' ? Number(valueMin) : null
+    const maxVal = valueMax !== '' ? Number(valueMax) : null
+    if (minVal === null && maxVal === null) return rawDisplayBoard
+    const filtered: Record<string, any[]> = {}
+    for (const [stage, cards] of Object.entries(rawDisplayBoard)) {
+      filtered[stage] = cards.filter((conv: any) => {
+        const cId = conv.contacts?.id || conv.contact_id
+        const total = cId ? getContactPurchaseTotal(cId) : 0
+        if (minVal !== null && total < minVal) return false
+        if (maxVal !== null && total > maxVal) return false
+        return true
+      })
+    }
+    return filtered
+  })()
   const getColumnTotal = (stageKey: string): number => {
     const cards = displayBoard?.[stageKey] || []
     return cards.reduce((sum: number, conv: any) => {
@@ -598,6 +619,20 @@ export default function PipelinePage() {
                 {(campaigns as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <DollarSign size={13} color="var(--text-faint)" />
+              <input type="number" placeholder="Min" value={valueMin} onChange={e => setValueMin(e.target.value)}
+                style={{ width: '70px', padding: '7px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--text)', outline: 'none' }} />
+              <span style={{ fontSize: '11px', color: 'var(--text-faintest)' }}>-</span>
+              <input type="number" placeholder="Max" value={valueMax} onChange={e => setValueMax(e.target.value)}
+                style={{ width: '70px', padding: '7px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--text)', outline: 'none' }} />
+              {(valueMin || valueMax) && (
+                <button onClick={() => { setValueMin(''); setValueMax('') }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-faint)', display: 'flex' }}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
             {canEdit('/dashboard/pipeline') && (
             <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
