@@ -22,7 +22,7 @@ function getStoredTenantId(): string | null {
 
 function forceLogout(reason: string) {
   console.warn('[Auth] Forçando logout:', reason)
-  localStorage.clear()
+  localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
   window.location.href = '/login'
 }
 

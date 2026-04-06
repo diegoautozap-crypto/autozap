@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { useAuthStore } from './auth.store'
+import { authApi } from '@/lib/api'
 
 interface Permissions {
   role: string
@@ -54,13 +55,9 @@ export const usePermissionsStore = create<PermissionsStore>((set, get) => ({
     }
 
     try {
-      const token = localStorage.getItem('accessToken')
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) return
-      const json = await res.json()
-      const perms = json?.data?.permissions || {}
+      const res = await authApi.get('/auth/me')
+      if (!res.data?.data) return
+      const perms = res.data.data.permissions || {}
 
       set({
         role,

@@ -283,12 +283,21 @@ router.get('/contacts/:contactId/purchases', async (req, res, next) => {
 })
 
 // POST /purchases/batch — pedido com múltiplos produtos
+const batchPurchaseSchema = z.object({
+  contactId: z.string().uuid(),
+  conversationId: z.string().uuid().optional().nullable(),
+  items: z.array(z.object({ productId: z.string().uuid(), qty: z.number().int().min(1).default(1) })).min(1),
+  discount: z.number().min(0).optional(),
+  surcharge: z.number().min(0).optional(),
+  shipping: z.number().min(0).optional(),
+  coupon: z.string().optional().nullable(),
+})
+
 router.post('/purchases/batch', async (req, res, next) => {
   try {
-    const { contactId, conversationId, items, discount, surcharge, shipping, coupon } = req.body
-    if (!contactId || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: 'contactId and items[] required' }); return
-    }
+    const parsed = batchPurchaseSchema.safeParse(req.body)
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message || 'Dados inválidos' }); return }
+    const { contactId, conversationId, items, discount, surcharge, shipping, coupon } = parsed.data
     // Busca preços de todos os produtos
     const productIds = items.map((i: any) => i.productId)
     const { data: productsData } = await db.from('products').select('id, price').in('id', productIds).eq('tenant_id', req.auth.tid)

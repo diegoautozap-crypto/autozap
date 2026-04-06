@@ -46,7 +46,7 @@ function clearAuthCookie() {
 
 function forceLogout(reason: string) {
   console.warn('[Auth] Sessão inválida:', reason)
-  localStorage.clear()
+  localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
   clearAuthCookie()
   window.location.href = '/login'
 }
@@ -120,7 +120,7 @@ export const useAuthStore = create<AuthState>()(
 
           const payload = parseJwt(accessToken)
           if (payload?.tid && user?.tenantId && payload.tid !== user.tenantId) {
-            localStorage.clear()
+            localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
             clearAuthCookie()
             set({ isLoading: false })
             throw new Error('Inconsistência de sessão detectada no login')
@@ -148,7 +148,7 @@ export const useAuthStore = create<AuthState>()(
             await authApi.post('/auth/logout', { refreshToken })
           } catch {}
         }
-        localStorage.clear()
+        localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
         clearAuthCookie()
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
       },

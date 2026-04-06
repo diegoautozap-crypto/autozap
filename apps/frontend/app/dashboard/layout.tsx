@@ -17,7 +17,6 @@ function NotificationsProvider() {
 
 function PermissionsLoader() {
   const { loaded, load } = usePermissionsStore()
-  const { useEffect } = require('react')
   useEffect(() => { if (!loaded) load() }, [loaded, load])
   return null
 }
