@@ -10,27 +10,31 @@ import {
 } from 'lucide-react'
 
 /* ---- Types ---- */
+interface DaysAvailable { mon: boolean; tue: boolean; wed: boolean; thu: boolean; fri: boolean; sat: boolean; sun: boolean }
+
 interface SchedulingConfig {
   id: string
-  slot_duration: number
-  days_available: number[]
+  name: string
+  slot_duration_minutes: number
+  days_available: DaysAvailable
   start_time: string
   end_time: string
   break_start: string | null
   break_end: string | null
   advance_days: number
   reminder_minutes: number
+  is_active: boolean
 }
 
 interface Appointment {
   id: string
   date: string
-  time: string
-  contact_name: string
-  contact_phone: string | null
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+  start_time: string
+  end_time: string
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
   notes: string | null
-  scheduling_config_id: string
+  config_id: string
+  contacts?: { name: string; phone: string } | null
 }
 
 /* ---- Helpers ---- */
@@ -51,6 +55,7 @@ const statusColors: Record<string, { bg: string; color: string; label: string }>
   cancelled:  { bg: '#fef2f2', color: '#dc2626', label: 'Cancelado' },
 }
 
+const DAY_KEYS: (keyof DaysAvailable)[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 function todayStr() {
@@ -84,21 +89,23 @@ export default function SchedulingPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Config form state
+  const defaultDays: DaysAvailable = { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
   const [cfgSlotDuration, setCfgSlotDuration] = useState(30)
-  const [cfgDays, setCfgDays] = useState<number[]>([1, 2, 3, 4, 5])
-  const [cfgStart, setCfgStart] = useState('08:00')
+  const [cfgDays, setCfgDays] = useState<DaysAvailable>(defaultDays)
+  const [cfgStart, setCfgStart] = useState('09:00')
   const [cfgEnd, setCfgEnd] = useState('18:00')
   const [cfgBreakStart, setCfgBreakStart] = useState('')
   const [cfgBreakEnd, setCfgBreakEnd] = useState('')
-  const [cfgAdvanceDays, setCfgAdvanceDays] = useState(30)
-  const [cfgReminder, setCfgReminder] = useState(30)
+  const [cfgAdvanceDays, setCfgAdvanceDays] = useState(7)
+  const [cfgReminder, setCfgReminder] = useState(60)
 
   /* ---- Queries ---- */
   const { data: config, isLoading: configLoading } = useQuery<SchedulingConfig | null>({
     queryKey: ['scheduling-config'],
     queryFn: async () => {
       const { data } = await conversationApi.get('/scheduling')
-      return data.data || null
+      const list = data.data || []
+      return Array.isArray(list) && list.length > 0 ? list[0] : null
     },
   })
 
@@ -169,8 +176,8 @@ export default function SchedulingPage() {
   /* ---- Config modal helpers ---- */
   function openConfigModal() {
     if (config) {
-      setCfgSlotDuration(config.slot_duration)
-      setCfgDays(config.days_available)
+      setCfgSlotDuration(config.slot_duration_minutes)
+      setCfgDays(config.days_available || defaultDays)
       setCfgStart(config.start_time)
       setCfgEnd(config.end_time)
       setCfgBreakStart(config.break_start || '')
@@ -183,7 +190,7 @@ export default function SchedulingPage() {
 
   function handleSaveConfig() {
     const body = {
-      slot_duration: cfgSlotDuration,
+      slot_duration_minutes: cfgSlotDuration,
       days_available: cfgDays,
       start_time: cfgStart,
       end_time: cfgEnd,
@@ -195,8 +202,8 @@ export default function SchedulingPage() {
     saveConfigMutation.mutate(body)
   }
 
-  function toggleDay(day: number) {
-    setCfgDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort())
+  function toggleDay(key: keyof DaysAvailable) {
+    setCfgDays(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   function handleStatusChange(appt: Appointment, newStatus: string) {
@@ -204,7 +211,7 @@ export default function SchedulingPage() {
   }
 
   const sortedAppointments = useMemo(
-    () => [...appointments].sort((a, b) => a.time.localeCompare(b.time)),
+    () => [...appointments].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')),
     [appointments],
   )
 
@@ -280,7 +287,7 @@ export default function SchedulingPage() {
                   {/* Time */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '70px' }}>
                     <Clock size={14} color="var(--text-faint)" />
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{appt.time}</span>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{appt.start_time}</span>
                   </div>
 
                   {/* Contact name */}
@@ -288,7 +295,7 @@ export default function SchedulingPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <User size={14} color="var(--text-faint)" />
                       <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {appt.contact_name}
+                        {appt.contacts?.name || 'Sem nome'}
                       </span>
                     </div>
                   </div>
@@ -307,10 +314,10 @@ export default function SchedulingPage() {
                   <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
                     <div style={{ paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {/* Phone */}
-                      {appt.contact_phone && (
+                      {appt.contacts?.phone && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Phone size={13} color="var(--text-faint)" />
-                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{appt.contact_phone}</span>
+                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{appt.contacts?.phone}</span>
                         </div>
                       )}
 
@@ -384,11 +391,12 @@ export default function SchedulingPage() {
                 <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Dias disponíveis</label>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {DAY_LABELS.map((label, idx) => {
-                    const active = cfgDays.includes(idx)
+                    const dayKey = DAY_KEYS[idx]
+                    const active = cfgDays[dayKey] === true
                     return (
                       <button
                         key={idx}
-                        onClick={() => toggleDay(idx)}
+                        onClick={() => toggleDay(dayKey)}
                         style={{
                           padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                           border: active ? 'none' : '1px solid var(--border)',
