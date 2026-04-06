@@ -18,13 +18,24 @@ async function getUserPermissions(userId: string, tenantId: string) {
   return data
 }
 
-// ─── Media proxy ──────────────────────────────────────────────────────────────
-router.get('/conversations/media/:mediaId', requireAuth, async (req, res, next) => {
+// ─── Media proxy (auth via query token ou header) ────────────────────────────
+router.get('/conversations/media/:mediaId', async (req, res, next) => {
   try {
     const { mediaId } = req.params
-    const { channelId } = req.query as any
+    const { channelId, token: queryToken } = req.query as any
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
-    const tenantId = req.auth.tid
+
+    // Auth: aceita JWT no header OU na query string (pra <img>, <audio>, <video>)
+    let tenantId: string | null = null
+    const authHeader = req.headers.authorization
+    const jwtToken = queryToken || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)
+    if (jwtToken) {
+      try {
+        const jwt = require('jsonwebtoken')
+        const payload = jwt.verify(jwtToken, process.env.JWT_SECRET!)
+        tenantId = payload.tid
+      } catch {}
+    }
     if (!tenantId) { res.status(401).json({ error: 'Unauthorized' }); return }
     let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId).eq('tenant_id', tenantId)
     const { data: channel } = await channelQuery.single()

@@ -34,7 +34,8 @@ function getMediaUrl(mediaUrl: string | undefined, channelId: string | undefined
   if (!mediaUrl) return null
   if (mediaUrl.startsWith('http')) return mediaUrl
   if (!channelId) return null
-  return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}${tenantId ? `&t=${tenantId}` : ''}`
+  const token = localStorage.getItem('accessToken') || ''
+  return `${CONVERSATION_SERVICE_URL}/conversations/media/${mediaUrl}?channelId=${channelId}&token=${token}`
 }
 function getContentType(file: File): 'image' | 'audio' | 'video' | 'document' {
   if (file.type.startsWith('image/')) return 'image'
