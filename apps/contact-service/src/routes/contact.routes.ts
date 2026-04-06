@@ -38,6 +38,30 @@ const tagSchema = z.object({
 
 const addTagsSchema = z.object({ tagIds: z.array(z.string().uuid()) })
 
+const createProductSchema = z.object({
+  name: z.string().min(1).max(255),
+  price: z.number().min(0).optional(),
+  description: z.string().max(2000).optional(),
+  sku: z.string().max(100).optional(),
+  category: z.string().max(100).optional(),
+})
+
+const updateProductSchema = z.object({
+  name: z.string().max(255).optional(),
+  price: z.number().min(0).optional(),
+  description: z.string().max(2000).optional(),
+  sku: z.string().max(100).optional(),
+  category: z.string().max(100).optional(),
+  is_active: z.boolean().optional(),
+})
+
+const dealAdjustmentsSchema = z.object({
+  discount: z.number().min(0),
+  surcharge: z.number().min(0),
+  shipping: z.number().min(0),
+  coupon: z.string().max(50).optional(),
+})
+
 // ─── Contacts ─────────────────────────────────────────────────────────────────
 
 // GET /contacts
@@ -121,7 +145,7 @@ router.patch('/contacts/:id', validate(updateContactSchema), async (req, res, ne
 })
 
 // PATCH /contacts/:id/deal-adjustments
-router.patch('/contacts/:id/deal-adjustments', async (req, res, next) => {
+router.patch('/contacts/:id/deal-adjustments', validate(dealAdjustmentsSchema), async (req, res, next) => {
   try {
     const { discount, surcharge, shipping, coupon } = req.body
     const adjustments = {
@@ -232,10 +256,9 @@ router.get('/products', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/products', async (req, res, next) => {
+router.post('/products', validate(createProductSchema), async (req, res, next) => {
   try {
     const { name, description, price, sku, category } = req.body
-    if (!name) { res.status(400).json({ error: 'name required' }); return }
     // Plan limit: products (active only)
     const productPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
       const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
@@ -254,7 +277,7 @@ router.post('/products', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/products/:id', async (req, res, next) => {
+router.patch('/products/:id', validate(updateProductSchema), async (req, res, next) => {
   try {
     const update: any = { updated_at: new Date() }
     if (req.body.name !== undefined) update.name = req.body.name

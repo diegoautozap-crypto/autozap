@@ -67,7 +67,7 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   const url = getMediaUrl(msg.media_url, channelId, tenantId)
   if (type === 'image') return (
     <div>
-      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.image')}</p>}
+      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
     </div>
   )
@@ -85,8 +85,14 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   )
   if (type === 'document') {
     const fn = msg.body || msg.media_url?.split('/')?.pop() || 'documento'
+    if (!url) return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: isOut ? 'rgba(255,255,255,0.15)' : 'var(--bg)', borderRadius: '8px' }}>
+        <FileText size={20} color={isOut ? '#fff' : 'var(--text-muted)'} />
+        <p style={{ fontSize: '13px', color: sc, margin: 0 }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>
+      </div>
+    )
     return (
-      <a href={url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+      <a href={url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: isOut ? 'rgba(255,255,255,0.15)' : 'var(--bg)', borderRadius: '8px' }}>
           <FileText size={20} color={isOut ? '#fff' : 'var(--text-muted)'} />
           <div>

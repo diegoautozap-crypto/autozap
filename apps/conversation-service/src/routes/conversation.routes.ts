@@ -34,7 +34,11 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
         const jwt = require('jsonwebtoken')
         const payload = jwt.verify(jwtToken, process.env.JWT_SECRET!)
         tenantId = payload.tid
-      } catch {}
+      } catch (err: any) {
+        // Invalid token — reject instead of silently falling through
+        res.status(401).json({ error: 'Invalid token' })
+        return
+      }
     }
     if (!tenantId) { res.status(401).json({ error: 'Unauthorized' }); return }
     let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId).eq('tenant_id', tenantId)
@@ -80,6 +84,20 @@ const pipelineSchema = z.object({
 })
 const noteSchema = z.object({ body: z.string().min(1).max(5000) })
 const quickReplySchema = z.object({ title: z.string().min(1).max(200), body: z.string().min(1).max(5000) })
+const createTaskSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  dueDate: z.string().optional(),
+  conversationId: z.string().uuid().optional(),
+  contactId: z.string().uuid().optional(),
+  assignedTo: z.string().uuid().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+})
+
+const bulkIdsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+})
+
 const pipelineColumnSchema = z.object({
   columns: z.array(z.object({
     id: z.string().optional(),
@@ -478,10 +496,9 @@ router.get('/tasks/summary', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/tasks', async (req, res, next) => {
+router.post('/tasks', validate(createTaskSchema), async (req, res, next) => {
   try {
     const { title, description, dueDate, conversationId, contactId, assignedTo, priority } = req.body
-    if (!title) { res.status(400).json({ error: 'title required' }); return }
     // Valida conversa pertence ao tenant
     if (conversationId) {
       const { data: conv } = await db.from('conversations').select('id').eq('id', conversationId).eq('tenant_id', req.auth.tid).single()
@@ -594,21 +611,17 @@ router.delete('/pipeline-cards/:id', async (req, res, next) => {
 
 // ─── Ações em massa ───────────────────────────────────────────────────────────
 
-router.post('/conversations/bulk/read', async (req, res, next) => {
+router.post('/conversations/bulk/read', validate(bulkIdsSchema), async (req, res, next) => {
   try {
     const { ids } = req.body
-    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
-    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     await db.from('conversations').update({ unread_count: 0 }).eq('tenant_id', req.auth.tid).in('id', ids)
     res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }
 })
 
-router.post('/conversations/bulk/close', async (req, res, next) => {
+router.post('/conversations/bulk/close', validate(bulkIdsSchema), async (req, res, next) => {
   try {
     const { ids } = req.body
-    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
-    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     await db.from('conversations').update({ status: 'closed' }).eq('tenant_id', req.auth.tid).in('id', ids)
     res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }

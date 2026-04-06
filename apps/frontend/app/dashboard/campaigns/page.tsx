@@ -49,7 +49,7 @@ export default function CampaignsPage() {
   const [curlCopies, setCurlCopies]             = useState<string[]>([''])
   const [campaignName, setCampaignName]         = useState('')
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [messagesPerMin, setMessagesPerMin]     = useState(1200)
+  const [messagesPerMin, setMessagesPerMin]     = useState(1000)
   const [selectedCamp, setSelectedCamp]         = useState<any>(null)
   const [page, setPage]                         = useState(1)
   const [useTemplate, setUseTemplate]           = useState(true)
@@ -114,7 +114,7 @@ export default function CampaignsPage() {
     setCampaignName(''); setContactsText(''); setCurlCopies([''])
     setSelectedChannels([]); setSelectedTemplates([]); setSelectedTagIds([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
-    setMessagesPerMin(1200); setContactMode('manual')
+    setMessagesPerMin(1000); setContactMode('manual')
     setSegNoInteraction(0); setSegOrigin(''); setSegCustomField(''); setSegCustomValue('')
     setPreviewCount(null); setRecurrence('none')
   }
@@ -729,11 +729,11 @@ export default function CampaignsPage() {
               <div>
                 <Lbl>{t('campaigns.speedPerChannel')}</Lbl>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="number" min="1" max="1200" style={{ ...inp, width: '100px' } as any}
+                  <input type="number" min="1" max="1000" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
                     onChange={e => {
                       const val = Number(e.target.value)
-                      if (!isNaN(val)) setMessagesPerMin(Math.min(1200, Math.max(1, val)))
+                      if (!isNaN(val)) setMessagesPerMin(Math.min(1000, Math.max(1, val)))
                     }}
                     onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                     onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
