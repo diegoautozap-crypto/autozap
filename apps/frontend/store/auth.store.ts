@@ -63,23 +63,30 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const { accessToken, refreshToken } = data.data
+
+          // Persiste tokens ANTES de qualquer outra chamada
+          const storeData = { state: { accessToken, refreshToken, user: null, isAuthenticated: false }, version: 0 }
+          try {
+            const existing = JSON.parse(localStorage.getItem('autozap-auth') || '{}')
+            storeData.version = existing.version || 0
+            if (existing.state) storeData.state = { ...existing.state, accessToken, refreshToken }
+          } catch {}
+          localStorage.setItem('autozap-auth', JSON.stringify(storeData))
           set({ accessToken, refreshToken })
 
-          // Força persistência imediata pro interceptor do axios conseguir ler
-          try {
-            const current = JSON.parse(localStorage.getItem('autozap-auth') || '{"state":{}}')
-            current.state = { ...current.state, accessToken, refreshToken }
-            localStorage.setItem('autozap-auth', JSON.stringify(current))
-          } catch {}
-
-          const meRes = await authApi.get('/auth/me')
+          // Busca dados do usuário com token explícito no header
+          const meRes = await authApi.get('/auth/me', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          })
           const user = meRes.data.data
 
-          set({
-            user,
-            isAuthenticated: true,
-            isLoading: false,
-          })
+          // Persiste tudo de uma vez
+          set({ user, isAuthenticated: true, isLoading: false })
+          try {
+            const final = JSON.parse(localStorage.getItem('autozap-auth') || '{}')
+            final.state = { ...final.state, user, isAuthenticated: true, accessToken, refreshToken }
+            localStorage.setItem('autozap-auth', JSON.stringify(final))
+          } catch {}
 
           return {}
         } catch (err) {
