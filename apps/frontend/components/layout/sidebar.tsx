@@ -7,7 +7,7 @@ import { tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   LayoutDashboard, Megaphone, Users, MessageSquare, Settings,
-  LogOut, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon, ShoppingBag,
+  LogOut, Radio, FileText, Workflow, Kanban, UserCog, AlertCircle, CheckSquare, Menu, X as XIcon, ShoppingBag, Calendar,
 } from 'lucide-react'
 import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 import { useI18nStore, useT, LOCALES } from '@/lib/i18n'
@@ -18,8 +18,9 @@ const ALL_NAV = [
   { href: '/dashboard/templates', labelKey: 'nav.templates',  icon: FileText },
   { href: '/dashboard/contacts',  labelKey: 'nav.contacts',   icon: Users },
   { href: '/dashboard/inbox',     labelKey: 'nav.inbox',      icon: MessageSquare },
-  { href: '/dashboard/pipeline',  labelKey: 'nav.pipeline',   icon: Kanban },
-  { href: '/dashboard/products',  labelKey: 'nav.products',   icon: ShoppingBag },
+  { href: '/dashboard/pipeline',    labelKey: 'nav.pipeline',    icon: Kanban },
+  { href: '/dashboard/scheduling', labelKey: 'nav.scheduling', icon: Calendar },
+  { href: '/dashboard/products',   labelKey: 'nav.products',   icon: ShoppingBag },
   { href: '/dashboard/flows',     labelKey: 'nav.flows',      icon: Workflow },
   { href: '/dashboard/tasks',     labelKey: 'nav.tasks',      icon: CheckSquare },
   { href: '/dashboard/channels',  labelKey: 'nav.channels',   icon: Radio },
