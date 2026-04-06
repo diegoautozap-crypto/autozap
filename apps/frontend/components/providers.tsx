@@ -11,6 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             retry: 2,
             staleTime: 10000,
+            gcTime: 5 * 60 * 1000,
           },
         },
       }),

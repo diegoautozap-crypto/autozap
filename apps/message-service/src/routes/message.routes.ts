@@ -4,7 +4,7 @@ import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
 import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
-import { ok, generateId, normalizeBRPhone, rateLimit, AppError } from '@autozap/utils'
+import { ok, generateId, normalizeBRPhone, rateLimit, AppError, cachedGet } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 import { ensureContact, ensureConversation } from '../services/contact.helper'
@@ -108,11 +108,14 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
 
     // ── Hard message limit check (só pra campanhas) ──
     if (campaignId) {
-      const { data: tenant } = await db.from('tenants').select('plan_slug, messages_sent_this_period').eq('id', tenantId).single()
-      if (tenant) {
-        const planSlug = (tenant.plan_slug || 'pending') as PlanSlug
-        const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
-        if (limits.messages !== null && (tenant.messages_sent_this_period ?? 0) >= limits.messages) {
+      const planSlug = await cachedGet(`tenant-plan:${tenantId}`, 120, async () => {
+        const { data } = await db.from('tenants').select('plan_slug').eq('id', tenantId).single()
+        return (data?.plan_slug || 'pending') as PlanSlug
+      })
+      const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+      if (limits.messages !== null) {
+        const { data: tenant } = await db.from('tenants').select('messages_sent_this_period').eq('id', tenantId).single()
+        if (tenant && (tenant.messages_sent_this_period ?? 0) >= limits.messages) {
           throw new AppError('PLAN_LIMIT', `Limite de ${limits.messages} mensagens de campanha atingido no seu plano`, 403)
         }
       }

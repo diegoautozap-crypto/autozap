@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth, validate } from '../middleware/message.middleware'
-import { ok, AppError } from '@autozap/utils'
+import { ok, AppError, cachedGet } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 
@@ -57,8 +57,10 @@ router.get('/flows', async (req, res, next) => {
 router.post('/flows', validate(flowSchema), async (req, res, next) => {
   try {
     // ── Plan limit check ──
-    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
     const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
     const { count: flowCount } = await db.from('flows').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
     if (planLimits.flows !== null && (flowCount ?? 0) >= planLimits.flows) {
@@ -161,8 +163,11 @@ router.put('/flows/:id/graph', validate(graphSchema), async (req, res, next) => 
     }
 
     // ── Plan feature check for premium nodes ──
-    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const planLimits = PLAN_LIMITS[(tenantData?.plan_slug || 'pending') as PlanSlug] ?? PLAN_LIMITS.pending
+    const graphPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
+    const planLimits = PLAN_LIMITS[graphPlanSlug] ?? PLAN_LIMITS.pending
     const nodeTypes = nodes.map((n: any) => n.type)
     if (!planLimits.transcription && nodeTypes.includes('transcribe_audio')) {
       throw new AppError('PLAN_LIMIT', 'Transcrição de áudio não disponível no seu plano', 403)

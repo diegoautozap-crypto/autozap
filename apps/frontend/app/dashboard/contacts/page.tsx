@@ -10,9 +10,7 @@ import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 import * as XLSX from 'xlsx'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+import { supabase } from '@/lib/supabase'
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 12px',
@@ -338,8 +336,14 @@ export default function ContactsPage() {
   const { user } = useAuthStore()
   const { isAdmin, canEdit, canDelete } = usePermissions()
   const tenantId = user?.tenantId || ''
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
   const [showCreate, setShowCreate] = useState(false)
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -554,7 +558,7 @@ export default function ContactsPage() {
       {/* Search */}
       <div style={{ marginBottom: '14px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-        <input style={{ ...inp, paddingLeft: '36px' }} placeholder={t('contacts.search')} value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+        <input style={{ ...inp, paddingLeft: '36px' }} placeholder={t('contacts.search')} value={searchInput} onChange={e => setSearchInput(e.target.value)}
           onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
           onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
       </div>

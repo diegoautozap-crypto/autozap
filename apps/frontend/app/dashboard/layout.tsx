@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { TrialBanner } from '@/components/layout/TrialBanner'
 import { useNotifications } from '@/hooks/useNotifications'
 import { usePermissionsStore } from '@/store/permissions.store'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 // Componente separado — só monta quando o usuário já está autenticado
 // Isso garante que o tenantId está disponível quando o Pusher conecta
@@ -74,7 +75,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />
         <div className="flex-1 overflow-y-auto">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
     </div>

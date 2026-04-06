@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { contactService } from '../services/contact.service'
 import { requireAuth, requireRole, validate } from '../middleware/contact.middleware'
-import { ok, paginationSchema, AppError } from '@autozap/utils'
+import { ok, paginationSchema, AppError, cachedGet } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { db } from '../lib/db'
 
@@ -56,8 +56,10 @@ router.get('/contacts', async (req, res, next) => {
 router.post('/contacts', validate(createContactSchema), async (req, res, next) => {
   try {
     // ── Plan limit check ──
-    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
+    const planSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
     const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
     const { count } = await db.from('contacts').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
     if (planLimits.contacts !== null && (count ?? 0) >= planLimits.contacts) {
@@ -73,8 +75,10 @@ router.post('/contacts', validate(createContactSchema), async (req, res, next) =
 router.get('/contacts/export', async (req, res, next) => {
   try {
     // ── Plan limit check: reports ──
-    const { data: tenantExport } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const exportPlanSlug = (tenantExport?.plan_slug || 'pending') as PlanSlug
+    const exportPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
     const exportPlanLimits = PLAN_LIMITS[exportPlanSlug] ?? PLAN_LIMITS.pending
     if (!exportPlanLimits.reports) {
       throw new AppError('PLAN_LIMIT', 'Exportação de relatórios não disponível no seu plano', 403)
@@ -199,8 +203,10 @@ router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next)
 router.post('/contacts/import', async (req, res, next) => {
   try {
     // ── Plan limit check ──
-    const { data: tenantImport } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const importPlanSlug = (tenantImport?.plan_slug || 'pending') as PlanSlug
+    const importPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
     const importPlanLimits = PLAN_LIMITS[importPlanSlug] ?? PLAN_LIMITS.pending
     const { count: importCount } = await db.from('contacts').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid)
     if (importPlanLimits.contacts !== null && (importCount ?? 0) >= importPlanLimits.contacts) {
@@ -231,8 +237,11 @@ router.post('/products', async (req, res, next) => {
     const { name, description, price, sku, category } = req.body
     if (!name) { res.status(400).json({ error: 'name required' }); return }
     // Plan limit: products (active only)
-    const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
-    const planLimits = PLAN_LIMITS[(tenantData?.plan_slug || 'pending') as PlanSlug] ?? PLAN_LIMITS.pending
+    const productPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
+      const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
+      return (data?.plan_slug || 'pending') as PlanSlug
+    })
+    const planLimits = PLAN_LIMITS[productPlanSlug] ?? PLAN_LIMITS.pending
     const { count: productCount } = await db.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).eq('is_active', true)
     if (planLimits.products !== null && (productCount ?? 0) >= planLimits.products) {
       throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.products} produtos`, 403)
