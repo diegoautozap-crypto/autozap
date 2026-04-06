@@ -65,6 +65,13 @@ export const useAuthStore = create<AuthState>()(
           const { accessToken, refreshToken } = data.data
           set({ accessToken, refreshToken })
 
+          // Força persistência imediata pro interceptor do axios conseguir ler
+          try {
+            const current = JSON.parse(localStorage.getItem('autozap-auth') || '{"state":{}}')
+            current.state = { ...current.state, accessToken, refreshToken }
+            localStorage.setItem('autozap-auth', JSON.stringify(current))
+          } catch {}
+
           const meRes = await authApi.get('/auth/me')
           const user = meRes.data.data
 
