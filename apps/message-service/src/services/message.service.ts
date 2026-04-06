@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
 import { logger } from '../lib/logger'
 import { AppError, generateId } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
 import { flowEngine } from './flow.engine'
@@ -192,8 +193,17 @@ export class MessageService {
     automationService.processAutomations(automationCtx)
       .catch(err => logger.error('Automation error', { err }))
 
-    flowEngine.processFlows(automationCtx)
-      .catch(err => logger.error('Flow engine error', { err }))
+    let flowMatched = false
+    try {
+      flowMatched = await flowEngine.processFlows(automationCtx)
+    } catch (err) {
+      logger.error('Flow engine error', { err })
+    }
+
+    if (!flowMatched) {
+      this.tryAIChatbot(tenantId, channelId, conversation.id, contact.id, msg.from, msg.body || '')
+        .catch(err => logger.error('AI chatbot error', { err }))
+    }
 
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
@@ -279,6 +289,146 @@ export class MessageService {
       stage,
       phone: contactPhone || null,
     })
+  }
+
+  // ─── AI Chatbot fallback ──────────────────────────────────────────────────────
+  async tryAIChatbot(tenantId: string, channelId: string, conversationId: string, contactId: string, phone: string, userMessage: string): Promise<void> {
+    if (!userMessage.trim()) return
+
+    // 1. Check if AI chatbot is enabled for this channel
+    const { data: channel } = await db.from('channels').select('settings').eq('id', channelId).single()
+    if (!channel?.settings?.aiChatbotEnabled) return
+
+    // 2. Check AI plan limits
+    const { data: tenant } = await db.from('tenants').select('plan_slug, settings, metadata').eq('id', tenantId).single()
+    const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
+    const limits = PLAN_LIMITS[planSlug]
+    if (limits.aiResponses === 0) return
+
+    // Check monthly count
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const { count: aiCount } = await db.from('flow_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'ai_response')
+      .gte('created_at', monthStart.toISOString())
+    if (limits.aiResponses !== null && (aiCount ?? 0) >= limits.aiResponses) return
+
+    // 3. Get conversation history (last 20 messages)
+    const { data: history } = await db.from('messages')
+      .select('direction, body, content_type')
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .in('content_type', ['text'])
+      .not('body', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    // 4. Get contact info
+    const { data: contact } = await db.from('contacts')
+      .select('name, phone, email, company, metadata')
+      .eq('id', contactId)
+      .single()
+
+    // 5. Get products catalog
+    let productContext = ''
+    if (tenant?.settings?.aiIncludeProducts !== false) {
+      const { data: products } = await db.from('products')
+        .select('name, description, price, category')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .limit(50)
+      if (products && products.length > 0) {
+        productContext = '\n\nCatálogo de produtos:\n' + products.map((p: any) =>
+          `- ${p.name}: R$ ${Number(p.price).toFixed(2)}${p.description ? ' — ' + p.description : ''}${p.category ? ' (' + p.category + ')' : ''}`
+        ).join('\n')
+      }
+    }
+
+    // 6. Build system prompt
+    const customPrompt = tenant?.settings?.aiSystemPrompt || ''
+    const contactName = contact?.name || 'Cliente'
+
+    const systemPrompt = `${customPrompt || 'Você é um assistente virtual prestativo de atendimento ao cliente. Responda de forma natural, educada e objetiva em português brasileiro.'}
+
+Informações do contato:
+- Nome: ${contactName}
+${contact?.email ? '- Email: ' + contact.email : ''}
+${contact?.company ? '- Empresa: ' + contact.company : ''}
+${productContext}
+
+Regras:
+- Responda sempre em português brasileiro
+- Seja objetivo e útil
+- Se não souber algo, diga que vai verificar com a equipe
+- Nunca invente informações sobre produtos ou preços que não estejam no catálogo
+- Formate valores em R$ (reais)`
+
+    // 7. Build messages array
+    const messages: Array<{ role: string; content: string }> = [
+      { role: 'system', content: systemPrompt },
+    ]
+
+    // Add history (reverse to chronological order)
+    if (history) {
+      for (const m of [...history].reverse()) {
+        messages.push({
+          role: m.direction === 'inbound' ? 'user' : 'assistant',
+          content: m.body,
+        })
+      }
+    }
+
+    // 8. Call OpenAI
+    const openaiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+    if (!openaiKey) return
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+        body: JSON.stringify({
+          model: tenant?.settings?.aiModel || 'gpt-4o-mini',
+          messages,
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      })
+
+      const result = (await response.json()) as any
+      const aiReply = result.choices?.[0]?.message?.content?.trim()
+      if (!aiReply) return
+
+      // 9. Send the AI response via internal endpoint (same as flow engine)
+      const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
+      const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
+      const sendRes = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
+        body: JSON.stringify({ tenantId, channelId, contactId, conversationId, to: phone, contentType: 'text', body: aiReply }),
+      })
+      if (!sendRes.ok) {
+        const err = await sendRes.json().catch(() => ({}))
+        logger.error('AI chatbot failed to send message', { err })
+        return
+      }
+
+      // 10. Log AI usage
+      await db.from('flow_logs').insert({
+        id: generateId(),
+        tenant_id: tenantId,
+        flow_id: null,
+        node_id: 'ai_chatbot',
+        contact_id: contactId,
+        conversation_id: conversationId,
+        status: 'ai_response',
+        detail: `Q: ${userMessage.substring(0, 200)} | A: ${aiReply.substring(0, 300)}`,
+      })
+    } catch (err) {
+      logger.error('AI chatbot error', { err, tenantId, conversationId })
+    }
   }
 
   private async savePending(externalId: string, tenantId: string, status: string, timestamp: Date, errorMessage?: string): Promise<void> {

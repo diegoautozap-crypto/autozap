@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { channelApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil, QrCode, Wifi, WifiOff } from 'lucide-react'
+import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil, QrCode, Wifi, WifiOff, Bot } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
@@ -27,7 +27,7 @@ const CHANNEL_LIMITS: Record<string, number> = {
 }
 
 type ChannelFormType = 'gupshup' | 'evolution'
-const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '' }
+const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false }
 
 export default function ChannelsPage() {
   const t = useT()
@@ -66,10 +66,11 @@ export default function ChannelsPage() {
   })
   const editMutation = useMutation({
     mutationFn: async () => {
+      const settingsPayload = { aiChatbotEnabled: form.aiChatbotEnabled }
       if (form.channelType === 'evolution') {
-        await channelApi.patch(`/channels/${editingId}`, { name: form.name, credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName } })
+        await channelApi.patch(`/channels/${editingId}`, { name: form.name, credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName }, settings: settingsPayload })
       } else {
-        await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined } })
+        await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: settingsPayload })
       }
     },
     onSuccess: () => { toast.success(t('channels.toast.updated')); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setEditingId(null); setForm(emptyForm) },
@@ -82,10 +83,11 @@ export default function ChannelsPage() {
   })
 
   const openEdit = (ch: any) => {
+    const aiEnabled = ch.settings?.aiChatbotEnabled ?? false
     if (ch.type === 'evolution') {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '' })
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '', aiChatbotEnabled: aiEnabled })
     } else {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', channelType: 'gupshup', baseUrl: '', instanceName: '' })
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', channelType: 'gupshup', baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled })
     }
     setEditingId(ch.id); setShowForm(true)
   }
@@ -248,6 +250,20 @@ export default function ChannelsPage() {
             </>
           )}
 
+          {/* Toggle: Chatbot IA neste canal */}
+          {editingId && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)', marginBottom: '16px' }}>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', display: 'block' }}>Chatbot IA ativo neste canal</span>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>O chatbot de IA respondera automaticamente neste canal</span>
+              </div>
+              <button onClick={() => setForm({ ...form, aiChatbotEnabled: !form.aiChatbotEnabled })}
+                style={{ position: 'relative' as const, width: '40px', height: '22px', background: form.aiChatbotEnabled ? '#22c55e' : 'var(--border)', borderRadius: '99px', border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ position: 'absolute' as const, top: '3px', left: form.aiChatbotEnabled ? '20px' : '3px', width: '16px', height: '16px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.15)' }} />
+              </button>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={handleSubmit} disabled={isPending || !isFormValid}
               style={{ padding: '9px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: !isFormValid ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: !isFormValid ? 0.5 : 1 }}>
@@ -304,6 +320,11 @@ export default function ChannelsPage() {
                       <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: isEvolution ? '#3b82f6' : '#22c55e' }} />
                       {isEvolution ? 'Evolution' : t('channels.active')}
                     </div>
+                    {ch.settings?.aiChatbotEnabled && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '3px 9px', borderRadius: '99px' }}>
+                        <Bot size={11} /> IA
+                      </div>
+                    )}
                     {isEvolution && canEdit('/dashboard/channels') && (
                       <>
                         <button onClick={() => fetchQrCode(ch.id)} title="QR Code"

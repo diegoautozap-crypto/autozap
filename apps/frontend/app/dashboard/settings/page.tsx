@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -386,6 +386,181 @@ function WebhooksSection() {
   )
 }
 
+// ── Chatbot IA ───────────────────────────────────────────────────────────────
+function AiChatbotSection() {
+  const t = useT()
+  const queryClient = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
+
+  const { data: tenant } = useQuery({
+    queryKey: ['tenant'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
+  })
+
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiIncludeProducts, setAiIncludeProducts] = useState(false)
+  const [aiModel, setAiModel] = useState('gpt-4o-mini')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    if (tenant && !loaded) {
+      setAiEnabled(tenant.settings?.aiChatbotEnabled ?? false)
+      setAiPrompt(tenant.settings?.aiChatbotPrompt ?? '')
+      setAiIncludeProducts(tenant.settings?.aiIncludeProducts ?? false)
+      setAiModel(tenant.settings?.aiModel ?? 'gpt-4o-mini')
+      setOpenaiKey(tenant.metadata?.openai_api_key ?? '')
+      setLoaded(true)
+    }
+  }, [tenant, loaded])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await tenantApi.patch('/tenant/settings', {
+        settings: {
+          aiChatbotEnabled: aiEnabled,
+          aiChatbotPrompt: aiPrompt,
+          aiIncludeProducts,
+          aiModel,
+        },
+        metadata: {
+          openai_api_key: openaiKey || undefined,
+        },
+      })
+      queryClient.invalidateQueries({ queryKey: ['tenant'] })
+      toast.success('Configuracoes de IA salvas com sucesso')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || 'Erro ao salvar configuracoes de IA')
+    } finally { setSaving(false) }
+  }
+
+  const toggleStyle = (active: boolean): React.CSSProperties => ({
+    position: 'relative',
+    width: '40px',
+    height: '22px',
+    background: active ? '#22c55e' : 'var(--border)',
+    borderRadius: '99px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+    flexShrink: 0,
+  })
+
+  const toggleDot = (active: boolean): React.CSSProperties => ({
+    position: 'absolute',
+    top: '3px',
+    left: active ? '20px' : '3px',
+    width: '16px',
+    height: '16px',
+    background: '#fff',
+    borderRadius: '50%',
+    transition: 'left 0.2s',
+    boxShadow: '0 1px 3px rgba(0,0,0,.15)',
+  })
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f0f9ff', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Bot size={16} color="#0284c7" />
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '2px' }}>Chatbot IA</span>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>Configure o assistente de IA para responder clientes automaticamente</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Toggle: Ativar chatbot IA */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', display: 'block' }}>Ativar chatbot IA</span>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>Responde automaticamente quando nenhum agente esta online</span>
+          </div>
+          <button onClick={() => setAiEnabled(!aiEnabled)} style={toggleStyle(aiEnabled)}>
+            <div style={toggleDot(aiEnabled)} />
+          </button>
+        </div>
+
+        {/* Prompt do sistema */}
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Prompt do sistema</label>
+          <textarea
+            placeholder="Voce e o assistente da [empresa]. Ajude clientes com duvidas sobre produtos, precos e agendamentos."
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            rows={4}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6 }}
+            onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
+            onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          />
+          <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Instrucoes que definem a personalidade e escopo do chatbot</p>
+        </div>
+
+        {/* Toggle: Incluir catálogo */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', display: 'block' }}>Incluir catalogo de produtos no contexto</span>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>O chatbot tera acesso aos seus produtos para responder com precos e detalhes</span>
+          </div>
+          <button onClick={() => setAiIncludeProducts(!aiIncludeProducts)} style={toggleStyle(aiIncludeProducts)}>
+            <div style={toggleDot(aiIncludeProducts)} />
+          </button>
+        </div>
+
+        {/* Modelo */}
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Modelo</label>
+          <select
+            value={aiModel}
+            onChange={e => setAiModel(e.target.value)}
+            style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', cursor: 'pointer', fontFamily: 'inherit' }}
+            onFocus={(e: any) => e.currentTarget.style.borderColor = '#22c55e'}
+            onBlur={(e: any) => e.currentTarget.style.borderColor = 'var(--border)'}
+          >
+            <option value="gpt-4o-mini">gpt-4o-mini (mais rapido)</option>
+            <option value="gpt-4o">gpt-4o (mais inteligente)</option>
+          </select>
+        </div>
+
+        {/* Chave OpenAI */}
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Chave OpenAI</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              placeholder="sk-..."
+              value={openaiKey}
+              onChange={e => setOpenaiKey(e.target.value)}
+              style={{ width: '100%', padding: '9px 36px 9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const, fontFamily: 'ui-monospace, monospace' }}
+              onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
+              onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            />
+            <button onClick={() => setShowApiKey(s => !s)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex' }}>
+              {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Sua chave da API OpenAI. Necessaria para o chatbot funcionar.</p>
+        </div>
+
+        {/* Salvar */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={handleSave} disabled={saving}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 22px', background: '#22c55e', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, transition: 'all 0.12s' }}
+            onMouseEnter={e => { if (!saving) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+            onMouseLeave={e => { if (!saving) (e.currentTarget as HTMLButtonElement).style.background = '#22c55e' }}>
+            {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+            Salvar configuracoes de IA
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const t = useT()
   const { isAdmin, canEdit } = usePermissions()
@@ -570,6 +745,9 @@ export default function SettingsPage() {
 
         {/* ── Webhooks de Saída ── */}
         {canEdit('/dashboard/settings') && <WebhooksSection />}
+
+        {/* ── Chatbot IA ── */}
+        {canEdit('/dashboard/settings') && <AiChatbotSection />}
 
         {/* Planos */}
         {canEdit('/dashboard/settings') && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">

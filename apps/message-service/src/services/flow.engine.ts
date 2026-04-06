@@ -209,10 +209,10 @@ export class FlowEngine {
     return count ?? 0
   }
 
-  async processFlows(ctx: FlowContext): Promise<void> {
+  async processFlows(ctx: FlowContext): Promise<boolean> {
     try {
       const resumed = await this.resumeWaitingFlow(ctx)
-      if (resumed) return
+      if (resumed) return true
 
       const { data: flows } = await cached(
         `flows:${ctx.channelId}:${ctx.tenantId}`,
@@ -227,7 +227,7 @@ export class FlowEngine {
           .order('created_at', { ascending: true }),
       )
 
-      if (!flows || flows.length === 0) return
+      if (!flows || flows.length === 0) return false
 
       // Busca campaign_id da conversa pra filtrar flows por campanha
       const { data: convData } = await db.from('conversations').select('campaign_id').eq('id', ctx.conversationId).single()
@@ -243,10 +243,12 @@ export class FlowEngine {
         if (onCooldown) { logger.info('Flow skipped — cooldown active', { flowId: flow.id }); continue }
         logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
         await this.executeFlow(flow, ctx, {})
-        break
+        return true
       }
+      return false
     } catch (err) {
       logger.error('Flow engine error', { err, tenantId: ctx.tenantId })
+      return false
     }
   }
 
