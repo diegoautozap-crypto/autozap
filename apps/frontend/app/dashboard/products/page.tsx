@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
-  ShoppingBag, Plus, Pencil, Trash2, Loader2, X, Package, BarChart3, Truck, TrendingUp, Tag, Receipt,
+  ShoppingBag, Plus, Pencil, Trash2, Loader2, X, Package, BarChart3, Truck, TrendingUp, Tag, Receipt, Camera, Filter,
 } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 
@@ -16,6 +17,7 @@ interface Product {
   price: number
   sku: string | null
   category: string | null
+  image_url: string | null
   is_active: boolean
 }
 
@@ -48,6 +50,10 @@ export default function ProductsPage() {
   const [formPrice, setFormPrice] = useState('')
   const [formSku, setFormSku] = useState('')
   const [formCategory, setFormCategory] = useState('')
+  const [formImageUrl, setFormImageUrl] = useState('')
+  const [imageUploading, setImageUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ['products'],
@@ -69,6 +75,9 @@ export default function ProductsPage() {
   const totalShipping = stats.reduce((a, s) => a + s.totalShipping, 0)
   const totalDiscount = stats.reduce((a, s) => a + s.totalDiscount, 0)
 
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean) as string[])).sort()
+  const filteredProducts = categoryFilter === 'all' ? products : products.filter(p => p.category === categoryFilter)
+
   const createMutation = useMutation({
     mutationFn: async (body: any) => { await contactApi.post('/products', body) },
     onSuccess: () => { toast.success('Produto criado'); queryClient.invalidateQueries({ queryKey: ['products'] }); closeModal() },
@@ -89,21 +98,36 @@ export default function ProductsPage() {
 
   function openCreateModal() {
     setEditingProduct(null)
-    setFormName(''); setFormDescription(''); setFormPrice(''); setFormSku(''); setFormCategory('')
+    setFormName(''); setFormDescription(''); setFormPrice(''); setFormSku(''); setFormCategory(''); setFormImageUrl('')
     setShowModal(true)
   }
 
   function openEditModal(p: Product) {
     setEditingProduct(p)
-    setFormName(p.name); setFormDescription(p.description || ''); setFormPrice(String(p.price)); setFormSku(p.sku || ''); setFormCategory(p.category || '')
+    setFormName(p.name); setFormDescription(p.description || ''); setFormPrice(String(p.price)); setFormSku(p.sku || ''); setFormCategory(p.category || ''); setFormImageUrl(p.image_url || '')
     setShowModal(true)
+  }
+
+  async function handleImageUpload(file: File) {
+    setImageUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' })
+      if (error) throw error
+      const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
+      setFormImageUrl(publicData.publicUrl)
+      toast.success('Imagem enviada')
+    } catch (err: any) {
+      toast.error('Erro ao enviar imagem: ' + (err.message || 'tente novamente'))
+    } finally { setImageUploading(false) }
   }
 
   function closeModal() { setShowModal(false); setEditingProduct(null) }
 
   function handleSubmit() {
     if (!formName.trim()) { toast.error('Nome obrigatório'); return }
-    const body = { name: formName.trim(), description: formDescription.trim() || null, price: parseFloat(formPrice) || 0, sku: formSku.trim() || null, category: formCategory.trim() || null }
+    const body = { name: formName.trim(), description: formDescription.trim() || null, price: parseFloat(formPrice) || 0, sku: formSku.trim() || null, category: formCategory.trim() || null, image_url: formImageUrl.trim() || null }
     editingProduct ? updateMutation.mutate({ id: editingProduct.id, body }) : createMutation.mutate(body)
   }
 
@@ -145,15 +169,38 @@ export default function ProductsPage() {
         ))}
       </div>
 
+      {/* Category Filter */}
+      {uniqueCategories.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <Filter size={14} color="var(--text-faint)" />
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            style={{ padding: '7px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', background: 'var(--bg-card)', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
+          >
+            <option value="all">Todas as categorias</option>
+            {uniqueCategories.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {categoryFilter !== 'all' && (
+            <button onClick={() => setCategoryFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', padding: '4px' }}>
+              <X size={14} />
+            </button>
+          )}
+          <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
       {/* Product List */}
       {isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
           <Loader2 size={28} color="var(--text-faint)" style={{ animation: 'spin 1s linear infinite' }} />
         </div>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-faint)' }}>
           <ShoppingBag size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
-          <p style={{ fontSize: '15px', fontWeight: 500 }}>Nenhum produto cadastrado</p>
+          <p style={{ fontSize: '15px', fontWeight: 500 }}>{categoryFilter !== 'all' ? 'Nenhum produto nesta categoria' : 'Nenhum produto cadastrado'}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -166,7 +213,7 @@ export default function ProductsPage() {
             <span></span>
           </div>
 
-          {products.map((product) => {
+          {filteredProducts.map((product) => {
             const s = statsMap[product.id]
             const isExpanded = expandedId === product.id
 
@@ -177,15 +224,24 @@ export default function ProductsPage() {
                   onClick={() => setExpandedId(isExpanded ? null : product.id)}
                   style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr 80px', gap: '12px', padding: '14px 16px', alignItems: 'center', cursor: 'pointer' }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {product.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '3px', alignItems: 'center' }}>
-                      {product.category && (
-                        <span style={{ fontSize: '10px', fontWeight: 600, color: '#6366f1', background: '#eef2ff', padding: '1px 6px', borderRadius: '99px' }}>{product.category}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <Package size={16} color="var(--text-faintest)" />
                       )}
-                      {product.sku && <span style={{ fontSize: '10px', color: 'var(--text-faintest)' }}>SKU: {product.sku}</span>}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {product.name}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '3px', alignItems: 'center' }}>
+                        {product.category && (
+                          <span style={{ fontSize: '10px', fontWeight: 600, color: '#6366f1', background: '#eef2ff', padding: '1px 6px', borderRadius: '99px' }}>{product.category}</span>
+                        )}
+                        {product.sku && <span style={{ fontSize: '10px', color: 'var(--text-faintest)' }}>SKU: {product.sku}</span>}
+                      </div>
                     </div>
                   </div>
                   <span style={{ textAlign: 'right', fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{fmt(product.price)}</span>
@@ -250,6 +306,51 @@ export default function ProductsPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Image upload */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  onClick={() => !imageUploading && fileInputRef.current?.click()}
+                  style={{
+                    width: '100px', height: '100px', borderRadius: '12px',
+                    border: '2px dashed var(--border)', background: 'var(--bg-input)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: imageUploading ? 'not-allowed' : 'pointer', overflow: 'hidden',
+                    flexShrink: 0, position: 'relative', transition: 'border-color 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!imageUploading) e.currentTarget.style.borderColor = '#22c55e' }}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                >
+                  {imageUploading ? (
+                    <Loader2 size={22} color="var(--text-faint)" style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : formImageUrl ? (
+                    <img src={formImageUrl} alt="Produto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <Camera size={20} color="var(--text-faintest)" />
+                      <span style={{ fontSize: '10px', color: 'var(--text-faintest)', fontWeight: 500 }}>Adicionar foto</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) handleImageUpload(file)
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 4px' }}>Foto do produto</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>Clique para selecionar uma imagem. JPG, PNG ou WebP.</p>
+                  {formImageUrl && (
+                    <button onClick={() => setFormImageUrl('')} style={{ marginTop: '6px', fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>Remover imagem</button>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>Nome *</label>
                 <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Nome do produto" style={inputStyle} />

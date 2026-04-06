@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical } from 'lucide-react'
+import { Download, Plus, Search, Loader2, User, Trash2, Pencil, X, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Tag, Upload, AlertCircle, Settings2, GripVertical, MessageCircle, GitMerge, Copy } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -331,8 +332,188 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   )
 }
 
+function MergeDuplicatesModal({ onClose, onMerged }: { onClose: () => void; onMerged: () => void }) {
+  const t = useT()
+  const [loading, setLoading] = useState(true)
+  const [duplicates, setDuplicates] = useState<{ phone: string; contacts: any[] }[]>([])
+  const [merging, setMerging] = useState<string | null>(null)
+
+  useEffect(() => {
+    findDuplicates()
+  }, [])
+
+  const findDuplicates = async () => {
+    setLoading(true)
+    try {
+      let allContacts: any[] = []
+      let p = 1
+      while (true) {
+        const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`)
+        const rows = data?.data || []
+        allContacts = [...allContacts, ...rows]
+        if (!data?.meta?.hasMore) break
+        p++
+      }
+      const byPhone: Record<string, any[]> = {}
+      allContacts.forEach(c => {
+        const phone = (c.phone || '').replace(/\D/g, '')
+        if (phone.length >= 8) {
+          if (!byPhone[phone]) byPhone[phone] = []
+          byPhone[phone].push(c)
+        }
+      })
+      const dups = Object.entries(byPhone)
+        .filter(([, contacts]) => contacts.length > 1)
+        .map(([phone, contacts]) => ({ phone, contacts }))
+        .sort((a, b) => b.contacts.length - a.contacts.length)
+      setDuplicates(dups)
+    } catch {
+      toast.error('Erro ao buscar duplicados')
+    }
+    setLoading(false)
+  }
+
+  const handleMerge = async (phone: string, keepId: string, deleteIds: string[]) => {
+    setMerging(phone)
+    try {
+      // Collect tags from contacts being deleted
+      const allContacts = duplicates.find(d => d.phone === phone)?.contacts || []
+      const keepContact = allContacts.find(c => c.id === keepId)
+      const deleteContacts = allContacts.filter(c => deleteIds.includes(c.id))
+      // Gather all unique tag IDs from deleted contacts
+      const keepTagIds = new Set((keepContact?.contact_tags || []).map((ct: any) => ct.tags?.id).filter(Boolean))
+      const tagsToAdd: string[] = []
+      deleteContacts.forEach(c => {
+        (c.contact_tags || []).forEach((ct: any) => {
+          if (ct.tags?.id && !keepTagIds.has(ct.tags.id)) {
+            tagsToAdd.push(ct.tags.id)
+            keepTagIds.add(ct.tags.id)
+          }
+        })
+      })
+      // Add collected tags to keep contact
+      if (tagsToAdd.length > 0) {
+        await contactApi.post(`/contacts/${keepId}/tags`, { tagIds: tagsToAdd })
+      }
+      // Merge notes/metadata: update kept contact with combined notes if any
+      const allNotes = allContacts.map(c => c.notes).filter(Boolean).join('\n---\n')
+      const mergedMetadata = { ...keepContact?.metadata }
+      deleteContacts.forEach(c => {
+        if (c.metadata) {
+          Object.entries(c.metadata).forEach(([k, v]) => {
+            if (v && !mergedMetadata[k]) mergedMetadata[k] = v
+          })
+        }
+      })
+      if (allNotes || Object.keys(mergedMetadata).length > 0) {
+        const updatePayload: any = { metadata: mergedMetadata }
+        if (allNotes) updatePayload.notes = allNotes
+        // Merge name, email, company from others if keep is missing them
+        deleteContacts.forEach(c => {
+          if (!keepContact?.name && c.name) updatePayload.name = c.name
+          if (!keepContact?.email && c.email) updatePayload.email = c.email
+          if (!keepContact?.company && c.company) updatePayload.company = c.company
+        })
+        await contactApi.patch(`/contacts/${keepId}`, updatePayload)
+      }
+      // Delete duplicate contacts
+      await Promise.all(deleteIds.map(id => contactApi.delete(`/contacts/${id}`)))
+      toast.success(`Duplicados do telefone ${phone} mesclados com sucesso`)
+      setDuplicates(prev => prev.filter(d => d.phone !== phone))
+      onMerged()
+    } catch {
+      toast.error('Erro ao mesclar contatos')
+    }
+    setMerging(null)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(2px)' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <GitMerge size={16} color="#7c3aed" /> Verificar duplicados
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+              Contatos com o mesmo telefone que podem ser mesclados
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text-muted)' }}><X size={15} /></button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} />
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '12px' }}>Buscando duplicados...</p>
+            </div>
+          ) : duplicates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <Check size={22} color="#16a34a" />
+              </div>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Nenhum duplicado encontrado</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Todos os contatos possuem telefones unicos.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={14} color="#d97706" />
+                <span style={{ fontSize: '13px', color: '#92400e' }}>
+                  <strong>{duplicates.length}</strong> grupo{duplicates.length > 1 ? 's' : ''} de duplicados ({duplicates.reduce((a, d) => a + d.contacts.length, 0)} contatos)
+                </span>
+              </div>
+              {duplicates.map(({ phone, contacts }) => (
+                <div key={phone} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <Copy size={13} color="var(--text-faint)" />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>{phone}</span>
+                    <span style={{ fontSize: '11px', background: '#fef2f2', color: '#ef4444', padding: '2px 7px', borderRadius: '4px', fontWeight: 600 }}>
+                      {contacts.length} duplicados
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {contacts.map((c: any) => {
+                      const av = getAvatarColor(c.name)
+                      const contactTags = (c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)
+                      return (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>{getInitials(c.name)}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{c.name || '(sem nome)'}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-faint)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {c.email && <span>{c.email}</span>}
+                              {c.company && <span>{c.company}</span>}
+                              {contactTags.length > 0 && <span>{contactTags.map((t: any) => t.name).join(', ')}</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleMerge(phone, c.id, contacts.filter((x: any) => x.id !== c.id).map((x: any) => x.id))}
+                            disabled={merging === phone}
+                            style={{ padding: '5px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: merging === phone ? 'not-allowed' : 'pointer', color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', opacity: merging === phone ? 0.5 : 1 }}>
+                            {merging === phone ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <GitMerge size={11} />}
+                            Manter este
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 18px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#52525b' }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ContactsPage() {
   const t = useT()
+  const router = useRouter()
   const { user } = useAuthStore()
   const { isAdmin, canEdit, canDelete } = usePermissions()
   const tenantId = user?.tenantId || ''
@@ -348,6 +529,7 @@ export default function ContactsPage() {
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showCustomFields, setShowCustomFields] = useState(false)
+  const [showDuplicates, setShowDuplicates] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<{ name: string; email: string; company: string; metadata: Record<string, any> }>({ name: '', email: '', company: '', metadata: {} })
@@ -412,6 +594,7 @@ export default function ContactsPage() {
     <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '1400px', background: 'var(--bg)', minHeight: '100%' }}>
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
       {showCustomFields && <CustomFieldsModal tenantId={tenantId} onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
+      {showDuplicates && <MergeDuplicatesModal onClose={() => setShowDuplicates(false)} onMerged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} />}
 
       {/* Header */}
       <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -448,6 +631,12 @@ export default function ContactsPage() {
           {canEdit('/dashboard/contacts') && !contactLimitReached && (
           <button onClick={() => setShowImport(true)} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Upload size={13} /> {t('contacts.import')}
+          </button>
+          )}
+          {canEdit('/dashboard/contacts') && (
+          <button onClick={() => setShowDuplicates(true)}
+            style={{ padding: '8px 12px', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: '8px', color: '#7c3aed', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <GitMerge size={13} /> Duplicados
           </button>
           )}
           {canEdit('/dashboard/contacts') && (
@@ -615,6 +804,13 @@ export default function ContactsPage() {
                       </>
                     ) : (
                       <>
+                        <button onClick={() => router.push(`/dashboard/inbox?contactId=${c.id}&phone=${encodeURIComponent(c.phone || '')}`)}
+                          title="Ver perfil / Conversa"
+                          style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                          <MessageCircle size={13} />
+                        </button>
                         {canEdit('/dashboard/contacts') && (
                         <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}

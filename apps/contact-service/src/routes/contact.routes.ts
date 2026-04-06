@@ -44,6 +44,7 @@ const createProductSchema = z.object({
   description: z.string().max(2000).optional(),
   sku: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
+  image_url: z.string().url().max(2000).optional().nullable(),
 })
 
 const updateProductSchema = z.object({
@@ -52,6 +53,7 @@ const updateProductSchema = z.object({
   description: z.string().max(2000).optional(),
   sku: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
+  image_url: z.string().url().max(2000).optional().nullable(),
   is_active: z.boolean().optional(),
 })
 
@@ -258,7 +260,7 @@ router.get('/products', async (req, res, next) => {
 
 router.post('/products', validate(createProductSchema), async (req, res, next) => {
   try {
-    const { name, description, price, sku, category } = req.body
+    const { name, description, price, sku, category, image_url } = req.body
     // Plan limit: products (active only)
     const productPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
       const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
@@ -270,7 +272,7 @@ router.post('/products', validate(createProductSchema), async (req, res, next) =
       throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.products} produtos`, 403)
     }
     const { data, error } = await db.from('products').insert({
-      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category,
+      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category, image_url: image_url || null,
     }).select().single()
     if (error) throw error
     res.status(201).json(ok(data))
@@ -285,6 +287,7 @@ router.patch('/products/:id', validate(updateProductSchema), async (req, res, ne
     if (req.body.price !== undefined) update.price = req.body.price
     if (req.body.sku !== undefined) update.sku = req.body.sku
     if (req.body.category !== undefined) update.category = req.body.category
+    if (req.body.image_url !== undefined) update.image_url = req.body.image_url
     if (req.body.is_active !== undefined) update.is_active = req.body.is_active
     const { data, error } = await db.from('products').update(update)
       .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
