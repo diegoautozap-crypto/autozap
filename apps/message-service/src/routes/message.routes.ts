@@ -11,11 +11,17 @@ import { ensureContact, ensureConversation } from '../services/contact.helper'
 
 const router = Router()
 
+import crypto from 'crypto'
+
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 function requireAuthOrInternal(req: any, res: any, next: any): void {
-  const secret = req.headers['x-internal-secret']
-  if (secret === INTERNAL_SECRET) { next(); return }
+  const secret = req.headers['x-internal-secret'] as string
+  if (secret && INTERNAL_SECRET && secret.length === INTERNAL_SECRET.length) {
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(INTERNAL_SECRET))) { next(); return }
+    } catch {}
+  }
   requireAuth(req, res, next)
 }
 

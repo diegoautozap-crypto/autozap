@@ -19,19 +19,13 @@ async function getUserPermissions(userId: string, tenantId: string) {
 }
 
 // ─── Media proxy ──────────────────────────────────────────────────────────────
-router.get('/conversations/media/:mediaId', async (req, res, next) => {
+router.get('/conversations/media/:mediaId', requireAuth, async (req, res, next) => {
   try {
     const { mediaId } = req.params
     const { channelId } = req.query as any
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
-    // Busca canal — sempre restringe por tenant via query param ou auth
-    const tenantId = (req as any).auth?.tid || req.query.t as string
+    const tenantId = req.auth.tid
     if (!tenantId) { res.status(401).json({ error: 'Unauthorized' }); return }
-    // Validate tenant exists when using query param fallback
-    if (!(req as any).auth?.tid && req.query.t) {
-      const { data: tenant } = await db.from('tenants').select('id').eq('id', tenantId).single()
-      if (!tenant) { res.status(401).json({ error: 'Invalid tenant' }); return }
-    }
     let channelQuery = db.from('channels').select('credentials, type').eq('id', channelId).eq('tenant_id', tenantId)
     const { data: channel } = await channelQuery.single()
     if (!channel) { res.status(404).json({ error: 'Channel not found' }); return }

@@ -137,12 +137,16 @@ router.get('/audio-proxy', async (req, res) => {
       return
     }
 
-    if (!url.includes('supabase.co')) {
-      res.status(403).json({ error: 'Only Supabase URLs are allowed' })
-      return
+    // Validação rigorosa contra SSRF
+    let parsed: URL
+    try { parsed = new URL(url) } catch { res.status(400).json({ error: 'Invalid URL' }); return }
+    if (parsed.protocol !== 'https:') { res.status(403).json({ error: 'Only HTTPS allowed' }); return }
+    if (!parsed.hostname.endsWith('.supabase.co')) { res.status(403).json({ error: 'Only Supabase URLs are allowed' }); return }
+    if (/^(127\.|10\.|172\.(1[6-9]|2|3[01])\.|192\.168\.|169\.254\.|localhost|::1)/.test(parsed.hostname)) {
+      res.status(403).json({ error: 'Private IPs not allowed' }); return
     }
 
-    const audioResponse = await fetch(url)
+    const audioResponse = await fetch(parsed.toString())
     if (!audioResponse.ok) {
       res.status(502).json({ error: 'Failed to fetch audio' })
       return

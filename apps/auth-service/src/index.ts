@@ -29,7 +29,7 @@ app.use(
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 50,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many requests, try again later' } },
   standardHeaders: true,
   legacyHeaders: false,
@@ -37,7 +37,7 @@ const authLimiter = rateLimit({
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 50,
+  max: 10,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many registration attempts, try again later' } },
 })
 
