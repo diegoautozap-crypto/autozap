@@ -214,6 +214,7 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
 }
 
 function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: string; stage: string; pipelineId: string | null; onDone: () => void }) {
+  const queryClient = useQueryClient()
   const { data: contacts = [], isLoading, isError } = useQuery({
     queryKey: ['pipeline-contact-search', search],
     queryFn: async () => {
@@ -231,7 +232,7 @@ function ContactSearchResults({ search, stage, pipelineId, onDone }: { search: s
     mutationFn: async (contactId: string) => {
       await conversationApi.post('/pipeline-cards', { contactId, columnKey: stage, pipelineId })
     },
-    onSuccess: () => { toast.success('Contato adicionado à pipeline!'); onDone() },
+    onSuccess: () => { toast.success('Contato adicionado à pipeline!'); onDone(); queryClient.invalidateQueries({ queryKey: ['conversations'] }) },
     onError: (err: any) => toast.error(err?.response?.data?.error || 'Erro ao adicionar contato'),
   })
 
@@ -437,7 +438,7 @@ export default function PipelinePage() {
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       await conversationApi.patch(`/conversations/${id}/pipeline`, { stage, pipelineId: selectedPipelineId })
     },
-    onSuccess: () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }) },
+    onSuccess: () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }); queryClient.invalidateQueries({ queryKey: ['conversations'] }) },
     onError: () => { localBoardRef.current = null; forceRender(n => n + 1); toast.error(t('pipeline.toastMoveError')) },
   })
 

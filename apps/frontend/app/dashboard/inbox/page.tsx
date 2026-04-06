@@ -315,6 +315,7 @@ export default function InboxPage() {
     const onConvUpdated = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['conv-pipeline'] })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
     }
     const onStatus = (data: any) => {
@@ -403,6 +404,7 @@ export default function InboxPage() {
       setPurchaseProductId(''); setPurchaseQty('1'); setShowAddPurchase(false)
       queryClient.invalidateQueries({ queryKey: ['purchases', contactIdForPurchases] })
       queryClient.invalidateQueries({ queryKey: ['purchases-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
     onError: () => toast.error('Erro ao registrar compra'),
   })
@@ -1010,7 +1012,7 @@ export default function InboxPage() {
                   if (dueDate) { const [d, m, y] = dueDate.split('/'); due = new Date(Number(y), Number(m) - 1, Number(d), 23, 59).toISOString() }
                   try {
                     await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
-                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
                   } catch { toast.error(t('inbox.taskCreateError')) }
                 }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>}
               </div>
@@ -1023,7 +1025,7 @@ export default function InboxPage() {
                           <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: isOverdue ? '#fef2f2' : '#f0f9ff', border: `1px solid ${isOverdue ? '#fecaca' : '#bae6fd'}`, borderRadius: '7px' }}>
                             <button onClick={async () => {
                               await conversationApi.patch(`/tasks/${t.id}`, { status: t.status === 'pending' ? 'completed' : 'pending' })
-                              queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                              queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
                             }} style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${t.status === 'completed' ? '#22c55e' : isOverdue ? '#ef4444' : '#93c5fd'}`, background: t.status === 'completed' ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 }}>
                               {t.status === 'completed' && <Check size={10} color="#fff" strokeWidth={3} />}
                             </button>

@@ -83,7 +83,7 @@ export default function ProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { await contactApi.delete(`/products/${id}`) },
-    onSuccess: () => { toast.success('Produto removido'); queryClient.invalidateQueries({ queryKey: ['products'] }); queryClient.invalidateQueries({ queryKey: ['purchases-summary'] }) },
+    onSuccess: () => { toast.success('Produto removido'); queryClient.invalidateQueries({ queryKey: ['products'] }); queryClient.invalidateQueries({ queryKey: ['purchases-summary'] }); queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] }); queryClient.invalidateQueries({ queryKey: ['contact-purchases'] }) },
     onError: () => toast.error('Erro ao remover'),
   })
 
