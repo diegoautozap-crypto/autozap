@@ -7,6 +7,7 @@ export type ChannelType =
   | 'evolution'
   | 'zapi'
   | 'instagram'
+  | 'messenger'
 
 export type ContentType =
   | 'text'

@@ -204,6 +204,22 @@ export class ChannelService {
     return channel ? this.mapRow(channel) : null
   }
 
+  // ── Get channel by page ID (for Instagram/Messenger webhook routing) ────
+
+  async getChannelByPageId(pageId: string, type?: ChannelType): Promise<Channel | null> {
+    let query = db.from('channels').select('*').eq('status', 'active')
+    if (type) query = query.eq('type', type)
+    const { data: channels } = await query
+    if (!channels) return null
+    for (const row of channels) {
+      const creds = decryptCredentials(row.credentials)
+      if (creds.pageId === pageId) {
+        return this.mapRow(row)
+      }
+    }
+    return null
+  }
+
   // ── Delete channel ───────────────────────────────────────────────────────
 
   async deleteChannel(channelId: string, tenantId: string): Promise<void> {

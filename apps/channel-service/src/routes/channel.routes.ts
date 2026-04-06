@@ -18,7 +18,7 @@ const router = Router()
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const createChannelSchema = z.object({
   name: z.string().min(2).max(255),
-  type: z.enum(['gupshup', 'meta_cloud', 'twilio', 'evolution', 'zapi', 'instagram']),
+  type: z.enum(['gupshup', 'meta_cloud', 'twilio', 'evolution', 'zapi', 'instagram', 'messenger']),
   phoneNumber: z.string().optional(),
   credentials: z.record(z.string()),
   settings: z.record(z.unknown()).optional(),
@@ -36,6 +36,8 @@ function safeChannel(channel: any) {
     // Evolution-specific
     baseUrl: credentials?.baseUrl || '',
     instanceName: credentials?.instanceName || '',
+    // Meta (Instagram/Messenger)-specific
+    pageId: credentials?.pageId || '',
   }
 }
 
@@ -358,6 +360,86 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
     logger.error('Evolution webhook processing error', { err })
     res.status(500).json({ success: false, error: 'Internal processing error' })
   }
+})
+
+// ─── Meta Webhook (Instagram + Messenger) ────────────────────────────────────
+
+// GET /webhook/meta — verification handshake from Meta
+router.get('/webhook/meta', (req, res) => {
+  const mode = req.query['hub.mode']
+  const token = req.query['hub.verify_token']
+  const challenge = req.query['hub.challenge']
+
+  if (mode === 'subscribe' && token) {
+    const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN
+    if (token === expectedToken) {
+      res.status(200).send(challenge)
+      return
+    }
+  }
+  res.status(403).send('Forbidden')
+})
+
+// POST /webhook/meta — inbound from Instagram DM and Messenger
+router.post('/webhook/meta', rateLimit({ max: 120 }), async (req, res, next) => {
+  try {
+    const payload = req.body
+    const objectType = payload?.object // 'instagram' or 'page'
+
+    if (!objectType) { res.json({ success: true }); return }
+
+    // Determine channel type
+    const isInstagram = objectType === 'instagram'
+    const channelType = isInstagram ? 'instagram' : 'messenger'
+
+    // Extract page ID from entry
+    const pageId = payload?.entry?.[0]?.id
+    if (!pageId) { res.json({ success: true }); return }
+
+    // Find channel by page ID
+    const channel = await channelService.getChannelByPageId(pageId, channelType as any)
+    if (!channel) {
+      logger.warn('Meta webhook for unknown page', { pageId, objectType })
+      res.json({ success: true })
+      return
+    }
+
+    // Validate webhook signature
+    const adapter = channelRouter.resolve(channel.type)
+    const credentials = decryptCredentials(channel.credentials)
+    if (!adapter.validateWebhook(req.body, req.headers as Record<string, string>, credentials.appSecret || '')) {
+      logger.warn('Invalid Meta webhook signature', { channelId: channel.id })
+      res.status(401).json({ error: 'Invalid webhook' })
+      return
+    }
+
+    // Process messaging events
+    const messaging = payload?.entry?.[0]?.messaging || []
+    for (const event of messaging) {
+      if (event.message) {
+        const normalized = adapter.parseInbound(payload)
+        if (normalized) {
+          normalized.channelId = channel.id
+          await notifyMessageService('inbound', {
+            tenantId: channel.tenantId,
+            channelId: channel.id,
+            message: normalized,
+          })
+        }
+      } else if (event.delivery || event.read) {
+        const statusUpdate = adapter.parseStatusUpdate(payload)
+        if (statusUpdate) {
+          await notifyMessageService('status_update', {
+            tenantId: channel.tenantId,
+            channelId: channel.id,
+            ...statusUpdate,
+          })
+        }
+      }
+    }
+
+    res.json({ success: true })
+  } catch (err) { next(err) }
 })
 
 // ─── Helper: notify message-service ──────────────────────────────────────────

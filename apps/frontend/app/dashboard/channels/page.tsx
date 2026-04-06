@@ -26,8 +26,8 @@ const CHANNEL_LIMITS: Record<string, number> = {
   pending: 0, starter: 5, pro: 10, enterprise: 30, unlimited: 999,
 }
 
-type ChannelFormType = 'gupshup' | 'evolution'
-const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false }
+type ChannelFormType = 'gupshup' | 'evolution' | 'instagram' | 'messenger'
+const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false, accessToken: '', pageId: '', appSecret: '' }
 
 export default function ChannelsPage() {
   const t = useT()
@@ -55,7 +55,9 @@ export default function ChannelsPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (form.channelType === 'evolution') {
+      if (form.channelType === 'instagram' || form.channelType === 'messenger') {
+        await channelApi.post('/channels', { name: form.name, type: form.channelType, phoneNumber: '', credentials: { accessToken: form.accessToken, pageId: form.pageId, appSecret: form.appSecret }, settings: {} })
+      } else if (form.channelType === 'evolution') {
         await channelApi.post('/channels', { name: form.name, type: 'evolution', phoneNumber: '', credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName }, settings: {} })
       } else {
         await channelApi.post('/channels', { name: form.name, type: 'gupshup', phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: {} })
@@ -67,7 +69,9 @@ export default function ChannelsPage() {
   const editMutation = useMutation({
     mutationFn: async () => {
       const settingsPayload = { aiChatbotEnabled: form.aiChatbotEnabled }
-      if (form.channelType === 'evolution') {
+      if (form.channelType === 'instagram' || form.channelType === 'messenger') {
+        await channelApi.patch(`/channels/${editingId}`, { name: form.name, credentials: { accessToken: form.accessToken, pageId: form.pageId, appSecret: form.appSecret }, settings: settingsPayload })
+      } else if (form.channelType === 'evolution') {
         await channelApi.patch(`/channels/${editingId}`, { name: form.name, credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName }, settings: settingsPayload })
       } else {
         await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: settingsPayload })
@@ -84,10 +88,12 @@ export default function ChannelsPage() {
 
   const openEdit = (ch: any) => {
     const aiEnabled = ch.settings?.aiChatbotEnabled ?? false
-    if (ch.type === 'evolution') {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '', aiChatbotEnabled: aiEnabled })
+    if (ch.type === 'instagram' || ch.type === 'messenger') {
+      setForm({ name: ch.name || '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: ch.type as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: ch.pageId || '', appSecret: '' })
+    } else if (ch.type === 'evolution') {
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
     } else {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', channelType: 'gupshup', baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled })
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', channelType: 'gupshup', baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
     }
     setEditingId(ch.id); setShowForm(true)
   }
@@ -96,7 +102,9 @@ export default function ChannelsPage() {
   const toggleApiKey = (id: string) => setShowApiKey(prev => ({ ...prev, [id]: !prev[id] }))
   const handleSubmit = () => editingId ? editMutation.mutate() : createMutation.mutate()
   const isPending = createMutation.isPending || editMutation.isPending
-  const isFormValid = form.channelType === 'evolution'
+  const isFormValid = (form.channelType === 'instagram' || form.channelType === 'messenger')
+    ? !!(form.name && form.accessToken && form.pageId && form.appSecret)
+    : form.channelType === 'evolution'
     ? !!(form.name && form.apiKey && form.baseUrl && form.instanceName)
     : !!(form.name && form.apiKey && form.source)
 
@@ -186,6 +194,8 @@ export default function ChannelsPage() {
                 {[
                   { value: 'gupshup' as ChannelFormType, label: 'Gupshup', color: '#6366f1' },
                   { value: 'evolution' as ChannelFormType, label: 'Evolution API', color: '#22c55e' },
+                  { value: 'instagram' as ChannelFormType, label: 'Instagram', color: '#e1306c' },
+                  { value: 'messenger' as ChannelFormType, label: 'Messenger', color: '#0084ff' },
                 ].map(opt => (
                   <button key={opt.value} onClick={() => setForm({ ...form, channelType: opt.value })}
                     style={{ flex: 1, padding: '10px 16px', background: form.channelType === opt.value ? `${opt.color}11` : 'var(--bg)', border: `1.5px solid ${form.channelType === opt.value ? opt.color : 'var(--border)'}`, borderRadius: '9px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: form.channelType === opt.value ? opt.color : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -203,7 +213,31 @@ export default function ChannelsPage() {
             <input style={inp} placeholder={t('channels.formNamePlaceholder')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
           </div>
 
-          {form.channelType === 'gupshup' ? (
+          {(form.channelType === 'instagram' || form.channelType === 'messenger') ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={lbl}>Page ID</label>
+                  <input style={inp} placeholder="123456789012345" value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+                </div>
+                <div>
+                  <label style={lbl}>Access Token</label>
+                  <input style={inp} type="password" placeholder="EAAxxxxxxx..." value={form.accessToken} onChange={e => setForm({ ...form, accessToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+                </div>
+                <div>
+                  <label style={lbl}>App Secret</label>
+                  <input style={inp} type="password" placeholder="abc123def456..." value={form.appSecret} onChange={e => setForm({ ...form, appSecret: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px', padding: '14px 16px', background: form.channelType === 'instagram' ? '#fdf2f8' : '#eff6ff', borderRadius: '9px', border: `1px solid ${form.channelType === 'instagram' ? '#fbcfe8' : '#bfdbfe'}` }}>
+                <p style={{ fontSize: '12px', color: form.channelType === 'instagram' ? '#9d174d' : '#1d4ed8', margin: 0, lineHeight: 1.6 }}>
+                  Configure o webhook no Meta Developers para: <strong>{WEBHOOK_BASE}/webhook/meta</strong>
+                  <br />Defina a variavel <strong>META_WEBHOOK_VERIFY_TOKEN</strong> no servidor para o token de verificacao escolhido.
+                </p>
+              </div>
+            </>
+          ) : form.channelType === 'gupshup' ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 {[
@@ -291,7 +325,10 @@ export default function ChannelsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {channels?.map((ch: any) => {
             const isEvolution = ch.type === 'evolution'
-            const webhookUrl = isEvolution
+            const isMeta = ch.type === 'instagram' || ch.type === 'messenger'
+            const webhookUrl = isMeta
+              ? `${WEBHOOK_BASE}/webhook/meta`
+              : isEvolution
               ? `${WEBHOOK_BASE}/webhook/evolution/${ch.instanceName || ch.credentials?.instanceName || ''}`
               : `${WEBHOOK_BASE}/webhook/gupshup/${ch.webhookApiKey}`
             const isVisible  = showApiKey[ch.id]
@@ -305,20 +342,20 @@ export default function ChannelsPage() {
                 {/* Header do canal */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: isEvolution ? '#eff6ff' : '#f0fdf4', border: `1px solid ${isEvolution ? '#bfdbfe' : '#bbf7d0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Radio size={17} color={isEvolution ? '#2563eb' : '#16a34a'} />
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: ch.type === 'instagram' ? '#fdf2f8' : ch.type === 'messenger' ? '#eff6ff' : isEvolution ? '#eff6ff' : '#f0fdf4', border: `1px solid ${ch.type === 'instagram' ? '#fbcfe8' : ch.type === 'messenger' ? '#bfdbfe' : isEvolution ? '#bfdbfe' : '#bbf7d0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Radio size={17} color={ch.type === 'instagram' ? '#e1306c' : ch.type === 'messenger' ? '#0084ff' : isEvolution ? '#2563eb' : '#16a34a'} />
                     </div>
                     <div>
                       <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', margin: '0 0 2px', letterSpacing: '-0.01em' }}>{ch.name}</p>
                       <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0, fontFamily: 'ui-monospace, monospace' }}>
-                        {isEvolution ? `Evolution - ${ch.instanceName || ''}` : (ch.phoneNumber || ch.phone_number || '')}
+                        {isMeta ? `${ch.type === 'instagram' ? 'Instagram' : 'Messenger'} - Page ${ch.pageId || ''}` : isEvolution ? `Evolution - ${ch.instanceName || ''}` : (ch.phoneNumber || ch.phone_number || '')}
                       </p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 600, color: isEvolution ? '#2563eb' : '#16a34a', background: isEvolution ? '#eff6ff' : '#f0fdf4', border: `1px solid ${isEvolution ? '#bfdbfe' : '#bbf7d0'}`, padding: '3px 10px', borderRadius: '99px' }}>
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: isEvolution ? '#3b82f6' : '#22c55e' }} />
-                      {isEvolution ? 'Evolution' : t('channels.active')}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 600, color: ch.type === 'instagram' ? '#e1306c' : ch.type === 'messenger' ? '#0084ff' : isEvolution ? '#2563eb' : '#16a34a', background: ch.type === 'instagram' ? '#fdf2f8' : ch.type === 'messenger' ? '#eff6ff' : isEvolution ? '#eff6ff' : '#f0fdf4', border: `1px solid ${ch.type === 'instagram' ? '#fbcfe8' : ch.type === 'messenger' ? '#bfdbfe' : isEvolution ? '#bfdbfe' : '#bbf7d0'}`, padding: '3px 10px', borderRadius: '99px' }}>
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: ch.type === 'instagram' ? '#e1306c' : ch.type === 'messenger' ? '#0084ff' : isEvolution ? '#3b82f6' : '#22c55e' }} />
+                      {ch.type === 'instagram' ? 'Instagram' : ch.type === 'messenger' ? 'Messenger' : isEvolution ? 'Evolution' : t('channels.active')}
                     </div>
                     {ch.settings?.aiChatbotEnabled && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '3px 9px', borderRadius: '99px' }}>
@@ -397,7 +434,7 @@ export default function ChannelsPage() {
                 )}
 
                 {/* API Key — só visível pra quem pode editar */}
-                {canEdit('/dashboard/channels') && !isEvolution && <div style={{ marginBottom: '12px' }}>
+                {canEdit('/dashboard/channels') && !isEvolution && !isMeta && <div style={{ marginBottom: '12px' }}>
                   <label style={lbl}>API Key</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly type={isVisible ? 'text' : 'password'} value={ch.webhookApiKey || ''}
