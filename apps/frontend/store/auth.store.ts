@@ -13,6 +13,8 @@ interface User {
 
 interface AuthState {
   user: User | null
+  accessToken: string | null
+  refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
 
@@ -20,6 +22,7 @@ interface AuthState {
   logout: () => Promise<void>
   register: (name: string, email: string, password: string, tenantName: string) => Promise<void>
   updateUser: (data: Partial<User>) => void
+  setTokens: (accessToken: string, refreshToken: string) => void
   validateSession: () => void
 }
 
@@ -33,17 +36,20 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
+      accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
 
-      validateSession: () => {
-        const { user, isAuthenticated } = get()
-        if (!user || !isAuthenticated) return
+      setTokens: (accessToken, refreshToken) => {
+        set({ accessToken, refreshToken })
+      },
 
-        // With httpOnly cookies, we can't inspect the token from JS.
-        // Session validity is enforced server-side on every request.
-        // If /auth/me fails with 401, the api interceptor will attempt refresh
-        // and ultimately force logout if refresh also fails.
+      validateSession: () => {
+        const { user, isAuthenticated, accessToken } = get()
+        if (!user || !isAuthenticated || !accessToken) {
+          if (isAuthenticated) forceLogout('sessao incompleta')
+        }
       },
 
       login: async (email, password, totpCode) => {
@@ -56,8 +62,9 @@ export const useAuthStore = create<AuthState>()(
             return { requiresTwoFactor: true }
           }
 
-          // Tokens are now in httpOnly cookies set by the server.
-          // We only need to fetch user data.
+          const { accessToken, refreshToken } = data.data
+          set({ accessToken, refreshToken })
+
           const meRes = await authApi.get('/auth/me')
           const user = meRes.data.data
 
@@ -75,12 +82,12 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
+        const rt = get().refreshToken
         try {
-          // Server clears httpOnly cookies on logout
-          await authApi.post('/auth/logout')
+          await authApi.post('/auth/logout', { refreshToken: rt })
         } catch {}
         localStorage.removeItem('autozap-auth')
-        set({ user: null, isAuthenticated: false })
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
       },
 
       register: async (name, email, password, tenantName) => {
@@ -104,6 +111,8 @@ export const useAuthStore = create<AuthState>()(
       name: 'autozap-auth',
       partialize: (state) => ({
         user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     },
