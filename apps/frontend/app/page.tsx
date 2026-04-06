@@ -49,7 +49,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     const state = useAuthStore.getState()
-    if (state.user && state.accessToken && state.isAuthenticated) {
+    if (state.user && state.isAuthenticated) {
       router.replace('/dashboard')
     } else {
       setAuthChecked(true)

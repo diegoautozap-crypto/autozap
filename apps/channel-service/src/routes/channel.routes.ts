@@ -4,6 +4,7 @@ import { channelService } from '../services/channel.service'
 import { requireAuth, requireRole, validate } from '../middleware/channel.middleware'
 import { ok, rateLimit } from '@autozap/utils'
 import { encryptCredentials, decryptCredentials } from '../lib/crypto'
+import { channelRouter } from '../adapters/ChannelRouter'
 import { logger } from '../lib/logger'
 import { db } from '../lib/db'
 import ffmpeg from 'fluent-ffmpeg'
@@ -204,6 +205,15 @@ router.post('/webhook/gupshup/:apikey', rateLimit({ max: 120 }), async (req, res
       return
     }
 
+    // Validate webhook authenticity
+    const adapter = channelRouter.resolve(channel.type)
+    const credentials = decryptCredentials(channel.credentials)
+    if (!adapter.validateWebhook(req.body, req.headers as Record<string, string>, credentials.apiKey || '')) {
+      logger.warn('Invalid Gupshup webhook signature', { channelId: channel.id })
+      res.status(401).json({ error: 'Invalid webhook' })
+      return
+    }
+
     const isMetaV3 = payload?.object === 'whatsapp_business_account'
 
     if (isMetaV3) {
@@ -308,6 +318,15 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
     if (!channel) {
       logger.warn('Evolution webhook for unknown instance', { instanceName })
       res.status(200).json({ success: true })
+      return
+    }
+
+    // Validate webhook authenticity
+    const evoAdapter = channelRouter.resolve(channel.type)
+    const evoCreds = decryptCredentials(channel.credentials)
+    if (!evoAdapter.validateWebhook(req.body, req.headers as Record<string, string>, evoCreds.apiKey || '')) {
+      logger.warn('Invalid Evolution webhook signature', { channelId: channel.id })
+      res.status(401).json({ error: 'Invalid webhook' })
       return
     }
 

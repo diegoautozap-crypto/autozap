@@ -4,6 +4,7 @@ initSentry('message-service')
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import zlib from 'zlib'
 import messageRoutes from './routes/message.routes'
@@ -20,6 +21,7 @@ const PORT = process.env.PORT || 3004
 app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
+app.use(cookieParser())
 
 // ─── Captura o body bruto ANTES do express.json() ─────────────────────────────
 // Necessário para descompressão de gzip/deflate (Make, Zapier comprimem o body)

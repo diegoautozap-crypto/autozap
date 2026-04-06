@@ -131,6 +131,17 @@ router.post('/tenants/:id/impersonate', async (req, res, next) => {
     const token = signAccessToken({ sub: owner.id, tid: owner.tenant_id, role: owner.role as any, email: owner.email })
 
     logger.info('Admin impersonating tenant', { adminId: req.auth.sub, tenantId: req.params.id })
+
+    // Set httpOnly cookie for impersonation
+    const isProduction = process.env.NODE_ENV === 'production'
+    res.cookie('accessToken', token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: '/',
+    })
+
     res.json(ok({ accessToken: token, tenantId: req.params.id }))
   } catch (err) { next(err) }
 })

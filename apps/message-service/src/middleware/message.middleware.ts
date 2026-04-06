@@ -14,13 +14,13 @@ const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 if (!INTERNAL_SECRET) console.error('⚠ INTERNAL_SECRET não configurado — rotas internas desprotegidas')
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json(fail('UNAUTHORIZED', 'Missing authorization header'))
+  const token = req.cookies?.accessToken || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
+  if (!token) {
+    res.status(401).json(fail('UNAUTHORIZED', 'Missing authorization'))
     return
   }
   try {
-    req.auth = jwt.verify(header.slice(7), ACCESS_SECRET) as JwtPayload
+    req.auth = jwt.verify(token, ACCESS_SECRET) as JwtPayload
     next()
   } catch {
     res.status(401).json(fail('INVALID_TOKEN', 'Invalid or expired token'))

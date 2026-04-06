@@ -52,16 +52,67 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
     const result = await authService.login({ ...req.body, userAgent: req.headers['user-agent'], ipAddress: req.ip })
     if (result.requiresTwoFactor) { res.status(200).json(ok({ requiresTwoFactor: true })); return }
+
+    // Set httpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production'
+    res.cookie('accessToken', result.tokens.accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: '/',
+    })
+    res.cookie('refreshToken', result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/auth/refresh',
+    })
+
     res.json(ok(result.tokens))
   } catch (err) { next(err) }
 })
 
-router.post('/refresh', validate(refreshSchema), async (req, res, next) => {
-  try { res.json(ok(await authService.refresh(req.body.refreshToken, req.ip))) } catch (err) { next(err) }
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken
+    if (!refreshToken) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Missing refresh token' } })
+      return
+    }
+
+    const tokens = await authService.refresh(refreshToken, req.ip)
+
+    // Set httpOnly cookies
+    const isProduction = process.env.NODE_ENV === 'production'
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: '/',
+    })
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/auth/refresh',
+    })
+
+    res.json(ok(tokens))
+  } catch (err) { next(err) }
 })
 
-router.post('/logout', validate(refreshSchema), async (req, res, next) => {
-  try { await authService.logout(req.body.refreshToken); res.json(ok({ message: 'Logged out' })) } catch (err) { next(err) }
+router.post('/logout', async (req, res, next) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken
+    if (refreshToken) await authService.logout(refreshToken)
+    res.clearCookie('accessToken', { path: '/' })
+    res.clearCookie('refreshToken', { path: '/auth/refresh' })
+    res.json(ok({ message: 'Logged out' }))
+  } catch (err) { next(err) }
 })
 
 router.post('/forgot-password', validate(forgotSchema), async (req, res, next) => {
@@ -102,7 +153,12 @@ router.get('/me', requireAuth, async (req, res, next) => {
 })
 
 router.post('/logout-all', requireAuth, async (req, res, next) => {
-  try { await authService.logoutAllSessions(req.auth.sub); res.json(ok({ message: 'All sessions revoked' })) } catch (err) { next(err) }
+  try {
+    await authService.logoutAllSessions(req.auth.sub)
+    res.clearCookie('accessToken', { path: '/' })
+    res.clearCookie('refreshToken', { path: '/auth/refresh' })
+    res.json(ok({ message: 'All sessions revoked' }))
+  } catch (err) { next(err) }
 })
 
 // ─── 2FA ──────────────────────────────────────────────────────────────────────

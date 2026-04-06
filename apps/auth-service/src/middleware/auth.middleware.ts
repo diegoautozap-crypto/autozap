@@ -17,13 +17,12 @@ declare global {
 // Validates Bearer token and attaches decoded payload to req.auth
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) {
-    res.status(401).json(fail('UNAUTHORIZED', 'Missing or invalid authorization header'))
+  const token = req.cookies?.accessToken || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
+  if (!token) {
+    res.status(401).json(fail('UNAUTHORIZED', 'Missing or invalid authorization'))
     return
   }
 
-  const token = authHeader.slice(7)
   try {
     req.auth = verifyAccessToken(token)
     next()
