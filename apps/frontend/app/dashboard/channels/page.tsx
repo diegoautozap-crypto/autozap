@@ -194,8 +194,9 @@ export default function ChannelsPage() {
                 {[
                   { value: 'gupshup' as ChannelFormType, label: 'Gupshup', color: '#6366f1' },
                   { value: 'evolution' as ChannelFormType, label: 'Evolution API', color: '#22c55e' },
-                  { value: 'instagram' as ChannelFormType, label: 'Instagram', color: '#e1306c' },
-                  { value: 'messenger' as ChannelFormType, label: 'Messenger', color: '#0084ff' },
+                  // Instagram e Messenger: backend pronto, habilitar no frontend quando configurar app Meta
+                  // { value: 'instagram' as ChannelFormType, label: 'Instagram', color: '#e1306c' },
+                  // { value: 'messenger' as ChannelFormType, label: 'Messenger', color: '#0084ff' },
                 ].map(opt => (
                   <button key={opt.value} onClick={() => setForm({ ...form, channelType: opt.value })}
                     style={{ flex: 1, padding: '10px 16px', background: form.channelType === opt.value ? `${opt.color}11` : 'var(--bg)', border: `1.5px solid ${form.channelType === opt.value ? opt.color : 'var(--border)'}`, borderRadius: '9px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: form.channelType === opt.value ? opt.color : 'var(--text-muted)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
