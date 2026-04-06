@@ -31,7 +31,18 @@
       "Bash(git revert:*)",
       "Bash(find /c/Users/Adm/Desktop/autozap/packages/database -type f -name *.sql)",
       "Bash(find /c/Users/Adm/Desktop/autozap -type f -name *.sql)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(find /c/Users/Adm/Desktop/autozap/apps/frontend/src -type f -name *.tsx -o -name *.ts)",
+      "Bash(while read:*)",
+      "Read(//c/Users/Adm/Desktop/autozap/**)",
+      "Bash(find /c/Users/Adm/Desktop/autozap/apps -name .env* -type f)",
+      "Bash(find /c/Users/Adm/Desktop/autozap/packages/database -type f -name *.ts)",
+      "Bash(git ls-files:*)",
+      "Bash(/tmp/autozap_features.txt:*)",
+      "Read(//tmp/**)",
+      "Bash(find /c/Users/Adm/Desktop/autozap -path */supabase/* -name *.sql)",
+      "Bash(npx next:*)",
+      "Bash(node -e \":*)"
     ]
   }
 }
