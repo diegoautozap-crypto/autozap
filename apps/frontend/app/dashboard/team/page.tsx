@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApi, channelApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
+import { usePermissionsStore } from '@/store/permissions.store'
 import { toast } from 'sonner'
 import {
   Users, Plus, Pencil, Trash2, X, Check, Loader2,
@@ -101,6 +102,7 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
       setPerms(null)
       queryClient.invalidateQueries({ queryKey: ['member-permissions', member.id] })
       queryClient.invalidateQueries({ queryKey: ['team'] })
+      usePermissionsStore.getState().load()
     },
     onError: (err: any) => toast.error(err?.response?.data?.error?.message || t('team.toast.errorSave')),
   })

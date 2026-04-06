@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText,
   User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot,
-  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft, ShoppingBag,
+  UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft, ShoppingBag, History,
 } from 'lucide-react'
 import { subscribeTenant } from '@/lib/pusher'
 import { createClient } from '@supabase/supabase-js'
@@ -67,7 +67,7 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   const url = getMediaUrl(msg.media_url, channelId, tenantId)
   if (type === 'image') return (
     <div>
-      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.image')}</p>}
+      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
     </div>
   )
@@ -85,8 +85,14 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   )
   if (type === 'document') {
     const fn = msg.body || msg.media_url?.split('/')?.pop() || 'documento'
+    if (!url) return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: isOut ? 'rgba(255,255,255,0.15)' : 'var(--bg)', borderRadius: '8px' }}>
+        <FileText size={20} color={isOut ? '#fff' : 'var(--text-muted)'} />
+        <p style={{ fontSize: '13px', color: sc, margin: 0 }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>
+      </div>
+    )
     return (
-      <a href={url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+      <a href={url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: isOut ? 'rgba(255,255,255,0.15)' : 'var(--bg)', borderRadius: '8px' }}>
           <FileText size={20} color={isOut ? '#fff' : 'var(--text-muted)'} />
           <div>
@@ -265,6 +271,8 @@ export default function InboxPage() {
   const [allConvs, setAllConvs] = useState<any[]>([])
   const [hasMoreConvs, setHasMoreConvs] = useState(true)
   const [showQuickReplies, setShowQuickReplies] = useState(false)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const dragCounterRef = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -315,6 +323,7 @@ export default function InboxPage() {
     const onConvUpdated = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['conv-pipeline'] })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] })
     }
     const onStatus = (data: any) => {
@@ -403,6 +412,7 @@ export default function InboxPage() {
       setPurchaseProductId(''); setPurchaseQty('1'); setShowAddPurchase(false)
       queryClient.invalidateQueries({ queryKey: ['purchases', contactIdForPurchases] })
       queryClient.invalidateQueries({ queryKey: ['purchases-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases-by-contact'] })
     },
     onError: () => toast.error('Erro ao registrar compra'),
   })
@@ -560,6 +570,43 @@ export default function InboxPage() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (inputMode === 'message') handleSendText(); else if (noteText.trim()) saveNoteMutation.mutate() }
   }
+  // Quick replies with "/" shortcut — fetch for inline dropdown
+  const { data: quickRepliesData = [] } = useQuery({
+    queryKey: ['quick-replies'],
+    queryFn: async () => { const { data } = await conversationApi.get('/quick-replies'); return data.data || [] },
+    staleTime: 30000,
+  })
+  const slashActive = inputMode === 'message' && messageText.startsWith('/')
+  const filteredSlashReplies = slashActive
+    ? quickRepliesData.filter((r: any) => {
+        const q = messageText.slice(1).toLowerCase()
+        return !q || r.title.toLowerCase().includes(q) || r.body.toLowerCase().includes(q)
+      })
+    : []
+  const handleSlashSelect = (body: string) => {
+    const replaced = body.replace(/\{\{nome\}\}/gi, contactName || '')
+    setMessageText(replaced)
+  }
+  // Drag-and-drop file handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounterRef.current++
+    if (e.dataTransfer.types.includes('Files')) setIsDraggingFile(true)
+  }
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) setIsDraggingFile(false)
+  }
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation() }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    dragCounterRef.current = 0; setIsDraggingFile(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (file.size > 15 * 1024 * 1024) { toast.error('Arquivo muito grande. Maximo 15MB'); return }
+    setPendingFile({ file, previewUrl: URL.createObjectURL(file), contentType: getContentType(file) })
+  }
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, notes])
 
   const handleSelectConv = async (convId: string) => {
@@ -700,7 +747,8 @@ export default function InboxPage() {
       </div>
 
       {/* ── Centro — chat ── */}
-      <div className="inbox-chat" style={{ flex: 1, display: isMobile && !mobileShowChat ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', width: isMobile ? '100%' : undefined }}>
+      <div className="inbox-chat" style={{ flex: 1, display: isMobile && !mobileShowChat ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', width: isMobile ? '100%' : undefined, position: 'relative' }}
+        onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
         {!selectedConvId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: 'var(--bg)' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow)' }}><MessageSquare size={24} color="var(--text-faintest)" /></div>
@@ -782,6 +830,16 @@ export default function InboxPage() {
               </div>
             )}
 
+            {/* Drag-and-drop overlay */}
+            {isDraggingFile && canEdit('/dashboard/inbox') && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'rgba(34,197,94,0.08)', border: '3px dashed #22c55e', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ background: '#fff', padding: '20px 32px', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Paperclip size={24} color="#22c55e" />
+                  <span style={{ fontSize: '16px', fontWeight: 600, color: '#15803d' }}>Solte o arquivo para enviar</span>
+                </div>
+              </div>
+            )}
+
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg)' }}>
               {loadingMessages
                 ? <div style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
@@ -826,7 +884,28 @@ export default function InboxPage() {
               </div>
             )}
 
-            {canEdit('/dashboard/inbox') && showQuickReplies && <QuickRepliesModal onSelect={text => { setMessageText(text); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />}
+            {canEdit('/dashboard/inbox') && showQuickReplies && <QuickRepliesModal onSelect={text => { const replaced = text.replace(/\{\{nome\}\}/gi, contactName || ''); setMessageText(replaced); setInputMode('message') }} onClose={() => setShowQuickReplies(false)} />}
+
+            {/* Slash-command inline dropdown */}
+            {canEdit('/dashboard/inbox') && slashActive && filteredSlashReplies.length > 0 && !showQuickReplies && (
+              <div style={{ position: 'absolute', bottom: '60px', left: '14px', right: '14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', zIndex: 50, maxHeight: '220px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <Zap size={12} color="#22c55e" />
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)' }}>Respostas rapidas — digite / para filtrar</span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {filteredSlashReplies.map((r: any) => (
+                    <div key={r.id} style={{ padding: '8px 14px', borderBottom: '1px solid var(--divider)', cursor: 'pointer' }}
+                      onClick={() => handleSlashSelect(r.body)}
+                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card-hover)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: '0 0 1px' }}>{r.title}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {!canEdit('/dashboard/inbox') ? (
               <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)', textAlign: 'center', flexShrink: 0 }}>
@@ -1010,7 +1089,7 @@ export default function InboxPage() {
                   if (dueDate) { const [d, m, y] = dueDate.split('/'); due = new Date(Number(y), Number(m) - 1, Number(d), 23, 59).toISOString() }
                   try {
                     await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
-                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
                   } catch { toast.error(t('inbox.taskCreateError')) }
                 }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>}
               </div>
@@ -1023,7 +1102,7 @@ export default function InboxPage() {
                           <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: isOverdue ? '#fef2f2' : '#f0f9ff', border: `1px solid ${isOverdue ? '#fecaca' : '#bae6fd'}`, borderRadius: '7px' }}>
                             <button onClick={async () => {
                               await conversationApi.patch(`/tasks/${t.id}`, { status: t.status === 'pending' ? 'completed' : 'pending' })
-                              queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                              queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
                             }} style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${t.status === 'completed' ? '#22c55e' : isOverdue ? '#ef4444' : '#93c5fd'}`, background: t.status === 'completed' ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 }}>
                               {t.status === 'completed' && <Check size={10} color="#fff" strokeWidth={3} />}
                             </button>
@@ -1084,6 +1163,68 @@ export default function InboxPage() {
                     ))}
                   </div>
               }
+            </div>
+
+            {/* Timeline */}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <History size={13} color="#6366f1" />
+                <p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Timeline</p>
+              </div>
+              {(() => {
+                const timelineItems: { type: string; date: string; label: string; detail?: string; color: string; icon: string }[] = []
+                // Recent messages (last 5)
+                if (messages && messages.length > 0) {
+                  const recentMsgs = [...messages].sort((a: any, b: any) => new Date(b.sent_at || b.created_at).getTime() - new Date(a.sent_at || a.created_at).getTime()).slice(0, 5)
+                  recentMsgs.forEach((m: any) => {
+                    const dir = m.direction === 'inbound' ? 'Recebida' : 'Enviada'
+                    const body = m.content_type === 'text' ? (m.body || '').slice(0, 40) : `[${m.content_type}]`
+                    timelineItems.push({ type: 'message', date: m.sent_at || m.created_at, label: `${dir}: ${body}${(m.body || '').length > 40 ? '...' : ''}`, color: m.direction === 'inbound' ? '#2563eb' : '#22c55e', icon: 'msg' })
+                  })
+                }
+                // Purchases
+                if (contactPurchases && contactPurchases.length > 0) {
+                  contactPurchases.slice(0, 5).forEach((p: any) => {
+                    timelineItems.push({ type: 'purchase', date: p.created_at, label: `Compra: ${p.products?.name || 'Produto'}`, detail: `${p.quantity}x R$ ${Number(p.unit_price).toFixed(2)}`, color: '#16a34a', icon: 'shop' })
+                  })
+                }
+                // Tasks
+                if (convTasks && convTasks.length > 0) {
+                  convTasks.slice(0, 5).forEach((tk: any) => {
+                    timelineItems.push({ type: 'task', date: tk.created_at, label: `Tarefa: ${tk.title}`, detail: tk.status === 'completed' ? 'Concluida' : (tk.due_date ? `Vence ${new Date(tk.due_date).toLocaleDateString('pt-BR')}` : 'Pendente'), color: '#2563eb', icon: 'task' })
+                  })
+                }
+                // Tags
+                if (contactTags && contactTags.length > 0) {
+                  contactTags.forEach((tag: any) => {
+                    timelineItems.push({ type: 'tag', date: tag.created_at || new Date().toISOString(), label: `Tag: ${tag.name}`, color: tag.color || '#6b7280', icon: 'tag' })
+                  })
+                }
+                // Sort chronologically descending
+                timelineItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                const limited = timelineItems.slice(0, 12)
+                if (limited.length === 0) return <p style={{ fontSize: '12px', color: 'var(--text-faintest)', textAlign: 'center', padding: '4px 0' }}>Nenhum evento</p>
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                    {limited.map((item, idx) => (
+                      <div key={`tl-${idx}`} style={{ display: 'flex', gap: '10px', paddingBottom: '8px', position: 'relative' }}>
+                        {/* Timeline line */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '14px', flexShrink: 0 }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color, flexShrink: 0, marginTop: '3px' }} />
+                          {idx < limited.length - 1 && <div style={{ width: '1px', flex: 1, background: 'var(--divider)', marginTop: '2px' }} />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, paddingBottom: '4px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text)', margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</p>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {item.detail && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.detail}</span>}
+                            <span style={{ fontSize: '10px', color: 'var(--text-faintest)' }}>{item.date ? new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(item.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
 
             <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--divider)' }}>

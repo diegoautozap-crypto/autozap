@@ -137,6 +137,24 @@ export default function DashboardPage() {
     queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
   })
 
+  // Pipeline funnel data
+  const { data: pipelineBoard } = useQuery({
+    queryKey: ['pipeline-board-funnel'],
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/conversations/pipeline')
+      return data.data as Record<string, any[]>
+    },
+    staleTime: 30000, refetchInterval: 30000,
+  })
+  const { data: pipelineColumns } = useQuery({
+    queryKey: ['pipeline-columns-funnel'],
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/pipeline-columns')
+      return data.data as any[]
+    },
+    staleTime: 60000,
+  })
+
   const [selectedAgent, setSelectedAgent] = useState<string>('')
 
   const { data: analytics } = useQuery({
@@ -301,6 +319,67 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Funil de conversão */}
+      {pipelineBoard && (() => {
+        const defaultCols = [
+          { key: 'lead', label: 'Lead', color: '#6b7280' },
+          { key: 'qualificacao', label: 'Qualificação', color: '#2563eb' },
+          { key: 'proposta', label: 'Proposta', color: '#7c3aed' },
+          { key: 'negociacao', label: 'Negociação', color: '#d97706' },
+          { key: 'ganho', label: 'Ganho', color: '#16a34a' },
+          { key: 'perdido', label: 'Perdido', color: '#dc2626' },
+        ]
+        const cols = (pipelineColumns && pipelineColumns.length > 0) ? pipelineColumns : defaultCols
+        // Exclude "perdido" from funnel (it's not a conversion stage)
+        const funnelCols = cols.filter((c: any) => c.key !== 'perdido')
+        const funnelData = funnelCols.map((col: any) => ({
+          label: col.label,
+          color: col.color || '#6b7280',
+          count: (pipelineBoard[col.key] || []).length,
+        }))
+        const maxCount = Math.max(...funnelData.map((d: any) => d.count), 1)
+        const totalEntries = funnelData[0]?.count || 0
+
+        if (totalEntries === 0 && funnelData.every((d: any) => d.count === 0)) return null
+
+        return (
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '20px', boxShadow: 'var(--shadow)', cursor: 'pointer' }}
+            onClick={() => router.push('/dashboard/pipeline')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Funil de Pipeline</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Conversão entre etapas</p>
+              </div>
+              <Workflow size={16} color="var(--text-faintest)" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {funnelData.map((stage: any, i: number) => {
+                const widthPct = Math.max((stage.count / maxCount) * 100, 8)
+                const prevCount = i > 0 ? funnelData[i - 1].count : null
+                const conversionPct = prevCount && prevCount > 0 ? Math.round((stage.count / prevCount) * 100) : null
+                return (
+                  <div key={stage.label}>
+                    {i > 0 && conversionPct !== null && (
+                      <div style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-faint)', padding: '2px 0', fontWeight: 600 }}>
+                        {conversionPct}%
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', width: '100px', textAlign: 'right', flexShrink: 0 }}>{stage.label}</span>
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <div style={{ width: `${widthPct}%`, height: '28px', background: stage.color, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'width 0.4s ease', margin: '0 auto', minWidth: '40px', opacity: 0.85 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{stage.count}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Acesso rápido */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
@@ -326,3 +405,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+// deploy 1775501739

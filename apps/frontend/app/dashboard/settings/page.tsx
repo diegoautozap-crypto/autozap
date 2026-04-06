@@ -404,14 +404,26 @@ function AiChatbotSection() {
   const [aiModel, setAiModel] = useState('gpt-4o-mini')
   const [openaiKey, setOpenaiKey] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [aiPersonality, setAiPersonality] = useState<string>('personalizado')
+
+  const personalityPresets: Record<string, string> = {
+    formal: 'Voce e um assistente profissional. Use linguagem formal, trate o cliente por "senhor/senhora". Seja educado, objetivo e eficiente. Nao use emojis ou girias.',
+    informal: 'Voce e um assistente amigavel e descontraido. Use linguagem informal, pode usar emojis. Trate o cliente pelo nome. Seja simpatico e prestativo.',
+    vendedor: 'Voce e um vendedor experiente. Seu objetivo e ajudar o cliente a encontrar o produto ideal e fechar a venda. Destaque beneficios, ofereca alternativas, sugira produtos complementares. Seja persuasivo mas nao insistente.',
+    suporte: 'Voce e um agente de suporte tecnico. Seu foco e resolver o problema do cliente da forma mais rapida possivel. Faca perguntas objetivas para entender o problema. Ofereca solucoes passo a passo.',
+  }
 
   useEffect(() => {
     if (tenant && !loaded) {
       setAiEnabled(tenant.settings?.aiChatbotEnabled ?? false)
-      setAiPrompt(tenant.settings?.aiChatbotPrompt ?? '')
+      const savedPrompt = tenant.settings?.aiChatbotPrompt ?? ''
+      setAiPrompt(savedPrompt)
       setAiIncludeProducts(tenant.settings?.aiIncludeProducts ?? false)
       setAiModel(tenant.settings?.aiModel ?? 'gpt-4o-mini')
       setOpenaiKey(tenant.metadata?.openai_api_key ?? '')
+      // Detect if saved prompt matches a preset
+      const matchedPreset = Object.entries(personalityPresets).find(([, v]) => v === savedPrompt)
+      setAiPersonality(matchedPreset ? matchedPreset[0] : 'personalizado')
       setLoaded(true)
     }
   }, [tenant, loaded])
@@ -485,19 +497,58 @@ function AiChatbotSection() {
           </button>
         </div>
 
+        {/* Personalidade do chatbot */}
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Personalidade</label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            {([
+              { key: 'formal', label: 'Formal' },
+              { key: 'informal', label: 'Informal' },
+              { key: 'vendedor', label: 'Vendedor' },
+              { key: 'suporte', label: 'Suporte' },
+              { key: 'personalizado', label: 'Personalizado' },
+            ] as const).map(p => (
+              <button
+                key={p.key}
+                onClick={() => {
+                  setAiPersonality(p.key)
+                  if (p.key === 'personalizado') {
+                    setAiPrompt('')
+                  } else {
+                    setAiPrompt(personalityPresets[p.key])
+                  }
+                }}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '99px',
+                  border: aiPersonality === p.key ? '1.5px solid #22c55e' : '1px solid var(--border)',
+                  background: aiPersonality === p.key ? '#f0fdf4' : 'var(--bg-input)',
+                  color: aiPersonality === p.key ? '#16a34a' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Prompt do sistema */}
         <div>
           <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Prompt do sistema</label>
           <textarea
             placeholder="Voce e o assistente da [empresa]. Ajude clientes com duvidas sobre produtos, precos e agendamentos."
             value={aiPrompt}
-            onChange={e => setAiPrompt(e.target.value)}
+            onChange={e => { setAiPrompt(e.target.value); setAiPersonality('personalizado') }}
             rows={4}
             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6 }}
             onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
           />
-          <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Instrucoes que definem a personalidade e escopo do chatbot</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Instrucoes que definem a personalidade e escopo do chatbot. {aiPersonality !== 'personalizado' ? 'Voce pode editar o texto acima livremente.' : ''}</p>
         </div>
 
         {/* Toggle: Incluir catálogo */}
