@@ -2,6 +2,7 @@ import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
   RefreshCw, AlignLeft, Link, Play, Mic, ClipboardList, Bell, Split, Shuffle,
+  Calendar,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -31,6 +32,7 @@ export const NODE_COLORS: Record<string, string> = {
   send_notification:     '#db2777',
   split_ab:              '#ea580c',
   random_path:           '#ea580c',
+  schedule_appointment:  '#16a34a',
 }
 
 export const NODE_ICONS: Record<string, any> = {
@@ -60,6 +62,7 @@ export const NODE_ICONS: Record<string, any> = {
   send_notification:     Bell,
   split_ab:              Split,
   random_path:           Shuffle,
+  schedule_appointment:  Calendar,
 }
 
 // Fallback hardcoded labels (used when t() is not available)
@@ -88,6 +91,7 @@ export const NODE_LABELS: Record<string, string> = {
   send_notification:     'Notificar agente',
   split_ab:              'Teste A/B',
   random_path:           'Caminho aleatório',
+  schedule_appointment:  'Agendar horário',
 }
 
 const NODE_LABEL_KEYS: Record<string, string> = {
@@ -117,6 +121,7 @@ const NODE_LABEL_KEYS: Record<string, string> = {
   send_notification:     'nodes.sendNotification',
   split_ab:              'nodes.splitAb',
   random_path:           'nodes.randomPath',
+  schedule_appointment:  'nodes.scheduleAppointment',
 }
 
 export function getNodeLabels(t: (key: string) => string): Record<string, string> {

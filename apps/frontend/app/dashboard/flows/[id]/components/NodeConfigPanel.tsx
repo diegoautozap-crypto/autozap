@@ -140,6 +140,13 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
     enabled: d.type === 'assign_agent',
   })
 
+  // ── Scheduling configs para schedule_appointment ──────────────────────────
+  const { data: schedulingConfigs = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['scheduling-configs-flow'],
+    queryFn: async () => { const { data } = await conversationApi.get('/scheduling'); return data.data || [] },
+    enabled: d.type === 'schedule_appointment',
+  })
+
   // ── Webhook token para trigger_webhook ────────────────────────────────────
   const { data: flowData, refetch: refetchFlow } = useQuery({
     queryKey: ['flow-webhook-token', d.flowId],
@@ -928,6 +935,20 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               </div>
             ))}
           </div>
+        </>)}
+
+        {d.type === 'schedule_appointment' && (<>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#15803d' }}>
+            📅 {t('nodes.scheduleAppointmentInfo')}
+          </div>
+          <div><label style={labelStyle}>{t('nodes.schedulingConfig')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.schedulingConfigId || ''} onChange={e => onUpdate(node.id, { schedulingConfigId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+            <option value="">{schedulingConfigs.length === 0 ? t('nodes.schedulingConfigNone') : t('nodes.schedulingConfigSelect')}</option>
+            {schedulingConfigs.map((cfg: any) => <option key={cfg.id} value={cfg.id}>{cfg.name}</option>)}
+          </select></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><input style={inputStyle} value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><input style={inputStyle} value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><input style={inputStyle} value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><input style={inputStyle} value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
         {d.type === 'end' && (

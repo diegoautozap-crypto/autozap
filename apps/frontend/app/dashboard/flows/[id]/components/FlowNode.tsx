@@ -84,6 +84,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       if (sub === 'retry') return t('nodes.upToRetries').replace('{n}', String(data.maxRetries ?? 3))
       if (sub === 'while') return data.conditionFieldName ? `${t('nodes.whilePrefix')} ${data.conditionFieldName}` : t('nodes.configureCondition')
     }
+    if (data.type === 'schedule_appointment') return data.schedulingConfigId ? `✓ ${t('nodes.scheduleAppointment')}` : t('nodes.schedulingConfigSelect')
     if (data.type === 'end') return data.message ? data.message.slice(0, 40) : t('nodes.finalize')
     return ''
   }

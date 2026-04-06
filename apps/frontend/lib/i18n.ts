@@ -893,6 +893,15 @@ const translations: Record<string, Record<string, string>> = {
     'nodes.sendNotification': 'Notificar agente',
     'nodes.splitAb': 'Teste A/B',
     'nodes.randomPath': 'Caminho aleatório',
+    'nodes.scheduleAppointment': 'Agendar horário',
+    'nodes.scheduleAppointmentInfo': 'Agenda um horário automaticamente para o contato.',
+    'nodes.schedulingConfig': 'Configuração de agenda',
+    'nodes.schedulingConfigSelect': 'Selecione uma agenda',
+    'nodes.schedulingConfigNone': 'Nenhuma agenda configurada',
+    'nodes.schedulingMsgAskDate': 'Mensagem: pedir data (opcional)',
+    'nodes.schedulingMsgAskTime': 'Mensagem: pedir horário (opcional)',
+    'nodes.schedulingMsgConfirm': 'Mensagem: confirmar agendamento (opcional)',
+    'nodes.schedulingMsgNoSlots': 'Mensagem: sem horários (opcional)',
 
     // Flow Editor — Section labels
     'nodes.sectionTriggers': 'Gatilhos',
@@ -2063,6 +2072,15 @@ const translations: Record<string, Record<string, string>> = {
     'nodes.sendNotification': 'Notify agent',
     'nodes.splitAb': 'A/B Test',
     'nodes.randomPath': 'Random path',
+    'nodes.scheduleAppointment': 'Schedule appointment',
+    'nodes.scheduleAppointmentInfo': 'Automatically schedules an appointment for the contact.',
+    'nodes.schedulingConfig': 'Scheduling config',
+    'nodes.schedulingConfigSelect': 'Select a schedule',
+    'nodes.schedulingConfigNone': 'No schedule configured',
+    'nodes.schedulingMsgAskDate': 'Message: ask date (optional)',
+    'nodes.schedulingMsgAskTime': 'Message: ask time (optional)',
+    'nodes.schedulingMsgConfirm': 'Message: confirm appointment (optional)',
+    'nodes.schedulingMsgNoSlots': 'Message: no slots available (optional)',
 
     // Flow Editor — Section labels
     'nodes.sectionTriggers': 'Triggers',
@@ -3248,6 +3266,15 @@ const translations: Record<string, Record<string, string>> = {
     'nodes.sendNotification': 'Notificar agente',
     'nodes.splitAb': 'Prueba A/B',
     'nodes.randomPath': 'Camino aleatorio',
+    'nodes.scheduleAppointment': 'Agendar cita',
+    'nodes.scheduleAppointmentInfo': 'Agenda una cita automáticamente para el contacto.',
+    'nodes.schedulingConfig': 'Configuración de agenda',
+    'nodes.schedulingConfigSelect': 'Seleccione una agenda',
+    'nodes.schedulingConfigNone': 'Ninguna agenda configurada',
+    'nodes.schedulingMsgAskDate': 'Mensaje: pedir fecha (opcional)',
+    'nodes.schedulingMsgAskTime': 'Mensaje: pedir hora (opcional)',
+    'nodes.schedulingMsgConfirm': 'Mensaje: confirmar cita (opcional)',
+    'nodes.schedulingMsgNoSlots': 'Mensaje: sin horarios (opcional)',
 
     // Flow Editor — Section labels
     'nodes.sectionTriggers': 'Disparadores',

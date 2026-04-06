@@ -22,6 +22,7 @@ function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promi
 }
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
+const CONVERSATION_SERVICE_URL = process.env.CONVERSATION_SERVICE_URL || 'http://localhost:3005'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
 const PUSHER_KEY     = process.env.PUSHER_KEY
@@ -100,6 +101,12 @@ interface FlowNodeData {
   agentId?: string
   transcribeSaveAs?: string
   transcribeLanguage?: string
+  // schedule_appointment
+  schedulingConfigId?: string
+  askDateMessage?: string
+  askTimeMessage?: string
+  noSlotsMessage?: string
+  confirmMessage?: string
   // set_variable
   variableName?: string
   variableValue?: string
@@ -1093,6 +1100,214 @@ export class FlowEngine {
           const idx = Math.floor(Math.random() * rpaths.length)
           variables['random_path'] = rpaths[idx]
           return { success: true, nextHandle: `random_${idx}` }
+        }
+
+        case 'schedule_appointment': {
+          const configId = data?.schedulingConfigId
+          if (!configId) { await this.logNode(flowId, node.id, ctx, 'error', 'schedulingConfigId não configurado'); break }
+
+          const step = variables['_schedule_step'] || '1'
+
+          if (step === '1') {
+            // Step 1: Show available days
+            const today = new Date()
+            const days: string[] = []
+
+            const { data: config } = await db.from('scheduling_config').select('*').eq('id', configId).single()
+            if (!config) { await this.logNode(flowId, node.id, ctx, 'error', 'Config não encontrada'); break }
+
+            const advanceDays = config.advance_days || 7
+            const daysAvailable = config.days_available || {}
+            const fullDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+
+            for (let i = 1; i <= advanceDays; i++) {
+              const d = new Date(today)
+              d.setDate(d.getDate() + i)
+              const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]
+              if (daysAvailable[dayKey]) {
+                const dateStr = d.toISOString().split('T')[0]
+                const dayName = fullDayNames[d.getDay()]
+                const dd = String(d.getDate()).padStart(2, '0')
+                const mm = String(d.getMonth() + 1).padStart(2, '0')
+                days.push(`${days.length + 1}. ${dayName} ${dd}/${mm}`)
+                variables[`_schedule_day_${days.length}`] = dateStr
+              }
+            }
+
+            if (days.length === 0) {
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.noSlotsMessage || 'Desculpe, não temos horários disponíveis no momento.' })
+              break
+            }
+
+            const msg = (data?.askDateMessage || '📅 Escolha o dia para agendamento:') + '\n\n' + days.join('\n') + '\n\nDigite o número do dia.'
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: msg })
+
+            variables['_schedule_step'] = '2'
+            variables['_schedule_config_id'] = configId
+            variables['_schedule_total_days'] = String(days.length)
+
+            const inputStateId1 = stateId || generateId()
+            await db.from('flow_states').upsert({
+              id: inputStateId1, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+              conversation_id: ctx.conversationId, current_node_id: node.id,
+              variables, loop_counters: loopCounters, waiting_variable: '_schedule_day_choice',
+              status: 'waiting', updated_at: new Date(),
+            }, { onConflict: 'flow_id,conversation_id' })
+            return { success: true, paused: true }
+          }
+
+          if (step === '2') {
+            // Step 2: User picked a day, show available slots
+            const choice = parseInt(variables['_schedule_day_choice'] || '0')
+            const totalDays = parseInt(variables['_schedule_total_days'] || '0')
+
+            if (choice < 1 || choice > totalDays) {
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalDays}.` })
+              const reStateId = stateId || generateId()
+              await db.from('flow_states').upsert({
+                id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+                conversation_id: ctx.conversationId, current_node_id: node.id,
+                variables, loop_counters: loopCounters, waiting_variable: '_schedule_day_choice',
+                status: 'waiting', updated_at: new Date(),
+              }, { onConflict: 'flow_id,conversation_id' })
+              return { success: true, paused: true }
+            }
+
+            const selectedDate = variables[`_schedule_day_${choice}`]
+            variables['_schedule_selected_date'] = selectedDate
+            const cfgId = variables['_schedule_config_id']
+
+            const { data: config } = await db.from('scheduling_config').select('*').eq('id', cfgId).single()
+            if (!config) break
+
+            const slotDuration = config.slot_duration_minutes || 30
+            const startParts = (config.start_time || '09:00').split(':').map(Number)
+            const endParts = (config.end_time || '18:00').split(':').map(Number)
+            const breakStart = config.break_start ? config.break_start.split(':').map(Number) : null
+            const breakEnd = config.break_end ? config.break_end.split(':').map(Number) : null
+
+            let startMin = startParts[0] * 60 + startParts[1]
+            const endMin = endParts[0] * 60 + endParts[1]
+            const breakStartMin = breakStart ? breakStart[0] * 60 + breakStart[1] : null
+            const breakEndMin = breakEnd ? breakEnd[0] * 60 + breakEnd[1] : null
+
+            const allSlots: string[] = []
+            while (startMin + slotDuration <= endMin) {
+              if (breakStartMin !== null && breakEndMin !== null && startMin >= breakStartMin && startMin < breakEndMin) {
+                startMin = breakEndMin
+                continue
+              }
+              const hh = String(Math.floor(startMin / 60)).padStart(2, '0')
+              const mmSlot = String(startMin % 60).padStart(2, '0')
+              allSlots.push(`${hh}:${mmSlot}`)
+              startMin += slotDuration
+            }
+
+            // Filter out already booked slots
+            const { data: booked } = await db.from('appointments')
+              .select('start_time')
+              .eq('tenant_id', ctx.tenantId)
+              .eq('config_id', cfgId)
+              .eq('date', selectedDate)
+              .neq('status', 'cancelled')
+            const bookedTimes = new Set((booked || []).map((b: any) => b.start_time))
+            const available = allSlots.filter(s => !bookedTimes.has(s))
+
+            if (available.length === 0) {
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.noSlotsMessage || 'Desculpe, não temos horários disponíveis nesse dia. Tente outro dia.' })
+              // Go back to step 1
+              variables['_schedule_step'] = '1'
+              return await this.executeNode(node, ctx, flowId, variables, loopCounters, edgeMap, nodeMap, stateId)
+            }
+
+            const slotList = available.map((s, i) => {
+              variables[`_schedule_slot_${i + 1}`] = s
+              return `${i + 1}. ${s}`
+            })
+
+            const dd2 = selectedDate.split('-')[2]
+            const mm2 = selectedDate.split('-')[1]
+            const timeMsg = (data?.askTimeMessage || `⏰ Horários disponíveis para ${dd2}/${mm2}:`) + '\n\n' + slotList.join('\n') + '\n\nDigite o número do horário.'
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: timeMsg })
+
+            variables['_schedule_step'] = '3'
+            variables['_schedule_total_slots'] = String(available.length)
+
+            const inputStateId2 = stateId || generateId()
+            await db.from('flow_states').upsert({
+              id: inputStateId2, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+              conversation_id: ctx.conversationId, current_node_id: node.id,
+              variables, loop_counters: loopCounters, waiting_variable: '_schedule_slot_choice',
+              status: 'waiting', updated_at: new Date(),
+            }, { onConflict: 'flow_id,conversation_id' })
+            return { success: true, paused: true }
+          }
+
+          if (step === '3') {
+            // Step 3: User picked a time, create appointment
+            const choice = parseInt(variables['_schedule_slot_choice'] || '0')
+            const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
+
+            if (choice < 1 || choice > totalSlots) {
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalSlots}.` })
+              const reStateId = stateId || generateId()
+              await db.from('flow_states').upsert({
+                id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+                conversation_id: ctx.conversationId, current_node_id: node.id,
+                variables, loop_counters: loopCounters, waiting_variable: '_schedule_slot_choice',
+                status: 'waiting', updated_at: new Date(),
+              }, { onConflict: 'flow_id,conversation_id' })
+              return { success: true, paused: true }
+            }
+
+            const selectedTime = variables[`_schedule_slot_${choice}`]
+            const selectedDate = variables['_schedule_selected_date']
+            const cfgId = variables['_schedule_config_id']
+
+            // Calculate end time
+            const { data: config } = await db.from('scheduling_config').select('slot_duration_minutes').eq('id', cfgId).single()
+            const duration = config?.slot_duration_minutes || 30
+            const [hh, mmPart] = selectedTime.split(':').map(Number)
+            const endMinTotal = hh * 60 + mmPart + duration
+            const endTime = `${String(Math.floor(endMinTotal / 60)).padStart(2, '0')}:${String(endMinTotal % 60).padStart(2, '0')}`
+
+            // Create appointment
+            const { data: appointment, error } = await db.from('appointments').insert({
+              tenant_id: ctx.tenantId,
+              contact_id: ctx.contactId,
+              conversation_id: ctx.conversationId,
+              channel_id: ctx.channelId,
+              config_id: cfgId,
+              date: selectedDate,
+              start_time: selectedTime,
+              end_time: endTime,
+              status: 'scheduled',
+              notes: 'Agendado via WhatsApp (flow)',
+            }).select().single()
+
+            if (error) {
+              await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao agendar. Tente novamente.' })
+              await this.logNode(flowId, node.id, ctx, 'error', error.message)
+              break
+            }
+
+            const dd3 = selectedDate.split('-')[2]
+            const mm3 = selectedDate.split('-')[1]
+            const confirmMsg = data?.confirmMessage || `✅ Agendado com sucesso!\n\n📅 Data: ${dd3}/${mm3}\n⏰ Horário: ${selectedTime}\n\nTe enviaremos um lembrete antes do horário.`
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
+
+            // Save to flow variables for subsequent nodes
+            variables['agendamento_data'] = `${dd3}/${mm3}`
+            variables['agendamento_horario'] = selectedTime
+            variables['agendamento_id'] = appointment?.id || ''
+
+            // Clean up internal schedule variables
+            Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+
+            await this.logNode(flowId, node.id, ctx, 'success', `Agendado: ${selectedDate} ${selectedTime}`)
+          }
+
+          break
         }
 
         case 'end': {
