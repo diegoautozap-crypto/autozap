@@ -364,7 +364,9 @@ Regras:
 - Seja objetivo e útil
 - Se não souber algo, diga que vai verificar com a equipe
 - Nunca invente informações sobre produtos ou preços que não estejam no catálogo
-- Formate valores em R$ (reais)`
+- Formate valores em R$ (reais)
+- NUNCA inclua tags como [INTENT:...], [AÇÃO:...], [STATUS:...] ou qualquer marcação interna na resposta
+- A resposta deve ser texto natural, como se fosse um humano respondendo`
 
     // 7. Build messages array
     const messages: Array<{ role: string; content: string }> = [
@@ -398,8 +400,10 @@ Regras:
       })
 
       const result = (await response.json()) as any
-      const aiReply = result.choices?.[0]?.message?.content?.trim()
+      let aiReply = result.choices?.[0]?.message?.content?.trim()
       if (!aiReply) return
+      // Limpa tags internas que a IA pode gerar
+      aiReply = aiReply.replace(/\[INTENT:[^\]]*\]/gi, '').replace(/\[AÇÃO:[^\]]*\]/gi, '').replace(/\[STATUS:[^\]]*\]/gi, '').replace(/\[ACTION:[^\]]*\]/gi, '').trim()
 
       // 9. Send the AI response via internal endpoint (same as flow engine)
       const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
