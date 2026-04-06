@@ -87,7 +87,7 @@ function getActionNodes(t: (key: string) => string) {
     { type: 'assign_agent',      label: t('nodes.assignAgent') },
     { type: 'go_to',             label: t('nodes.goTo') },
     { type: 'loop',              label: t('nodes.loop') },
-    { type: 'schedule_appointment', label: t('nodes.scheduleAppointment') },
+    // { type: 'schedule_appointment', label: t('nodes.scheduleAppointment') },
     { type: 'end',               label: t('nodes.end') },
   ]
 }

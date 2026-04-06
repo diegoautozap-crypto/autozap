@@ -19,7 +19,7 @@ const ALL_NAV = [
   { href: '/dashboard/contacts',  labelKey: 'nav.contacts',   icon: Users },
   { href: '/dashboard/inbox',     labelKey: 'nav.inbox',      icon: MessageSquare },
   { href: '/dashboard/pipeline',    labelKey: 'nav.pipeline',    icon: Kanban },
-  { href: '/dashboard/scheduling', labelKey: 'nav.scheduling', icon: Calendar },
+  // { href: '/dashboard/scheduling', labelKey: 'nav.scheduling', icon: Calendar },
   { href: '/dashboard/products',   labelKey: 'nav.products',   icon: ShoppingBag },
   { href: '/dashboard/flows',     labelKey: 'nav.flows',      icon: Workflow },
   { href: '/dashboard/tasks',     labelKey: 'nav.tasks',      icon: CheckSquare },
