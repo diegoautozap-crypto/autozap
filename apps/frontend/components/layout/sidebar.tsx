@@ -82,7 +82,8 @@ export function Sidebar() {
   const fetchPermissions = useCallback(async () => {
     if (!user) return
     try {
-      const res   = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, { credentials: 'include' })
+      const token = localStorage.getItem('accessToken')
+      const res   = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { setAllowedPages(prev => prev ?? ['/dashboard/inbox']); return }
       const json      = await res.json()
       const freshRole = json?.data?.role || roleFromStore

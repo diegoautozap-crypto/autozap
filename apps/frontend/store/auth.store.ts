@@ -21,14 +21,33 @@ interface AuthState {
   login: (email: string, password: string, totpCode?: string) => Promise<{ requiresTwoFactor?: boolean }>
   logout: () => Promise<void>
   register: (name: string, email: string, password: string, tenantName: string) => Promise<void>
-  updateUser: (data: Partial<User>) => void
   setTokens: (accessToken: string, refreshToken: string) => void
+  updateUser: (data: Partial<User>) => void
   validateSession: () => void
 }
 
+function parseJwt(token: string): any {
+  try {
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch {
+    return null
+  }
+}
+
+function setAuthCookie(token: string) {
+  const expires = new Date()
+  expires.setFullYear(expires.getFullYear() + 1)
+  document.cookie = `accessToken=${token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+}
+
+function clearAuthCookie() {
+  document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
+
 function forceLogout(reason: string) {
-  console.warn('[Auth] Sessao invalida:', reason)
-  localStorage.removeItem('autozap-auth')
+  console.warn('[Auth] Sessão inválida:', reason)
+  localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
+  clearAuthCookie()
   window.location.href = '/login'
 }
 
@@ -41,14 +60,40 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
 
-      setTokens: (accessToken, refreshToken) => {
-        set({ accessToken, refreshToken })
-      },
-
       validateSession: () => {
-        const { user, isAuthenticated, accessToken } = get()
-        if (!user || !isAuthenticated || !accessToken) {
-          if (isAuthenticated) forceLogout('sessao incompleta')
+        const { user, accessToken } = get()
+        if (!user || !accessToken) return
+
+        const payload = parseJwt(accessToken)
+        if (!payload) {
+          forceLogout('token inválido')
+          return
+        }
+
+        // ✅ Se o token está expirado, NÃO força logout aqui
+        // O interceptor do api.ts vai renovar automaticamente no próximo request
+        // Forçar logout aqui causaria deslogin desnecessário durante o refresh
+        const now = Math.floor(Date.now() / 1000)
+        const isExpired = payload.exp && payload.exp < now
+        if (isExpired) {
+          // Token expirado mas temos refresh token — deixa o api.ts renovar
+          // Só força logout se não tiver refresh token
+          const refreshToken = localStorage.getItem('refreshToken')
+          if (!refreshToken) {
+            forceLogout('token expirado e sem refresh token')
+          }
+          return
+        }
+
+        // Token ainda válido — verifica consistência
+        if (payload.tid && user.tenantId && payload.tid !== user.tenantId) {
+          forceLogout(`tenant_id inconsistente: token=${payload.tid} store=${user.tenantId}`)
+          return
+        }
+
+        if (payload.sub && user.userId && payload.sub !== user.userId) {
+          forceLogout(`userId inconsistente: token=${payload.sub} store=${user.userId}`)
+          return
         }
       },
 
@@ -63,30 +108,31 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const { accessToken, refreshToken } = data.data
+          localStorage.setItem('accessToken', accessToken)
+          localStorage.setItem('refreshToken', refreshToken)
+          setAuthCookie(accessToken)
 
-          // Persiste tokens ANTES de qualquer outra chamada
-          const storeData = { state: { accessToken, refreshToken, user: null, isAuthenticated: false }, version: 0 }
-          try {
-            const existing = JSON.parse(localStorage.getItem('autozap-auth') || '{}')
-            storeData.version = existing.version || 0
-            if (existing.state) storeData.state = { ...existing.state, accessToken, refreshToken }
-          } catch {}
-          localStorage.setItem('autozap-auth', JSON.stringify(storeData))
-          set({ accessToken, refreshToken })
-
-          // Busca dados do usuário com token explícito no header
           const meRes = await authApi.get('/auth/me', {
             headers: { Authorization: `Bearer ${accessToken}` },
           })
+
           const user = meRes.data.data
 
-          // Persiste tudo de uma vez
-          set({ user, isAuthenticated: true, isLoading: false })
-          try {
-            const final = JSON.parse(localStorage.getItem('autozap-auth') || '{}')
-            final.state = { ...final.state, user, isAuthenticated: true, accessToken, refreshToken }
-            localStorage.setItem('autozap-auth', JSON.stringify(final))
-          } catch {}
+          const payload = parseJwt(accessToken)
+          if (payload?.tid && user?.tenantId && payload.tid !== user.tenantId) {
+            localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
+            clearAuthCookie()
+            set({ isLoading: false })
+            throw new Error('Inconsistência de sessão detectada no login')
+          }
+
+          set({
+            user,
+            accessToken,
+            refreshToken,
+            isAuthenticated: true,
+            isLoading: false,
+          })
 
           return {}
         } catch (err) {
@@ -96,11 +142,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        const rt = get().refreshToken
-        try {
-          await authApi.post('/auth/logout', { refreshToken: rt })
-        } catch {}
-        localStorage.removeItem('autozap-auth')
+        const refreshToken = get().refreshToken
+        if (refreshToken) {
+          try {
+            await authApi.post('/auth/logout', { refreshToken })
+          } catch {}
+        }
+        localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
+        clearAuthCookie()
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
       },
 
@@ -113,6 +162,13 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false })
           throw err
         }
+      },
+
+      setTokens: (accessToken, refreshToken) => {
+        localStorage.setItem('accessToken', accessToken)
+        localStorage.setItem('refreshToken', refreshToken)
+        setAuthCookie(accessToken)
+        set({ accessToken, refreshToken })
       },
 
       updateUser: (data) => {

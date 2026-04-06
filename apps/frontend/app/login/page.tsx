@@ -36,8 +36,6 @@ export default function LoginPage() {
         toast.info('Digite o código do autenticador')
         return
       }
-      // Aguarda zustand persistir no localStorage antes de redirecionar
-      await new Promise(r => setTimeout(r, 100))
       const role = (useAuthStore.getState().user as any)?.role || 'agent'
       if (role === 'agent' || role === 'supervisor') router.push('/dashboard/inbox')
       else router.push('/dashboard')

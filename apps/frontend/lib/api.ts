@@ -2,43 +2,31 @@ import axios from 'axios'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getToken(): string | null {
+function parseJwt(token: string): any {
   try {
-    const raw = localStorage.getItem('autozap-auth')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed?.state?.accessToken || null
-  } catch { return null }
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch {
+    return null
+  }
 }
 
-function getRefreshToken(): string | null {
+function getStoredTenantId(): string | null {
   try {
-    const raw = localStorage.getItem('autozap-auth')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed?.state?.refreshToken || null
-  } catch { return null }
-}
-
-function updateStoredTokens(accessToken: string, refreshToken: string) {
-  try {
-    const raw = localStorage.getItem('autozap-auth')
-    if (!raw) return
-    const parsed = JSON.parse(raw)
-    parsed.state.accessToken = accessToken
-    parsed.state.refreshToken = refreshToken
-    localStorage.setItem('autozap-auth', JSON.stringify(parsed))
-  } catch {}
+    const auth = localStorage.getItem('autozap-auth')
+    if (!auth) return null
+    return JSON.parse(auth)?.tenantId || null
+  } catch {
+    return null
+  }
 }
 
 function forceLogout(reason: string) {
-  console.warn('[Auth] Forcando logout:', reason)
-  localStorage.removeItem('autozap-auth')
+  console.warn('[Auth] Forçando logout:', reason)
+  localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); localStorage.removeItem('auth-storage')
   window.location.href = '/login'
 }
 
-// ─── Token Refresh ──────────────────────────────────────────────────────────
-
+// Renovação em andamento — evita múltiplas chamadas simultâneas
 let refreshPromise: Promise<string> | null = null
 let refreshRetried = false
 
@@ -47,35 +35,44 @@ async function refreshAccessToken(): Promise<string> {
 
   refreshPromise = (async () => {
     try {
-      const rt = getRefreshToken()
-      if (!rt) throw new Error('No refresh token')
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (!refreshToken) throw new Error('No refresh token')
 
       const { data } = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-        { refreshToken: rt },
-        { withCredentials: true },
+        { refreshToken },
       )
 
-      const { accessToken, refreshToken } = data.data
-      updateStoredTokens(accessToken, refreshToken)
-      return accessToken
+      const newAccessToken: string = data.data.accessToken
+      const newRefreshToken: string = data.data.refreshToken
+
+      // ── Validação crítica: tenant não pode mudar ──────────────────────────
+      const newPayload = parseJwt(newAccessToken)
+      const storedTenantId = getStoredTenantId()
+
+      if (storedTenantId && newPayload?.tid && newPayload.tid !== storedTenantId) {
+        forceLogout('tenant_id mudou após refresh — possível inconsistência de sessão')
+        throw new Error('Tenant mismatch')
+      }
+
+      localStorage.setItem('accessToken', newAccessToken)
+      localStorage.setItem('refreshToken', newRefreshToken)
+
+      return newAccessToken
     } catch (err: any) {
+      // Retry uma vez antes de deslogar (pode ser erro de rede passageiro)
       if (!refreshRetried) {
         refreshRetried = true
         try {
           await new Promise(r => setTimeout(r, 2000))
-          const rt = getRefreshToken()
-          if (!rt) throw new Error('No refresh token')
-          const { data } = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-            { refreshToken: rt },
-            { withCredentials: true },
-          )
-          const { accessToken, refreshToken } = data.data
-          updateStoredTokens(accessToken, refreshToken)
+          const refreshToken = localStorage.getItem('refreshToken')
+          if (!refreshToken) throw err
+          const { data } = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, { refreshToken })
+          localStorage.setItem('accessToken', data.data.accessToken)
+          localStorage.setItem('refreshToken', data.data.refreshToken)
           refreshRetried = false
-          return accessToken
-        } catch { /* retry failed */ }
+          return data.data.accessToken
+        } catch { /* retry falhou, faz logout */ }
       }
       refreshRetried = false
       forceLogout('falha no refresh token')
@@ -88,23 +85,47 @@ async function refreshAccessToken(): Promise<string> {
   return refreshPromise
 }
 
+// ─── Verificação proativa: renova se faltar menos de 60s para expirar ─────────
+// Roda antes de cada request — se o token está prestes a expirar, renova antes
+// Isso evita que o token expire no meio de uma operação importante
+
+function shouldRefreshProactively(): boolean {
+  try {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return false
+    const payload = parseJwt(token)
+    if (!payload?.exp) return false
+    const expiresIn = payload.exp - Math.floor(Date.now() / 1000)
+    return expiresIn < 300 // renova se faltar menos de 5 minutos
+  } catch {
+    return false
+  }
+}
+
 // ─── Factory de cliente ───────────────────────────────────────────────────────
 
 const createClient = (baseURL: string) => {
-  const client = axios.create({
-    baseURL,
-    timeout: 30000,
-    withCredentials: true,
-  })
+  const client = axios.create({ baseURL, timeout: 30000 })
 
-  // Attach token on every request
+  // Interceptor de request: renova proativamente se necessário
   client.interceptors.request.use(async (config) => {
-    const token = getToken()
+    // Renova proativamente antes de expirar
+    if (shouldRefreshProactively()) {
+      try {
+        const newToken = await refreshAccessToken()
+        config.headers.Authorization = `Bearer ${newToken}`
+        return config
+      } catch {
+        // Se falhar, deixa o request prosseguir e o 401 vai tratar
+      }
+    }
+
+    const token = localStorage.getItem('accessToken')
     if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   })
 
-  // Handle 401 → refresh → retry
+  // Interceptor de response: trata 401 (token expirado no meio do request)
   client.interceptors.response.use(
     (res) => res,
     async (err) => {
@@ -115,7 +136,7 @@ const createClient = (baseURL: string) => {
           err.config.headers.Authorization = `Bearer ${newToken}`
           return client(err.config)
         } catch {
-          // forceLogout already called
+          // forceLogout já foi chamado dentro de refreshAccessToken
         }
       }
       return Promise.reject(err)

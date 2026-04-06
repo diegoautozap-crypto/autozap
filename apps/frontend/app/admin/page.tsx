@@ -334,9 +334,11 @@ export default function AdminPage() {
       return { ...data.data, tenantName: name }
     },
     onSuccess: (data) => {
-      // httpOnly cookie is set by the server on impersonate response
-      sessionStorage.setItem('impersonating', 'true')
+      const original = { accessToken: localStorage.getItem('accessToken'), refreshToken: localStorage.getItem('refreshToken') }
+      sessionStorage.setItem('originalTokens', JSON.stringify(original))
       sessionStorage.setItem('impersonatingTenantName', data.tenantName)
+      localStorage.setItem('accessToken', data.accessToken)
+      localStorage.removeItem('refreshToken')
       toast.success(`Logado como ${data.tenantName}`)
       window.location.href = '/dashboard'
     },
@@ -395,12 +397,16 @@ export default function AdminPage() {
 
   /* --- Helpers --- */
   function returnFromImpersonation() {
-    // Re-login as admin: clear impersonation state and redirect to login
-    // The admin needs to re-authenticate since httpOnly cookies can't be swapped client-side
-    sessionStorage.removeItem('impersonating')
-    sessionStorage.removeItem('impersonatingTenantName')
-    toast.success('Saindo da impersonacao - faca login novamente como admin')
-    window.location.href = '/login'
+    const orig = sessionStorage.getItem('originalTokens')
+    if (orig) {
+      const { accessToken, refreshToken } = JSON.parse(orig)
+      if (accessToken) localStorage.setItem('accessToken', accessToken)
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken)
+      sessionStorage.removeItem('originalTokens')
+      sessionStorage.removeItem('impersonatingTenantName')
+      toast.success('Voltou ao admin')
+      window.location.href = '/admin'
+    }
   }
 
   function handleLogin(e: React.FormEvent) {
