@@ -28,5 +28,3 @@ app.use(errorHandler)
 app.listen(PORT, () => logger.info(`conversation-service running on port ${PORT}`))
 
 export default app
-// 1775504952
-// 1775505262

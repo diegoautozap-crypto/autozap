@@ -49,7 +49,7 @@ export default function ChannelsPage() {
     queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
   })
 
-  const channelLimit = CHANNEL_LIMITS[tenant?.planSlug || 'pending'] ?? 5
+  const channelLimit = CHANNEL_LIMITS[tenant?.planSlug || 'pending'] ?? 0
   const channelCount = channels?.length ?? 0
   const atLimit      = channelCount >= channelLimit
 

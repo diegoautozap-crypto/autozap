@@ -38,23 +38,17 @@ interface TaskSummary {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function parseDateLocal(dateStr: string): Date {
-  // Parse as local date to avoid UTC timezone shift (e.g. "2026-04-02" parsed as UTC becomes Apr 1 in BRT)
-  const parts = dateStr.slice(0, 10).split('-')
-  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
-}
-
 function isOverdue(dueDate: string | null): boolean {
   if (!dueDate) return false
-  const due = parseDateLocal(dueDate)
+  const due = new Date(dueDate)
   const now = new Date()
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return due < todayMidnight
+  due.setHours(23, 59, 59, 999)
+  return due < now
 }
 
 function isToday(dueDate: string | null): boolean {
   if (!dueDate) return false
-  const due = parseDateLocal(dueDate)
+  const due = new Date(dueDate)
   const now = new Date()
   return due.getFullYear() === now.getFullYear() &&
     due.getMonth() === now.getMonth() &&

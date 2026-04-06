@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignApi, channelApi, contactApi, tenantApi } from '@/lib/api'
 import { Tag } from 'lucide-react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download, Eye, AlertTriangle } from 'lucide-react'
+import { Plus, RefreshCw, X, Send, Upload, Play, Pause, Loader2, ChevronLeft, ChevronRight, BarChart2, CheckCheck, AlertCircle, TrendingUp, Trash2, FileText, Clock, Calendar, Megaphone, Shuffle, Search, Download } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -40,42 +40,6 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
   return `${speedLabel} · ${totalContacts.toLocaleString()} contatos = ~${timeLabel}`
 }
 
-function WhatsAppPreview({ body, header, footer }: { body: string; header?: string; footer?: string }) {
-  const exampleVars: Record<string, string> = { '{{1}}': 'João', '{{2}}': 'AutoZap', '{{3}}': '29/03/2026', '{{4}}': 'R$ 99,90', '{{5}}': '12345', '{{name}}': 'João', '{{company}}': 'AutoZap', '{{phone}}': '5511999990001', '{{date}}': '29/03/2026', '{{amount}}': 'R$ 99,90' }
-  const replaceVars = (text: string) => {
-    if (!text) return ''
-    return text.replace(/\{\{[^}]+\}\}/g, match => exampleVars[match] || match)
-  }
-  const formatWhatsApp = (text: string) => {
-    let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    html = html.replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-    html = html.replace(/_([^_]+)_/g, '<em>$1</em>')
-    html = html.replace(/~([^~]+)~/g, '<s>$1</s>')
-    html = html.replace(/\n/g, '<br/>')
-    return html
-  }
-  const previewBody = replaceVars(body)
-  const now = new Date()
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-
-  return (
-    <div style={{ background: '#e5ddd5', backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'400\' height=\'400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3Cpattern id=\'p\' patternUnits=\'userSpaceOnUse\' width=\'50\' height=\'50\' patternTransform=\'rotate(45)\'%3E%3Ccircle cx=\'25\' cy=\'25\' r=\'1\' fill=\'%23d4ccb5\' opacity=\'0.4\'/%3E%3C/pattern%3E%3C/defs%3E%3Crect fill=\'url(%23p)\' width=\'100%25\' height=\'100%25\'/%3E%3C/svg%3E")', borderRadius: '10px', padding: '16px 12px', minHeight: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      <div style={{ maxWidth: '85%', alignSelf: 'flex-end' }}>
-        <div style={{ background: '#dcf8c6', borderRadius: '8px 0 8px 8px', padding: '7px 10px 4px', boxShadow: '0 1px 2px rgba(0,0,0,0.13)', position: 'relative' }}>
-          {header && <div style={{ fontSize: '12px', fontWeight: 700, color: '#303030', marginBottom: '4px' }}>{replaceVars(header)}</div>}
-          <div style={{ fontSize: '12.5px', color: '#303030', lineHeight: 1.45, wordBreak: 'break-word' }} dangerouslySetInnerHTML={{ __html: previewBody ? formatWhatsApp(previewBody) : '<span style="color:#999">Selecione um template...</span>' }} />
-          {footer && <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: '4px' }}>{replaceVars(footer)}</div>}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-            <span style={{ fontSize: '10px', color: '#8c8c8c' }}>{timeStr}</span>
-            <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M11.5 1L5.5 7L3 4.5" stroke="#53bdeb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14.5 1L8.5 7L7.5 6" stroke="#53bdeb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-        </div>
-        <div style={{ width: 0, height: 0, borderLeft: '8px solid #dcf8c6', borderBottom: '8px solid transparent', alignSelf: 'flex-end', marginLeft: 'auto' }} />
-      </div>
-    </div>
-  )
-}
-
 export default function CampaignsPage() {
   const t = useT()
   const { canCreateCampaigns, canManageCampaigns, canDelete, canEdit } = usePermissions()
@@ -85,7 +49,7 @@ export default function CampaignsPage() {
   const [curlCopies, setCurlCopies]             = useState<string[]>([''])
   const [campaignName, setCampaignName]         = useState('')
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [messagesPerMin, setMessagesPerMin]     = useState(1000)
+  const [messagesPerMin, setMessagesPerMin]     = useState(1200)
   const [selectedCamp, setSelectedCamp]         = useState<any>(null)
   const [page, setPage]                         = useState(1)
   const [useTemplate, setUseTemplate]           = useState(true)
@@ -101,7 +65,6 @@ export default function CampaignsPage() {
   const [recurrence, setRecurrence]             = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [previewCount, setPreviewCount]         = useState<number | null>(null)
   const [loadingPreview, setLoadingPreview]     = useState(false)
-  const [showMsgPreview, setShowMsgPreview]     = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: campaigns, isLoading, refetch } = useQuery({
@@ -151,7 +114,7 @@ export default function CampaignsPage() {
     setCampaignName(''); setContactsText(''); setCurlCopies([''])
     setSelectedChannels([]); setSelectedTemplates([]); setSelectedTagIds([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
-    setMessagesPerMin(1000); setContactMode('manual')
+    setMessagesPerMin(1200); setContactMode('manual')
     setSegNoInteraction(0); setSegOrigin(''); setSegCustomField(''); setSegCustomValue('')
     setPreviewCount(null); setRecurrence('none')
   }
@@ -183,26 +146,8 @@ export default function CampaignsPage() {
     } catch { setPreviewCount(null) }
     finally { setLoadingPreview(false) }
   }
-  const scheduleValidation = useMemo(() => {
-    if (!scheduledAt) return { valid: true, warning: '', error: '' }
-    const scheduled = new Date(scheduledAt)
-    const now = new Date()
-    if (scheduled <= now) return { valid: false, warning: '', error: 'A data agendada est\u00e1 no passado. Escolha uma data futura.' }
-    const diffMs = scheduled.getTime() - now.getTime()
-    const diffMins = diffMs / 60000
-    if (diffMins < 5) return { valid: false, warning: '', error: 'Agendamento deve ser pelo menos 5 minutos no futuro.' }
-    if (diffMins < 30) return { valid: true, warning: 'Agendamento em menos de 30 minutos. Certifique-se de que tudo est\u00e1 pronto.', error: '' }
-    return { valid: true, warning: '', error: '' }
-  }, [scheduledAt])
-
-  const selectedTemplateObjects = useMemo(() => {
-    if (!useTemplate || !templates) return []
-    return (templates as any[]).filter((t: any) => selectedTemplates.includes(t.id))
-  }, [useTemplate, templates, selectedTemplates])
-
   const isValid = campaignName && selectedChannels.length > 0 &&
-    (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0) &&
-    (scheduleMode !== 'scheduled' || (scheduledAt && scheduleValidation.valid))
+    (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0)
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -638,26 +583,6 @@ export default function CampaignsPage() {
                             🎲 {t('campaigns.eachContactReceivesRandom').replace('{count}', String(selectedTemplates.length))}
                           </p>
                         )}
-                        {selectedTemplateObjects.length > 0 && (
-                          <div style={{ marginTop: '10px' }}>
-                            <button onClick={() => setShowMsgPreview(prev => !prev)}
-                              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: showMsgPreview ? '#f0fdf4' : 'var(--bg-input)', border: `1px solid ${showMsgPreview ? '#bbf7d0' : 'var(--border)'}`, borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: showMsgPreview ? '#15803d' : 'var(--text-muted)', transition: 'all 0.15s' }}>
-                              <Eye size={12} /> {showMsgPreview ? 'Ocultar preview' : 'Preview da mensagem'}
-                            </button>
-                            {showMsgPreview && (
-                              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {selectedTemplateObjects.map((tpl: any) => (
-                                  <div key={tpl.id}>
-                                    {selectedTemplateObjects.length > 1 && (
-                                      <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>{tpl.name}</p>
-                                    )}
-                                    <WhatsAppPreview body={tpl.body || ''} header={tpl.header} footer={tpl.footer} />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )
                   ) : (
@@ -804,11 +729,11 @@ export default function CampaignsPage() {
               <div>
                 <Lbl>{t('campaigns.speedPerChannel')}</Lbl>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="number" min="1" max="1000" style={{ ...inp, width: '100px' } as any}
+                  <input type="number" min="1" max="1200" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
                     onChange={e => {
                       const val = Number(e.target.value)
-                      if (!isNaN(val)) setMessagesPerMin(Math.min(1000, Math.max(1, val)))
+                      if (!isNaN(val)) setMessagesPerMin(Math.min(1200, Math.max(1, val)))
                     }}
                     onFocus={e => { (e.target as HTMLInputElement).style.borderColor = '#22c55e'; (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(34,197,94,0.1)' }}
                     onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; (e.target as HTMLInputElement).style.boxShadow = 'none' }} />
@@ -832,20 +757,10 @@ export default function CampaignsPage() {
                 </div>
                 {scheduleMode === 'scheduled' && (
                   <div>
-                    <input type="datetime-local" min={minDateTime} value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} style={{ ...inp, borderColor: scheduleValidation.error ? '#ef4444' : scheduledAt ? '#7c3aed' : 'var(--border)' }} />
-                    {scheduledAt && scheduleValidation.error && (
-                      <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '7px 10px' }}>
-                        <AlertCircle size={12} /> {scheduleValidation.error}
-                      </div>
-                    )}
-                    {scheduledAt && scheduleValidation.warning && !scheduleValidation.error && (
-                      <div style={{ fontSize: '12px', color: '#d97706', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '7px 10px' }}>
-                        <AlertTriangle size={12} /> {scheduleValidation.warning}
-                      </div>
-                    )}
-                    {scheduledAt && scheduleValidation.valid && (
+                    <input type="datetime-local" min={minDateTime} value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} style={inp} />
+                    {scheduledAt && (
                       <p style={{ fontSize: '12px', color: '#7c3aed', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
-                        <Clock size={11} /> {new Date(scheduledAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+                        <Clock size={11} /> {new Date(scheduledAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </p>
                     )}
                   </div>

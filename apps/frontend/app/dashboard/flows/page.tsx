@@ -457,7 +457,6 @@ export default function FlowsPage() {
   const [editChannelId, setEditChannelId] = useState('')
   const [editCampaignId, setEditCampaignId] = useState('')
   const [editCooldown, setEditCooldown] = useState('24h')
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   const { data: flows = [], isLoading } = useQuery({
     queryKey: ['flows'],
@@ -523,49 +522,6 @@ export default function FlowsPage() {
   const openEdit = (f: any, e: React.MouseEvent) => {
     e.stopPropagation()
     setEditingFlow(f); setEditName(f.name); setEditChannelId(f.channel_id || ''); setEditCampaignId(f.campaign_id || ''); setEditCooldown(f.cooldown_type || '24h')
-  }
-
-  const duplicateFlow = async (flow: any, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (duplicatingId) return
-    setDuplicatingId(flow.id)
-    try {
-      // 1. Create new flow with same settings
-      const { data: newFlowRes } = await messageApi.post('/flows', {
-        name: `${flow.name} (copia)`,
-        channelId: flow.channel_id || null,
-        campaignId: flow.campaign_id || null,
-        cooldown_type: flow.cooldown_type || '24h',
-      })
-      const newFlow = newFlowRes.data
-      // 2. Get original flow nodes/edges
-      const { data: originalRes } = await messageApi.get(`/flows/${flow.id}`)
-      const original = originalRes.data
-      if (original.nodes && original.nodes.length > 0) {
-        // 3. Remap IDs so they are unique
-        const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        const idMap: Record<string, string> = {}
-        const nodes = original.nodes.map((n: any) => {
-          const newId = uid()
-          idMap[n.id] = newId
-          return { id: newId, type: n.type, position_x: n.position_x, position_y: n.position_y, data: n.data || {} }
-        })
-        const edges = (original.edges || []).map((edge: any) => ({
-          id: uid(),
-          source_node: idMap[edge.source_node] || edge.source_node,
-          target_node: idMap[edge.target_node] || edge.target_node,
-          source_handle: edge.source_handle || null,
-        }))
-        // 4. Save graph to new flow
-        await messageApi.put(`/flows/${newFlow.id}/graph`, { nodes, edges })
-      }
-      toast.success(`Flow "${flow.name}" duplicado!`)
-      queryClient.invalidateQueries({ queryKey: ['flows'] })
-    } catch {
-      toast.error('Erro ao duplicar flow')
-    } finally {
-      setDuplicatingId(null)
-    }
   }
 
   const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || t('flows.allChannels')
@@ -763,14 +719,6 @@ export default function FlowsPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
                   <Pencil size={14} />
-                </button>
-                )}
-                {canEdit('/dashboard/flows') && !flowLimitReached && (
-                <button onClick={e => duplicateFlow(f, e)} disabled={duplicatingId === f.id} title="Duplicar flow"
-                  style={{ background: 'none', border: 'none', cursor: duplicatingId === f.id ? 'not-allowed' : 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px', opacity: duplicatingId === f.id ? 0.5 : 1 }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff'; (e.currentTarget as HTMLButtonElement).style.color = '#7c3aed' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
-                  {duplicatingId === f.id ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Copy size={14} />}
                 </button>
                 )}
                 {canDelete('/dashboard/flows') && (

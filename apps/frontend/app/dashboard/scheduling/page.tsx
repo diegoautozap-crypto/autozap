@@ -189,10 +189,6 @@ export default function SchedulingPage() {
   }
 
   function handleSaveConfig() {
-    if (cfgEnd <= cfgStart) {
-      toast.error('Horário de fim deve ser maior que o de início')
-      return
-    }
     const body = {
       slot_duration_minutes: cfgSlotDuration,
       days_available: cfgDays,

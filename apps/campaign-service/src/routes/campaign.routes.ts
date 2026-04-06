@@ -46,12 +46,6 @@ const importContactsSchema = z.object({
   })).min(1),
 })
 
-const updateTemplateSchema = z.object({
-  name: z.string().max(255).optional(),
-  body: z.string().max(5000).optional(),
-  category: z.enum(['marketing', 'utility', 'authentication']).optional(),
-})
-
 const createTemplateSchema = z.object({
   channelId: z.string().uuid(),
   name: z.string().min(2).max(255),
@@ -85,7 +79,7 @@ router.post('/templates', requireRole('admin', 'owner'), validate(createTemplate
   } catch (err) { next(err) }
 })
 
-router.patch('/templates/:id', requireRole('admin', 'owner'), validate(updateTemplateSchema), async (req, res, next) => {
+router.patch('/templates/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const { name, templateId, body, variables, category } = req.body
     const update: any = {}
@@ -139,7 +133,7 @@ router.get('/campaigns', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/campaigns', validate(createCampaignSchema), async (req, res, next) => {
+router.post('/campaigns', async (req, res, next) => {
   try {
     // ── Plan limit check: campaigns/month ──
     const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
@@ -299,4 +293,3 @@ router.delete('/campaigns/:id', async (req, res, next) => {
 })
 
 export default router
-// deploy 1775502038

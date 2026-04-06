@@ -46,5 +46,4 @@ const shutdown = async (signal: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
 
-export default app// 1775504952
-// 1775505262
+export default app

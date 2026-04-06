@@ -38,32 +38,6 @@ const tagSchema = z.object({
 
 const addTagsSchema = z.object({ tagIds: z.array(z.string().uuid()) })
 
-const createProductSchema = z.object({
-  name: z.string().min(1).max(255),
-  price: z.number().min(0).optional(),
-  description: z.string().max(2000).optional(),
-  sku: z.string().max(100).optional(),
-  category: z.string().max(100).optional(),
-  image_url: z.string().url().max(2000).optional().nullable(),
-})
-
-const updateProductSchema = z.object({
-  name: z.string().max(255).optional(),
-  price: z.number().min(0).optional(),
-  description: z.string().max(2000).optional(),
-  sku: z.string().max(100).optional(),
-  category: z.string().max(100).optional(),
-  image_url: z.string().url().max(2000).optional().nullable(),
-  is_active: z.boolean().optional(),
-})
-
-const dealAdjustmentsSchema = z.object({
-  discount: z.number().min(0),
-  surcharge: z.number().min(0),
-  shipping: z.number().min(0),
-  coupon: z.string().max(50).optional(),
-})
-
 // ─── Contacts ─────────────────────────────────────────────────────────────────
 
 // GET /contacts
@@ -147,7 +121,7 @@ router.patch('/contacts/:id', validate(updateContactSchema), async (req, res, ne
 })
 
 // PATCH /contacts/:id/deal-adjustments
-router.patch('/contacts/:id/deal-adjustments', validate(dealAdjustmentsSchema), async (req, res, next) => {
+router.patch('/contacts/:id/deal-adjustments', async (req, res, next) => {
   try {
     const { discount, surcharge, shipping, coupon } = req.body
     const adjustments = {
@@ -258,9 +232,10 @@ router.get('/products', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/products', validate(createProductSchema), async (req, res, next) => {
+router.post('/products', async (req, res, next) => {
   try {
-    const { name, description, price, sku, category, image_url } = req.body
+    const { name, description, price, sku, category } = req.body
+    if (!name) { res.status(400).json({ error: 'name required' }); return }
     // Plan limit: products (active only)
     const productPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
       const { data } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
@@ -272,14 +247,14 @@ router.post('/products', validate(createProductSchema), async (req, res, next) =
       throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.products} produtos`, 403)
     }
     const { data, error } = await db.from('products').insert({
-      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category, image_url: image_url || null,
+      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category,
     }).select().single()
     if (error) throw error
     res.status(201).json(ok(data))
   } catch (err) { next(err) }
 })
 
-router.patch('/products/:id', validate(updateProductSchema), async (req, res, next) => {
+router.patch('/products/:id', async (req, res, next) => {
   try {
     const update: any = { updated_at: new Date() }
     if (req.body.name !== undefined) update.name = req.body.name
@@ -287,7 +262,6 @@ router.patch('/products/:id', validate(updateProductSchema), async (req, res, ne
     if (req.body.price !== undefined) update.price = req.body.price
     if (req.body.sku !== undefined) update.sku = req.body.sku
     if (req.body.category !== undefined) update.category = req.body.category
-    if (req.body.image_url !== undefined) update.image_url = req.body.image_url
     if (req.body.is_active !== undefined) update.is_active = req.body.is_active
     const { data, error } = await db.from('products').update(update)
       .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
@@ -493,4 +467,4 @@ router.get('/purchases/summary', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-export default router// deploy 1775501776
+export default router
