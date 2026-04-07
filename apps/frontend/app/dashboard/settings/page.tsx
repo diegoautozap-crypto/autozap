@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX, Upload } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -741,6 +742,8 @@ function FormBuilderSection() {
   const [newFieldLabel, setNewFieldLabel] = useState('')
   const [newFieldType, setNewFieldType] = useState('text')
   const [formLogo, setFormLogo] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [formBgColor, setFormBgColor] = useState('f4f4f5')
   const [formSuccessText, setFormSuccessText] = useState('Obrigado pelo contato! Retornaremos em breve.')
   const [formHideBrand, setFormHideBrand] = useState(false)
@@ -902,10 +905,49 @@ function FormBuilderSection() {
 
           {/* Logo */}
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Logo da empresa (URL da imagem)</label>
-            <input value={formLogo} onChange={e => setFormLogo(e.target.value)} placeholder="https://exemplo.com/logo.png"
-              style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
-              onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Logo da empresa</label>
+            {formLogo ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+                <img src={formLogo} alt="logo" style={{ maxHeight: '36px', maxWidth: '120px', objectFit: 'contain' }} />
+                <button onClick={() => setFormLogo('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex' }}><X size={14} /></button>
+              </div>
+            ) : (
+              <div
+                onClick={() => logoInputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#22c55e' }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                onDrop={async e => {
+                  e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'
+                  const file = e.dataTransfer.files?.[0]; if (!file || !file.type.startsWith('image/')) return
+                  setLogoUploading(true)
+                  try {
+                    const ext = file.name.split('.').pop() || 'png'
+                    const path = `logos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+                    const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
+                    if (error) throw error
+                    const { data: pub } = supabase.storage.from('media').getPublicUrl(path)
+                    setFormLogo(pub.publicUrl)
+                  } catch { toast.error('Erro ao enviar imagem') }
+                  setLogoUploading(false)
+                }}
+                style={{ padding: '20px', border: '2px dashed var(--border)', borderRadius: '9px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s' }}>
+                {logoUploading ? <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)', margin: '0 auto' }} />
+                  : <><Upload size={20} color="var(--text-faint)" style={{ margin: '0 auto 6px', display: 'block' }} /><p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0 }}>Arraste a logo aqui ou clique pra selecionar</p></>}
+              </div>
+            )}
+            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+              const file = e.target.files?.[0]; if (!file) return
+              setLogoUploading(true)
+              try {
+                const ext = file.name.split('.').pop() || 'png'
+                const path = `logos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+                const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false })
+                if (error) throw error
+                const { data: pub } = supabase.storage.from('media').getPublicUrl(path)
+                setFormLogo(pub.publicUrl)
+              } catch { toast.error('Erro ao enviar imagem') }
+              setLogoUploading(false)
+            }} />
           </div>
 
           {/* Background + Success */}
