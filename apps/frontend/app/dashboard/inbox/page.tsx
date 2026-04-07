@@ -781,25 +781,33 @@ export default function InboxPage() {
         </div>
         {/* Barra de ações em massa */}
         {bulkMode && (
-          <div style={{ padding: '6px 10px', borderBottom: '1px solid #e0f2fe', background: '#f0f9ff', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1' }}>
-              {bulkSelected.size > 0 ? `${bulkSelected.size} ${bulkSelected.size > 1 ? t('inbox.selectedPlural') : t('inbox.selected')}` : t('inbox.selectConversations')}
-            </span>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px' }}>
-              <button onClick={() => { const all = conversations.map((c: any) => c.id); setBulkSelected(prev => prev.size === all.length ? new Set() : new Set(all)) }}
-                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer' }}>
-                {bulkSelected.size === conversations.length ? t('inbox.noneSelected') : t('inbox.all')}
-              </button>
-              {canEdit('/dashboard/inbox') && bulkSelected.size > 0 && (<>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #e0f2fe', background: '#f0f9ff', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: bulkSelected.size > 0 ? '6px' : 0 }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1' }}>
+                {bulkSelected.size > 0 ? `${bulkSelected.size} ${bulkSelected.size > 1 ? t('inbox.selectedPlural') : t('inbox.selected')}` : t('inbox.selectConversations')}
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => { const all = conversations.map((c: any) => c.id); setBulkSelected(prev => prev.size === all.length ? new Set() : new Set(all)) }}
+                  style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer' }}>
+                  {bulkSelected.size === conversations.length ? t('inbox.noneSelected') : t('inbox.all')}
+                </button>
+                <button onClick={() => { setBulkMode(false); setBulkSelected(new Set()) }}
+                  style={{ padding: '3px 6px', borderRadius: '5px', border: '1px solid #bae6fd', background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+            {canEdit('/dashboard/inbox') && bulkSelected.size > 0 && (
+              <div style={{ display: 'flex', gap: '4px' }}>
                 <button onClick={async () => {
                   await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
                   toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-                }} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer' }}>
-                  <Check size={11} /> {t('inbox.read')}
+                }} style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <Check size={11} /> Lidas
                 </button>
-                <div style={{ position: 'relative' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
                   <button onClick={() => setBulkAssignOpen(p => !p)}
-                    style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                     <UserCheck size={11} /> Atribuir
                   </button>
                   {bulkAssignOpen && (
@@ -810,7 +818,7 @@ export default function InboxPage() {
                           <button key={m.id} onClick={async () => {
                             await conversationApi.post('/conversations/bulk/assign', { ids: Array.from(bulkSelected), userId: m.id })
                             toast.success(`${bulkSelected.size} atribuídas a ${m.name}`); setBulkSelected(new Set()); setBulkAssignOpen(false); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
-                          }} style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text)', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px' }}
+                          }} style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text)', textAlign: 'left' }}
                             onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                             {m.name}
                           </button>
@@ -822,15 +830,11 @@ export default function InboxPage() {
                 <button onClick={async () => {
                   await conversationApi.post('/conversations/bulk/close', { ids: Array.from(bulkSelected) })
                   toast.success(`${bulkSelected.size} fechadas`); setBulkSelected(new Set()); setBulkMode(false); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
-                }} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #fecaca', background: 'var(--bg-card)', color: '#dc2626', cursor: 'pointer' }}>
-                  {t('inbox.close')}
+                }} style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #fecaca', background: 'var(--bg-card)', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  Fechar
                 </button>
-              </>)}
-              <button onClick={() => { setBulkMode(false); setBulkSelected(new Set()) }}
-                style={{ padding: '4px 6px', borderRadius: '6px', border: '1px solid #bae6fd', background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
-                <X size={13} />
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleConvScroll}>
