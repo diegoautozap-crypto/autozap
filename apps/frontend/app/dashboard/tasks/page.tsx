@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi } from '@/lib/api'
+import { conversationApi, authApi } from '@/lib/api'
 import { toast } from 'sonner'
 import {
   CheckSquare, Plus, Trash2, Loader2, Calendar, AlertTriangle,
-  User, Clock, X, Flag,
+  User, Clock, X, Flag, Pencil, UserCheck,
 } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 
@@ -113,13 +113,18 @@ export default function TasksPage() {
     { key: 'completed', label: t('tasks.completed') },
   ]
   const [showModal, setShowModal] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  // New task form
+  // Task form (create + edit)
   const [newTitle, setNewTitle] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newDueDate, setNewDueDate] = useState('')
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [newAssignedTo, setNewAssignedTo] = useState('')
+
+  const openCreateModal = () => { setEditingTask(null); setNewTitle(''); setNewDescription(''); setNewDueDate(''); setNewPriority('medium'); setNewAssignedTo(''); setShowModal(true) }
+  const openEditModal = (task: Task) => { setEditingTask(task); setNewTitle(task.title); setNewDescription(task.description || ''); setNewDueDate(task.due_date ? task.due_date.slice(0, 10) : ''); setNewPriority(task.priority); setNewAssignedTo(task.assigned_to || ''); setShowModal(true) }
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -139,6 +144,11 @@ export default function TasksPage() {
       const { data } = await conversationApi.get('/tasks/summary')
       return data.data || { pending: 0, overdue: 0, today: 0 }
     },
+  })
+
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['team-members'],
+    queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
   })
 
   // ── Client-side filtering ────────────────────────────────────────────────
@@ -183,6 +193,7 @@ export default function TasksPage() {
       const body: any = { title: newTitle, priority: newPriority }
       if (newDescription.trim()) body.description = newDescription
       if (newDueDate) body.dueDate = new Date(newDueDate + 'T23:59:00').toISOString()
+      if (newAssignedTo) body.assignedTo = newAssignedTo
       await conversationApi.post('/tasks', body)
     },
     onSuccess: () => {
@@ -190,12 +201,27 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
       toast.success(t('tasks.toastCreated'))
       setShowModal(false)
-      setNewTitle('')
-      setNewDescription('')
-      setNewDueDate('')
-      setNewPriority('medium')
     },
     onError: () => toast.error(t('tasks.toastCreateError')),
+  })
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingTask) return
+      const body: any = { title: newTitle, priority: newPriority, assignedTo: newAssignedTo || null }
+      if (newDescription.trim()) body.description = newDescription
+      else body.description = null
+      if (newDueDate) body.dueDate = new Date(newDueDate + 'T23:59:00').toISOString()
+      else body.dueDate = null
+      await conversationApi.patch(`/tasks/${editingTask.id}`, body)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+      toast.success('Tarefa atualizada')
+      setShowModal(false)
+    },
+    onError: () => toast.error('Erro ao atualizar tarefa'),
   })
 
   // ── Tab counts ───────────────────────────────────────────────────────────
@@ -229,7 +255,7 @@ export default function TasksPage() {
         </div>
         <button
           className="mobile-header-actions"
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModal}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '9px 18px', borderRadius: '10px',
@@ -398,21 +424,22 @@ export default function TasksPage() {
                   </div>
                 </div>
 
-                {/* Delete button (on hover) */}
-                <button
-                  onClick={() => {
-                    if (confirm(t('tasks.confirmDelete'))) deleteMutation.mutate(task.id)
-                  }}
-                  style={{
-                    padding: '6px', borderRadius: '6px', border: 'none',
-                    background: hovered ? '#fef2f2' : 'transparent',
-                    color: hovered ? '#ef4444' : 'transparent',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Trash2 size={15} />
-                </button>
+                {/* Actions (on hover) */}
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {task.assigned_to && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px', marginRight: '4px' }}>
+                      <UserCheck size={11} /> {(teamMembers as any[]).find((m: any) => m.id === task.assigned_to)?.name?.split(' ')[0] || ''}
+                    </span>
+                  )}
+                  <button onClick={() => openEditModal(task)}
+                    style={{ padding: '6px', borderRadius: '6px', border: 'none', background: hovered ? '#eff6ff' : 'transparent', color: hovered ? '#2563eb' : 'transparent', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => { if (confirm(t('tasks.confirmDelete'))) deleteMutation.mutate(task.id) }}
+                    style={{ padding: '6px', borderRadius: '6px', border: 'none', background: hovered ? '#fef2f2' : 'transparent', color: hovered ? '#ef4444' : 'transparent', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             )
           })
@@ -440,7 +467,7 @@ export default function TasksPage() {
           >
             {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{t('tasks.modalTitle')}</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{editingTask ? 'Editar tarefa' : t('tasks.modalTitle')}</h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{ padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px', color: 'var(--text-muted)' }}
@@ -506,6 +533,19 @@ export default function TasksPage() {
               </div>
             </div>
 
+            {/* Assign to */}
+            <div style={{ marginBottom: '22px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#52525b', marginBottom: '5px' }}>
+                Delegar a
+              </label>
+              <select value={newAssignedTo} onChange={e => setNewAssignedTo(e.target.value)} style={selectStyle}>
+                <option value="">Sem responsável</option>
+                {(teamMembers as any[]).filter((m: any) => m.is_active).map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -520,8 +560,8 @@ export default function TasksPage() {
                 {t('common.cancel')}
               </button>
               <button
-                disabled={!newTitle.trim() || createMutation.isPending}
-                onClick={() => createMutation.mutate()}
+                disabled={!newTitle.trim() || createMutation.isPending || editMutation.isPending}
+                onClick={() => editingTask ? editMutation.mutate() : createMutation.mutate()}
                 style={{
                   padding: '9px 24px', borderRadius: '10px',
                   background: !newTitle.trim() ? 'var(--text-faintest)' : '#22c55e',
@@ -531,8 +571,8 @@ export default function TasksPage() {
                   transition: 'background 0.15s', opacity: createMutation.isPending ? 0.7 : 1,
                 }}
               >
-                {createMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                {t('tasks.create')}
+                {(createMutation.isPending || editMutation.isPending) && <Loader2 size={14} className="animate-spin" />}
+                {editingTask ? 'Salvar' : t('tasks.create')}
               </button>
             </div>
           </div>
