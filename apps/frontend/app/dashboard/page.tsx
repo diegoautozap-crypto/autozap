@@ -359,7 +359,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '3px 0 0' }}>{totalEntries} leads no topo · clique pra ver pipeline</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {pipelines.length > 1 && (
+                {pipelines.length > 0 && (
                   <select value={selectedPipelineId} onChange={e => { e.stopPropagation(); setSelectedPipelineId(e.target.value) }}
                     onClick={e => e.stopPropagation()}
                     style={{ padding: '5px 10px', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer', outline: 'none' }}>
