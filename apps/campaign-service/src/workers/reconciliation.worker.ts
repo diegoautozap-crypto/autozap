@@ -47,12 +47,14 @@ export async function runStatusReconciliation(): Promise<void> {
           await db.from('pending_status_updates').update({ processed_at: new Date() }).eq('id', event.id)
           if (row.campaign_id && (event.status === 'delivered' || event.status === 'read')) {
             const field = event.status === 'delivered' ? 'delivered_count' : 'read_count'
-            await db.rpc('increment_campaign_counter_safe', {
-              p_external_id: event.external_id,
-              p_campaign_id: row.campaign_id,
-              p_field:       field,
-              p_status:      event.status,
-            }).catch(() => {})
+            try {
+              await db.rpc('increment_campaign_counter_safe', {
+                p_external_id: event.external_id,
+                p_campaign_id: row.campaign_id,
+                p_field:       field,
+                p_status:      event.status,
+              })
+            } catch {}
           }
           resolved++
         } else {

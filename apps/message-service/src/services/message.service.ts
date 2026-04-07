@@ -332,9 +332,10 @@ export class MessageService {
     if (!channel?.settings?.aiChatbotEnabled) return
 
     // 2. Check AI plan limits
-    const { data: tenant } = await getCachedTenant(`tenant:${tenantId}`, 120_000, () =>
-      db.from('tenants').select('plan_slug, settings, metadata').eq('id', tenantId).single()
-    )
+    const { data: tenant } = await getCachedTenant(`tenant:${tenantId}`, 120_000, async () => {
+      const r = await db.from('tenants').select('plan_slug, settings, metadata').eq('id', tenantId).single()
+      return r
+    })
     const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
     const limits = PLAN_LIMITS[planSlug]
     if (limits.aiResponses === 0) return

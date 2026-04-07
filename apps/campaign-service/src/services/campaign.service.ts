@@ -188,15 +188,17 @@ export class CampaignService {
     return data
   }
 
-  async listCampaigns(tenantId: string, page = 1, limit = 20) {
+  async listCampaigns(tenantId: string, page = 1, limit = 20, allowedChannels?: string[]) {
     const offset = (page - 1) * limit
-    const { data, count, error } = await db
+    let query = db
       .from('campaigns')
       .select('id, name, status, total_contacts, sent_count, delivered_count, read_count, failed_count, created_at, started_at, completed_at, channels(name)', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .in('status', ['draft', 'running', 'paused', 'completed', 'failed', 'scheduled'])
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
+    if (allowedChannels?.length) query = query.in('channel_id', allowedChannels)
+    const { data, count, error } = await query
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return { campaigns: data || [], meta: paginationMeta(count || 0, page, limit) }

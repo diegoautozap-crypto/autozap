@@ -104,7 +104,7 @@ export function startMessageWorker(): Worker {
         await messageService.markSent(messageUuid, result.data.externalId)
 
         if (campaignId) {
-          await db.rpc('increment_message_count', { p_tenant_id: tenantId }).catch(() => {})
+          try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
         }
 
         logger.info('Message sent successfully', {

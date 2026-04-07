@@ -48,7 +48,7 @@ interface TokenPair {
 
 export class AuthService {
 
-  async register(input: RegisterInput): Promise<{ userId: string; tenantId: string }> {
+  async register(input: RegisterInput): Promise<{ userId: string; tenantId: string; tempToken: string }> {
     const { name, email, password, tenantName } = input
 
     // 1. Check if email already exists

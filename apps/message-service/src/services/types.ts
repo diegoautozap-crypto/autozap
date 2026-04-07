@@ -33,4 +33,5 @@ export interface SendMessageJob {
   body?: string
   mediaUrl?: string
   retryCount: number
+  campaignId?: string
 }

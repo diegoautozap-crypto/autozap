@@ -197,9 +197,10 @@ export class FlowEngine {
 
   /** Check tenant plan limits for a specific resource */
   private async getTenantPlanLimits(tenantId: string): Promise<{ planSlug: PlanSlug; limits: typeof PLAN_LIMITS[PlanSlug] }> {
-    const { data: tenant } = await cached(`tenant-plan:${tenantId}`, 60_000, () =>
-      db.from('tenants').select('plan_slug').eq('id', tenantId).single().then(r => r)
-    )
+    const { data: tenant } = await cached(`tenant-plan:${tenantId}`, 60_000, async () => {
+      const r = await db.from('tenants').select('plan_slug').eq('id', tenantId).single()
+      return r
+    })
     const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
     const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
     return { planSlug, limits }
@@ -224,14 +225,17 @@ export class FlowEngine {
       const { data: flows } = await cached(
         `flows:${ctx.channelId}:${ctx.tenantId}`,
         30_000,
-        () => db
-          .from('flows')
-          .select('*')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('is_active', true)
-          .or(`channel_id.eq.${ctx.channelId},channel_id.is.null`)
-          .order('sort_order', { ascending: true })
-          .order('created_at', { ascending: true }),
+        async () => {
+          const r = await db
+            .from('flows')
+            .select('*')
+            .eq('tenant_id', ctx.tenantId)
+            .eq('is_active', true)
+            .or(`channel_id.eq.${ctx.channelId},channel_id.is.null`)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true })
+          return r
+        },
       )
 
       if (!flows || flows.length === 0) return false
@@ -315,12 +319,12 @@ export class FlowEngine {
         if (lastMsg?.content_type === 'audio' && lastMsg?.media_url) {
           // Tenta transcrever
           try {
-            const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
+            const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, async () => { const r = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single(); return r })
             const creds = channel?.credentials || {}
             const metaToken = (typeof creds === 'object' && creds.metaToken?.startsWith('EAA')) ? creds.metaToken : (typeof creds === 'object' ? decryptCredentials(creds).metaToken : null)
             let openaiKey = process.env.OPENAI_API_KEY
             if (!openaiKey) {
-              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
+              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, async () => { const r = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single(); return r })
               openaiKey = tenant?.metadata?.openai_api_key
             }
             if (metaToken && openaiKey && /^\d+$/.test(lastMsg.media_url)) {
@@ -661,7 +665,7 @@ export class FlowEngine {
             // Busca chave OpenAI
             let whisperKey = data?.apiKey
             if (!whisperKey) {
-              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
+              const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, async () => { const r = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single(); return r })
               whisperKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
             }
             if (!whisperKey) { logger.warn('Transcribe node: no OpenAI API key'); variables[saveVar] = lastMsg.body || ''; break }
@@ -671,7 +675,7 @@ export class FlowEngine {
               const mediaId = lastMsg.media_url
 
               // Busca credenciais do canal (podem estar em texto puro ou criptografadas)
-              const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
+              const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, async () => { const r = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single(); return r })
               const rawCreds = channel?.credentials || {}
               const creds = typeof rawCreds === 'string' ? JSON.parse(rawCreds) : rawCreds
               // Tenta descriptografar — se já estiver em texto puro, retorna como está
@@ -750,7 +754,7 @@ export class FlowEngine {
 
           let openaiKey = data?.apiKey
           if (!openaiKey) {
-            const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, () => db.from('tenants').select('metadata').eq('id', ctx.tenantId).single().then(r => r))
+            const { data: tenant } = await cached(`tenant:${ctx.tenantId}`, 60_000, async () => { const r = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single(); return r })
             openaiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
           }
           if (!openaiKey) { logger.warn('AI node: no OpenAI API key'); break }
@@ -881,7 +885,7 @@ export class FlowEngine {
             email: email || undefined, origin: 'webhook', metadata, mergeMetadata: true,
           })
 
-          const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, () => db.from('channels').select('credentials, type').eq('id', ctx.channelId).single().then(r => r))
+          const { data: channel } = await cached(`channel:${ctx.channelId}`, 60_000, async () => { const r = await db.from('channels').select('credentials, type').eq('id', ctx.channelId).single(); return r })
           const { conversationId } = await ensureConversation({
             tenantId: ctx.tenantId, contactId, channelId: ctx.channelId,
             channelType: channel?.type || 'whatsapp', lastMessage: notePreview,
