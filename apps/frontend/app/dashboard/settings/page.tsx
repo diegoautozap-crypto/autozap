@@ -740,6 +740,10 @@ function FormBuilderSection() {
   const [customFields, setCustomFields] = useState<{ label: string; type: string }[]>([])
   const [newFieldLabel, setNewFieldLabel] = useState('')
   const [newFieldType, setNewFieldType] = useState('text')
+  const [formLogo, setFormLogo] = useState('')
+  const [formBgColor, setFormBgColor] = useState('f4f4f5')
+  const [formSuccessText, setFormSuccessText] = useState('Obrigado pelo contato! Retornaremos em breve.')
+  const [formHideBrand, setFormHideBrand] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const PRESET_COLORS = [
@@ -755,8 +759,9 @@ function FormBuilderSection() {
 
   const formFields = ['name', 'phone', ...(fieldEmail ? ['email'] : []), ...(fieldCompany ? ['company'] : []), ...(fieldMessage ? ['message'] : [])]
   const customParam = customFields.length > 0 ? `&custom=${encodeURIComponent(JSON.stringify(customFields))}` : ''
+  const extraParams = `${formLogo ? `&logo=${encodeURIComponent(formLogo)}` : ''}${formBgColor !== 'f4f4f5' ? `&bg=${formBgColor}` : ''}${formSuccessText !== 'Obrigado pelo contato! Retornaremos em breve.' ? `&success=${encodeURIComponent(formSuccessText)}` : ''}${formHideBrand ? '&brand=0' : ''}`
   const formUrl = webhookToken
-    ? `https://useautozap.app/form/${webhookToken}?title=${encodeURIComponent(formTitle)}&button=${encodeURIComponent(formButton)}&color=${formColor}&fields=${formFields.join(',')}${customParam}`
+    ? `https://useautozap.app/form/${webhookToken}?title=${encodeURIComponent(formTitle)}&button=${encodeURIComponent(formButton)}&color=${formColor}&fields=${formFields.join(',')}${customParam}${extraParams}`
     : ''
   const embedCode = formUrl ? `<iframe src="${formUrl}" width="100%" height="500" frameborder="0"></iframe>` : ''
 
@@ -895,11 +900,45 @@ function FormBuilderSection() {
             </div>
           </div>
 
+          {/* Logo */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Logo da empresa (URL da imagem)</label>
+            <input value={formLogo} onChange={e => setFormLogo(e.target.value)} placeholder="https://exemplo.com/logo.png"
+              style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
+              onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
+          </div>
+
+          {/* Background + Success */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Cor de fundo</label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[{ value: 'f4f4f5', label: 'Cinza' }, { value: 'ffffff', label: 'Branco' }, { value: '18181b', label: 'Preto' }, { value: 'eff6ff', label: 'Azul' }, { value: 'f0fdf4', label: 'Verde' }, { value: 'fef2f2', label: 'Rosa' }].map(c => (
+                  <button key={c.value} onClick={() => setFormBgColor(c.value)} title={c.label}
+                    style={{ width: '28px', height: '28px', borderRadius: '6px', background: `#${c.value}`, border: formBgColor === c.value ? '3px solid var(--text)' : '2px solid var(--border)', cursor: 'pointer', transition: 'all 0.15s' }} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Texto de sucesso</label>
+              <input value={formSuccessText} onChange={e => setFormSuccessText(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
+                onFocus={e => e.currentTarget.style.borderColor = '#22c55e'} onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
+            </div>
+          </div>
+
+          {/* Hide brand */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={formHideBrand} onChange={() => setFormHideBrand(!formHideBrand)} style={{ width: '14px', height: '14px', accentColor: '#22c55e' }} />
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Esconder "Powered by AutoZap"</span>
+          </label>
+
           {/* Live Preview */}
           <div>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Pre-visualizacao</label>
-            <div style={{ background: '#f4f4f5', borderRadius: '10px', padding: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ background: `#${formBgColor}`, borderRadius: '10px', padding: '24px', display: 'flex', justifyContent: 'center' }}>
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '100%', maxWidth: '380px', boxShadow: '0 4px 20px rgba(0,0,0,.08)' }}>
+                {formLogo && <img src={formLogo} alt="logo" style={{ maxHeight: '40px', maxWidth: '160px', display: 'block', margin: '0 auto 16px', objectFit: 'contain' }} />}
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', marginBottom: '20px', textAlign: 'center' }}>{formTitle || 'Entre em contato'}</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {formFields.map(f => (

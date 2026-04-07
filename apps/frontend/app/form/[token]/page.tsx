@@ -37,6 +37,10 @@ export default function LeadForm() {
   const customFields: { label: string; type: string }[] = (() => {
     try { return JSON.parse(searchParams.get('custom') || '[]') } catch { return [] }
   })()
+  const logo = searchParams.get('logo') || ''
+  const bgColor = searchParams.get('bg') || 'f4f4f5'
+  const successText = searchParams.get('success') || 'Obrigado pelo contato! Retornaremos em breve.'
+  const hideBrand = searchParams.get('brand') === '0'
 
   const [form, setForm] = useState<Record<string, string>>({ name: '', phone: '', email: '', company: '', message: '' })
   const [sent, setSent] = useState(false)
@@ -89,7 +93,7 @@ export default function LeadForm() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f4f4f5',
+        background: `#${bgColor}`,
         fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         padding: '16px',
       }}>
@@ -102,6 +106,7 @@ export default function LeadForm() {
           boxShadow: '0 4px 24px rgba(0,0,0,.08)',
           textAlign: 'center',
         }}>
+          {logo && <img src={logo} alt="logo" style={{ maxHeight: '40px', maxWidth: '160px', margin: '0 auto 16px', display: 'block', objectFit: 'contain' }} />}
           <div style={{
             width: '56px', height: '56px', borderRadius: '50%',
             background: `#${color}1a`, display: 'flex', alignItems: 'center',
@@ -115,7 +120,7 @@ export default function LeadForm() {
             Mensagem enviada!
           </h2>
           <p style={{ fontSize: '14px', color: '#71717a', lineHeight: 1.5 }}>
-            Obrigado pelo contato. Retornaremos em breve.
+            {successText}
           </p>
         </div>
       </div>
@@ -128,7 +133,7 @@ export default function LeadForm() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f4f4f5',
+      background: `#${bgColor}`,
       fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       padding: '16px',
     }}>
@@ -140,6 +145,7 @@ export default function LeadForm() {
         maxWidth: '420px',
         boxShadow: '0 4px 24px rgba(0,0,0,.08)',
       }}>
+        {logo && <img src={logo} alt="logo" style={{ maxHeight: '44px', maxWidth: '180px', display: 'block', margin: '0 auto 16px', objectFit: 'contain' }} />}
         <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#18181b', marginBottom: '24px', textAlign: 'center' }}>
           {title}
         </h2>
@@ -202,9 +208,11 @@ export default function LeadForm() {
           </button>
         </form>
 
-        <p style={{ fontSize: '11px', color: '#a1a1aa', textAlign: 'center', marginTop: '20px' }}>
-          Powered by AutoZap
-        </p>
+        {!hideBrand && (
+          <p style={{ fontSize: '11px', color: '#a1a1aa', textAlign: 'center', marginTop: '20px' }}>
+            Powered by AutoZap
+          </p>
+        )}
       </div>
     </div>
   )
