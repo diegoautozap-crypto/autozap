@@ -34,4 +34,9 @@ export interface SendMessageJob {
   mediaUrl?: string
   retryCount: number
   campaignId?: string
+  interactiveType?: 'button' | 'list'
+  buttons?: { id: string; title: string }[]
+  listRows?: { id: string; title: string; description?: string }[]
+  listButtonText?: string
+  footer?: string
 }

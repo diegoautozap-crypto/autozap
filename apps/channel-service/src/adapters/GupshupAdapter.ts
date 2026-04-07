@@ -54,6 +54,43 @@ export class GupshupAdapter implements IChannelAdapter {
       message = { type: 'video', url: mediaUrl, caption: body || '' }
     } else if (contentType === 'document') {
       message = { type: 'file', url: mediaUrl, filename: body || 'document' }
+    } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
+      message = {
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          ...(input.header ? { header: { type: 'text', text: input.header } } : {}),
+          body: { text: body || '' },
+          ...(input.footer ? { footer: { text: input.footer } } : {}),
+          action: {
+            buttons: input.buttons.slice(0, 3).map(b => ({
+              type: 'reply',
+              reply: { id: b.id, title: b.title.slice(0, 20) },
+            })),
+          },
+        },
+      }
+    } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
+      message = {
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          ...(input.header ? { header: { type: 'text', text: input.header } } : {}),
+          body: { text: body || '' },
+          ...(input.footer ? { footer: { text: input.footer } } : {}),
+          action: {
+            button: input.listButtonText || 'Ver opções',
+            sections: [{
+              title: 'Opções',
+              rows: input.listRows.slice(0, 10).map(r => ({
+                id: r.id,
+                title: r.title.slice(0, 24),
+                ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+              })),
+            }],
+          },
+        },
+      }
     } else {
       message = { type: 'text', text: body || '' }
     }
@@ -116,14 +153,18 @@ export class GupshupAdapter implements IChannelAdapter {
 
         const contentType = this.mapContentType(msg.type)
 
+        // Interactive reply (button or list click)
+        const interactiveBody = msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || null
+        const textBody = msg.text?.body || msg.caption || interactiveBody || undefined
+
         return {
           channelType: 'gupshup',
           channelId: '',
           externalId: msg.id,
           from: msg.from,
           to: value?.metadata?.display_phone_number || '',
-          contentType,
-          body: msg.text?.body || msg.caption || undefined,
+          contentType: interactiveBody ? 'text' as ContentType : contentType,
+          body: textBody,
           mediaUrl: msg.image?.id || msg.audio?.id || msg.video?.id || msg.document?.id || undefined,
           mediaMimeType: msg.image?.mime_type || msg.audio?.mime_type || undefined,
           timestamp: parseGupshupTimestamp(msg.timestamp),

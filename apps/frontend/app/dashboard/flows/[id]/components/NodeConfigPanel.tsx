@@ -576,6 +576,51 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.useVariablePersonalize')}</p>
             </div>
           )}
+          {d.subtype === 'buttons' && (<>
+            <div>
+              <label style={labelStyle}>Mensagem</label>
+              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Texto que aparece acima dos botões" value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            </div>
+            <div>
+              <label style={labelStyle}>Botões (máx 3)</label>
+              {(d.buttons || []).map((btn: any, i: number) => (
+                <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                  <input style={{ ...inputStyle, flex: 1 }} placeholder={`Botão ${i + 1}`} value={btn.title || ''} onChange={e => { const newBtns = [...(d.buttons || [])]; newBtns[i] = { ...btn, title: e.target.value }; onUpdate(node.id, { buttons: newBtns }) }} onFocus={focusInput} onBlur={blurInput} />
+                  <button onClick={() => { const newBtns = (d.buttons || []).filter((_: any, j: number) => j !== i); onUpdate(node.id, { buttons: newBtns }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}>✕</button>
+                </div>
+              ))}
+              {(d.buttons || []).length < 3 && (
+                <button onClick={() => onUpdate(node.id, { buttons: [...(d.buttons || []), { title: '' }] })} style={{ fontSize: '12px', color: '#22c55e', background: 'none', border: '1px dashed #22c55e', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', width: '100%' }}>+ Adicionar botão</button>
+              )}
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>O cliente clica no botão ao invés de digitar</p>
+            </div>
+          </>)}
+          {d.subtype === 'list' && (<>
+            <div>
+              <label style={labelStyle}>Mensagem</label>
+              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Texto que aparece acima da lista" value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            </div>
+            <div>
+              <label style={labelStyle}>Texto do botão</label>
+              <input style={inputStyle} placeholder="Ver opções" value={d.listButtonText || ''} onChange={e => onUpdate(node.id, { listButtonText: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            </div>
+            <div>
+              <label style={labelStyle}>Opções da lista (máx 10)</label>
+              {(d.listRows || []).map((row: any, i: number) => (
+                <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                  <div style={{ flex: 1 }}>
+                    <input style={{ ...inputStyle, marginBottom: '4px' }} placeholder={`Opção ${i + 1}`} value={row.title || ''} onChange={e => { const newRows = [...(d.listRows || [])]; newRows[i] = { ...row, title: e.target.value }; onUpdate(node.id, { listRows: newRows }) }} onFocus={focusInput} onBlur={blurInput} />
+                    <input style={{ ...inputStyle, fontSize: '12px' }} placeholder="Descrição (opcional)" value={row.description || ''} onChange={e => { const newRows = [...(d.listRows || [])]; newRows[i] = { ...row, description: e.target.value }; onUpdate(node.id, { listRows: newRows }) }} onFocus={focusInput} onBlur={blurInput} />
+                  </div>
+                  <button onClick={() => { const newRows = (d.listRows || []).filter((_: any, j: number) => j !== i); onUpdate(node.id, { listRows: newRows }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px', alignSelf: 'flex-start' }}>✕</button>
+                </div>
+              ))}
+              {(d.listRows || []).length < 10 && (
+                <button onClick={() => onUpdate(node.id, { listRows: [...(d.listRows || []), { title: '', description: '' }] })} style={{ fontSize: '12px', color: '#22c55e', background: 'none', border: '1px dashed #22c55e', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', width: '100%' }}>+ Adicionar opção</button>
+              )}
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>O cliente abre um menu dropdown e seleciona</p>
+            </div>
+          </>)}
           {d.subtype === 'image' && (<>
             <div><label style={labelStyle}>{t('nodes.image')}</label><MediaUpload accept="image/*" label={t('nodes.imageUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
             <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>

@@ -143,6 +143,8 @@ export const SEND_SUBTYPES = [
 export function getSendSubtypes(t: (key: string) => string) {
   return [
     { value: 'text',     label: t('nodes.sendText'),     emoji: '💬' },
+    { value: 'buttons',  label: 'Botões',                emoji: '🔘' },
+    { value: 'list',     label: 'Lista',                 emoji: '📋' },
     { value: 'image',    label: t('nodes.sendImage'),    emoji: '🖼️' },
     { value: 'video',    label: t('nodes.sendVideo'),    emoji: '🎥' },
     { value: 'audio',    label: t('nodes.sendAudio'),    emoji: '🎵' },

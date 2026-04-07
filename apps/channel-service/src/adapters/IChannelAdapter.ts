@@ -18,6 +18,7 @@ export type ContentType =
   | 'sticker'
   | 'location'
   | 'template'
+  | 'interactive'
 
 export type MessageStatus =
   | 'queued'
@@ -42,6 +43,17 @@ export interface NormalizedMessage {
   raw: unknown
 }
 
+export interface InteractiveButton {
+  id: string
+  title: string
+}
+
+export interface InteractiveListRow {
+  id: string
+  title: string
+  description?: string
+}
+
 export interface SendMessageInput {
   to: string
   contentType: ContentType
@@ -50,6 +62,12 @@ export interface SendMessageInput {
   templateName?: string
   templateParams?: string[]
   messageUuid: string
+  interactiveType?: 'button' | 'list'
+  buttons?: InteractiveButton[]
+  listRows?: InteractiveListRow[]
+  listButtonText?: string
+  header?: string
+  footer?: string
 }
 
 export interface SendMessageResult {

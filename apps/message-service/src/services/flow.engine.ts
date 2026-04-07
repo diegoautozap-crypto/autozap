@@ -515,14 +515,23 @@ export class FlowEngine {
           const ch = data?.channelId || ctx.channelId
           if (data?.delay && data.delay > 0) {
             const delayMs = data.delay * 1000
-            // Cap sync delay at 30s; ignore longer delays (users should use wait node)
             if (delayMs <= 30000) {
               await new Promise(r => setTimeout(r, delayMs))
             } else {
               logger.warn('send_message delay exceeds 30s, skipping delay — use wait node instead', { delay: data.delay, nodeId: node.id })
             }
           }
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
+
+          // Interactive buttons or list
+          if (data?.subtype === 'buttons' && data?.buttons?.length) {
+            const buttons = data.buttons.map((b: any, i: number) => ({ id: `btn_${i}`, title: this.interpolate(b.title || b, ctx, variables) }))
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: message, interactiveType: 'button', buttons, footer: data.footer ? this.interpolate(data.footer, ctx, variables) : undefined })
+          } else if (data?.subtype === 'list' && data?.listRows?.length) {
+            const listRows = data.listRows.map((r: any, i: number) => ({ id: `row_${i}`, title: this.interpolate(r.title || r, ctx, variables), description: r.description ? this.interpolate(r.description, ctx, variables) : undefined }))
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: message, interactiveType: 'list', listRows, listButtonText: data.listButtonText || 'Ver opções', footer: data.footer ? this.interpolate(data.footer, ctx, variables) : undefined })
+          } else {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
+          }
           break
         }
 
@@ -1458,11 +1467,11 @@ export class FlowEngine {
     return result
   }
 
-  private async sendMessage(opts: { tenantId: string; channelId: string; contactId: string; conversationId: string; to: string; contentType: string; body?: string; mediaUrl?: string }): Promise<void> {
+  private async sendMessage(opts: { tenantId: string; channelId: string; contactId: string; conversationId: string; to: string; contentType: string; body?: string; mediaUrl?: string; interactiveType?: string; buttons?: any[]; listRows?: any[]; listButtonText?: string; footer?: string }): Promise<void> {
     const response = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
-      body: JSON.stringify({ tenantId: opts.tenantId, channelId: opts.channelId, contactId: opts.contactId, conversationId: opts.conversationId, to: opts.to, contentType: opts.contentType, body: opts.body, mediaUrl: opts.mediaUrl }),
+      body: JSON.stringify(opts),
     })
     if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(`Failed to send message: ${JSON.stringify(err)}`) }
   }
