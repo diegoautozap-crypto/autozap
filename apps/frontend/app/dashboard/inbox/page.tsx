@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { conversationApi, messageApi, contactApi, channelApi, authApi } from '@/lib/api'
+import { conversationApi, messageApi, contactApi, channelApi, authApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
@@ -346,6 +346,8 @@ export default function InboxPage() {
   const [hoveredConvId, setHoveredConvId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const dragCounterRef = useRef(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -1119,6 +1121,22 @@ export default function InboxPage() {
                     <StickyNote size={12} /> {t('inbox.internalNote')}
                   </button>
                 </div>
+                {/* AI Suggestions */}
+                {inputMode === 'message' && (aiSuggestions.length > 0 || loadingSuggestions) && (
+                  <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {loadingSuggestions ? (
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '4px' }}><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Gerando sugestões...</span>
+                    ) : aiSuggestions.map((s, i) => (
+                      <button key={i} onClick={() => { setMessageText(s); setAiSuggestions([]) }}
+                        style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', cursor: 'pointer', transition: 'all 0.1s', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#e0e7ff' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#eef2ff' }}>
+                        {s}
+                      </button>
+                    ))}
+                    <button onClick={() => setAiSuggestions([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '2px', display: 'flex' }}><X size={12} /></button>
+                  </div>
+                )}
                 <div style={{ padding: '10px 12px' }}>
                   {visibleChannels.length > 1 && inputMode === 'message' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -1150,6 +1168,22 @@ export default function InboxPage() {
                       <button onClick={() => fileInputRef.current?.click()} style={btnStyle} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}><Paperclip size={15} /></button>
                       <button onClick={startRecording} style={btnStyle} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}><Mic size={15} /></button>
                       <button onClick={() => setShowQuickReplies(p => !p)} style={{ ...btnStyle, background: showQuickReplies ? '#f0fdf4' : 'var(--bg-input)', color: showQuickReplies ? '#22c55e' : 'var(--text-muted)', border: `1px solid ${showQuickReplies ? '#bbf7d0' : 'var(--border)'}` }}><Zap size={15} /></button>
+                      <button title="Sugestões de IA" onClick={async () => {
+                        if (loadingSuggestions) return
+                        setLoadingSuggestions(true); setAiSuggestions([])
+                        try {
+                          const { data } = await tenantApi.post('/tenant/ai-test', {
+                            message: `Baseado no histórico desta conversa, sugira 3 respostas curtas e naturais que eu posso enviar. Retorne APENAS as 3 sugestões separadas por |||. Sem numeração, sem aspas.\n\nÚltimas mensagens:\n${(messages || []).slice(-6).map((m: any) => `${m.direction === 'inbound' ? 'Cliente' : 'Agente'}: ${m.body || '[mídia]'}`).join('\n')}`,
+                            prompt: 'Você é um assistente que sugere respostas para atendentes de CRM. Sugira respostas curtas, naturais e profissionais.',
+                            model: 'gpt-4o-mini',
+                          })
+                          const suggestions = (data.data?.reply || '').split('|||').map((s: string) => s.trim()).filter(Boolean).slice(0, 3)
+                          setAiSuggestions(suggestions)
+                        } catch { toast.error('Erro ao gerar sugestões') }
+                        setLoadingSuggestions(false)
+                      }} style={{ ...btnStyle, background: loadingSuggestions ? '#eef2ff' : 'var(--bg-input)', color: loadingSuggestions ? '#4338ca' : 'var(--text-muted)', border: `1px solid ${loadingSuggestions ? '#c7d2fe' : 'var(--border)'}` }}>
+                        {loadingSuggestions ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={15} />}
+                      </button>
                       <textarea style={{ flex: 1, padding: '9px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none', color: 'var(--text)', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto', transition: 'all 0.1s' }} placeholder={t('inbox.typePlaceholder')} value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={handleKeyDown}
                         onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
                         onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
