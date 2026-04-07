@@ -535,7 +535,7 @@ Regras:
   private async findOrCreateConversation(tenantId: string, channelId: string, contactId: string, channelType: string) {
     const { data: existing } = await db.from('conversations').select('id, unread_count').eq('tenant_id', tenantId).eq('contact_id', contactId).eq('channel_id', channelId).in('status', ['open','waiting']).order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (existing) return existing
-    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'waiting', pipeline_stage: 'lead', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
+    const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'waiting', pipeline_stage: 'novo', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     return created
   }

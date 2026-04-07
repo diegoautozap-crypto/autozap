@@ -81,7 +81,7 @@ export async function ensureConversation(opts: EnsureConversationOpts): Promise<
     .insert({
       id: generateId(), tenant_id: tenantId, contact_id: contactId,
       channel_id: channelId, channel_type: channelType, status: 'waiting',
-      pipeline_stage: 'lead', bot_active: true, unread_count: 1,
+      pipeline_stage: 'novo', bot_active: true, unread_count: 1,
       last_message: lastMessage || 'Lead via webhook', last_message_at: new Date(),
     })
     .select('id').single()
