@@ -2,7 +2,6 @@ import 'dotenv/config'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
-import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import authRoutes from './routes/auth.routes'
 import { errorHandler } from './middleware/auth.middleware'
@@ -30,7 +29,7 @@ app.use(
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 50,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many requests, try again later' } },
   standardHeaders: true,
   legacyHeaders: false,
@@ -38,19 +37,18 @@ const authLimiter = rateLimit({
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 30,
+  max: 10,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many registration attempts, try again later' } },
 })
 
 const passwordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: 5,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many attempts' } },
 })
 
-// ─── Cookie & Body Parsing ───────────────────────────────────────────────────
+// ─── Body Parsing ─────────────────────────────────────────────────────────────
 
-app.use(cookieParser())
 app.use(express.json({ limit: '100kb' }))
 app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 
