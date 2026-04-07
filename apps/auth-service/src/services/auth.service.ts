@@ -247,11 +247,16 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(newPassword)
-    await db.from('users').update({
+    const { error: updateError } = await db.from('users').update({
       password_hash: passwordHash,
       password_reset_token: null,
       password_reset_expires: null,
     }).eq('id', user.id)
+
+    if (updateError) {
+      logger.error('Failed to update password', { userId: user.id, error: updateError })
+      throw new AppError('DB_ERROR', 'Failed to reset password', 500)
+    }
 
     await this.logoutAllSessions(user.id)
     logger.info('Password reset', { userId: user.id })

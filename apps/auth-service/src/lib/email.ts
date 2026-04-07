@@ -3,7 +3,7 @@ import { logger } from './logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = process.env.SMTP_FROM || 'AutoZap <onboarding@resend.dev>'
-const APP_URL = process.env.APP_URL || 'https://frontend-production-795a.up.railway.app'
+const APP_URL = process.env.APP_URL || 'https://useautozap.app'
 
 // ─── Templates ────────────────────────────────────────────────────────────────
 
