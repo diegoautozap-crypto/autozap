@@ -141,7 +141,7 @@ export function startMessageWorker(): Worker {
       connection,
       concurrency: 20,
       limiter: {
-        max: 100,
+        max: 500,
         duration: 60_000,
       },
     },
