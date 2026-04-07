@@ -100,33 +100,67 @@ async function saveMessageError(params: {
 
 export class MessageService {
 
-  private async transcribeAudio(messageId: string, tenantId: string, channelId: string, mediaUrl: string): Promise<string | null> {
+  private async transcribeAudio(messageId: string, tenantId: string, channelId: string, mediaId: string): Promise<string | null> {
     try {
+      // Get OpenAI key
       const { data: tenant } = await db.from('tenants').select('metadata').eq('id', tenantId).single()
-      const apiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
-      if (!apiKey) return null
+      const whisperKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+      if (!whisperKey) return null
 
-      // Get meta token for media download
-      const { data: channel } = await db.from('channels').select('credentials').eq('id', channelId).single()
-      const creds = channel?.credentials || {}
-      const metaToken = creds?.metaToken || ''
+      // Get channel credentials
+      const { data: channel } = await db.from('channels').select('credentials, type').eq('id', channelId).single()
+      const rawCreds = channel?.credentials || {}
+      const creds = typeof rawCreds === 'string' ? JSON.parse(rawCreds) : rawCreds
+      const { decryptCredentials } = await import('../lib/crypto')
+      let metaToken: string | undefined
+      let apiKey: string | undefined
+      try {
+        metaToken = creds.metaToken?.startsWith('EAA') ? creds.metaToken : decryptCredentials(creds).metaToken
+        apiKey = creds.apiKey?.length < 100 ? creds.apiKey : decryptCredentials(creds).apiKey
+      } catch { metaToken = creds.metaToken; apiKey = creds.apiKey }
 
-      // Download audio
-      const headers: Record<string, string> = {}
-      if (metaToken) headers['Authorization'] = `Bearer ${metaToken}`
-      const audioRes = await fetch(mediaUrl, { headers, signal: AbortSignal.timeout(15000) })
-      if (!audioRes.ok) return null
-      const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+      let audioBuffer: Buffer | null = null
 
-      // Transcribe with OpenAI Whisper
-      const { default: OpenAI } = await import('openai')
-      const openai = new OpenAI({ apiKey })
-      const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+      // 1. Meta Graph API (media ID is numeric)
+      if (metaToken && /^\d+$/.test(mediaId)) {
+        const metaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${metaToken}` } })
+        if (metaRes.ok) {
+          const metaData = await metaRes.json() as any
+          if (metaData.url) {
+            const audioRes = await fetch(metaData.url, { headers: { Authorization: `Bearer ${metaToken}` } })
+            if (audioRes.ok) audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+          }
+        }
+      }
+
+      // 2. Fallback: Gupshup API
+      if (!audioBuffer && apiKey) {
+        const gupshupRes = await fetch(`https://api.gupshup.io/wa/api/v1/media/${mediaId}`, { headers: { apikey: apiKey } })
+        if (gupshupRes.ok) {
+          const ct = gupshupRes.headers.get('content-type') || ''
+          if (ct.includes('audio') || ct.includes('ogg') || ct.includes('octet')) {
+            audioBuffer = Buffer.from(await gupshupRes.arrayBuffer())
+          }
+        }
+      }
+
+      // 3. Direct URL fallback
+      if (!audioBuffer && mediaId.startsWith('http')) {
+        const res = await fetch(mediaId, { signal: AbortSignal.timeout(15000) })
+        if (res.ok) audioBuffer = Buffer.from(await res.arrayBuffer())
+      }
+
+      if (!audioBuffer || audioBuffer.length === 0) return null
+
+      // Transcribe
+      const { default: OpenAI, toFile } = await import('openai')
+      const openai = new OpenAI({ apiKey: whisperKey })
+      const file = await toFile(audioBuffer, 'audio.ogg', { type: 'audio/ogg' })
       const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: 'pt' })
       logger.info('Audio transcribed', { messageId, text: transcription.text?.slice(0, 50) })
       return transcription.text || null
     } catch (err) {
-      logger.error('Audio transcription failed', { messageId, err })
+      logger.error('Audio transcription failed', { messageId, err: err instanceof Error ? err.message : String(err) })
       return null
     }
   }
