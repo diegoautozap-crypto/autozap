@@ -11,7 +11,7 @@ import type {
 import { logger } from '../lib/logger'
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1'
-
+// Interactive messages: buttons + list via Meta Graph API
 const CHANNEL_SERVICE_PUBLIC_URL = 'https://autozapchannel-service-production.up.railway.app'
 
 // ─── Converte timestamp do Gupshup/Meta corretamente ─────────────────────────
