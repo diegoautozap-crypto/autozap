@@ -85,7 +85,7 @@ export default function CampaignsPage() {
   const [curlCopies, setCurlCopies]             = useState<string[]>([''])
   const [campaignName, setCampaignName]         = useState('')
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [messagesPerMin, setMessagesPerMin]     = useState(1000)
+  const [messagesPerMin, setMessagesPerMin]     = useState(1200)
   const [selectedCamp, setSelectedCamp]         = useState<any>(null)
   const [page, setPage]                         = useState(1)
   const [useTemplate, setUseTemplate]           = useState(true)
@@ -803,7 +803,7 @@ export default function CampaignsPage() {
               <div>
                 <Lbl>{t('campaigns.speedPerChannel')}</Lbl>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="number" min="1" max="1000" style={{ ...inp, width: '100px' } as any}
+                  <input type="number" min="1" max="2000" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
                     onChange={e => {
                       const val = Number(e.target.value)
