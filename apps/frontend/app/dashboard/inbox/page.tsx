@@ -107,6 +107,65 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 
+const CONVERSATION_LABELS = [
+  { id: 'urgent', name: 'Urgente', color: '#ef4444' },
+  { id: 'payment', name: 'Aguardando pagamento', color: '#f59e0b' },
+  { id: 'callback', name: 'Retornar', color: '#3b82f6' },
+  { id: 'resolved', name: 'Resolvido', color: '#22c55e' },
+  { id: 'negotiation', name: 'Em negociacao', color: '#8b5cf6' },
+  { id: 'new_lead', name: 'Lead novo', color: '#06b6d4' },
+]
+
+function ConversationLabelEditor({ conversationId, currentLabels, onChanged }: { conversationId: string; currentLabels: any[]; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const activeIds = new Set((currentLabels || []).map((l: any) => l.id))
+
+  const toggle = async (label: typeof CONVERSATION_LABELS[0]) => {
+    setSaving(true)
+    try {
+      let newLabels: typeof CONVERSATION_LABELS
+      if (activeIds.has(label.id)) {
+        newLabels = (currentLabels || []).filter((l: any) => l.id !== label.id)
+      } else {
+        newLabels = [...(currentLabels || []), { id: label.id, name: label.name, color: label.color }]
+      }
+      await conversationApi.patch(`/conversations/${conversationId}/labels`, { labels: newLabels })
+      onChanged()
+    } catch { toast.error('Erro ao atualizar etiqueta') }
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
+        style={{ width: '24px', height: '24px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: open ? '#ede9fe' : 'var(--bg-input)', color: open ? '#8b5cf6' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, transition: 'all 0.1s' }}
+        title="Etiquetas">
+        <Tag size={12} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow)', padding: '6px', minWidth: '180px', marginTop: '4px' }}
+          onClick={e => e.stopPropagation()}
+          onMouseLeave={() => setOpen(false)}>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', padding: '4px 8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Etiquetas</p>
+          {CONVERSATION_LABELS.map(label => {
+            const active = activeIds.has(label.id)
+            return (
+              <div key={label.id} onClick={() => toggle(label)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', background: active ? `${label.color}12` : 'transparent' }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${label.color}20` : 'var(--bg)'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = active ? `${label.color}12` : 'transparent'}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', color: 'var(--text)', flex: 1 }}>{label.name}</span>
+                {saving ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)' }} /> : active && <Check size={11} color={label.color} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function QuickRepliesModal({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
   const t = useT()
   const queryClient = useQueryClient()
@@ -274,6 +333,7 @@ export default function InboxPage() {
   const [showQuickReplies, setShowQuickReplies] = useState(false)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unanswered' | 'mine' | 'waiting'>('all')
+  const [labelFilter, setLabelFilter] = useState<string>('all')
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('autozap-pinned') || '[]')) } catch { return new Set() }
   })
@@ -630,6 +690,11 @@ export default function InboxPage() {
       if (inboxFilter === 'waiting') return c.status === 'waiting'
       return true
     })
+    .filter((c: any) => {
+      if (labelFilter === 'all') return true
+      if (labelFilter === 'none') return !c.labels || c.labels.length === 0
+      return (c.labels || []).some((l: any) => l.id === labelFilter)
+    })
     .sort((a: any, b: any) => {
       const aPinned = pinnedIds.has(a.id) ? 1 : 0
       const bPinned = pinnedIds.has(b.id) ? 1 : 0
@@ -678,6 +743,20 @@ export default function InboxPage() {
             <button key={f.key} onClick={() => setInboxFilter(f.key)}
               style={{ padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${inboxFilter === f.key ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: inboxFilter === f.key ? '#f0fdf4' : 'transparent', color: inboxFilter === f.key ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
               {f.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0, alignItems: 'center' }}>
+          <Tag size={11} color="var(--text-faint)" style={{ flexShrink: 0 }} />
+          <button onClick={() => setLabelFilter('all')}
+            style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, border: `1px solid ${labelFilter === 'all' ? '#8b5cf6' : 'var(--border)'}`, cursor: 'pointer', background: labelFilter === 'all' ? '#ede9fe' : 'transparent', color: labelFilter === 'all' ? '#7c3aed' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+            Todas
+          </button>
+          {CONVERSATION_LABELS.map(label => (
+            <button key={label.id} onClick={() => setLabelFilter(labelFilter === label.id ? 'all' : label.id)}
+              style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, border: `1px solid ${labelFilter === label.id ? label.color : 'var(--border)'}`, cursor: 'pointer', background: labelFilter === label.id ? `${label.color}18` : 'transparent', color: labelFilter === label.id ? label.color : 'var(--text-muted)', transition: 'all 0.1s', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: label.color, display: 'inline-block', flexShrink: 0 }} />
+              {label.name}
             </button>
           ))}
         </div>
@@ -766,19 +845,28 @@ export default function InboxPage() {
                       <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
                       {conv.last_message_at && <span style={{ color: 'var(--text-faint)', fontSize: '11px', flexShrink: 0, marginLeft: '4px' }}>{new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
-                    {convChannelName && channelFilter === 'all' && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', display: 'inline-block', marginBottom: '2px' }}>{convChannelName}</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginBottom: '1px' }}>
+                      {convChannelName && channelFilter === 'all' && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', display: 'inline-block' }}>{convChannelName}</span>}
+                      {(conv.labels || []).map((label: any) => (
+                        <span key={label.id} style={{ fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', background: `${label.color}18`, color: label.color, border: `1px solid ${label.color}30`, display: 'inline-flex', alignItems: 'center', gap: '3px', lineHeight: '14px' }}>
+                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: label.color, display: 'inline-block', flexShrink: 0 }} />
+                          {label.name}
+                        </span>
+                      ))}
+                    </div>
                     <div style={{ color: 'var(--text-faint)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>
                   </div>
                   {pinnedIds.has(conv.id) && <span style={{ fontSize: '12px', flexShrink: 0, lineHeight: 1 }} title="Fixada">📌</span>}
                   {hoveredConvId === conv.id && !bulkMode && (
                     <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <ConversationLabelEditor conversationId={conv.id} currentLabels={conv.labels || []} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', conv.id] }) }} />
                       <button onClick={(e) => { e.stopPropagation(); setPinnedIds(prev => { const next = new Set(prev); next.has(conv.id) ? next.delete(conv.id) : next.add(conv.id); return next }) }}
                         title={pinnedIds.has(conv.id) ? 'Desafixar' : 'Fixar'}
                         style={{ width: '24px', height: '24px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: pinnedIds.has(conv.id) ? '#fef3c7' : 'var(--bg-input)', color: pinnedIds.has(conv.id) ? '#d97706' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, transition: 'all 0.1s' }}>
                         <Pin size={12} />
                       </button>
                       <button onClick={async (e) => { e.stopPropagation(); await conversationApi.post(`/conversations/${conv.id}/unread`); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) }}
-                        title="Marcar como não lida"
+                        title="Marcar como nao lida"
                         style={{ width: '24px', height: '24px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, transition: 'all 0.1s' }}>
                         <Mail size={12} />
                       </button>
@@ -1098,6 +1186,24 @@ export default function InboxPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Tag size={13} color="var(--text-faint)" /><p style={{ fontSize: '10px', color: 'var(--text-faint)', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('inbox.tags')}</p></div>
                 {canEdit('/dashboard/inbox') ? <InboxTagEditor contactId={contactId!} contactTags={contactTags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contact', contactId] }); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} /> : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>{contactTags.map((tag: any) => <span key={tag.id} style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>)}</div>}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><Tag size={13} color="#8b5cf6" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Etiquetas</p></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                {(selectedConv?.labels || []).map((label: any) => (
+                  <span key={label.id} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${label.color}18`, color: label.color, border: `1px solid ${label.color}40`, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
+                    {label.name}
+                  </span>
+                ))}
+                {canEdit('/dashboard/inbox') && (
+                  <ConversationLabelEditor conversationId={selectedConvId!} currentLabels={selectedConv?.labels || []} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) }} />
+                )}
+                {(!selectedConv?.labels || selectedConv.labels.length === 0) && !canEdit('/dashboard/inbox') && (
+                  <p style={{ fontSize: '12px', color: 'var(--text-faintest)', margin: 0 }}>Nenhuma etiqueta</p>
+                )}
               </div>
             </div>
 

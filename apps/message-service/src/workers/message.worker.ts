@@ -8,6 +8,7 @@ import type { SendMessageJob } from '../services/types'
 const REDIS_URL = process.env.REDIS_URL!
 const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 function getRedisConnection() {
@@ -29,6 +30,15 @@ const connection = getRedisConnection()
 
 // ─── Auto-reply queue ────────────────────────────────────────────────────────
 export const autoReplyQueue = new Queue('auto-reply', {
+  connection,
+  defaultJobOptions: {
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  },
+})
+
+// ─── Agent email notification queue ─────────────────────────────────────────
+export const agentNotifyQueue = new Queue('agent-notify', {
   connection,
   defaultJobOptions: {
     removeOnComplete: { count: 500 },
@@ -241,6 +251,91 @@ export function startAutoReplyWorker(): Worker {
   })
 
   logger.info('Auto-reply worker started')
+  return worker
+}
+
+// ─── Agent email notification worker ─────────────────────────────────────────
+export function startAgentNotifyWorker(): Worker {
+  const worker = new Worker(
+    'agent-notify',
+    async (job) => {
+      const { tenantId, conversationId } = job.data
+
+      // Check if someone already replied in the last 10 minutes
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const { data: recentOutbound } = await db
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('direction', 'outbound')
+        .gte('created_at', tenMinAgo)
+        .limit(1)
+
+      if (recentOutbound && recentOutbound.length > 0) return // Agent already replied
+
+      // Check conversation is still open/waiting and assigned to someone
+      const { data: conv } = await db
+        .from('conversations')
+        .select('assigned_to, status, contacts(name, phone)')
+        .eq('id', conversationId)
+        .single()
+
+      if (!conv?.assigned_to) return // Not assigned to anyone
+      if (conv.status === 'closed') return
+
+      // Get agent info
+      const { data: agent } = await db
+        .from('users')
+        .select('email, name, settings')
+        .eq('id', conv.assigned_to)
+        .single()
+
+      if (!agent?.email) return
+
+      // Check if agent has email notifications disabled
+      const agentSettings = agent.settings as Record<string, any> | null
+      if (agentSettings?.emailNotifications === false) return
+
+      const contact = conv.contacts as any
+      const contactName = contact?.name || 'Cliente'
+      const contactPhone = contact?.phone || ''
+
+      // Send notification via auth-service internal endpoint
+      try {
+        const res = await fetch(`${AUTH_SERVICE_URL}/internal/notify-agent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': INTERNAL_SECRET,
+          },
+          body: JSON.stringify({
+            agentEmail: agent.email,
+            agentName: agent.name || 'Atendente',
+            contactName,
+            contactPhone,
+            tenantId,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          logger.error('Agent notify failed', { err, conversationId })
+          return
+        }
+
+        logger.info('Agent notification email sent', { conversationId, agentEmail: agent.email })
+      } catch (err) {
+        logger.error('Agent notify error', { err, conversationId })
+      }
+    },
+    { connection, concurrency: 3 },
+  )
+
+  worker.on('failed', (job, err) => {
+    logger.error('Agent notify job failed', { jobId: job?.id, error: err.message })
+  })
+
+  logger.info('Agent notify worker started')
   return worker
 }
 

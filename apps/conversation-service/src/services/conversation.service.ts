@@ -25,7 +25,7 @@ export class ConversationService {
       .from('conversations')
       .select(`
         id, status, pipeline_stage, unread_count, last_message, last_message_at, created_at,
-        bot_active, assigned_to,
+        bot_active, assigned_to, labels,
         contacts(id, name, phone, avatar_url),
         channels(id, name, type),
         users!conversations_assigned_to_fkey(id, name, avatar_url)

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -612,6 +612,234 @@ function AiChatbotSection() {
   )
 }
 
+// ── Formulário de Captura (Form Builder) ─────────────────────────────────────
+function FormBuilderSection() {
+  const { user } = useAuthStore()
+  const { data: tenant } = useQuery({
+    queryKey: ['tenant'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
+  })
+
+  const webhookToken = tenant?.webhookToken || ''
+
+  const [formTitle, setFormTitle] = useState('Entre em contato')
+  const [formButton, setFormButton] = useState('Enviar')
+  const [formColor, setFormColor] = useState('22c55e')
+  const [fieldEmail, setFieldEmail] = useState(false)
+  const [fieldCompany, setFieldCompany] = useState(false)
+  const [fieldMessage, setFieldMessage] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const PRESET_COLORS = [
+    { value: '22c55e', label: 'Verde' },
+    { value: '3b82f6', label: 'Azul' },
+    { value: '8b5cf6', label: 'Roxo' },
+    { value: 'f97316', label: 'Laranja' },
+    { value: 'ef4444', label: 'Vermelho' },
+    { value: '06b6d4', label: 'Ciano' },
+    { value: 'ec4899', label: 'Rosa' },
+    { value: '18181b', label: 'Preto' },
+  ]
+
+  const formFields = ['name', 'phone', ...(fieldEmail ? ['email'] : []), ...(fieldCompany ? ['company'] : []), ...(fieldMessage ? ['message'] : [])]
+  const formUrl = webhookToken
+    ? `https://useautozap.app/form/${webhookToken}?title=${encodeURIComponent(formTitle)}&button=${encodeURIComponent(formButton)}&color=${formColor}&fields=${formFields.join(',')}`
+    : ''
+  const embedCode = formUrl ? `<iframe src="${formUrl}" width="100%" height="500" frameborder="0"></iframe>` : ''
+
+  const copyEmbed = () => {
+    if (embedCode) {
+      navigator.clipboard.writeText(embedCode)
+      setCopied(true)
+      toast.success('Codigo copiado!')
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const fieldLabelMap: Record<string, string> = {
+    name: 'Nome',
+    phone: 'Telefone',
+    email: 'Email',
+    company: 'Empresa',
+    message: 'Mensagem',
+  }
+  const fieldPlaceholderMap: Record<string, string> = {
+    name: 'Seu nome',
+    phone: '(11) 99999-9999',
+    email: 'seu@email.com',
+    company: 'Nome da empresa',
+    message: 'Sua mensagem...',
+  }
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileText size={16} color="#16a34a" />
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '2px' }}>Formulario de captura</span>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>Gere um formulario HTML para capturar leads direto no seu inbox</p>
+        </div>
+      </div>
+
+      {!webhookToken ? (
+        <div style={{ textAlign: 'center', padding: '20px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Gere primeiro o token de webhook acima para usar o formulario de captura.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Field config */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Campos do formulario</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { key: 'name', label: 'Nome', checked: true, disabled: true },
+                { key: 'phone', label: 'Telefone (obrigatorio)', checked: true, disabled: true },
+                { key: 'email', label: 'Email', checked: fieldEmail, onChange: () => setFieldEmail(!fieldEmail) },
+                { key: 'company', label: 'Empresa', checked: fieldCompany, onChange: () => setFieldCompany(!fieldCompany) },
+                { key: 'message', label: 'Mensagem', checked: fieldMessage, onChange: () => setFieldMessage(!fieldMessage) },
+              ].map(f => (
+                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '7px', border: `1px solid ${f.checked ? '#bbf7d0' : 'var(--divider)'}`, background: f.checked ? '#f0fdf4' : 'var(--bg-card)', cursor: f.disabled ? 'default' : 'pointer', opacity: f.disabled ? 0.7 : 1 }}>
+                  <input type="checkbox" checked={f.checked} disabled={f.disabled} onChange={f.onChange} style={{ width: '14px', height: '14px', accentColor: '#22c55e', cursor: f.disabled ? 'default' : 'pointer' }} />
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{f.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Customization */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Titulo</label>
+              <input
+                value={formTitle}
+                onChange={e => setFormTitle(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
+                onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
+                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Texto do botao</label>
+              <input
+                value={formButton}
+                onChange={e => setFormButton(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
+                onFocus={e => e.currentTarget.style.borderColor = '#22c55e'}
+                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              />
+            </div>
+          </div>
+
+          {/* Color picker */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Palette size={13} /> Cor principal
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c.value}
+                  onClick={() => setFormColor(c.value)}
+                  title={c.label}
+                  style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    background: `#${c.value}`,
+                    border: formColor === c.value ? '3px solid var(--text)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    boxShadow: formColor === c.value ? '0 0 0 2px var(--bg-card)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Live Preview */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '8px' }}>Pre-visualizacao</label>
+            <div style={{ background: '#f4f4f5', borderRadius: '10px', padding: '24px', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '100%', maxWidth: '380px', boxShadow: '0 4px 20px rgba(0,0,0,.08)' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#18181b', marginBottom: '20px', textAlign: 'center' }}>{formTitle || 'Entre em contato'}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {formFields.map(f => (
+                    <div key={f}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '4px' }}>
+                        {fieldLabelMap[f]} {(f === 'phone' || f === 'name') && <span style={{ color: '#ef4444' }}>*</span>}
+                      </label>
+                      {f === 'message' ? (
+                        <textarea
+                          disabled
+                          placeholder={fieldPlaceholderMap[f]}
+                          rows={3}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', resize: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <input
+                          disabled
+                          placeholder={fieldPlaceholderMap[f]}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', boxSizing: 'border-box' as const }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    disabled
+                    style={{ width: '100%', padding: '10px', background: `#${formColor}`, color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'default', marginTop: '4px' }}
+                  >
+                    {formButton || 'Enviar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Embed code */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Codigo para incorporar</label>
+            <div style={{ position: 'relative' }}>
+              <textarea
+                readOnly
+                value={embedCode}
+                rows={3}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '11px', color: 'var(--text)', background: 'var(--bg-input)', boxSizing: 'border-box' as const, fontFamily: 'ui-monospace, monospace', resize: 'none', lineHeight: 1.5 }}
+              />
+              <button
+                onClick={copyEmbed}
+                style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: copied ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${copied ? '#bbf7d0' : 'var(--border)'}`, borderRadius: '6px', fontSize: '11px', fontWeight: 600, color: copied ? '#16a34a' : 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                {copied ? <Check size={11} /> : <Copy size={11} />}
+                {copied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+            <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>
+              Cole este codigo no HTML do seu site. O formulario enviara leads diretamente para o seu inbox.
+            </p>
+          </div>
+
+          {/* Direct link */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '6px' }}>Link direto</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <code style={{ flex: 1, fontSize: '11px', color: 'var(--text)', background: 'var(--bg-input)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', wordBreak: 'break-all' as const, lineHeight: 1.4 }}>
+                {formUrl}
+              </code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(formUrl); toast.success('Link copiado!') }}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faint)', padding: '6px 8px', display: 'flex', flexShrink: 0 }}
+              >
+                <Copy size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export default function SettingsPage() {
   const t = useT()
   const { isAdmin, canEdit } = usePermissions()
@@ -793,6 +1021,9 @@ export default function SettingsPage() {
 
         {/* ── Webhook de Entrada ── */}
         {canEdit('/dashboard/settings') && <InboundWebhookSection />}
+
+        {/* ── Formulário de Captura ── */}
+        {canEdit('/dashboard/settings') && <FormBuilderSection />}
 
         {/* ── Webhooks de Saída ── */}
         {canEdit('/dashboard/settings') && <WebhooksSection />}

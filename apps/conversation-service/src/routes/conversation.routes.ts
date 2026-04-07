@@ -94,6 +94,14 @@ const createTaskSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).optional(),
 })
 
+const labelsSchema = z.object({
+  labels: z.array(z.object({
+    id: z.string().min(1).max(100),
+    name: z.string().min(1).max(100),
+    color: z.string().min(1).max(20),
+  })).max(10),
+})
+
 const bulkIdsSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(100),
 })
@@ -716,6 +724,41 @@ router.patch('/conversations/:id/deal-value', async (req, res, next) => {
       .single()
     if (error) throw error
     res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+// ─── Etiquetas de conversa ───────────────────────────────────────────────────
+
+/*
+-- SQL para adicionar coluna labels na tabela conversations:
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS labels JSONB DEFAULT '[]';
+CREATE INDEX idx_conversations_labels ON conversations USING GIN (labels);
+*/
+
+router.patch('/conversations/:id/labels', validate(labelsSchema), async (req, res, next) => {
+  try {
+    const { labels } = req.body
+    const { data, error } = await db
+      .from('conversations')
+      .update({ labels })
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+      .select('id, labels')
+      .single()
+    if (error) throw error
+    if (!data) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
+    res.json(ok(data))
+  } catch (err) { next(err) }
+})
+
+router.post('/conversations/bulk/labels', async (req, res, next) => {
+  try {
+    const { ids, labels } = req.body
+    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
+    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
+    if (!Array.isArray(labels)) { res.status(400).json({ error: 'labels required' }); return }
+    await db.from('conversations').update({ labels }).eq('tenant_id', req.auth.tid).in('id', ids)
+    res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }
 })
 

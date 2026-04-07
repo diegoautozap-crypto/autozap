@@ -150,3 +150,36 @@ export async function sendTeamInviteEmail(opts: {
   if (error) throw new Error(error.message)
   logger.info('Team invite email sent', { to: opts.to, isReset: opts.isReset })
 }
+
+// ─── Agent Notification (new message without response) ───────────────────────
+
+export async function sendAgentNotificationEmail(opts: {
+  to: string
+  agentName: string
+  contactName: string
+  contactPhone: string
+  tenantId: string
+}): Promise<void> {
+  const html = baseLayout(`
+    <p>Olá, <strong>${opts.agentName}</strong>!</p>
+    <p>Você tem uma conversa aguardando resposta:</p>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:16px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Contato</p>
+      <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#111827;">${opts.contactName}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Telefone</p>
+      <p style="margin:0;font-size:16px;font-weight:600;color:#111827;">${opts.contactPhone}</p>
+    </div>
+    <p>O cliente enviou uma mensagem há mais de 10 minutos e ainda não recebeu resposta.</p>
+    <a href="${APP_URL}/dashboard/inbox" class="btn">Abrir Inbox</a>
+  `)
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `Mensagem sem resposta — ${opts.contactName}`,
+    html,
+  })
+
+  if (error) throw new Error(error.message)
+  logger.info('Agent notification email sent', { to: opts.to, contactName: opts.contactName })
+}

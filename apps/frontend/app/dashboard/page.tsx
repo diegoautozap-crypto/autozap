@@ -7,8 +7,9 @@ import { useT } from '@/lib/i18n'
 import {
   Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp,
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
-  Clock, UserCheck, Workflow, X, Trophy,
+  Clock, UserCheck, Workflow, X, Trophy, Printer,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
 import { GridSkeleton } from '@/components/ui/skeleton'
 
@@ -191,6 +192,49 @@ export default function DashboardPage() {
   const days = Object.keys(byDay).sort()
   const maxVal = Math.max(...days.map(d => byDay[d]?.sent || 0), 1)
 
+  function generateReport() {
+    const reportWindow = window.open('', '_blank')
+    if (!reportWindow) { toast.error('Permita pop-ups para gerar o relatório'); return }
+
+    const html = `
+      <html>
+      <head><title>Relatório AutoZap</title>
+      <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #18181b; }
+        h1 { font-size: 24px; color: #22c55e; }
+        .metric { display: inline-block; margin: 10px 20px 10px 0; }
+        .metric-value { font-size: 28px; font-weight: 700; }
+        .metric-label { font-size: 12px; color: #71717a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e4e4e7; }
+        th { font-size: 12px; color: #71717a; }
+      </style>
+      </head>
+      <body>
+        <h1>AutoZap — Relatório</h1>
+        <p>Período: últimos 30 dias</p>
+        <div>
+          <div class="metric"><div class="metric-value">${totalSent}</div><div class="metric-label">Mensagens enviadas</div></div>
+          <div class="metric"><div class="metric-value">${deliveryRate}%</div><div class="metric-label">Taxa de entrega</div></div>
+          <div class="metric"><div class="metric-value">${readRate}%</div><div class="metric-label">Taxa de leitura</div></div>
+          <div class="metric"><div class="metric-value">${conversations?.length || 0}</div><div class="metric-label">Conversas abertas</div></div>
+          <div class="metric"><div class="metric-value">${contactsMeta?.total || 0}</div><div class="metric-label">Contatos</div></div>
+        </div>
+        ${agentRanking.length > 0 ? `
+          <h2 style="margin-top:30px;font-size:18px;">Ranking de atendentes</h2>
+          <table>
+            <thead><tr><th>#</th><th>Agente</th><th>Mensagens</th><th>Tempo médio</th><th>Fechadas</th></tr></thead>
+            <tbody>${agentRanking.map((a, i) => `<tr><td>${i+1}</td><td>${a.name}</td><td>${a.messagesResponded}</td><td>${a.avgResponseMinutes ? a.avgResponseMinutes + 'min' : '—'}</td><td>${a.conversationsClosed}</td></tr>`).join('')}</tbody>
+          </table>
+        ` : ''}
+        <p style="margin-top:40px;font-size:11px;color:#a1a1aa;">Gerado em ${new Date().toLocaleString('pt-BR')} — AutoZap CRM</p>
+      </body></html>
+    `
+    reportWindow.document.write(html)
+    reportWindow.document.close()
+    setTimeout(() => reportWindow.print(), 500)
+  }
+
   const metricCards = [
     { label: t('dashboard.campaigns'),         value: campaigns?.length ?? 0,     sub: `${campaigns?.filter((c: any) => c.status === 'running').length || 0} ${t('dashboard.inProgress')}`, icon: Megaphone,    color: '#2563eb', bg: '#eff6ff', href: '/dashboard/campaigns' },
     { label: t('dashboard.contacts'),          value: contactsMeta?.total ?? 0,   sub: t('dashboard.inYourBase'),                                                                         icon: Users,        color: '#7c3aed', bg: '#f5f3ff', href: '/dashboard/contacts' },
@@ -202,9 +246,20 @@ export default function DashboardPage() {
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '1200px' }}>
 
       {/* Saudação */}
-      <div className="mobile-header" style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting(t)}! 👋</h1>
-        <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
+      <div className="mobile-header" style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting(t)}! 👋</h1>
+          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
+        </div>
+        {(role === 'owner' || role === 'admin') && (
+          <button onClick={generateReport}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--shadow)', whiteSpace: 'nowrap' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#22c55e' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}>
+            <Printer size={14} />
+            Gerar relatório
+          </button>
+        )}
       </div>
 
 

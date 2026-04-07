@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit'
 import authRoutes from './routes/auth.routes'
 import { errorHandler } from './middleware/auth.middleware'
 import { logger } from './lib/logger'
+import { sendAgentNotificationEmail } from './lib/email'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -56,6 +57,39 @@ app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'auth-service', timestamp: new Date().toISOString() })
+})
+
+// ─── Internal Endpoints (service-to-service, no rate limit) ─────────────────
+
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET
+
+app.post('/internal/notify-agent', async (req, res) => {
+  try {
+    const secret = req.headers['x-internal-secret']
+    if (!INTERNAL_SECRET || secret !== INTERNAL_SECRET) {
+      res.status(401).json({ success: false, error: 'Unauthorized' })
+      return
+    }
+
+    const { agentEmail, agentName, contactName, contactPhone, tenantId } = req.body
+    if (!agentEmail) {
+      res.status(400).json({ success: false, error: 'agentEmail is required' })
+      return
+    }
+
+    await sendAgentNotificationEmail({
+      to: agentEmail,
+      agentName: agentName || 'Atendente',
+      contactName: contactName || 'Cliente',
+      contactPhone: contactPhone || '',
+      tenantId: tenantId || '',
+    })
+
+    res.json({ success: true })
+  } catch (err: any) {
+    logger.error('Failed to send agent notification', { error: err.message })
+    res.status(500).json({ success: false, error: err.message })
+  }
 })
 
 // ─── Routes ───────────────────────────────────────────────────────────────────

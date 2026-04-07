@@ -217,6 +217,18 @@ export class MessageService {
       logger.error('Failed to schedule auto-reply', { err })
     }
 
+    // ─── Schedule agent email notification (10 min delay) ────────────────────
+    try {
+      const { agentNotifyQueue } = await import('../workers/message.worker')
+      await agentNotifyQueue.add(
+        'agent-notify-check',
+        { tenantId, conversationId: conversation.id },
+        { delay: 10 * 60 * 1000, jobId: `agent-notify-${conversation.id}-${Date.now()}` },
+      )
+    } catch (err) {
+      logger.error('Failed to schedule agent notification', { err })
+    }
+
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 

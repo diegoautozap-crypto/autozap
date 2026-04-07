@@ -12,7 +12,7 @@ import automationRoutes from './routes/automation.routes'
 import flowRoutes from './routes/flow.routes'
 import { errorHandler } from './middleware/message.middleware'
 import { logger } from './lib/logger'
-import { startMessageWorker, startRetryWorker, startAutoReplyWorker, startReconciliationJob } from './workers/message.worker'
+import { startMessageWorker, startRetryWorker, startAutoReplyWorker, startAgentNotifyWorker, startReconciliationJob } from './workers/message.worker'
 import { startFlowResumeWorker, startManualFlowWorker } from './workers/flow.worker'
 
 const app = express()
@@ -86,6 +86,7 @@ const server = app.listen(PORT, async () => {
   startMessageWorker()
   startRetryWorker()
   startAutoReplyWorker()
+  startAgentNotifyWorker()
   startFlowResumeWorker()
   startManualFlowWorker()
   await startReconciliationJob()
