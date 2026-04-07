@@ -34,6 +34,9 @@ export default function LeadForm() {
   const buttonText = searchParams.get('button') || 'Enviar'
   const color = searchParams.get('color') || '22c55e'
   const fields = (searchParams.get('fields') || 'name,phone').split(',').filter(Boolean)
+  const customFields: { label: string; type: string }[] = (() => {
+    try { return JSON.parse(searchParams.get('custom') || '[]') } catch { return [] }
+  })()
 
   const [form, setForm] = useState<Record<string, string>>({ name: '', phone: '', email: '', company: '', message: '' })
   const [sent, setSent] = useState(false)
@@ -65,6 +68,10 @@ export default function LeadForm() {
           company: form.company,
           message: form.message,
           source: 'web_form',
+          custom_fields: customFields.reduce((acc, cf, i) => {
+            if (form[`custom_${i}`]) acc[cf.label] = form[`custom_${i}`]
+            return acc
+          }, {} as Record<string, string>),
         }),
       })
       if (!res.ok) throw new Error('Erro ao enviar')
@@ -147,43 +154,31 @@ export default function LeadForm() {
                   {isRequired && <span style={{ color: '#ef4444', marginLeft: '3px' }}>*</span>}
                 </label>
                 {FIELD_TYPES[field] === 'textarea' ? (
-                  <textarea
-                    placeholder={FIELD_PLACEHOLDERS[field] || ''}
-                    value={form[field] || ''}
-                    onChange={e => updateField(field, e.target.value)}
-                    rows={3}
-                    style={{
-                      width: '100%', padding: '10px 14px',
-                      border: '1px solid #e4e4e7', borderRadius: '10px',
-                      fontSize: '14px', color: '#18181b', background: '#fafafa',
-                      outline: 'none', resize: 'vertical',
-                      fontFamily: 'inherit', boxSizing: 'border-box',
-                      transition: 'border-color 0.15s',
-                    }}
-                    onFocus={e => e.currentTarget.style.borderColor = `#${color}`}
-                    onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'}
-                  />
+                  <textarea placeholder={FIELD_PLACEHOLDERS[field] || ''} value={form[field] || ''} onChange={e => updateField(field, e.target.value)} rows={3}
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid #e4e4e7', borderRadius: '10px', fontSize: '14px', color: '#18181b', background: '#fafafa', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                    onFocus={e => e.currentTarget.style.borderColor = `#${color}`} onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'} />
                 ) : (
-                  <input
-                    type={FIELD_TYPES[field] || 'text'}
-                    placeholder={FIELD_PLACEHOLDERS[field] || ''}
-                    value={form[field] || ''}
-                    onChange={e => updateField(field, e.target.value)}
-                    required={isRequired}
-                    style={{
-                      width: '100%', padding: '10px 14px',
-                      border: '1px solid #e4e4e7', borderRadius: '10px',
-                      fontSize: '14px', color: '#18181b', background: '#fafafa',
-                      outline: 'none', boxSizing: 'border-box',
-                      transition: 'border-color 0.15s',
-                    }}
-                    onFocus={e => e.currentTarget.style.borderColor = `#${color}`}
-                    onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'}
-                  />
+                  <input type={FIELD_TYPES[field] || 'text'} placeholder={FIELD_PLACEHOLDERS[field] || ''} value={form[field] || ''} onChange={e => updateField(field, e.target.value)} required={isRequired}
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid #e4e4e7', borderRadius: '10px', fontSize: '14px', color: '#18181b', background: '#fafafa', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                    onFocus={e => e.currentTarget.style.borderColor = `#${color}`} onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'} />
                 )}
               </div>
             )
           })}
+          {customFields.map((cf, i) => (
+            <div key={`custom-${i}`}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#3f3f46', display: 'block', marginBottom: '5px' }}>{cf.label}</label>
+              {cf.type === 'textarea' ? (
+                <textarea placeholder={cf.label} value={form[`custom_${i}`] || ''} onChange={e => updateField(`custom_${i}`, e.target.value)} rows={3}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e4e4e7', borderRadius: '10px', fontSize: '14px', color: '#18181b', background: '#fafafa', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = `#${color}`} onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'} />
+              ) : (
+                <input type={cf.type || 'text'} placeholder={cf.label} value={form[`custom_${i}`] || ''} onChange={e => updateField(`custom_${i}`, e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e4e4e7', borderRadius: '10px', fontSize: '14px', color: '#18181b', background: '#fafafa', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = `#${color}`} onBlur={e => e.currentTarget.style.borderColor = '#e4e4e7'} />
+              )}
+            </div>
+          ))}
 
           {error && (
             <p style={{ fontSize: '13px', color: '#ef4444', margin: 0, textAlign: 'center' }}>{error}</p>

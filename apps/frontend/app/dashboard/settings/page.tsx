@@ -737,6 +737,9 @@ function FormBuilderSection() {
   const [fieldEmail, setFieldEmail] = useState(false)
   const [fieldCompany, setFieldCompany] = useState(false)
   const [fieldMessage, setFieldMessage] = useState(false)
+  const [customFields, setCustomFields] = useState<{ label: string; type: string }[]>([])
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [newFieldType, setNewFieldType] = useState('text')
   const [copied, setCopied] = useState(false)
 
   const PRESET_COLORS = [
@@ -751,8 +754,9 @@ function FormBuilderSection() {
   ]
 
   const formFields = ['name', 'phone', ...(fieldEmail ? ['email'] : []), ...(fieldCompany ? ['company'] : []), ...(fieldMessage ? ['message'] : [])]
+  const customParam = customFields.length > 0 ? `&custom=${encodeURIComponent(JSON.stringify(customFields))}` : ''
   const formUrl = webhookToken
-    ? `https://useautozap.app/form/${webhookToken}?title=${encodeURIComponent(formTitle)}&button=${encodeURIComponent(formButton)}&color=${formColor}&fields=${formFields.join(',')}`
+    ? `https://useautozap.app/form/${webhookToken}?title=${encodeURIComponent(formTitle)}&button=${encodeURIComponent(formButton)}&color=${formColor}&fields=${formFields.join(',')}${customParam}`
     : ''
   const embedCode = formUrl ? `<iframe src="${formUrl}" width="100%" height="500" frameborder="0"></iframe>` : ''
 
@@ -814,6 +818,32 @@ function FormBuilderSection() {
                   <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{f.label}</span>
                 </label>
               ))}
+            </div>
+
+            {/* Campos customizados */}
+            {customFields.map((cf, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '7px', border: '1px solid #bbf7d0', background: '#f0fdf4' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', flex: 1 }}>{cf.label} <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>({cf.type})</span></span>
+                <button onClick={() => setCustomFields(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '2px', display: 'flex' }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+
+            {/* Adicionar campo */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder="Nome do campo" style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', outline: 'none', color: 'var(--text)', background: 'var(--bg-card)', boxSizing: 'border-box' as const }}
+                onKeyDown={e => { if (e.key === 'Enter' && newFieldLabel.trim()) { setCustomFields(prev => [...prev, { label: newFieldLabel.trim(), type: newFieldType }]); setNewFieldLabel('') } }} />
+              <select value={newFieldType} onChange={e => setNewFieldType(e.target.value)} style={{ padding: '7px 8px', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', color: 'var(--text)', background: 'var(--bg-card)', outline: 'none' }}>
+                <option value="text">Texto</option>
+                <option value="number">Numero</option>
+                <option value="date">Data</option>
+                <option value="textarea">Texto longo</option>
+              </select>
+              <button onClick={() => { if (newFieldLabel.trim()) { setCustomFields(prev => [...prev, { label: newFieldLabel.trim(), type: newFieldType }]); setNewFieldLabel('') } }}
+                style={{ padding: '7px 12px', background: '#22c55e', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                <Plus size={12} /> Adicionar
+              </button>
             </div>
           </div>
 
@@ -878,18 +908,19 @@ function FormBuilderSection() {
                         {fieldLabelMap[f]} {(f === 'phone' || f === 'name') && <span style={{ color: '#ef4444' }}>*</span>}
                       </label>
                       {f === 'message' ? (
-                        <textarea
-                          disabled
-                          placeholder={fieldPlaceholderMap[f]}
-                          rows={3}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', resize: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' }}
-                        />
+                        <textarea disabled placeholder={fieldPlaceholderMap[f]} rows={3} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', resize: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' }} />
                       ) : (
-                        <input
-                          disabled
-                          placeholder={fieldPlaceholderMap[f]}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', boxSizing: 'border-box' as const }}
-                        />
+                        <input disabled placeholder={fieldPlaceholderMap[f]} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', boxSizing: 'border-box' as const }} />
+                      )}
+                    </div>
+                  ))}
+                  {customFields.map((cf, i) => (
+                    <div key={`custom-${i}`}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#52525b', display: 'block', marginBottom: '4px' }}>{cf.label}</label>
+                      {cf.type === 'textarea' ? (
+                        <textarea disabled placeholder={cf.label} rows={3} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', resize: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' }} />
+                      ) : (
+                        <input disabled type={cf.type} placeholder={cf.label} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '13px', background: '#fafafa', color: '#a1a1aa', boxSizing: 'border-box' as const }} />
                       )}
                     </div>
                   ))}
