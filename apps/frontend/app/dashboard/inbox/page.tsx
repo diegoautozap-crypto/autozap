@@ -334,6 +334,7 @@ export default function InboxPage() {
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unanswered' | 'mine' | 'waiting'>('all')
   const [labelFilter, setLabelFilter] = useState<string>('all')
+  const [showLabelFilter, setShowLabelFilter] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('autozap-pinned') || '[]')) } catch { return new Set() }
   })
@@ -737,7 +738,6 @@ export default function InboxPage() {
           {([
             { key: 'all' as const, label: 'Todas' },
             { key: 'unanswered' as const, label: 'Sem resposta' },
-            { key: 'mine' as const, label: 'Minhas' },
             { key: 'waiting' as const, label: 'Aguardando' },
           ]).map(f => (
             <button key={f.key} onClick={() => setInboxFilter(f.key)}
@@ -746,19 +746,37 @@ export default function InboxPage() {
             </button>
           ))}
         </div>
-        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0, alignItems: 'center' }}>
-          <Tag size={11} color="var(--text-faint)" style={{ flexShrink: 0 }} />
-          <button onClick={() => setLabelFilter('all')}
-            style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, border: `1px solid ${labelFilter === 'all' ? '#8b5cf6' : 'var(--border)'}`, cursor: 'pointer', background: labelFilter === 'all' ? '#ede9fe' : 'transparent', color: labelFilter === 'all' ? '#7c3aed' : 'var(--text-muted)', transition: 'all 0.1s' }}>
-            Todas
-          </button>
-          {CONVERSATION_LABELS.map(label => (
-            <button key={label.id} onClick={() => setLabelFilter(labelFilter === label.id ? 'all' : label.id)}
-              style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, border: `1px solid ${labelFilter === label.id ? label.color : 'var(--border)'}`, cursor: 'pointer', background: labelFilter === label.id ? `${label.color}18` : 'transparent', color: labelFilter === label.id ? label.color : 'var(--text-muted)', transition: 'all 0.1s', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: label.color, display: 'inline-block', flexShrink: 0 }} />
-              {label.name}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button onClick={() => setShowLabelFilter(p => !p)}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${labelFilter !== 'all' ? '#8b5cf6' : 'var(--border)'}`, cursor: 'pointer', background: labelFilter !== 'all' ? '#ede9fe' : 'transparent', color: labelFilter !== 'all' ? '#7c3aed' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              <Tag size={11} />
+              {labelFilter === 'all' ? 'Etiquetas' : CONVERSATION_LABELS.find(l => l.id === labelFilter)?.name || 'Etiquetas'}
             </button>
-          ))}
+            {labelFilter !== 'all' && (
+              <button onClick={() => setLabelFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '2px', display: 'flex' }}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          {showLabelFilter && (
+            <>
+              <div onClick={() => setShowLabelFilter(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+              <div style={{ position: 'absolute', top: '100%', left: '10px', zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '160px' }}>
+                <button onClick={() => { setLabelFilter('all'); setShowLabelFilter(false) }}
+                  style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === 'all' ? '#ede9fe' : 'transparent', color: labelFilter === 'all' ? '#7c3aed' : 'var(--text-muted)', textAlign: 'left', transition: 'all 0.1s' }}>
+                  Todas
+                </button>
+                {CONVERSATION_LABELS.map(label => (
+                  <button key={label.id} onClick={() => { setLabelFilter(labelFilter === label.id ? 'all' : label.id); setShowLabelFilter(false) }}
+                    style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === label.id ? `${label.color}18` : 'transparent', color: labelFilter === label.id ? label.color : 'var(--text-muted)', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         {visibleChannels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
