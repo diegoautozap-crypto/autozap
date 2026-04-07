@@ -610,6 +610,8 @@ function AiChatbotSection() {
               { key: 'informal', label: 'Informal' },
               { key: 'vendedor', label: 'Vendedor' },
               { key: 'suporte', label: 'Suporte' },
+              { key: 'recepcionista', label: 'Recepcionista' },
+              { key: 'consultor', label: 'Consultor' },
               { key: 'personalizado', label: 'Personalizado' },
             ] as const).map(p => (
               <button
