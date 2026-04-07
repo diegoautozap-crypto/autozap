@@ -803,7 +803,7 @@ export default function CampaignsPage() {
               <div>
                 <Lbl>{t('campaigns.speedPerChannel')}</Lbl>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="number" min="1" max="2000" style={{ ...inp, width: '100px' } as any}
+                  <input type="number" min="1" max="1200" style={{ ...inp, width: '100px' } as any}
                     value={messagesPerMin}
                     onChange={e => {
                       const val = Number(e.target.value)
