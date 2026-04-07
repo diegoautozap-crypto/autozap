@@ -97,6 +97,7 @@ router.patch('/name', requireRole('owner'), validate(updateNameSchema), async (r
 router.post('/webhook-token', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const crypto = require('crypto')
+    const { db } = await import('../lib/db')
     const token = crypto.randomBytes(24).toString('hex')
     const { data, error } = await db.from('tenants').update({
       webhook_token: token,
