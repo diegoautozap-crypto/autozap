@@ -323,6 +323,85 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e19', source_node: 'n16', target_node: 'n17', source_handle: 'success' },
       ],
     },
+    {
+      id: 'scheduling',
+      emoji: '📅',
+      name: '📅 Agendamento com consulta de horários',
+      desc: 'Menu de atendimento com consulta de horários disponíveis via webhook (integra com Google Sheets, n8n, etc)',
+      category: t('flows.categoryAdvanced'),
+      categoryKey: 'advanced',
+      nodes: [
+        // 1. Trigger
+        { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 300, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'menu', 'agendar'], matchType: 'contains' } },
+
+        // 2. Menu principal
+        { id: 'n2', type: 'send_message', position_x: 350, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Sou o assistente digital. Selecione uma opção:\n\n1️⃣ Agendar horário\n2️⃣ Informações\n3️⃣ Falar com atendente' } },
+        { id: 'n3', type: 'input', position_x: 650, position_y: 300, data: { type: 'input', question: '', saveAs: 'opcao_menu' } },
+
+        // 3. Condição menu
+        { id: 'n4', type: 'condition', position_x: 950, position_y: 300, data: { type: 'condition', branches: [
+          { id: 'b1', label: '📅 Agendar', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '1' }, { id: 'r1b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'agendar' }] },
+          { id: 'b2', label: 'ℹ️ Info', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '2' }, { id: 'r2b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'info' }] },
+          { id: 'b3', label: '👤 Atendente', logic: 'OR', rules: [{ id: 'r3', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '3' }, { id: 'r3b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'atendente' }] },
+        ] } },
+
+        // === AGENDAR ===
+        // 4. Perguntar dia
+        { id: 'n5', type: 'send_message', position_x: 1300, position_y: 100, data: { type: 'send_message', subtype: 'text', message: 'Para qual dia você gostaria de agendar?\n\n(ex: segunda, terça, 15/04)' } },
+        { id: 'n6', type: 'input', position_x: 1600, position_y: 100, data: { type: 'input', question: '', saveAs: 'dia_escolhido' } },
+
+        // 5. Webhook consultar horários
+        { id: 'n7', type: 'webhook', position_x: 1900, position_y: 100, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"dia": "{{dia_escolhido}}", "phone": "{{phone}}"}', saveResponseAs: 'horarios_disponiveis' } },
+
+        // 6. Mostrar horários
+        { id: 'n8', type: 'send_message', position_x: 2200, position_y: 100, data: { type: 'send_message', subtype: 'text', message: '📅 Horários disponíveis para {{dia_escolhido}}:\n\n{{horarios_disponiveis}}\n\nDigite o horário desejado ou "voltar" para escolher outro dia.' } },
+        { id: 'n9', type: 'input', position_x: 2500, position_y: 100, data: { type: 'input', question: '', saveAs: 'horario_escolhido' } },
+
+        // 7. Condição voltar ou confirmar
+        { id: 'n10', type: 'condition', position_x: 2800, position_y: 100, data: { type: 'condition', branches: [
+          { id: 'bv', label: '↩️ Voltar', logic: 'AND', rules: [{ id: 'rv', field: 'variable', fieldName: 'horario_escolhido', operator: 'contains', value: 'voltar' }] },
+        ] } },
+
+        // 8. Webhook confirmar reserva
+        { id: 'n11', type: 'webhook', position_x: 3100, position_y: 150, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/reservar', method: 'POST', body: '{"dia": "{{dia_escolhido}}", "horario": "{{horario_escolhido}}", "phone": "{{phone}}", "name": "{{name}}"}', saveResponseAs: 'confirmacao' } },
+
+        // 9. Mensagem confirmação
+        { id: 'n12', type: 'send_message', position_x: 3400, position_y: 150, data: { type: 'send_message', subtype: 'text', message: '✅ Agendamento confirmado!\n\n📅 {{dia_escolhido}} às {{horario_escolhido}}\n\n{{confirmacao}}\n\nSe precisar alterar ou cancelar, é só chamar!' } },
+        { id: 'n13', type: 'tag_contact', position_x: 3700, position_y: 150, data: { type: 'tag_contact', subtype: 'add' } },
+        { id: 'n14', type: 'end', position_x: 3950, position_y: 150, data: { type: 'end' } },
+
+        // === INFORMAÇÕES ===
+        { id: 'n15', type: 'send_message', position_x: 1300, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'ℹ️ Informações:\n\n📍 Endereço: [seu endereço]\n🕐 Horário: Seg-Sex 8h-22h | Sáb 8h-18h\n📞 Telefone: [seu telefone]\n💰 Valores: [seus valores]\n\nDeseja agendar um horário? Digite "agendar"' } },
+        { id: 'n16', type: 'end', position_x: 1600, position_y: 350, data: { type: 'end' } },
+
+        // === ATENDENTE ===
+        { id: 'n17', type: 'assign_agent', position_x: 1300, position_y: 550, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com um atendente agora! 😊' } },
+      ],
+      edges: [
+        { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
+        { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
+        { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        // Agendar
+        { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
+        { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
+        { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
+        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
+        { id: 'e8', source_node: 'n8', target_node: 'n9', source_handle: 'success' },
+        { id: 'e9', source_node: 'n9', target_node: 'n10', source_handle: 'success' },
+        // Voltar → pergunta dia de novo
+        { id: 'e10', source_node: 'n10', target_node: 'n5', source_handle: 'branch_bv' },
+        // Confirmar → webhook reservar
+        { id: 'e11', source_node: 'n10', target_node: 'n11', source_handle: 'fallback' },
+        { id: 'e12', source_node: 'n11', target_node: 'n12', source_handle: 'success' },
+        { id: 'e13', source_node: 'n12', target_node: 'n13', source_handle: 'success' },
+        { id: 'e14', source_node: 'n13', target_node: 'n14', source_handle: 'success' },
+        // Info
+        { id: 'e15', source_node: 'n4', target_node: 'n15', source_handle: 'branch_b2' },
+        { id: 'e16', source_node: 'n15', target_node: 'n16', source_handle: 'success' },
+        // Atendente
+        { id: 'e17', source_node: 'n4', target_node: 'n17', source_handle: 'branch_b3' },
+      ],
+    },
   ]
 }
 
