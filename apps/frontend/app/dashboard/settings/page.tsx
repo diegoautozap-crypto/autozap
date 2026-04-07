@@ -1140,8 +1140,6 @@ export default function SettingsPage() {
         {/* ── Notificações ── */}
         <NotificationSection />
 
-        {/* ── Chatbot IA ── */}
-        {canEdit('/dashboard/settings') && <AiChatbotSection />}
 
         {/* Planos */}
         {canEdit('/dashboard/settings') && <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }} id="planos">
