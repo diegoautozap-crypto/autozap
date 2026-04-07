@@ -379,7 +379,7 @@ export default function PipelinePage() {
       const columns = colData.data || []
       const stages = columns.length > 0
         ? columns.map((c: any) => c.key)
-        : ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
+        : ['novo', 'em_contato', 'em_andamento', 'aguardando', 'concluido', 'cancelado']
 
       const boardData: Record<string, any[]> = {}
       stages.forEach((s: string) => { boardData[s] = [] })

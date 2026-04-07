@@ -163,7 +163,7 @@ export class ConversationService {
     const { data: colData } = await colQuery
     const stages: string[] = colData && colData.length > 0
       ? colData.map((c: any) => c.key)
-      : ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
+      : ['novo', 'em_contato', 'em_andamento', 'aguardando', 'concluido', 'cancelado']
 
     let query = db
       .from('conversations')

@@ -109,11 +109,11 @@ function MessageContent({ msg, isOut, channelId, tenantId, onImageClick }: { msg
 
 const CONVERSATION_LABELS = [
   { id: 'urgent', name: 'Urgente', color: '#ef4444' },
-  { id: 'payment', name: 'Aguardando pagamento', color: '#f59e0b' },
+  { id: 'waiting', name: 'Aguardando', color: '#f59e0b' },
   { id: 'callback', name: 'Retornar', color: '#3b82f6' },
   { id: 'resolved', name: 'Resolvido', color: '#22c55e' },
-  { id: 'negotiation', name: 'Em negociacao', color: '#8b5cf6' },
-  { id: 'new_lead', name: 'Lead novo', color: '#06b6d4' },
+  { id: 'in_progress', name: 'Em andamento', color: '#8b5cf6' },
+  { id: 'new_contact', name: 'Novo', color: '#06b6d4' },
 ]
 
 function ConversationLabelEditor({ conversationId, currentLabels, onChanged }: { conversationId: string; currentLabels: any[]; onChanged: () => void }) {

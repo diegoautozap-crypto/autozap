@@ -189,12 +189,12 @@ export const LEGACY_TYPE_MAP: Record<string, { type: string; subtype: string }> 
 }
 
 export const DEFAULT_STAGES = [
-  { key: 'lead',         label: 'Lead' },
-  { key: 'qualificacao', label: 'Qualificação' },
-  { key: 'proposta',     label: 'Proposta' },
-  { key: 'negociacao',   label: 'Negociação' },
-  { key: 'ganho',        label: 'Ganho' },
-  { key: 'perdido',      label: 'Perdido' },
+  { key: 'novo',         label: 'Novo' },
+  { key: 'em_contato',   label: 'Em contato' },
+  { key: 'em_andamento', label: 'Em andamento' },
+  { key: 'aguardando',   label: 'Aguardando' },
+  { key: 'concluido',    label: 'Concluído' },
+  { key: 'cancelado',    label: 'Cancelado' },
 ]
 
 export function getDefaultStages(t: (key: string) => string) {
