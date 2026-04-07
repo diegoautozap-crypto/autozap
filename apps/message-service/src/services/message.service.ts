@@ -100,6 +100,37 @@ async function saveMessageError(params: {
 
 export class MessageService {
 
+  private async transcribeAudio(messageId: string, tenantId: string, channelId: string, mediaUrl: string): Promise<string | null> {
+    try {
+      const { data: tenant } = await db.from('tenants').select('metadata').eq('id', tenantId).single()
+      const apiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+      if (!apiKey) return null
+
+      // Get meta token for media download
+      const { data: channel } = await db.from('channels').select('credentials').eq('id', channelId).single()
+      const creds = channel?.credentials || {}
+      const metaToken = creds?.metaToken || ''
+
+      // Download audio
+      const headers: Record<string, string> = {}
+      if (metaToken) headers['Authorization'] = `Bearer ${metaToken}`
+      const audioRes = await fetch(mediaUrl, { headers, signal: AbortSignal.timeout(15000) })
+      if (!audioRes.ok) return null
+      const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+
+      // Transcribe with OpenAI Whisper
+      const { default: OpenAI } = await import('openai')
+      const openai = new OpenAI({ apiKey })
+      const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+      const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1', language: 'pt' })
+      logger.info('Audio transcribed', { messageId, text: transcription.text?.slice(0, 50) })
+      return transcription.text || null
+    } catch (err) {
+      logger.error('Audio transcription failed', { messageId, err })
+      return null
+    }
+  }
+
   async queueMessage(input: QueueMessageInput): Promise<string> {
     const messageUuid = uuidv4()
     const { error } = await db.from('messages').insert({
@@ -128,16 +159,31 @@ export class MessageService {
       await db.from('contacts').update({ name: senderName }).eq('id', contact.id).eq('tenant_id', tenantId)
     }
     const conversation = await this.findOrCreateConversation(tenantId, channelId, contact.id, msg.channelType)
+    const messageId = generateId()
+    let messageBody = msg.body
     await db.from('messages').insert({
-      id: generateId(), message_uuid: uuidv4(), tenant_id: tenantId,
+      id: messageId, message_uuid: uuidv4(), tenant_id: tenantId,
       conversation_id: conversation.id, channel_id: channelId, contact_id: contact.id,
-      direction: 'inbound', content_type: msg.contentType, body: msg.body,
+      direction: 'inbound', content_type: msg.contentType, body: messageBody,
       media_url: msg.mediaUrl, media_mime_type: msg.mediaMimeType,
       external_id: msg.externalId, status: 'delivered',
       sent_at: msg.timestamp, delivered_at: msg.timestamp,
     })
+
+    // Auto-transcribe audio
+    if (msg.contentType === 'audio' && msg.mediaUrl) {
+      this.transcribeAudio(messageId, tenantId, channelId, msg.mediaUrl).then(text => {
+        if (text) {
+          messageBody = `🎙️ ${text}`
+          db.from('messages').update({ body: messageBody }).eq('id', messageId).then(() => {})
+          db.from('conversations').update({ last_message: messageBody }).eq('id', conversation.id).then(() => {})
+          emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id })
+        }
+      }).catch(() => {})
+    }
+
     await db.from('conversations').update({
-      last_message: msg.body || `[${msg.contentType}]`,
+      last_message: messageBody || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
       status: 'waiting',
     }).eq('id', conversation.id)

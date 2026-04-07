@@ -77,6 +77,7 @@ function MessageContent({ msg, isOut, channelId, tenantId, onImageClick }: { msg
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><Music size={13} color={tc} /><span style={{ fontSize: '12px', color: sc }}>{t('inbox.audio')}</span></div>
       {url ? <audio controls style={{ maxWidth: '220px', height: '34px' }}><source src={url} /></audio> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.audioUnavailable')}</p>}
+      {msg.body && <p style={{ fontSize: '12px', marginTop: '6px', color: sc, whiteSpace: 'pre-line', fontStyle: 'italic', opacity: 0.85 }}>{msg.body}</p>}
     </div>
   )
   if (type === 'video') return (
