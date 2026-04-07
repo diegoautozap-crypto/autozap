@@ -734,18 +734,6 @@ export default function InboxPage() {
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
           </div>
         </div>
-        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', justifyContent: 'center', flexShrink: 0 }}>
-          {([
-            { key: 'all' as const, label: 'Todas' },
-            { key: 'unanswered' as const, label: 'Sem resposta' },
-            { key: 'waiting' as const, label: 'Aguardando' },
-          ]).map(f => (
-            <button key={f.key} onClick={() => setInboxFilter(f.key)}
-              style={{ padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${inboxFilter === f.key ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: inboxFilter === f.key ? '#f0fdf4' : 'transparent', color: inboxFilter === f.key ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
-              {f.label}
-            </button>
-          ))}
-        </div>
         {visibleChannels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
             <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
