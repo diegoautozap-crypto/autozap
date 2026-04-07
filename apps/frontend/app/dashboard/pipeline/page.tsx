@@ -358,37 +358,47 @@ export default function PipelinePage() {
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
     queryFn: async () => {
-      // Board baseado em pipeline_cards (cada card é independente)
+      // Carrega pipeline cards (independentes por pipeline)
       const cardsParams = new URLSearchParams()
       if (selectedPipelineId) cardsParams.set('pipelineId', selectedPipelineId)
       const { data: cardsRes } = await conversationApi.get(`/pipeline-cards?${cardsParams.toString()}`)
       const cards = cardsRes.data || []
+      const cardContactIds = new Set(cards.map((c: any) => c.contact_id))
 
-      // Também carrega conversas ativas sem card (pra não perder conversas novas)
-      const convParams = new URLSearchParams()
-      if (channelFilter !== 'all') convParams.set('channelId', channelFilter)
-      if (campaignFilter !== 'all') convParams.set('campaignId', campaignFilter)
-      if (selectedPipelineId) convParams.set('pipelineId', selectedPipelineId)
-      const { data: convData } = await conversationApi.get(`/conversations/pipeline?${convParams.toString()}`)
-      const convBoard = convData.data as Record<string, any[]>
+      // Carrega colunas pra montar board vazio
+      const colParams = new URLSearchParams()
+      if (selectedPipelineId) colParams.set('pipelineId', selectedPipelineId)
+      const { data: colData } = await conversationApi.get(`/pipeline-columns?${colParams.toString()}`)
+      const columns = colData.data || []
+      const stages = columns.length > 0
+        ? columns.map((c: any) => c.key)
+        : ['lead', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
-      // Monta board com colunas das conversas como base
       const boardData: Record<string, any[]> = {}
-      for (const [col, convs] of Object.entries(convBoard)) {
-        boardData[col] = []
-        // Adiciona conversas que NÃO têm card na mesma pipeline
-        for (const conv of convs as any[]) {
-          const contactId = conv.contacts?.id || conv.contact_id
-          const hasCard = cards.some((c: any) => c.contact_id === contactId)
-          if (!hasCard) {
-            boardData[col].push(conv)
+      stages.forEach((s: string) => { boardData[s] = [] })
+
+      // Pipeline principal (sem ID): mostra conversas + cards
+      // Pipelines criadas pelo usuário: mostra SÓ cards (independentes)
+      if (!selectedPipelineId) {
+        const convParams = new URLSearchParams()
+        if (channelFilter !== 'all') convParams.set('channelId', channelFilter)
+        if (campaignFilter !== 'all') convParams.set('campaignId', campaignFilter)
+        const { data: convData } = await conversationApi.get(`/conversations/pipeline?${convParams.toString()}`)
+        const convBoard = convData.data as Record<string, any[]>
+        for (const [col, convs] of Object.entries(convBoard)) {
+          if (!boardData[col]) boardData[col] = []
+          for (const conv of convs as any[]) {
+            const cId = conv.contacts?.id || conv.contact_id
+            if (!cardContactIds.has(cId)) {
+              boardData[col].push(conv)
+            }
           }
         }
       }
 
-      // Adiciona pipeline cards (independentes por pipeline)
+      // Adiciona pipeline cards
       for (const card of cards) {
-        const col = card.column_key || 'lead'
+        const col = card.column_key || stages[0] || 'lead'
         if (!boardData[col]) boardData[col] = []
         boardData[col].push({
           id: `card_${card.id}`,
