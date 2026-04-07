@@ -523,6 +523,7 @@ export class FlowEngine {
           }
 
           // Interactive buttons or list (v2)
+          logger.info('send_message debug', { subtype: data?.subtype, hasButtons: !!data?.buttons?.length, hasListRows: !!data?.listRows?.length, nodeId: node.id })
           if (data?.subtype === 'buttons' && data?.buttons?.length) {
             const buttons = data.buttons.map((b: any, i: number) => ({ id: `btn_${i}`, title: this.interpolate(b.title || b, ctx, variables) }))
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: message, interactiveType: 'button', buttons, footer: data.footer ? this.interpolate(data.footer, ctx, variables) : undefined })
