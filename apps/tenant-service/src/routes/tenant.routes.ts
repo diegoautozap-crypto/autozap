@@ -94,6 +94,19 @@ router.patch('/name', requireRole('owner'), validate(updateNameSchema), async (r
   } catch (err) { next(err) }
 })
 
+router.post('/webhook-token', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const crypto = require('crypto')
+    const token = crypto.randomBytes(24).toString('hex')
+    const { data, error } = await db.from('tenants').update({
+      webhook_token: token,
+      updated_at: new Date(),
+    }).eq('id', req.auth.tid).select('webhook_token').single()
+    if (error) throw error
+    res.json(ok({ token: data.webhook_token }))
+  } catch (err) { next(err) }
+})
+
 router.patch('/settings', requireRole('admin', 'owner'), validate(updateSettingsSchema), async (req, res, next) => {
   try {
     const tenant = await tenantService.updateSettings(req.auth.tid, req.body)

@@ -490,6 +490,8 @@ export class TenantService {
       messagesSentThisPeriod: row.messages_sent_this_period,
       isActive: row.is_active,
       settings: row.settings,
+      webhookToken: row.webhook_token || null,
+      metadata: row.metadata || {},
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     }
