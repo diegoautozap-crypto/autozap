@@ -55,11 +55,77 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'document') {
       message = { type: 'file', url: mediaUrl, filename: body || 'document' }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
-      // Formata botões como texto numerado (compatível com qualquer API)
+      // Envia botões via Meta Graph API (requer metaToken/phoneNumberId do Gupshup v3)
+      const metaToken = creds.metaToken
+      const phoneNumberId = creds.phoneNumberId || creds.source
+      if (metaToken && phoneNumberId) {
+        const metaBody = {
+          messaging_product: 'whatsapp',
+          to,
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: { text: body || '' },
+            ...(input.footer ? { footer: { text: input.footer } } : {}),
+            action: {
+              buttons: input.buttons.slice(0, 3).map(b => ({
+                type: 'reply',
+                reply: { id: b.id, title: b.title.slice(0, 20) },
+              })),
+            },
+          },
+        }
+        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(metaBody),
+        })
+        const metaData = await metaRes.json() as any
+        logger.debug('[GupshupAdapter] interactive button via Meta:', JSON.stringify(metaData).slice(0, 300))
+        if (metaData.messages?.[0]?.id) {
+          return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
+        }
+      }
+      // Fallback: texto numerado
       const btnText = input.buttons.slice(0, 3).map((b, i) => `${i + 1}️⃣ ${b.title}`).join('\n')
       message = { type: 'text', text: `${body || ''}\n\n${btnText}` }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
-      // Formata lista como texto numerado
+      const metaToken = creds.metaToken
+      const phoneNumberId = creds.phoneNumberId || creds.source
+      if (metaToken && phoneNumberId) {
+        const metaBody = {
+          messaging_product: 'whatsapp',
+          to,
+          type: 'interactive',
+          interactive: {
+            type: 'list',
+            body: { text: body || '' },
+            ...(input.footer ? { footer: { text: input.footer } } : {}),
+            action: {
+              button: input.listButtonText || 'Ver opções',
+              sections: [{
+                title: 'Opções',
+                rows: input.listRows.slice(0, 10).map(r => ({
+                  id: r.id,
+                  title: r.title.slice(0, 24),
+                  ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+                })),
+              }],
+            },
+          },
+        }
+        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(metaBody),
+        })
+        const metaData = await metaRes.json() as any
+        logger.debug('[GupshupAdapter] interactive list via Meta:', JSON.stringify(metaData).slice(0, 300))
+        if (metaData.messages?.[0]?.id) {
+          return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
+        }
+      }
+      // Fallback: texto numerado
       const listText = input.listRows.slice(0, 10).map((r, i) => `${i + 1}️⃣ ${r.title}${r.description ? ` — ${r.description}` : ''}`).join('\n')
       message = { type: 'text', text: `${body || ''}\n\n${listText}` }
     } else {
