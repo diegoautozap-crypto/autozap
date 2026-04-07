@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { initSentry } from '@autozap/utils'
 initSentry('channel-service')
+// v2: interactive buttons + list support
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
