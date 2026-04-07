@@ -158,7 +158,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Filtro por canal */}
-      {channels && channels.length > 1 && (
+      {channels && channels.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
           <select
             value={selectedChannel}
