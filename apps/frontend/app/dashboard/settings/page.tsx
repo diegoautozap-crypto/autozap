@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -386,6 +386,108 @@ function WebhooksSection() {
   )
 }
 
+// ── Preferências de Notificação ──────────────────────────────────────────────
+function NotificationSection() {
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try { return localStorage.getItem('autozap-sound') !== 'off' } catch { return true }
+  })
+  const [pushEnabled, setPushEnabled] = useState(() => {
+    try { return localStorage.getItem('autozap-push') !== 'off' } catch { return true }
+  })
+
+  const toggleSound = () => {
+    const next = !soundEnabled
+    setSoundEnabled(next)
+    localStorage.setItem('autozap-sound', next ? 'on' : 'off')
+    toast.success(next ? 'Som ativado' : 'Som desativado')
+  }
+
+  const togglePush = () => {
+    const next = !pushEnabled
+    setPushEnabled(next)
+    localStorage.setItem('autozap-push', next ? 'on' : 'off')
+    if (next && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    toast.success(next ? 'Notificações ativadas' : 'Notificações desativadas')
+  }
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <Bell size={15} color="#22c55e" />
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>Notificações</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {soundEnabled ? <Volume2 size={16} color="#22c55e" /> : <VolumeX size={16} color="var(--text-faint)" />}
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Som de notificação</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>Tocar som ao receber nova mensagem</p>
+            </div>
+          </div>
+          <button onClick={toggleSound} style={{ width: '40px', height: '22px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: soundEnabled ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
+            <span style={{ position: 'absolute', top: '2px', left: soundEnabled ? '20px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Bell size={16} color={pushEnabled ? '#22c55e' : 'var(--text-faint)'} />
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Notificações push</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>Receber alertas no navegador</p>
+            </div>
+          </div>
+          <button onClick={togglePush} style={{ width: '40px', height: '22px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: pushEnabled ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
+            <span style={{ position: 'absolute', top: '2px', left: pushEnabled ? '20px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Teste de IA ─────────────────────────────────────────────────────────────
+function AiTestChat({ prompt, model }: { prompt: string; model: string }) {
+  const [testMsg, setTestMsg] = useState('')
+  const [testReply, setTestReply] = useState('')
+  const [testing, setTesting] = useState(false)
+
+  const handleTest = async () => {
+    if (!testMsg.trim() || !prompt.trim()) return
+    setTesting(true)
+    setTestReply('')
+    try {
+      const { data } = await tenantApi.post('/tenant/ai-test', { message: testMsg, prompt, model })
+      setTestReply(data.data?.reply || 'Sem resposta')
+    } catch { setTestReply('Erro ao testar. Verifique a API key.') }
+    setTesting(false)
+  }
+
+  return (
+    <div style={{ padding: '14px', background: 'var(--bg)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+      <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '8px' }}>Testar chatbot</p>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: testReply ? '10px' : 0 }}>
+        <input value={testMsg} onChange={e => setTestMsg(e.target.value)} placeholder="Digite uma mensagem de teste..."
+          onKeyDown={e => { if (e.key === 'Enter') handleTest() }}
+          style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)' }} />
+        <button onClick={handleTest} disabled={testing || !testMsg.trim() || !prompt.trim()}
+          style={{ padding: '8px 14px', background: '#2563eb', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#fff', cursor: testing ? 'not-allowed' : 'pointer', opacity: testing ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {testing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={12} />}
+          Testar
+        </button>
+      </div>
+      {testReply && (
+        <div style={{ padding: '10px 12px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: '#2563eb', marginBottom: '4px', display: 'block' }}>Resposta da IA:</span>
+          {testReply}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Chatbot IA ───────────────────────────────────────────────────────────────
 function AiChatbotSection() {
   const t = useT()
@@ -596,6 +698,9 @@ function AiChatbotSection() {
           </div>
           <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '4px' }}>Sua chave da API OpenAI. Necessaria para o chatbot funcionar.</p>
         </div>
+
+        {/* Testar IA */}
+        <AiTestChat prompt={aiPrompt} model={aiModel} />
 
         {/* Salvar */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1027,6 +1132,9 @@ export default function SettingsPage() {
 
         {/* ── Webhooks de Saída ── */}
         {canEdit('/dashboard/settings') && <WebhooksSection />}
+
+        {/* ── Notificações ── */}
+        <NotificationSection />
 
         {/* ── Chatbot IA ── */}
         {canEdit('/dashboard/settings') && <AiChatbotSection />}

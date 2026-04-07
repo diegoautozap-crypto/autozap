@@ -105,7 +105,7 @@ function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }:
   )
 }
 
-function StatCard({ label, value, icon: Icon, color, bg, onClick }: any) {
+function StatCard({ label, value, icon: Icon, color, bg, onClick, delta }: any) {
   return (
     <div onClick={onClick} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s' }}
       onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
@@ -114,7 +114,10 @@ function StatCard({ label, value, icon: Icon, color, bg, onClick }: any) {
         <Icon size={18} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</span>
+          {delta != null && delta !== 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: delta > 0 ? '#16a34a' : '#dc2626', background: delta > 0 ? '#f0fdf4' : '#fef2f2', padding: '1px 6px', borderRadius: '99px' }}>{delta > 0 ? '+' : ''}{delta}%</span>}
+        </div>
         <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '1px' }}>{label}</div>
       </div>
     </div>
@@ -167,12 +170,15 @@ export default function DashboardPage() {
   })
 
   const [selectedAgent, setSelectedAgent] = useState<string>('')
+  const [analyticsDays, setAnalyticsDays] = useState(30)
 
   const { data: analytics } = useQuery({
-    queryKey: ['analytics', selectedAgent],
+    queryKey: ['analytics', selectedAgent, analyticsDays],
     queryFn: async () => {
-      const url = selectedAgent ? `/tenant/analytics?userId=${selectedAgent}` : '/tenant/analytics'
-      const { data } = await tenantApi.get(url)
+      const params = new URLSearchParams()
+      if (selectedAgent) params.set('userId', selectedAgent)
+      params.set('days', String(analyticsDays))
+      const { data } = await tenantApi.get(`/tenant/analytics?${params}`)
       return data.data
     },
     refetchInterval: 10000,
@@ -181,6 +187,8 @@ export default function DashboardPage() {
   const totalSent = analytics?.totalSent ?? 0
   const deliveryRate = analytics?.deliveryRate ?? 0
   const readRate = analytics?.readRate ?? 0
+  const prev = analytics?.previous || {}
+  const deltaFn = (curr: number, prevVal: number) => prevVal === 0 ? null : Math.round(((curr - prevVal) / prevVal) * 100)
   const byDay = analytics?.byDay || {}
   const byAgent: { name: string; count: number }[] = analytics?.byAgent || []
   const agentRanking: { name: string; messagesResponded: number; avgResponseMinutes: number | null; conversationsClosed: number; openConversations: number }[] = analytics?.agentRanking || []
@@ -212,7 +220,7 @@ export default function DashboardPage() {
       </head>
       <body>
         <h1>AutoZap — Relatório</h1>
-        <p>Período: últimos 30 dias</p>
+        <p>Período: últimos ${analyticsDays} dias</p>
         <div>
           <div class="metric"><div class="metric-value">${totalSent}</div><div class="metric-label">Mensagens enviadas</div></div>
           <div class="metric"><div class="metric-value">${deliveryRate}%</div><div class="metric-label">Taxa de entrega</div></div>
@@ -274,11 +282,19 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Taxa cards */}
+      {/* Período + Taxa cards */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+        {[7, 14, 30, 90].map(d => (
+          <button key={d} onClick={() => setAnalyticsDays(d)}
+            style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? '#f0fdf4' : 'transparent', color: analyticsDays === d ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+            {d}d
+          </button>
+        ))}
+      </div>
       <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        <StatCard label={t('dashboard.sent30days')} value={totalSent.toLocaleString()} icon={Send}       color="#2563eb" bg="#eff6ff" />
-        <StatCard label={t('dashboard.deliveryRate')}    value={`${deliveryRate}%`}          icon={CheckCheck} color="#22c55e" bg="#f0fdf4" />
-        <StatCard label={t('dashboard.readRate')}    value={`${readRate}%`}              icon={Eye}        color="#7c3aed" bg="#f5f3ff" />
+        <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString()} icon={Send} color="#2563eb" bg="#eff6ff" delta={deltaFn(totalSent, prev.totalSent)} />
+        <StatCard label={t('dashboard.deliveryRate')} value={`${deliveryRate}%`} icon={CheckCheck} color="#22c55e" bg="#f0fdf4" delta={prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
+        <StatCard label={t('dashboard.readRate')} value={`${readRate}%`} icon={Eye} color="#7c3aed" bg="#f5f3ff" delta={prev.readRate != null ? readRate - prev.readRate : null} />
       </div>
 
       {/* Seletor de atendente (só owner/admin) */}

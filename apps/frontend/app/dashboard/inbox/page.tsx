@@ -60,7 +60,7 @@ function MessageStatusIcon({ status }: { status: string }) {
   if (status === 'sent') return <Check size={11} color="#fff" style={{ opacity: 0.65 }} />
   return <Check size={11} color="#fff" style={{ opacity: 0.3 }} />
 }
-function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: boolean; channelId?: string; tenantId?: string }) {
+function MessageContent({ msg, isOut, channelId, tenantId, onImageClick }: { msg: any; isOut: boolean; channelId?: string; tenantId?: string; onImageClick?: (url: string) => void }) {
   const t = useT()
   const tc = isOut ? '#fff' : 'var(--text)'
   const sc = isOut ? 'rgba(255,255,255,0.65)' : 'var(--text-faint)'
@@ -68,7 +68,7 @@ function MessageContent({ msg, isOut, channelId, tenantId }: { msg: any; isOut: 
   const url = getMediaUrl(msg.media_url, channelId, tenantId)
   if (type === 'image') return (
     <div>
-      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(url, '_blank')} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>}
+      {url ? <img src={url} alt="img" style={{ maxWidth: '240px', borderRadius: '8px', display: 'block', cursor: 'pointer' }} onClick={() => onImageClick?.(url)} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : <p style={{ fontSize: '13px', color: sc }}>{t('inbox.mediaUnavailable') || 'Mídia indisponível'}</p>}
       {msg.body && <p style={{ fontSize: '13px', marginTop: '6px', color: tc, whiteSpace: 'pre-line' }}>{cleanText(msg.body)}</p>}
     </div>
   )
@@ -339,7 +339,10 @@ export default function InboxPage() {
     try { return new Set(JSON.parse(localStorage.getItem('autozap-pinned') || '[]')) } catch { return new Set() }
   })
   const [hoveredConvId, setHoveredConvId] = useState<string | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
   const dragCounterRef = useRef(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -543,7 +546,7 @@ export default function InboxPage() {
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
     queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
-    enabled: !!selectedConvId,
+    enabled: !!selectedConvId || bulkMode,
   })
   const assignMutation = useMutation({
     mutationFn: async (userId: string | null) => { await conversationApi.patch(`/conversations/${selectedConvId}/assign`, { userId }) },
@@ -705,6 +708,26 @@ export default function InboxPage() {
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
   const channelId = selectedConv?.channel_id
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+      if (e.key === 'Escape') { setLightboxUrl(null); if (isMobile) setMobileShowChat(false) }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); searchInputRef.current?.focus() }
+      if (!isInput && !e.ctrlKey && !e.metaKey) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          const idx = conversations.findIndex((c: any) => c.id === selectedConvId)
+          const next = e.key === 'ArrowDown' ? Math.min(idx + 1, conversations.length - 1) : Math.max(idx - 1, 0)
+          if (conversations[next]) handleSelectConv(conversations[next].id)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [conversations, selectedConvId, isMobile])
+
   const closeConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'closed' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] }) }
   const openConv = async () => { await conversationApi.patch(`/conversations/${selectedConvId}/status`, { status: 'open' }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] }) }
 
@@ -729,7 +752,7 @@ export default function InboxPage() {
           </div>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-            <input style={{ width: '100%', padding: '7px 10px 7px 30px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', boxSizing: 'border-box' as const }} placeholder={t('inbox.searchContact')} value={search} onChange={e => setSearch(e.target.value)}
+            <input ref={searchInputRef} style={{ width: '100%', padding: '7px 10px 7px 30px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', outline: 'none', color: 'var(--text)', boxSizing: 'border-box' as const }} placeholder={`${t('inbox.searchContact')} (Ctrl+K)`} value={search} onChange={e => setSearch(e.target.value)}
               onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
           </div>
@@ -755,6 +778,31 @@ export default function InboxPage() {
               </button>
             )
           })}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowLabelFilter(p => !p)}
+              style={{ padding: '5px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: labelFilter !== 'all' ? '#ede9fe' : 'transparent', color: labelFilter !== 'all' ? '#7c3aed' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' }}
+              title="Filtrar por etiqueta">
+              <Tag size={13} />
+            </button>
+            {showLabelFilter && (
+              <>
+                <div onClick={() => setShowLabelFilter(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '150px', marginTop: '4px' }}>
+                  <button onClick={() => { setLabelFilter('all'); setShowLabelFilter(false) }}
+                    style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === 'all' ? '#ede9fe' : 'transparent', color: labelFilter === 'all' ? '#7c3aed' : 'var(--text-muted)', textAlign: 'left', transition: 'all 0.1s' }}>
+                    Todas
+                  </button>
+                  {CONVERSATION_LABELS.map(label => (
+                    <button key={label.id} onClick={() => { setLabelFilter(labelFilter === label.id ? 'all' : label.id); setShowLabelFilter(false) }}
+                      style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === label.id ? `${label.color}18` : 'transparent', color: labelFilter === label.id ? label.color : 'var(--text-muted)', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
+                      {label.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         {/* Barra de ações em massa */}
         {bulkMode && (
@@ -774,6 +822,28 @@ export default function InboxPage() {
                 }} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer' }}>
                   <Check size={11} /> {t('inbox.read')}
                 </button>
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => setBulkAssignOpen(p => !p)}
+                    style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <UserCheck size={11} /> Atribuir
+                  </button>
+                  {bulkAssignOpen && (
+                    <>
+                      <div onClick={() => setBulkAssignOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                      <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '140px', marginTop: '4px' }}>
+                        {(teamMembers || []).filter((m: any) => m.is_active).map((m: any) => (
+                          <button key={m.id} onClick={async () => {
+                            await conversationApi.post('/conversations/bulk/assign', { ids: Array.from(bulkSelected), userId: m.id })
+                            toast.success(`${bulkSelected.size} atribuídas a ${m.name}`); setBulkSelected(new Set()); setBulkAssignOpen(false); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+                          }} style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text)', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button onClick={async () => {
                   await conversationApi.post('/conversations/bulk/close', { ids: Array.from(bulkSelected) })
                   toast.success(`${bulkSelected.size} fechadas`); setBulkSelected(new Set()); setBulkMode(false); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }); queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
@@ -963,7 +1033,7 @@ export default function InboxPage() {
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.2s' }}>
                       <div style={{ maxWidth: isMedia ? '280px' : '65%', padding: '9px 13px', borderRadius: isOut ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isOut ? '#22c55e' : 'var(--bg-card)', boxShadow: matchesSearch ? '0 0 0 2px #2563eb' : '0 1px 2px rgba(0,0,0,.06)' }}>
-                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} tenantId={tenantId} />
+                        <MessageContent msg={msg} isOut={isOut} channelId={channelId} tenantId={tenantId} onImageClick={setLightboxUrl} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '11px', opacity: 0.65, color: isOut ? '#fff' : 'var(--text-faint)' }}>{msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                           {isOut && <MessageStatusIcon status={msg.status} />}
@@ -1362,6 +1432,16 @@ export default function InboxPage() {
               </a>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div onClick={() => setLightboxUrl(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+          <img src={lightboxUrl} alt="preview" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px', objectFit: 'contain' }} onClick={e => e.stopPropagation()} />
+          <button onClick={() => setLightboxUrl(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+            <X size={20} />
+          </button>
         </div>
       )}
 

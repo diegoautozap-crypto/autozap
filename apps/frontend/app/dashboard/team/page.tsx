@@ -448,8 +448,11 @@ export default function TeamPage() {
                 onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,.07)'}
                 onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,.04)'}>
 
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: m.is_active ? av.bg : 'var(--bg)', color: m.is_active ? av.color : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
-                  {getInitials(m.name)}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: m.is_active ? av.bg : 'var(--bg)', color: m.is_active ? av.color : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
+                    {getInitials(m.name)}
+                  </div>
+                  {m.is_active && <span title={m.last_login_at && (Date.now() - new Date(m.last_login_at).getTime()) < 5 * 60 * 1000 ? 'Online' : 'Offline'} style={{ position: 'absolute', bottom: '0px', right: '0px', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--bg-card)', background: m.last_login_at && (Date.now() - new Date(m.last_login_at).getTime()) < 5 * 60 * 1000 ? '#22c55e' : '#a1a1aa' }} />}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>

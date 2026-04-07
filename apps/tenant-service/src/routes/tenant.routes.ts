@@ -108,6 +108,25 @@ router.post('/webhook-token', requireRole('admin', 'owner'), async (req, res, ne
   } catch (err) { next(err) }
 })
 
+router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) => {
+  try {
+    const { message, prompt, model } = req.body
+    if (!message || !prompt) { res.status(400).json({ success: false, error: { message: 'message and prompt required' } }); return }
+    const { db } = await import('../lib/db')
+    const { data: tenant } = await db.from('tenants').select('metadata').eq('id', req.auth.tid).single()
+    const apiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+    if (!apiKey) { res.status(400).json({ success: false, error: { message: 'OpenAI API key not configured' } }); return }
+    const { default: OpenAI } = await import('openai')
+    const openai = new OpenAI({ apiKey })
+    const completion = await openai.chat.completions.create({
+      model: model || 'gpt-4o-mini',
+      messages: [{ role: 'system', content: prompt }, { role: 'user', content: message }],
+      max_tokens: 500,
+    })
+    res.json(ok({ reply: completion.choices[0]?.message?.content || '' }))
+  } catch (err) { next(err) }
+})
+
 router.patch('/settings', requireRole('admin', 'owner'), validate(updateSettingsSchema), async (req, res, next) => {
   try {
     const tenant = await tenantService.updateSettings(req.auth.tid, req.body)
@@ -343,9 +362,15 @@ router.get('/analytics', async (req, res, next) => {
     const tenantId = req.auth.tid
     const filterUserId = req.query.userId as string | undefined
 
+    const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 7), 90)
     const since = new Date()
-    since.setDate(since.getDate() - 29)
+    since.setDate(since.getDate() - (days - 1))
     since.setHours(0, 0, 0, 0)
+
+    const previousSince = new Date()
+    previousSince.setDate(previousSince.getDate() - (days * 2 - 1))
+    previousSince.setHours(0, 0, 0, 0)
+    const previousEnd = new Date(since)
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -364,7 +389,7 @@ router.get('/analytics', async (req, res, next) => {
 
     const msgs = messages || []
     const byDay: Record<string, { sent: number; delivered: number; read: number }> = {}
-    for (let i = 29; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i)
       const key = d.toISOString().split('T')[0]
       byDay[key] = { sent: 0, delivered: 0, read: 0 }
@@ -379,6 +404,21 @@ router.get('/analytics', async (req, res, next) => {
     const totalSent = msgs.length
     const totalDelivered = msgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
     const totalRead = msgs.filter((m: any) => m.status === 'read').length
+
+    // Previous period for comparison
+    const { data: prevMessages } = await db
+      .from('messages')
+      .select('status')
+      .eq('tenant_id', tenantId)
+      .eq('direction', 'outbound')
+      .not('campaign_id', 'is', null)
+      .gte('created_at', previousSince.toISOString())
+      .lt('created_at', previousEnd.toISOString())
+
+    const prevMsgs = prevMessages || []
+    const prevTotalSent = prevMsgs.length
+    const prevTotalDelivered = prevMsgs.filter((m: any) => m.status === 'delivered' || m.status === 'read').length
+    const prevTotalRead = prevMsgs.filter((m: any) => m.status === 'read').length
 
     const { data: convsByAgent } = await db
       .from('conversations')
@@ -586,15 +626,21 @@ router.get('/analytics', async (req, res, next) => {
     const activeFlowsToday = new Set((flowLogs || []).map((f: any) => f.flow_id)).size
     const flowExecutionsToday = (flowLogs || []).length
 
+    const deliveryRate = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0
+    const readRate = totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0
+    const prevDeliveryRate = prevTotalSent > 0 ? Math.round((prevTotalDelivered / prevTotalSent) * 100) : 0
+    const prevReadRate = prevTotalSent > 0 ? Math.round((prevTotalRead / prevTotalSent) * 100) : 0
+
     res.json(ok({
       totalSent, totalDelivered, totalRead,
-      deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
-      readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
+      deliveryRate, readRate,
       byDay, byAgent, agentRanking,
       avgResponseMinutes: agentAvgResponseMinutes,
       activeFlowsToday, flowExecutionsToday,
       agentConversations: filterUserId ? agentConversations : null,
       agentClosedLast7d: filterUserId ? agentClosedLast7d : null,
+      days,
+      previous: { totalSent: prevTotalSent, deliveryRate: prevDeliveryRate, readRate: prevReadRate },
     }))
   } catch (err) { next(err) }
 })

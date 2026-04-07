@@ -205,12 +205,16 @@ export class ContactService {
   async listTags(tenantId: string) {
     const { data, error } = await db
       .from('tags')
-      .select('*')
+      .select('*, contact_tags(count)')
       .eq('tenant_id', tenantId)
       .order('name')
 
     if (error) throw new AppError('DB_ERROR', error.message, 500)
-    return data || []
+    return (data || []).map((tag: any) => ({
+      ...tag,
+      contact_count: tag.contact_tags?.[0]?.count || 0,
+      contact_tags: undefined,
+    }))
   }
 
   async createTag(tenantId: string, name: string, color = '#5a8dee') {

@@ -700,6 +700,7 @@ export default function ContactsPage() {
                 <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
                   <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{tag.name}</span>
+                  {tag.contact_count != null && <span style={{ fontSize: '10px', fontWeight: 700, color: tag.color || '#6b7280', opacity: 0.7 }}>{tag.contact_count}</span>}
                   {canEdit('/dashboard/contacts') && (
                   <button onClick={() => { if (confirm(`${t('contacts.confirmDeleteTag')} "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', display: 'flex', color: 'var(--text-faintest)', marginLeft: '2px' }}
@@ -784,7 +785,10 @@ export default function ContactsPage() {
                         : <><div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--text)' }}>{c.name || '—'}</div>{canEdit('/dashboard/contacts') ? <TagEditor contactId={c.id} contactTags={(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean)} allTags={tags} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); queryClient.invalidateQueries({ queryKey: ['contact', c.id] }) }} /> : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>{(c.contact_tags || []).map((ct: any) => ct.tags).filter(Boolean).map((tag: any) => <span key={tag.id} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px', background: `${tag.color || '#6b7280'}18`, color: tag.color || '#6b7280', border: `1px solid ${tag.color || '#6b7280'}40` }}>{tag.name}</span>)}</div>}</>}
                     </div>
                   </div>
-                  <span style={{ color: '#52525b', fontSize: '13px' }}>{c.phone}</span>
+                  <span style={{ color: '#52525b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {c.phone}
+                    {c.phone && <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(c.phone); toast.success('Telefone copiado') }} title="Copiar telefone" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faintest)', padding: '2px', display: 'flex', borderRadius: '4px' }}><Copy size={11} /></button>}
+                  </span>
                   {isEditing
                     ? <input style={{ ...inp, padding: '6px 10px', fontSize: '13px' }} placeholder="email@exemplo.com" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
                     : <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{c.email || '—'}</span>}
