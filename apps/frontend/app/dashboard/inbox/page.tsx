@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi, messageApi, contactApi, channelApi, authApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
@@ -297,6 +298,9 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
 export default function InboxPage() {
   const t = useT()
   const { canEdit } = usePermissions()
+  const searchParams = useSearchParams()
+  const urlContactId = searchParams.get('contactId')
+  const [autoSelectedDone, setAutoSelectedDone] = useState(false)
   const statusFilters = [
     { key: 'all',     label: t('inbox.all') },
     { key: 'open',    label: t('inbox.open') },
@@ -426,6 +430,21 @@ export default function InboxPage() {
     }
     if (convData.length < 50) setHasMoreConvs(false)
   }, [convData, convPage])
+
+  // Auto-select conversation from URL params (e.g. from contacts page)
+  useEffect(() => {
+    if (!urlContactId || autoSelectedDone || !allConvs.length) return
+    const conv = allConvs.find((c: any) => c.contact_id === urlContactId || c.contacts?.id === urlContactId)
+    if (conv) {
+      setSelectedConvId(conv.id)
+      setMobileShowChat(true)
+      setAutoSelectedDone(true)
+    } else if (convData && convPage === 1) {
+      // Contact has no conversation yet — set status to 'all' to search across all
+      if (statusFilter !== 'all') setStatusFilter('all')
+      setAutoSelectedDone(true)
+    }
+  }, [urlContactId, allConvs, autoSelectedDone])
 
   const handleConvScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
