@@ -801,7 +801,11 @@ export default function InboxPage() {
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button onClick={async () => {
                   await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
-                  toast.success(`${bulkSelected.size} marcadas como lidas`); setBulkSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+                  toast.success(`${bulkSelected.size} marcadas como lidas`)
+                  setAllConvs(prev => prev.map(c => bulkSelected.has(c.id) ? { ...c, unread_count: 0 } : c))
+                  setBulkSelected(new Set())
+                  queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
+                  queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
                 }} style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bae6fd', background: 'var(--bg-card)', color: '#0369a1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                   <Check size={11} /> Lidas
                 </button>
