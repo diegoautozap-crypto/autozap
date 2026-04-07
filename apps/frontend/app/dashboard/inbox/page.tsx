@@ -1208,23 +1208,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><Tag size={13} color="#8b5cf6" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Etiquetas</p></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                {(selectedConv?.labels || []).map((label: any) => (
-                  <span key={label.id} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: `${label.color}18`, color: label.color, border: `1px solid ${label.color}40`, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
-                    {label.name}
-                  </span>
-                ))}
-                {canEdit('/dashboard/inbox') && (
-                  <ConversationLabelEditor conversationId={selectedConvId!} currentLabels={selectedConv?.labels || []} onChanged={() => { queryClient.invalidateQueries({ queryKey: ['conversation', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) }} />
-                )}
-                {(!selectedConv?.labels || selectedConv.labels.length === 0) && !canEdit('/dashboard/inbox') && (
-                  <p style={{ fontSize: '12px', color: 'var(--text-faintest)', margin: 0 }}>Nenhuma etiqueta</p>
-                )}
-              </div>
-            </div>
 
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}><StickyNote size={13} color="#d97706" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('inbox.notes')}</p></div>
