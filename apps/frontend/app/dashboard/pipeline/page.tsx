@@ -779,12 +779,13 @@ export default function PipelinePage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             {canEdit('/dashboard/pipeline') && <button onClick={async (e) => {
                               e.stopPropagation()
-                              if (!confirm(`Remover "${name}" da pipeline?`)) return
+                              if (!confirm(`Remover "${name}" desta pipeline?`)) return
                               try {
                                 if (conv._cardId) {
                                   await conversationApi.delete(`/pipeline-cards/${conv._cardId}`)
                                 } else {
-                                  await conversationApi.patch(`/conversations/${conv.id}/status`, { status: 'closed' })
+                                  // Remove da pipeline sem fechar a conversa
+                                  await conversationApi.patch(`/conversations/${conv.id}/pipeline`, { stage: null, pipelineId: null })
                                 }
                                 refetch()
                                 toast.success('Removido da pipeline')
