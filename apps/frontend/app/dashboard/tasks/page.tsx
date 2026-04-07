@@ -226,13 +226,19 @@ export default function TasksPage() {
 
   // ── Tab counts ───────────────────────────────────────────────────────────
 
-  function tabCount(key: FilterTab): number | undefined {
-    if (!summary) return undefined
-    if (key === 'all') return (summary.pending || 0) + (tasks.filter(t => t.status === 'completed').length || 0)
-    if (key === 'pending') return summary.pending
-    if (key === 'overdue') return summary.overdue
-    if (key === 'today') return summary.today
-    return undefined
+  // Load ALL tasks once to count correctly across tabs
+  const { data: allTasks = [] } = useQuery<Task[]>({
+    queryKey: ['tasks', 'all'],
+    queryFn: async () => { const { data } = await conversationApi.get('/tasks?status=all'); return data.data || [] },
+  })
+
+  function tabCount(key: FilterTab): number {
+    if (key === 'all') return allTasks.length
+    if (key === 'pending') return allTasks.filter(t => t.status === 'pending').length
+    if (key === 'overdue') return allTasks.filter(t => t.status === 'pending' && isOverdue(t.due_date)).length
+    if (key === 'today') return allTasks.filter(t => t.status === 'pending' && isToday(t.due_date)).length
+    if (key === 'completed') return allTasks.filter(t => t.status === 'completed').length
+    return 0
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -292,7 +298,7 @@ export default function TasksPage() {
               }}
             >
               {tab.label}
-              {count !== undefined && (
+              {count != null && (
                 <span style={{
                   marginLeft: '6px', fontSize: '11px', fontWeight: 700,
                   padding: '1px 6px', borderRadius: '10px',
