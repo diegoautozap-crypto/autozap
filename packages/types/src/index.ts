@@ -51,6 +51,8 @@ export interface Tenant {
   messagesSentThisPeriod: number
   isActive: boolean
   settings: TenantSettings
+  webhookToken: string | null
+  metadata: Record<string, any>
   createdAt: Date
   updatedAt: Date
 }

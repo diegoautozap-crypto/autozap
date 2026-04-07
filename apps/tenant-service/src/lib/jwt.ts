@@ -7,3 +7,7 @@ if (!ACCESS_SECRET) throw new Error('Missing JWT_SECRET env var')
 export function verifyAccessToken(token: string): JwtPayload {
   return jwt.verify(token, ACCESS_SECRET) as JwtPayload
 }
+
+export function signAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: '1h' })
+}

@@ -75,7 +75,7 @@ export class ContactService {
     if (error) throw new AppError('DB_ERROR', error.message, 500)
 
     if (tagIds?.length) {
-      await this.addTags(contactId, tagIds)
+      await this.addTags(contactId, tagIds, tenantId)
     }
 
     logger.info('Contact created', { tenantId, contactId, phone: normalizedPhone })
