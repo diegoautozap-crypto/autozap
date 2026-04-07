@@ -159,14 +159,17 @@ export default function TemplatesPage() {
 
       {/* Filtro por canal */}
       {channels && channels.length > 0 && (
-        <div style={{ marginBottom: '16px' }}>
-          <select
-            value={selectedChannel}
-            onChange={e => setSelectedChannel(e.target.value)}
-            style={{ ...inputStyle, width: '280px' }}>
-            <option value="">{t('templates.allChannels')}</option>
-            {channels?.map((ch: any) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
-          </select>
+        <div style={{ marginBottom: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <button onClick={() => setSelectedChannel('')}
+            style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 600, border: `1px solid ${!selectedChannel ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: !selectedChannel ? '#f0fdf4' : 'transparent', color: !selectedChannel ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+            {t('templates.allChannels')}
+          </button>
+          {channels?.map((ch: any) => (
+            <button key={ch.id} onClick={() => setSelectedChannel(ch.id)}
+              style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 600, border: `1px solid ${selectedChannel === ch.id ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: selectedChannel === ch.id ? '#f0fdf4' : 'transparent', color: selectedChannel === ch.id ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              {ch.name}
+            </button>
+          ))}
         </div>
       )}
 
