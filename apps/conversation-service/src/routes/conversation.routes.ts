@@ -638,13 +638,16 @@ router.delete('/pipeline-cards/:id', async (req, res, next) => {
 router.post('/conversations/bulk/read', validate(bulkIdsSchema), async (req, res, next) => {
   try {
     const { ids } = req.body
-    const { error, count } = await db.from('conversations')
-      .update({ unread_count: 0, updated_at: new Date() })
-      .eq('tenant_id', req.auth.tid)
-      .in('id', ids)
-      .select('id', { count: 'exact', head: true })
-    if (error) throw error
-    res.json(ok({ updated: count || ids.length }))
+    // Update one by one to guarantee each write goes through
+    let updated = 0
+    for (const id of ids) {
+      const { error } = await db.from('conversations')
+        .update({ unread_count: 0 })
+        .eq('tenant_id', req.auth.tid)
+        .eq('id', id)
+      if (!error) updated++
+    }
+    res.json(ok({ updated }))
   } catch (err) { next(err) }
 })
 
