@@ -138,18 +138,28 @@ export default function DashboardPage() {
   })
 
   // Pipeline funnel data
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>('')
+
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ['pipelines-dash'],
+    queryFn: async () => { const { data } = await conversationApi.get('/pipelines'); return data.data || [] },
+    staleTime: 60000,
+  })
+
   const { data: pipelineBoard } = useQuery({
-    queryKey: ['pipeline-board-funnel'],
+    queryKey: ['pipeline-board-funnel', selectedPipelineId],
     queryFn: async () => {
-      const { data } = await conversationApi.get('/conversations/pipeline')
+      const params = selectedPipelineId ? `?pipelineId=${selectedPipelineId}` : ''
+      const { data } = await conversationApi.get(`/conversations/pipeline${params}`)
       return data.data as Record<string, any[]>
     },
     staleTime: 30000, refetchInterval: 30000,
   })
   const { data: pipelineColumns } = useQuery({
-    queryKey: ['pipeline-columns-funnel'],
+    queryKey: ['pipeline-columns-funnel', selectedPipelineId],
     queryFn: async () => {
-      const { data } = await conversationApi.get('/pipeline-columns')
+      const params = selectedPipelineId ? `?pipelineId=${selectedPipelineId}` : ''
+      const { data } = await conversationApi.get(`/pipeline-columns${params}`)
       return data.data as any[]
     },
     staleTime: 60000,
@@ -348,7 +358,17 @@ export default function DashboardPage() {
                 <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' }}>Funil de conversão</h3>
                 <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '3px 0 0' }}>{totalEntries} leads no topo · clique pra ver pipeline</p>
               </div>
-              <ChevronRight size={16} color="var(--text-faintest)" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {pipelines.length > 1 && (
+                  <select value={selectedPipelineId} onChange={e => { e.stopPropagation(); setSelectedPipelineId(e.target.value) }}
+                    onClick={e => e.stopPropagation()}
+                    style={{ padding: '5px 10px', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer', outline: 'none' }}>
+                    <option value="">Todas as pipelines</option>
+                    {pipelines.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+                <ChevronRight size={16} color="var(--text-faintest)" />
+              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0' }}>
               {funnelData.map((stage: any, i: number) => {
