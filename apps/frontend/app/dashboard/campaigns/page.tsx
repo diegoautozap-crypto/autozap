@@ -134,7 +134,6 @@ export default function CampaignsPage() {
     queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
     staleTime: 60000,
   })
-  const campaignLimitReached = false
 
   const totalCampaigns     = campaigns?.length ?? 0
   const totalPages         = Math.ceil(totalCampaigns / PAGE_SIZE)
@@ -292,12 +291,7 @@ export default function CampaignsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
-          {campaignLimitReached && (
-            <span style={{ fontSize: '12px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '6px 12px', fontWeight: 600 }}>
-              Limite de campanhas/mês atingido.<a href="/dashboard/settings#planos" style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'underline', marginLeft: '4px' }}>Fazer upgrade</a>
-            </span>
-          )}
-          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !campaignLimitReached && (
+          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
@@ -325,7 +319,7 @@ export default function CampaignsPage() {
                   <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>{t('campaigns.noCampaigns')}</p>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>{t('campaigns.createFirst')}</p>
                 </div>
-                {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !campaignLimitReached && (
+                {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
                 <button onClick={() => setShowModal(true)} style={{ padding: '8px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                   + {t('campaigns.createCampaign')}
                 </button>
