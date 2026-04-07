@@ -668,7 +668,7 @@ export default function InboxPage() {
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
           </div>
         </div>
-        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', flexWrap: 'nowrap', flexShrink: 0, justifyContent: 'center' }}>
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
           {([
             { key: 'all' as const, label: 'Todas' },
             { key: 'unanswered' as const, label: 'Sem resposta' },
