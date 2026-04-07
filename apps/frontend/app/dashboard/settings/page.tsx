@@ -1164,9 +1164,6 @@ export default function SettingsPage() {
         {/* ── Formulário de Captura ── */}
         {canEdit('/dashboard/settings') && <FormBuilderSection />}
 
-        {/* ── Webhooks de Saída ── */}
-        {canEdit('/dashboard/settings') && <WebhooksSection />}
-
         {/* ── Notificações ── */}
         <NotificationSection />
 
