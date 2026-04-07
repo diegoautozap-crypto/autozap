@@ -41,19 +41,19 @@ const addTagsSchema = z.object({ tagIds: z.array(z.string().uuid()) })
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
   price: z.number().min(0).optional(),
-  description: z.string().max(2000).optional(),
-  sku: z.string().max(100).optional(),
-  category: z.string().max(100).optional(),
-  image_url: z.string().url().max(2000).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  sku: z.string().max(100).optional().nullable(),
+  category: z.string().max(100).optional().nullable(),
+  image_url: z.string().max(2000).optional().nullable(),
 })
 
 const updateProductSchema = z.object({
   name: z.string().max(255).optional(),
   price: z.number().min(0).optional(),
-  description: z.string().max(2000).optional(),
-  sku: z.string().max(100).optional(),
-  category: z.string().max(100).optional(),
-  image_url: z.string().url().max(2000).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  sku: z.string().max(100).optional().nullable(),
+  category: z.string().max(100).optional().nullable(),
+  image_url: z.string().max(2000).optional().nullable(),
   is_active: z.boolean().optional(),
 })
 
@@ -272,7 +272,8 @@ router.post('/products', validate(createProductSchema), async (req, res, next) =
       throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.products} produtos`, 403)
     }
     const { data, error } = await db.from('products').insert({
-      tenant_id: req.auth.tid, name, description, price: price || 0, sku, category, image_url: image_url || null,
+      id: (await import('@autozap/utils')).generateId(),
+      tenant_id: req.auth.tid, name, description: description || null, price: price || 0, sku: sku || null, category: category || null, image_url: image_url || null, is_active: true,
     }).select().single()
     if (error) throw error
     res.status(201).json(ok(data))
