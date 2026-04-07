@@ -324,82 +324,199 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
       ],
     },
     {
-      id: 'scheduling',
+      id: 'scheduling_complete',
       emoji: '📅',
-      name: '📅 Agendamento com consulta de horários',
-      desc: 'Menu de atendimento com consulta de horários disponíveis via webhook (integra com Google Sheets, n8n, etc)',
+      name: '📅 Atendimento completo com agendamento',
+      desc: 'Menu multinível com sub-menus, consulta de horários via webhook, validação, pagamento PIX e atendente humano',
       category: t('flows.categoryAdvanced'),
       categoryKey: 'advanced',
       nodes: [
         // 1. Trigger
-        { id: 'n1', type: 'trigger_keyword', position_x: 50, position_y: 300, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'menu', 'agendar'], matchType: 'contains' } },
+        { id: 'n1', type: 'trigger_keyword', position_x: 400, position_y: 0, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'menu', 'início'], matchType: 'contains' } },
 
         // 2. Menu principal
-        { id: 'n2', type: 'send_message', position_x: 350, position_y: 300, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Sou o assistente digital. Selecione uma opção:\n\n1️⃣ Agendar horário\n2️⃣ Informações\n3️⃣ Falar com atendente' } },
-        { id: 'n3', type: 'input', position_x: 650, position_y: 300, data: { type: 'input', question: '', saveAs: 'opcao_menu' } },
+        { id: 'n2', type: 'send_message', position_x: 400, position_y: 120, data: { type: 'send_message', subtype: 'text', message: 'Olá! 👋 Sou o assistente digital.\nSelecione o setor que gostaria de informações:\n\n1️⃣ Reservas\n2️⃣ Informações gerais\n3️⃣ Agendar horário' } },
+        { id: 'n3', type: 'input', position_x: 400, position_y: 240, data: { type: 'input', question: '', saveAs: 'menu_principal' } },
 
-        // 3. Condição menu
-        { id: 'n4', type: 'condition', position_x: 950, position_y: 300, data: { type: 'condition', branches: [
-          { id: 'b1', label: '📅 Agendar', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '1' }, { id: 'r1b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'agendar' }] },
-          { id: 'b2', label: 'ℹ️ Info', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '2' }, { id: 'r2b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'info' }] },
-          { id: 'b3', label: '👤 Atendente', logic: 'OR', rules: [{ id: 'r3', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: '3' }, { id: 'r3b', field: 'variable', fieldName: 'opcao_menu', operator: 'contains', value: 'atendente' }] },
+        // 3. Condição menu principal
+        { id: 'n4', type: 'condition', position_x: 400, position_y: 360, data: { type: 'condition', branches: [
+          { id: 'b1', label: '📋 Reservas', logic: 'OR', rules: [{ id: 'r1', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: '1' }, { id: 'r1b', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'reserva' }] },
+          { id: 'b2', label: 'ℹ️ Informações', logic: 'OR', rules: [{ id: 'r2', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: '2' }, { id: 'r2b', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'info' }] },
+          { id: 'b3', label: '📅 Agendar', logic: 'OR', rules: [{ id: 'r3', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: '3' }, { id: 'r3b', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'agendar' }] },
         ] } },
 
-        // === AGENDAR ===
-        // 4. Perguntar dia
-        { id: 'n5', type: 'send_message', position_x: 1300, position_y: 100, data: { type: 'send_message', subtype: 'text', message: 'Para qual dia você gostaria de agendar?\n\n(ex: segunda, terça, 15/04)' } },
-        { id: 'n6', type: 'input', position_x: 1600, position_y: 100, data: { type: 'input', question: '', saveAs: 'dia_escolhido' } },
+        // ══════════ RESERVAS ══════════
+        // 4. Sub-menu reservas
+        { id: 'n5', type: 'send_message', position_x: 0, position_y: 520, data: { type: 'send_message', subtype: 'text', message: 'Qual tipo de reserva?\n\n1️⃣ Espaço A\n2️⃣ Espaço B\n3️⃣ Eventos' } },
+        { id: 'n6', type: 'input', position_x: 0, position_y: 640, data: { type: 'input', question: '', saveAs: 'tipo_reserva' } },
 
-        // 5. Webhook consultar horários
-        { id: 'n7', type: 'webhook', position_x: 1900, position_y: 100, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"dia": "{{dia_escolhido}}", "phone": "{{phone}}"}', saveResponseAs: 'horarios_disponiveis' } },
-
-        // 6. Mostrar horários
-        { id: 'n8', type: 'send_message', position_x: 2200, position_y: 100, data: { type: 'send_message', subtype: 'text', message: '📅 Horários disponíveis para {{dia_escolhido}}:\n\n{{horarios_disponiveis}}\n\nDigite o horário desejado ou "voltar" para escolher outro dia.' } },
-        { id: 'n9', type: 'input', position_x: 2500, position_y: 100, data: { type: 'input', question: '', saveAs: 'horario_escolhido' } },
-
-        // 7. Condição voltar ou confirmar
-        { id: 'n10', type: 'condition', position_x: 2800, position_y: 100, data: { type: 'condition', branches: [
-          { id: 'bv', label: '↩️ Voltar', logic: 'AND', rules: [{ id: 'rv', field: 'variable', fieldName: 'horario_escolhido', operator: 'contains', value: 'voltar' }] },
+        // 5. Condição tipo reserva
+        { id: 'n7', type: 'condition', position_x: 0, position_y: 760, data: { type: 'condition', branches: [
+          { id: 'br1', label: 'Espaço A', logic: 'OR', rules: [{ id: 'rr1', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: '1' }, { id: 'rr1b', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: 'espaço a' }] },
+          { id: 'br2', label: 'Espaço B', logic: 'OR', rules: [{ id: 'rr2', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: '2' }, { id: 'rr2b', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: 'espaço b' }] },
+          { id: 'br3', label: 'Eventos', logic: 'OR', rules: [{ id: 'rr3', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: '3' }, { id: 'rr3b', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: 'evento' }] },
         ] } },
 
-        // 8. Webhook confirmar reserva
-        { id: 'n11', type: 'webhook', position_x: 3100, position_y: 150, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/reservar', method: 'POST', body: '{"dia": "{{dia_escolhido}}", "horario": "{{horario_escolhido}}", "phone": "{{phone}}", "name": "{{name}}"}', saveResponseAs: 'confirmacao' } },
+        // Espaço A → atendente
+        { id: 'n8', type: 'assign_agent', position_x: -300, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pelo Espaço A! 😊' } },
 
-        // 9. Mensagem confirmação
-        { id: 'n12', type: 'send_message', position_x: 3400, position_y: 150, data: { type: 'send_message', subtype: 'text', message: '✅ Agendamento confirmado!\n\n📅 {{dia_escolhido}} às {{horario_escolhido}}\n\n{{confirmacao}}\n\nSe precisar alterar ou cancelar, é só chamar!' } },
-        { id: 'n13', type: 'tag_contact', position_x: 3700, position_y: 150, data: { type: 'tag_contact', subtype: 'add' } },
-        { id: 'n14', type: 'end', position_x: 3950, position_y: 150, data: { type: 'end' } },
+        // Espaço B → atendente
+        { id: 'n9', type: 'assign_agent', position_x: 0, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pelo Espaço B! 😊' } },
 
-        // === INFORMAÇÕES ===
-        { id: 'n15', type: 'send_message', position_x: 1300, position_y: 350, data: { type: 'send_message', subtype: 'text', message: 'ℹ️ Informações:\n\n📍 Endereço: [seu endereço]\n🕐 Horário: Seg-Sex 8h-22h | Sáb 8h-18h\n📞 Telefone: [seu telefone]\n💰 Valores: [seus valores]\n\nDeseja agendar um horário? Digite "agendar"' } },
-        { id: 'n16', type: 'end', position_x: 1600, position_y: 350, data: { type: 'end' } },
+        // Eventos → atendente
+        { id: 'n10', type: 'assign_agent', position_x: 300, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o setor de Eventos! 😊' } },
 
-        // === ATENDENTE ===
-        { id: 'n17', type: 'assign_agent', position_x: 1300, position_y: 550, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com um atendente agora! 😊' } },
+        // ══════════ INFORMAÇÕES ══════════
+        // 6. Sub-menu informações
+        { id: 'n11', type: 'send_message', position_x: 400, position_y: 520, data: { type: 'send_message', subtype: 'text', message: 'Sobre qual assunto?\n\n1️⃣ Serviço A\n2️⃣ Serviço B\n3️⃣ Serviço C' } },
+        { id: 'n12', type: 'input', position_x: 400, position_y: 640, data: { type: 'input', question: '', saveAs: 'tipo_info' } },
+
+        // 7. Condição info
+        { id: 'n13', type: 'condition', position_x: 400, position_y: 760, data: { type: 'condition', branches: [
+          { id: 'bi1', label: 'Serviço A', logic: 'OR', rules: [{ id: 'ri1', field: 'variable', fieldName: 'tipo_info', operator: 'contains', value: '1' }] },
+          { id: 'bi2', label: 'Serviço B', logic: 'OR', rules: [{ id: 'ri2', field: 'variable', fieldName: 'tipo_info', operator: 'contains', value: '2' }] },
+          { id: 'bi3', label: 'Serviço C', logic: 'OR', rules: [{ id: 'ri3', field: 'variable', fieldName: 'tipo_info', operator: 'contains', value: '3' }] },
+        ] } },
+
+        // Info A
+        { id: 'n14', type: 'send_message', position_x: 250, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'ℹ️ *Serviço A*\n\n[Descrição do serviço A]\n\nPara mais informações entre em contato pelo link:\n[seu link]' } },
+        { id: 'n15', type: 'end', position_x: 250, position_y: 1040, data: { type: 'end' } },
+
+        // Info B
+        { id: 'n16', type: 'send_message', position_x: 450, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'ℹ️ *Serviço B*\n\n[Descrição do serviço B]\n\nPara mais informações entre em contato pelo link:\n[seu link]' } },
+        { id: 'n17', type: 'end', position_x: 450, position_y: 1040, data: { type: 'end' } },
+
+        // Info C
+        { id: 'n18', type: 'send_message', position_x: 650, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'ℹ️ *Serviço C*\n\n[Descrição do serviço C]\n\nPara mais informações entre em contato pelo link:\n[seu link]' } },
+        { id: 'n19', type: 'end', position_x: 650, position_y: 1040, data: { type: 'end' } },
+
+        // ══════════ AGENDAR HORÁRIO ══════════
+        // 8. Opções de agendamento
+        { id: 'n20', type: 'send_message', position_x: 850, position_y: 520, data: { type: 'send_message', subtype: 'text', message: 'Selecione uma opção:\n\n1️⃣ Ver horários disponíveis\n2️⃣ Sou mensalista' } },
+        { id: 'n21', type: 'input', position_x: 850, position_y: 640, data: { type: 'input', question: '', saveAs: 'opcao_agenda' } },
+
+        // 9. Condição agenda
+        { id: 'n22', type: 'condition', position_x: 850, position_y: 760, data: { type: 'condition', branches: [
+          { id: 'ba1', label: '📅 Horários', logic: 'OR', rules: [{ id: 'ra1', field: 'variable', fieldName: 'opcao_agenda', operator: 'contains', value: '1' }, { id: 'ra1b', field: 'variable', fieldName: 'opcao_agenda', operator: 'contains', value: 'horário' }] },
+          { id: 'ba2', label: '🏷️ Mensalista', logic: 'OR', rules: [{ id: 'ra2', field: 'variable', fieldName: 'opcao_agenda', operator: 'contains', value: '2' }, { id: 'ra2b', field: 'variable', fieldName: 'opcao_agenda', operator: 'contains', value: 'mensalista' }] },
+        ] } },
+
+        // Mensalista → atendente
+        { id: 'n23', type: 'assign_agent', position_x: 1100, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pelos mensalistas! 😊' } },
+
+        // 10. Escolher categoria
+        { id: 'n24', type: 'send_message', position_x: 850, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'Temos horários disponíveis nas categorias:\n\n1️⃣ Categoria A\n2️⃣ Categoria B' } },
+        { id: 'n25', type: 'input', position_x: 850, position_y: 1040, data: { type: 'input', question: '', saveAs: 'categoria' } },
+
+        // 11. Condição categoria
+        { id: 'n26', type: 'condition', position_x: 850, position_y: 1160, data: { type: 'condition', branches: [
+          { id: 'bc1', label: 'Categoria A', logic: 'OR', rules: [{ id: 'rc1', field: 'variable', fieldName: 'categoria', operator: 'contains', value: '1' }] },
+          { id: 'bc2', label: 'Categoria B', logic: 'OR', rules: [{ id: 'rc2', field: 'variable', fieldName: 'categoria', operator: 'contains', value: '2' }] },
+        ] } },
+
+        // 12. Webhook horários categoria A
+        { id: 'n27', type: 'webhook', position_x: 650, position_y: 1320, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"categoria": "A", "phone": "{{phone}}"}', saveResponseAs: 'horarios_a' } },
+        { id: 'n28', type: 'send_message', position_x: 650, position_y: 1440, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis — Categoria A*\n(Valores: [seu valor])\n\n{{horarios_a}}' } },
+
+        // 13. Webhook horários categoria B
+        { id: 'n29', type: 'webhook', position_x: 1050, position_y: 1320, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"categoria": "B", "phone": "{{phone}}"}', saveResponseAs: 'horarios_b' } },
+        { id: 'n30', type: 'send_message', position_x: 1050, position_y: 1440, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis — Categoria B*\n(Valores: [seu valor])\n\n{{horarios_b}}' } },
+
+        // 14. Opções após ver horários
+        { id: 'n31', type: 'send_message', position_x: 850, position_y: 1580, data: { type: 'send_message', subtype: 'text', message: '1️⃣ Reservar um horário\n2️⃣ Ver horários da outra categoria' } },
+        { id: 'n32', type: 'input', position_x: 850, position_y: 1700, data: { type: 'input', question: '', saveAs: 'acao_horario' } },
+
+        // 15. Condição reservar ou ver outros
+        { id: 'n33', type: 'condition', position_x: 850, position_y: 1820, data: { type: 'condition', branches: [
+          { id: 'bh1', label: '✅ Reservar', logic: 'OR', rules: [{ id: 'rh1', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: '1' }, { id: 'rh1b', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: 'reservar' }] },
+          { id: 'bh2', label: '🔄 Ver outra', logic: 'OR', rules: [{ id: 'rh2', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: '2' }, { id: 'rh2b', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: 'outra' }] },
+        ] } },
+
+        // Ver outra → volta pra escolha de categoria
+        // (edge volta pro n24)
+
+        // 16. Pedir dados da reserva
+        { id: 'n34', type: 'send_message', position_x: 850, position_y: 1960, data: { type: 'send_message', subtype: 'text', message: 'Digite qual categoria, dia e horário você tem interesse:\n\n(ex: Categoria A, Segunda 14h)' } },
+        { id: 'n35', type: 'input', position_x: 850, position_y: 2080, data: { type: 'input', question: '', saveAs: 'reserva_dados' } },
+
+        // 17. Webhook validar reserva
+        { id: 'n36', type: 'webhook', position_x: 850, position_y: 2200, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/validar-reserva', method: 'POST', body: '{"dados": "{{reserva_dados}}", "phone": "{{phone}}"}', saveResponseAs: 'validacao' } },
+
+        // 18. Condição validação
+        { id: 'n37', type: 'condition', position_x: 850, position_y: 2320, data: { type: 'condition', branches: [
+          { id: 'bv1', label: '❌ Inválido', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'webhook_ok', operator: 'equals', value: 'false' }] },
+        ] } },
+
+        // Inválido → tenta de novo
+        { id: 'n38', type: 'send_message', position_x: 650, position_y: 2440, data: { type: 'send_message', subtype: 'text', message: 'Opção inválida (horário reservado ou erro de digitação). Confira os horários disponíveis novamente:' } },
+        // (edge volta pro n31)
+
+        // 19. Válido → pedir pagamento
+        { id: 'n39', type: 'send_message', position_x: 1050, position_y: 2440, data: { type: 'send_message', subtype: 'text', message: 'Ótimo! Estamos quase lá! 🎉\n\nPara reservar, é necessário um PIX no valor de R$ [valor] que será descontado do montante total.\n\nChave PIX: [sua chave]\n\nAguardamos o envio do comprovante.' } },
+
+        // 20. Atendente pra confirmar pagamento
+        { id: 'n40', type: 'assign_agent', position_x: 1050, position_y: 2580, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Um atendente vai confirmar seu pagamento e finalizar a reserva! 🚀' } },
       ],
       edges: [
+        // Menu principal
         { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
         { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
         { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
-        // Agendar
+
+        // Reservas
         { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
         { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
         { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
-        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'success' },
-        { id: 'e8', source_node: 'n8', target_node: 'n9', source_handle: 'success' },
-        { id: 'e9', source_node: 'n9', target_node: 'n10', source_handle: 'success' },
-        // Voltar → pergunta dia de novo
-        { id: 'e10', source_node: 'n10', target_node: 'n5', source_handle: 'branch_bv' },
-        // Confirmar → webhook reservar
-        { id: 'e11', source_node: 'n10', target_node: 'n11', source_handle: 'fallback' },
-        { id: 'e12', source_node: 'n11', target_node: 'n12', source_handle: 'success' },
-        { id: 'e13', source_node: 'n12', target_node: 'n13', source_handle: 'success' },
-        { id: 'e14', source_node: 'n13', target_node: 'n14', source_handle: 'success' },
-        // Info
-        { id: 'e15', source_node: 'n4', target_node: 'n15', source_handle: 'branch_b2' },
-        { id: 'e16', source_node: 'n15', target_node: 'n16', source_handle: 'success' },
-        // Atendente
-        { id: 'e17', source_node: 'n4', target_node: 'n17', source_handle: 'branch_b3' },
+        { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'branch_br1' },
+        { id: 'e8', source_node: 'n7', target_node: 'n9', source_handle: 'branch_br2' },
+        { id: 'e9', source_node: 'n7', target_node: 'n10', source_handle: 'branch_br3' },
+
+        // Informações
+        { id: 'e10', source_node: 'n4', target_node: 'n11', source_handle: 'branch_b2' },
+        { id: 'e11', source_node: 'n11', target_node: 'n12', source_handle: 'success' },
+        { id: 'e12', source_node: 'n12', target_node: 'n13', source_handle: 'success' },
+        { id: 'e13', source_node: 'n13', target_node: 'n14', source_handle: 'branch_bi1' },
+        { id: 'e14', source_node: 'n14', target_node: 'n15', source_handle: 'success' },
+        { id: 'e15', source_node: 'n13', target_node: 'n16', source_handle: 'branch_bi2' },
+        { id: 'e16', source_node: 'n16', target_node: 'n17', source_handle: 'success' },
+        { id: 'e17', source_node: 'n13', target_node: 'n18', source_handle: 'branch_bi3' },
+        { id: 'e18', source_node: 'n18', target_node: 'n19', source_handle: 'success' },
+
+        // Agendar
+        { id: 'e19', source_node: 'n4', target_node: 'n20', source_handle: 'branch_b3' },
+        { id: 'e20', source_node: 'n20', target_node: 'n21', source_handle: 'success' },
+        { id: 'e21', source_node: 'n21', target_node: 'n22', source_handle: 'success' },
+        { id: 'e22', source_node: 'n22', target_node: 'n23', source_handle: 'branch_ba2' },
+        { id: 'e23', source_node: 'n22', target_node: 'n24', source_handle: 'branch_ba1' },
+        { id: 'e24', source_node: 'n24', target_node: 'n25', source_handle: 'success' },
+        { id: 'e25', source_node: 'n25', target_node: 'n26', source_handle: 'success' },
+
+        // Categoria A/B → webhook → horários
+        { id: 'e26', source_node: 'n26', target_node: 'n27', source_handle: 'branch_bc1' },
+        { id: 'e27', source_node: 'n27', target_node: 'n28', source_handle: 'success' },
+        { id: 'e28', source_node: 'n28', target_node: 'n31', source_handle: 'success' },
+        { id: 'e29', source_node: 'n26', target_node: 'n29', source_handle: 'branch_bc2' },
+        { id: 'e30', source_node: 'n29', target_node: 'n30', source_handle: 'success' },
+        { id: 'e31', source_node: 'n30', target_node: 'n31', source_handle: 'success' },
+
+        // Reservar ou ver outra
+        { id: 'e32', source_node: 'n31', target_node: 'n32', source_handle: 'success' },
+        { id: 'e33', source_node: 'n32', target_node: 'n33', source_handle: 'success' },
+        { id: 'e34', source_node: 'n33', target_node: 'n24', source_handle: 'branch_bh2' },
+        { id: 'e35', source_node: 'n33', target_node: 'n34', source_handle: 'branch_bh1' },
+
+        // Dados reserva → validação
+        { id: 'e36', source_node: 'n34', target_node: 'n35', source_handle: 'success' },
+        { id: 'e37', source_node: 'n35', target_node: 'n36', source_handle: 'success' },
+        { id: 'e38', source_node: 'n36', target_node: 'n37', source_handle: 'success' },
+
+        // Inválido → tenta de novo
+        { id: 'e39', source_node: 'n37', target_node: 'n38', source_handle: 'branch_bv1' },
+        { id: 'e40', source_node: 'n38', target_node: 'n31', source_handle: 'success' },
+
+        // Válido → PIX → atendente
+        { id: 'e41', source_node: 'n37', target_node: 'n39', source_handle: 'fallback' },
+        { id: 'e42', source_node: 'n39', target_node: 'n40', source_handle: 'success' },
       ],
     },
   ]
