@@ -525,6 +525,7 @@ export default function ContactsPage() {
     const timer = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
     return () => clearTimeout(timer)
   }, [searchInput])
+  const [filterTagId, setFilterTagId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -543,7 +544,7 @@ export default function ContactsPage() {
   const loadCustomFields = async () => { const { data } = await supabase.from('custom_fields').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }); if (data) setCustomFields(data) }
   useEffect(() => { loadCustomFields() }, [])
 
-  const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
+  const { data, isLoading } = useQuery({ queryKey: ['contacts', search, page, filterTagId], queryFn: async () => { const params = new URLSearchParams({ page: String(page), limit: '20' }); if (search) params.set('search', search); if (filterTagId) params.set('tagId', filterTagId); const { data } = await contactApi.get(`/contacts?${params}`); return data } })
   const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: async () => { const { data } = await contactApi.get('/tags'); return data.data || [] } })
   const { data: limitsData } = useQuery({ queryKey: ['limits'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data }, staleTime: 60000 })
   const contactLimitReached = limitsData?.limits?.contacts !== null && limitsData?.limits?.contacts !== undefined && (limitsData?.usage?.contacts ?? 0) >= limitsData?.limits?.contacts
@@ -696,10 +697,17 @@ export default function ContactsPage() {
           </div>
           {(tags as any[]).length === 0 ? <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{t('contacts.noTags')}</p> : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(tags as any[]).map((tag: any) => (
-                <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: `${tag.color || '#6b7280'}12`, border: `1px solid ${tag.color || '#6b7280'}30` }}>
+              {filterTagId && (
+                <button onClick={() => { setFilterTagId(null); setPage(1) }} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '99px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  Todas <X size={10} />
+                </button>
+              )}
+              {(tags as any[]).map((tag: any) => {
+                const isActive = filterTagId === tag.id
+                return (
+                <div key={tag.id} onClick={() => { setFilterTagId(isActive ? null : tag.id); setPage(1) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '99px', background: isActive ? `${tag.color || '#6b7280'}25` : `${tag.color || '#6b7280'}12`, border: `2px solid ${isActive ? tag.color || '#6b7280' : `${tag.color || '#6b7280'}30`}`, cursor: 'pointer', transition: 'all 0.1s' }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tag.color || '#6b7280', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{tag.name}</span>
+                  <span style={{ fontSize: '13px', fontWeight: isActive ? 700 : 500, color: isActive ? tag.color || '#6b7280' : 'var(--text)' }}>{tag.name}</span>
                   {tag.contact_count != null && <span style={{ fontSize: '10px', fontWeight: 700, color: tag.color || '#6b7280', opacity: 0.7 }}>{tag.contact_count}</span>}
                   {canEdit('/dashboard/contacts') && (
                   <button onClick={() => { if (confirm(`${t('contacts.confirmDeleteTag')} "${tag.name}"?`)) deleteTagMutation.mutate(tag.id) }}
@@ -710,7 +718,8 @@ export default function ContactsPage() {
                   </button>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
