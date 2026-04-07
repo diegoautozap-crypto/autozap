@@ -834,8 +834,9 @@ export default function InboxPage() {
             {canEdit('/dashboard/inbox') && bulkSelected.size > 0 && (
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button onClick={async () => {
-                  await conversationApi.post('/conversations/bulk/read', { ids: Array.from(bulkSelected) })
-                  toast.success(`${bulkSelected.size} marcadas como lidas`)
+                  const ids = Array.from(bulkSelected)
+                  await Promise.all(ids.map(id => conversationApi.post(`/conversations/${id}/read`)))
+                  toast.success(`${ids.length} marcadas como lidas`)
                   setAllConvs(prev => prev.map(c => bulkSelected.has(c.id) ? { ...c, unread_count: 0 } : c))
                   setBulkSelected(new Set())
                   queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
