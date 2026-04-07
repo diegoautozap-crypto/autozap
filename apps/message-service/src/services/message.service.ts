@@ -7,6 +7,14 @@ import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
 import { flowEngine } from './flow.engine'
 
+// In-memory cache for tenant data
+const tenantCache = new Map<string, { data: any; expires: number }>()
+function getCachedTenant(tenantId: string, ttlMs: number, fetcher: () => Promise<any>): Promise<any> {
+  const entry = tenantCache.get(tenantId)
+  if (entry && entry.expires > Date.now()) return Promise.resolve(entry.data)
+  return fetcher().then(data => { tenantCache.set(tenantId, { data, expires: Date.now() + ttlMs }); return data })
+}
+
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
 const PUSHER_KEY     = process.env.PUSHER_KEY
 const PUSHER_SECRET  = process.env.PUSHER_SECRET
@@ -324,7 +332,9 @@ export class MessageService {
     if (!channel?.settings?.aiChatbotEnabled) return
 
     // 2. Check AI plan limits
-    const { data: tenant } = await db.from('tenants').select('plan_slug, settings, metadata').eq('id', tenantId).single()
+    const { data: tenant } = await getCachedTenant(`tenant:${tenantId}`, 120_000, () =>
+      db.from('tenants').select('plan_slug, settings, metadata').eq('id', tenantId).single()
+    )
     const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
     const limits = PLAN_LIMITS[planSlug]
     if (limits.aiResponses === 0) return
