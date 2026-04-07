@@ -358,34 +358,50 @@ export default function PipelinePage() {
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
     queryFn: async () => {
-      const params = new URLSearchParams()
-      if (channelFilter !== 'all') params.set('channelId', channelFilter)
-      if (campaignFilter !== 'all') params.set('campaignId', campaignFilter)
-      if (selectedPipelineId) params.set('pipelineId', selectedPipelineId)
-      const url = `/conversations/pipeline${params.toString() ? '?' + params.toString() : ''}`
-      const { data } = await conversationApi.get(url)
-      const boardData = data.data as Record<string, any[]>
+      // Board baseado em pipeline_cards (cada card é independente)
+      const cardsParams = new URLSearchParams()
+      if (selectedPipelineId) cardsParams.set('pipelineId', selectedPipelineId)
+      const { data: cardsRes } = await conversationApi.get(`/pipeline-cards?${cardsParams.toString()}`)
+      const cards = cardsRes.data || []
 
-      // Carrega pipeline cards (negócios manuais) e adiciona ao board
-      try {
-        const cardsParams = selectedPipelineId ? `?pipelineId=${selectedPipelineId}` : ''
-        const { data: cardsRes } = await conversationApi.get(`/pipeline-cards${cardsParams}`)
-        const cards = cardsRes.data || []
-        for (const card of cards) {
-          const col = card.column_key || 'lead'
-          if (!boardData[col]) boardData[col] = []
-          boardData[col].push({
-            id: `card_${card.id}`,
-            _cardId: card.id,
-            contacts: card.contacts,
-            deal_value: card.deal_value,
-            last_message: card.title || 'Negócio manual',
-            last_message_at: card.created_at,
-            status: 'open',
-            pipeline_stage: col,
-          })
+      // Também carrega conversas ativas sem card (pra não perder conversas novas)
+      const convParams = new URLSearchParams()
+      if (channelFilter !== 'all') convParams.set('channelId', channelFilter)
+      if (campaignFilter !== 'all') convParams.set('campaignId', campaignFilter)
+      if (selectedPipelineId) convParams.set('pipelineId', selectedPipelineId)
+      const { data: convData } = await conversationApi.get(`/conversations/pipeline?${convParams.toString()}`)
+      const convBoard = convData.data as Record<string, any[]>
+
+      // Monta board com colunas das conversas como base
+      const boardData: Record<string, any[]> = {}
+      for (const [col, convs] of Object.entries(convBoard)) {
+        boardData[col] = []
+        // Adiciona conversas que NÃO têm card na mesma pipeline
+        for (const conv of convs as any[]) {
+          const contactId = conv.contacts?.id || conv.contact_id
+          const hasCard = cards.some((c: any) => c.contact_id === contactId)
+          if (!hasCard) {
+            boardData[col].push(conv)
+          }
         }
-      } catch {}
+      }
+
+      // Adiciona pipeline cards (independentes por pipeline)
+      for (const card of cards) {
+        const col = card.column_key || 'lead'
+        if (!boardData[col]) boardData[col] = []
+        boardData[col].push({
+          id: `card_${card.id}`,
+          _cardId: card.id,
+          contact_id: card.contact_id,
+          contacts: card.contacts,
+          deal_value: card.deal_value,
+          last_message: card.title || '',
+          last_message_at: card.created_at,
+          status: 'open',
+          pipeline_stage: col,
+        })
+      }
 
       localBoardRef.current = null
       return boardData
@@ -457,7 +473,12 @@ export default function PipelinePage() {
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
-      await conversationApi.patch(`/conversations/${id}/pipeline`, { stage, pipelineId: selectedPipelineId })
+      if (id.startsWith('card_')) {
+        const cardId = id.replace('card_', '')
+        await conversationApi.patch(`/pipeline-cards/${cardId}`, { columnKey: stage })
+      } else {
+        await conversationApi.patch(`/conversations/${id}/pipeline`, { stage, pipelineId: selectedPipelineId })
+      }
     },
     onSuccess: () => { localBoardRef.current = null; queryClient.refetchQueries({ queryKey: ['pipeline-board'] }); queryClient.invalidateQueries({ queryKey: ['conversations'] }) },
     onError: () => { localBoardRef.current = null; forceRender(n => n + 1); toast.error(t('pipeline.toastMoveError')) },
