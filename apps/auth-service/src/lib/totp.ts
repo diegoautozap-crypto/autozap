@@ -14,28 +14,16 @@ authenticator.options = { window: 1 } // allow 1 step tolerance (±30s)
 
 export function encryptSecret(secret: string): string {
   const iv = randomBytes(16)
-  const cipher = createCipheriv('aes-256-gcm', KEY, iv)
+  const cipher = createCipheriv('aes-256-cbc', KEY, iv)
   const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`
+  return `${iv.toString('hex')}:${encrypted.toString('hex')}`
 }
 
 export function decryptSecret(encrypted: string): string {
-  const parts = encrypted.split(':')
-  // Suporta formato antigo (CBC: iv:data) e novo (GCM: iv:tag:data)
-  if (parts.length === 2) {
-    const [ivHex, dataHex] = parts
-    const iv = Buffer.from(ivHex, 'hex')
-    const data = Buffer.from(dataHex, 'hex')
-    const decipher = createDecipheriv('aes-256-cbc', KEY, iv)
-    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
-  }
-  const [ivHex, tagHex, dataHex] = parts
+  const [ivHex, dataHex] = encrypted.split(':')
   const iv = Buffer.from(ivHex, 'hex')
-  const tag = Buffer.from(tagHex, 'hex')
   const data = Buffer.from(dataHex, 'hex')
-  const decipher = createDecipheriv('aes-256-gcm', KEY, iv)
-  decipher.setAuthTag(tag)
+  const decipher = createDecipheriv('aes-256-cbc', KEY, iv)
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
 }
 
