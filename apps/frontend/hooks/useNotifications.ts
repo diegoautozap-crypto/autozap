@@ -31,9 +31,9 @@ function updateDocumentTitle(count: number) {
 
 async function fetchTotalUnread(): Promise<number> {
   try {
-    const { data } = await conversationApi.get('/conversations/counts')
-    // Use the open count as a proxy for unread — conversations with activity
-    return data?.data?.open || 0
+    const { data } = await conversationApi.get('/conversations?status=open&limit=100')
+    const convs = data?.data || []
+    return convs.filter((c: any) => c.unread_count > 0).length
   } catch {
     return 0
   }
