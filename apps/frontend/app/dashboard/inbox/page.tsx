@@ -433,18 +433,33 @@ export default function InboxPage() {
 
   // Auto-select conversation from URL params (e.g. from contacts page)
   useEffect(() => {
-    if (!urlContactId || autoSelectedDone || !allConvs.length) return
+    if (!urlContactId || autoSelectedDone) return
+
+    // Force show all conversations to find the contact
+    if (statusFilter !== 'all') { setStatusFilter('all'); return }
+    if (channelFilter !== 'all') { setChannelFilter('all'); return }
+
+    // Try to find in local list first
     const conv = allConvs.find((c: any) => c.contact_id === urlContactId || c.contacts?.id === urlContactId)
     if (conv) {
       setSelectedConvId(conv.id)
       setMobileShowChat(true)
       setAutoSelectedDone(true)
-    } else if (convData && convPage === 1) {
-      // Contact has no conversation yet — set status to 'all' to search across all
-      if (statusFilter !== 'all') setStatusFilter('all')
-      setAutoSelectedDone(true)
+      return
     }
-  }, [urlContactId, allConvs, autoSelectedDone])
+
+    // If not in local list, search via API
+    if (allConvs.length > 0) {
+      conversationApi.get(`/conversations/search?q=${urlContactId}`).then(({ data }) => {
+        const found = (data.data || []).find((c: any) => c.contact_id === urlContactId || c.contacts?.id === urlContactId)
+        if (found) {
+          setSelectedConvId(found.id)
+          setMobileShowChat(true)
+        }
+        setAutoSelectedDone(true)
+      }).catch(() => setAutoSelectedDone(true))
+    }
+  }, [urlContactId, allConvs, autoSelectedDone, statusFilter, channelFilter])
 
   const handleConvScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
