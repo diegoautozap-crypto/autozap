@@ -27,9 +27,9 @@ function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
 
 function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes', '15 produtos'],
-    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', '100 produtos', 'Transcricao'],
-    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', '500 produtos', 'Relatorios'],
+    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes', 'Campanhas ilimitadas', '15 produtos'],
+    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', 'Campanhas ilimitadas', '100 produtos', 'Transcricao'],
+    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', 'Campanhas ilimitadas', '500 produtos', 'Relatorios'],
     unlimited:  ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
   }
 }
@@ -1123,7 +1123,6 @@ export default function SettingsPage() {
                 ['Membros', limitsData.usage?.members, limitsData.limits?.members],
                 ['Flows ativos', limitsData.usage?.flows, limitsData.limits?.flows],
                 ['Contatos', limitsData.usage?.contacts, limitsData.limits?.contacts],
-                ['Campanhas/mes', limitsData.usage?.campaigns, limitsData.limits?.campaigns],
                 ['Respostas IA/mes', limitsData.usage?.aiResponses, limitsData.limits?.aiResponses],
               ] as [string, number, number | null][]).map(([label, used, max]) => {
                 const usedVal = used ?? 0

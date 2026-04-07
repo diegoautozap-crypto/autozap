@@ -62,11 +62,11 @@ const PLAN_COLORS: Record<string, { color: string; bg: string; border: string }>
 const PLAN_PRICES: Record<string, number> = { starter: 97, pro: 197, enterprise: 397, unlimited: 697 }
 
 const PLAN_LIMITS: Record<string, { messages: number; contacts: number; channels: number; campaigns: number; ai: number; flows: number }> = {
-  pending:    { messages: 100, contacts: 50, channels: 0, campaigns: 0, ai: 0, flows: 0 },
-  starter:    { messages: 5000, contacts: 1000, channels: 5, campaigns: 10, ai: 500, flows: 5 },
-  pro:        { messages: 20000, contacts: 5000, channels: 10, campaigns: 50, ai: 2000, flows: 20 },
-  enterprise: { messages: 50000, contacts: 20000, channels: 30, campaigns: 200, ai: 10000, flows: 100 },
-  unlimited:  { messages: 999999, contacts: 999999, channels: 999, campaigns: 999, ai: 999999, flows: 999 },
+  pending:    { messages: 100, contacts: 50, channels: 0, campaigns: 999999, ai: 0, flows: 0 },
+  starter:    { messages: 5000, contacts: 1000, channels: 5, campaigns: 999999, ai: 500, flows: 5 },
+  pro:        { messages: 20000, contacts: 5000, channels: 10, campaigns: 999999, ai: 2000, flows: 20 },
+  enterprise: { messages: 50000, contacts: 20000, channels: 30, campaigns: 999999, ai: 10000, flows: 100 },
+  unlimited:  { messages: 999999, contacts: 999999, channels: 999, campaigns: 999999, ai: 999999, flows: 999 },
 }
 
 const TABS = ['Dashboard', 'Tenants', 'Receita', 'Sistema'] as const

@@ -141,16 +141,8 @@ router.get('/campaigns', async (req, res, next) => {
 
 router.post('/campaigns', validate(createCampaignSchema), async (req, res, next) => {
   try {
-    // ── Plan limit check: campaigns/month ──
     const { data: tenantData } = await db.from('tenants').select('plan_slug').eq('id', req.auth.tid).single()
     const planSlug = (tenantData?.plan_slug || 'pending') as PlanSlug
-    const planLimits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    // Conta TODAS campanhas criadas no mês (incluindo deletadas via soft delete)
-    const { count: campaignCount } = await db.from('campaigns').select('id', { count: 'exact', head: true }).eq('tenant_id', req.auth.tid).gte('created_at', startOfMonth)
-    if (planLimits.campaigns !== null && (campaignCount ?? 0) >= planLimits.campaigns) {
-      throw new AppError('PLAN_LIMIT', `Seu plano permite ${planLimits.campaigns} campanhas/mes. Voce ja criou ${campaignCount} este mes.`, 403)
-    }
 
     const role = req.auth.role
 

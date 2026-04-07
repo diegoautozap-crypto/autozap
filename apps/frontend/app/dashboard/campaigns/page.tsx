@@ -134,7 +134,7 @@ export default function CampaignsPage() {
     queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
     staleTime: 60000,
   })
-  const campaignLimitReached = limitsData?.limits?.campaigns !== null && limitsData?.limits?.campaigns !== undefined && (limitsData?.usage?.campaigns ?? 0) >= limitsData?.limits?.campaigns
+  const campaignLimitReached = false
 
   const totalCampaigns     = campaigns?.length ?? 0
   const totalPages         = Math.ceil(totalCampaigns / PAGE_SIZE)
