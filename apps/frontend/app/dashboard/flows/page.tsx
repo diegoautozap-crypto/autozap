@@ -332,112 +332,143 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
       categoryKey: 'advanced',
       nodes: [
         // ── TRIGGER ──
-        { id: 'n1', type: 'trigger_first_message', position_x: 400, position_y: 0, data: { type: 'trigger_first_message' } },
+        { id: 'n1', type: 'trigger_first_message', position_x: 500, position_y: 0, data: { type: 'trigger_first_message' } },
 
-        // ── MENU PRINCIPAL (Lista) ──
-        { id: 'n2', type: 'send_message', position_x: 400, position_y: 120, data: { type: 'send_message', subtype: 'list', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', listButtonText: 'Ver opções', listRows: [{ title: 'Outro Assunto' }, { title: 'Reservas' }, { title: 'Quadra' }] } },
-        { id: 'n3', type: 'input', position_x: 400, position_y: 240, data: { type: 'input', question: '', saveAs: 'menu_principal' } },
-        { id: 'n4', type: 'condition', position_x: 400, position_y: 360, data: { type: 'condition', branches: [
+        // ── MENU PRINCIPAL ──
+        { id: 'n2', type: 'send_message', position_x: 500, position_y: 100, data: { type: 'send_message', subtype: 'list', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', listButtonText: 'Ver opções', listRows: [{ title: 'Outro Assunto', description: 'Campeonato, Escolinha, etc' }, { title: 'Reservas', description: 'Churrasqueira, Eventos' }, { title: 'Quadra', description: 'Horários e reservas de quadra' }] } },
+        { id: 'n3', type: 'input', position_x: 500, position_y: 200, data: { type: 'input', question: '', saveAs: 'menu_principal', timeoutHours: 1 } },
+        { id: 'n4', type: 'condition', position_x: 500, position_y: 300, data: { type: 'condition', branches: [
           { id: 'b1', label: 'Outro Assunto', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'Outro' }] },
           { id: 'b2', label: 'Reservas', logic: 'AND', rules: [{ id: 'r2', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'Reserva' }] },
           { id: 'b3', label: 'Quadra', logic: 'AND', rules: [{ id: 'r3', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'Quadra' }] },
         ] } },
+        // Fallback menu principal → não entendi
+        { id: 'nf1', type: 'send_message', position_x: 200, position_y: 400, data: { type: 'send_message', subtype: 'text', message: 'Desculpe, não entendi sua resposta. Vamos tentar novamente!' } },
 
         // ══════════ OUTRO ASSUNTO ══════════
-        { id: 'n5', type: 'send_message', position_x: -200, position_y: 520, data: { type: 'send_message', subtype: 'buttons', message: 'Selecione o assunto:', buttons: [{ title: 'Campeonato' }, { title: 'Escolinha' }, { title: 'Ayrton Senna' }] } },
-        { id: 'n6', type: 'input', position_x: -200, position_y: 640, data: { type: 'input', question: '', saveAs: 'outro_assunto' } },
-        { id: 'n7', type: 'condition', position_x: -200, position_y: 760, data: { type: 'condition', branches: [
+        { id: 'n5', type: 'send_message', position_x: -100, position_y: 450, data: { type: 'send_message', subtype: 'buttons', message: 'Selecione o assunto:', buttons: [{ title: 'Campeonato' }, { title: 'Escolinha' }, { title: 'Ayrton Senna' }] } },
+        { id: 'n6', type: 'input', position_x: -100, position_y: 550, data: { type: 'input', question: '', saveAs: 'outro_assunto', timeoutHours: 1 } },
+        { id: 'n7', type: 'condition', position_x: -100, position_y: 650, data: { type: 'condition', branches: [
           { id: 'bo1', label: 'Campeonato', logic: 'AND', rules: [{ id: 'ro1', field: 'variable', fieldName: 'outro_assunto', operator: 'contains', value: 'Campeonato' }] },
           { id: 'bo2', label: 'Escolinha', logic: 'AND', rules: [{ id: 'ro2', field: 'variable', fieldName: 'outro_assunto', operator: 'contains', value: 'Escolinha' }] },
           { id: 'bo3', label: 'Ayrton Senna', logic: 'AND', rules: [{ id: 'ro3', field: 'variable', fieldName: 'outro_assunto', operator: 'contains', value: 'Senna' }] },
         ] } },
-        // Campeonato
-        { id: 'n8', type: 'send_message', position_x: -450, position_y: 920, data: { type: 'send_message', subtype: 'text', message: '[Informações sobre o Campeonato]\n\nFale com o responsável pelo link:\nwa.me/55XXXXXXXXXXX' } },
-        { id: 'n9', type: 'end', position_x: -450, position_y: 1040, data: { type: 'end' } },
-        // Escolinha
-        { id: 'n10', type: 'send_message', position_x: -200, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'Agradecemos o seu contato, este setor é por este link:\nwa.me/55XXXXXXXXXXX' } },
-        { id: 'n11', type: 'end', position_x: -200, position_y: 1040, data: { type: 'end' } },
-        // Ayrton Senna
-        { id: 'n12', type: 'send_message', position_x: 50, position_y: 920, data: { type: 'send_message', subtype: 'text', message: 'Agradecemos o seu contato, este setor é por este link:\nwa.me/55XXXXXXXXXXX' } },
-        { id: 'n13', type: 'end', position_x: 50, position_y: 1040, data: { type: 'end' } },
+        // Info + "Posso ajudar em mais alguma coisa?"
+        { id: 'n8', type: 'send_message', position_x: -350, position_y: 800, data: { type: 'send_message', subtype: 'text', message: '[Informações sobre o Campeonato]\n\nFale com o responsável pelo link:\nwa.me/55XXXXXXXXXXX' } },
+        { id: 'n10', type: 'send_message', position_x: -100, position_y: 800, data: { type: 'send_message', subtype: 'text', message: 'Agradecemos o seu contato, este setor é por este link:\nwa.me/55XXXXXXXXXXX' } },
+        { id: 'n12', type: 'send_message', position_x: 150, position_y: 800, data: { type: 'send_message', subtype: 'text', message: 'Agradecemos o seu contato, este setor é por este link:\nwa.me/55XXXXXXXXXXX' } },
+        // Fallback outro assunto
+        { id: 'nf2', type: 'send_message', position_x: -350, position_y: 700, data: { type: 'send_message', subtype: 'text', message: 'Não entendi. Vamos tentar novamente!' } },
+        // "Posso ajudar?" compartilhado
+        { id: 'na1', type: 'send_message', position_x: -100, position_y: 920, data: { type: 'send_message', subtype: 'buttons', message: 'Posso ajudar em mais alguma coisa?', buttons: [{ title: 'Sim, voltar ao menu' }, { title: 'Não, obrigado' }] } },
+        { id: 'na2', type: 'input', position_x: -100, position_y: 1020, data: { type: 'input', question: '', saveAs: 'ajudar_mais', timeoutHours: 1 } },
+        { id: 'na3', type: 'condition', position_x: -100, position_y: 1120, data: { type: 'condition', branches: [
+          { id: 'ba1', label: 'Sim', logic: 'AND', rules: [{ id: 'ra1', field: 'variable', fieldName: 'ajudar_mais', operator: 'contains', value: 'Sim' }] },
+        ] } },
+        { id: 'na4', type: 'send_message', position_x: -100, position_y: 1240, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo contato! Se precisar, é só chamar. 😊' } },
+        { id: 'na5', type: 'end', position_x: -100, position_y: 1340, data: { type: 'end' } },
 
         // ══════════ RESERVAS ══════════
-        { id: 'n14', type: 'send_message', position_x: 400, position_y: 520, data: { type: 'send_message', subtype: 'buttons', message: 'Qual tipo de reserva?', buttons: [{ title: 'Churrasqueira' }, { title: 'Eventos' }] } },
-        { id: 'n15', type: 'input', position_x: 400, position_y: 640, data: { type: 'input', question: '', saveAs: 'tipo_reserva' } },
-        { id: 'n16', type: 'condition', position_x: 400, position_y: 760, data: { type: 'condition', branches: [
+        { id: 'n14', type: 'send_message', position_x: 500, position_y: 450, data: { type: 'send_message', subtype: 'buttons', message: 'Qual tipo de reserva?', buttons: [{ title: 'Churrasqueira' }, { title: 'Eventos' }] } },
+        { id: 'n15', type: 'input', position_x: 500, position_y: 550, data: { type: 'input', question: '', saveAs: 'tipo_reserva', timeoutHours: 1 } },
+        { id: 'n16', type: 'condition', position_x: 500, position_y: 650, data: { type: 'condition', branches: [
           { id: 'br1', label: 'Churrasqueira', logic: 'AND', rules: [{ id: 'rr1', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: 'Churrasqueira' }] },
           { id: 'br2', label: 'Eventos', logic: 'AND', rules: [{ id: 'rr2', field: 'variable', fieldName: 'tipo_reserva', operator: 'contains', value: 'Evento' }] },
         ] } },
-        { id: 'n17', type: 'assign_agent', position_x: 300, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pela Churrasqueira/Cozinha! 😊' } },
-        { id: 'n18', type: 'assign_agent', position_x: 500, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o setor de Eventos! 😊' } },
+        { id: 'n17', type: 'assign_agent', position_x: 400, position_y: 800, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pela Churrasqueira/Cozinha! 😊' } },
+        { id: 'n18', type: 'assign_agent', position_x: 600, position_y: 800, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o setor de Eventos! 😊' } },
+        // Fallback reservas → volta menu
+        { id: 'nf3', type: 'send_message', position_x: 500, position_y: 780, data: { type: 'send_message', subtype: 'text', message: 'Não entendi. Vamos tentar novamente!' } },
 
         // ══════════ QUADRA ══════════
-        { id: 'n19', type: 'send_message', position_x: 900, position_y: 520, data: { type: 'send_message', subtype: 'buttons', message: 'Selecione uma opção:', buttons: [{ title: 'Horários disponíveis' }, { title: 'Sou Mensalista' }] } },
-        { id: 'n20', type: 'input', position_x: 900, position_y: 640, data: { type: 'input', question: '', saveAs: 'opcao_quadra' } },
-        { id: 'n21', type: 'condition', position_x: 900, position_y: 760, data: { type: 'condition', branches: [
+        { id: 'n19', type: 'send_message', position_x: 1000, position_y: 450, data: { type: 'send_message', subtype: 'buttons', message: 'Selecione uma opção:', buttons: [{ title: 'Horários disponíveis' }, { title: 'Sou Mensalista' }] } },
+        { id: 'n20', type: 'input', position_x: 1000, position_y: 550, data: { type: 'input', question: '', saveAs: 'opcao_quadra', timeoutHours: 1 } },
+        { id: 'n21', type: 'condition', position_x: 1000, position_y: 650, data: { type: 'condition', branches: [
           { id: 'bq1', label: 'Horários', logic: 'AND', rules: [{ id: 'rq1', field: 'variable', fieldName: 'opcao_quadra', operator: 'contains', value: 'Horário' }] },
           { id: 'bq2', label: 'Mensalista', logic: 'AND', rules: [{ id: 'rq2', field: 'variable', fieldName: 'opcao_quadra', operator: 'contains', value: 'Mensalista' }] },
         ] } },
-        // Mensalista → atendente
-        { id: 'n22', type: 'assign_agent', position_x: 1150, position_y: 920, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pelos mensalistas! 😊' } },
+        { id: 'n22', type: 'assign_agent', position_x: 1250, position_y: 800, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Vou te conectar com o responsável pelos mensalistas! 😊' } },
+        // Fallback quadra
+        { id: 'nf4', type: 'send_message', position_x: 1000, position_y: 780, data: { type: 'send_message', subtype: 'text', message: 'Não entendi. Vamos tentar novamente!' } },
 
         // ── ESCOLHER QUADRA ──
-        { id: 'n23', type: 'send_message', position_x: 900, position_y: 920, data: { type: 'send_message', subtype: 'buttons', message: 'Temos horários disponíveis nas duas quadras:\n\n🏟️ Quadra Externa — 40m x 25m\nrecomenda-se 5 na linha + goleiro\n\n🏠 Quadra Interna — 46m x 26m\nrecomenda-se 6 na linha + goleiro', buttons: [{ title: 'Quadra Interna' }, { title: 'Quadra Externa' }] } },
-        { id: 'n24', type: 'input', position_x: 900, position_y: 1040, data: { type: 'input', question: '', saveAs: 'tipo_quadra' } },
-        { id: 'n25', type: 'condition', position_x: 900, position_y: 1160, data: { type: 'condition', branches: [
+        { id: 'n23', type: 'send_message', position_x: 1000, position_y: 800, data: { type: 'send_message', subtype: 'buttons', message: 'Temos horários disponíveis nas duas quadras:\n\n🏟️ Quadra Externa — 40m x 25m\nrecomenda-se 5 na linha + goleiro\n\n🏠 Quadra Interna — 46m x 26m\nrecomenda-se 6 na linha + goleiro', buttons: [{ title: 'Quadra Interna' }, { title: 'Quadra Externa' }] } },
+        { id: 'n24', type: 'input', position_x: 1000, position_y: 900, data: { type: 'input', question: '', saveAs: 'tipo_quadra', timeoutHours: 1 } },
+        { id: 'n25', type: 'condition', position_x: 1000, position_y: 1000, data: { type: 'condition', branches: [
           { id: 'bt1', label: 'Interna', logic: 'AND', rules: [{ id: 'rt1', field: 'variable', fieldName: 'tipo_quadra', operator: 'contains', value: 'Interna' }] },
           { id: 'bt2', label: 'Externa', logic: 'AND', rules: [{ id: 'rt2', field: 'variable', fieldName: 'tipo_quadra', operator: 'contains', value: 'Externa' }] },
         ] } },
 
-        // ── WEBHOOK HORÁRIOS INTERNA ──
-        { id: 'n26', type: 'webhook', position_x: 700, position_y: 1320, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"quadra": "interna", "phone": "{{phone}}"}', saveResponseAs: 'horarios_interna' } },
-        { id: 'n27', type: 'send_message', position_x: 700, position_y: 1440, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis*\n(Valores avulso)\nQUADRA INTERNA\n\n{{horarios_interna}}' } },
-
-        // ── WEBHOOK HORÁRIOS EXTERNA ──
-        { id: 'n28', type: 'webhook', position_x: 1100, position_y: 1320, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"quadra": "externa", "phone": "{{phone}}"}', saveResponseAs: 'horarios_externa' } },
-        { id: 'n29', type: 'send_message', position_x: 1100, position_y: 1440, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis*\n(Valores avulso)\nQUADRA EXTERNA\n\n{{horarios_externa}}' } },
+        // ── WEBHOOK HORÁRIOS ──
+        { id: 'n26', type: 'webhook', position_x: 800, position_y: 1150, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"quadra": "interna", "phone": "{{phone}}"}', saveResponseAs: 'horarios_interna' } },
+        { id: 'n27', type: 'send_message', position_x: 800, position_y: 1250, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis*\n(Valores avulso)\nQUADRA INTERNA\n\n{{horarios_interna}}' } },
+        { id: 'n28', type: 'webhook', position_x: 1200, position_y: 1150, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/horarios', method: 'POST', body: '{"quadra": "externa", "phone": "{{phone}}"}', saveResponseAs: 'horarios_externa' } },
+        { id: 'n29', type: 'send_message', position_x: 1200, position_y: 1250, data: { type: 'send_message', subtype: 'text', message: '📅 *Horários disponíveis*\n(Valores avulso)\nQUADRA EXTERNA\n\n{{horarios_externa}}' } },
+        // Fallback webhook (n8n fora do ar)
+        { id: 'nfw', type: 'send_message', position_x: 1000, position_y: 1100, data: { type: 'send_message', subtype: 'text', message: 'Desculpe, não consegui consultar os horários no momento. Vou te conectar com um atendente!' } },
+        { id: 'nfw2', type: 'assign_agent', position_x: 1000, position_y: 1200, data: { type: 'assign_agent', agentId: 'round_robin' } },
 
         // ── AÇÕES APÓS HORÁRIOS ──
-        { id: 'n30', type: 'send_message', position_x: 900, position_y: 1580, data: { type: 'send_message', subtype: 'buttons', message: 'O que deseja fazer?', buttons: [{ title: 'Reservar horário' }, { title: 'Ver outra quadra' }] } },
-        { id: 'n31', type: 'input', position_x: 900, position_y: 1700, data: { type: 'input', question: '', saveAs: 'acao_horario' } },
-        { id: 'n32', type: 'condition', position_x: 900, position_y: 1820, data: { type: 'condition', branches: [
+        { id: 'n30', type: 'send_message', position_x: 1000, position_y: 1400, data: { type: 'send_message', subtype: 'buttons', message: 'O que deseja fazer?', buttons: [{ title: 'Reservar horário' }, { title: 'Ver outra quadra' }, { title: 'Voltar ao menu' }] } },
+        { id: 'n31', type: 'input', position_x: 1000, position_y: 1500, data: { type: 'input', question: '', saveAs: 'acao_horario', timeoutHours: 1 } },
+        { id: 'n32', type: 'condition', position_x: 1000, position_y: 1600, data: { type: 'condition', branches: [
           { id: 'bh1', label: '✅ Reservar', logic: 'AND', rules: [{ id: 'rh1', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: 'Reservar' }] },
           { id: 'bh2', label: '🔄 Ver outra', logic: 'AND', rules: [{ id: 'rh2', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: 'outra' }] },
+          { id: 'bh3', label: '↩️ Menu', logic: 'AND', rules: [{ id: 'rh3', field: 'variable', fieldName: 'acao_horario', operator: 'contains', value: 'menu' }] },
         ] } },
 
         // ── PEDIR DADOS DA RESERVA ──
-        { id: 'n33', type: 'send_message', position_x: 900, position_y: 1960, data: { type: 'send_message', subtype: 'text', message: 'Digite qual quadra, dia e horário você tem interesse:' } },
-        { id: 'n34', type: 'input', position_x: 900, position_y: 2080, data: { type: 'input', question: '', saveAs: 'reserva_dados' } },
+        { id: 'n33', type: 'send_message', position_x: 1000, position_y: 1750, data: { type: 'send_message', subtype: 'text', message: 'Digite qual quadra, dia e horário você tem interesse:\n\n(ex: Quadra Interna, Segunda 14h)' } },
+        { id: 'n34', type: 'input', position_x: 1000, position_y: 1850, data: { type: 'input', question: '', saveAs: 'reserva_dados', timeoutHours: 1 } },
 
-        // ── WEBHOOK VALIDAR ──
-        { id: 'n35', type: 'webhook', position_x: 900, position_y: 2200, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/validar-reserva', method: 'POST', body: '{"dados": "{{reserva_dados}}", "phone": "{{phone}}"}', saveResponseAs: 'validacao' } },
-        { id: 'n36', type: 'condition', position_x: 900, position_y: 2320, data: { type: 'condition', branches: [
+        // ── WEBHOOK VALIDAR + RESERVAR no Sheets ──
+        { id: 'n35', type: 'webhook', position_x: 1000, position_y: 1950, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/validar-e-reservar', method: 'POST', body: '{"dados": "{{reserva_dados}}", "phone": "{{phone}}", "name": "{{name}}"}', saveResponseAs: 'resultado_reserva' } },
+        { id: 'n36', type: 'condition', position_x: 1000, position_y: 2050, data: { type: 'condition', branches: [
           { id: 'bv1', label: '❌ Inválido', logic: 'AND', rules: [{ id: 'rv1', field: 'variable', fieldName: 'webhook_ok', operator: 'equals', value: 'false' }] },
         ] } },
 
-        // Inválido
-        { id: 'n37', type: 'send_message', position_x: 700, position_y: 2440, data: { type: 'send_message', subtype: 'text', message: 'Opção inválida (horário reservado ou erro de digitação). Confira os horários disponíveis novamente.' } },
+        // Inválido → tenta de novo
+        { id: 'n37', type: 'send_message', position_x: 800, position_y: 2200, data: { type: 'send_message', subtype: 'text', message: 'Opção inválida (horário reservado ou erro de digitação). Confira os horários disponíveis novamente.' } },
 
-        // Válido → PIX
-        { id: 'n38', type: 'send_message', position_x: 1100, position_y: 2440, data: { type: 'send_message', subtype: 'text', message: 'Ótimo! Estamos quase lá! 🎉\n\nPara reservar, é necessário um PIX no valor de R$ [valor] que será descontado do montante total.\n\nChave PIX: [sua chave]\n\nAguardamos o envio do comprovante.' } },
-        { id: 'n39', type: 'assign_agent', position_x: 1100, position_y: 2580, data: { type: 'assign_agent', agentId: 'round_robin', message: 'Um atendente vai confirmar seu pagamento e finalizar a reserva! 🚀' } },
+        // ── VÁLIDO → Confirmação + PIX + Notifica dono ──
+        { id: 'n38', type: 'send_message', position_x: 1200, position_y: 2200, data: { type: 'send_message', subtype: 'text', message: '✅ *Horário reservado com sucesso!*\n\n{{resultado_reserva}}\n\nPara confirmar, é necessário um PIX no valor de R$ [valor] que será descontado do montante total.\n\nChave PIX: [sua chave]\n\nAguardamos o envio do comprovante.' } },
+
+        // Webhook notifica o dono no WhatsApp
+        { id: 'n39', type: 'webhook', position_x: 1200, position_y: 2320, data: { type: 'webhook', url: 'https://SEU-N8N.com/webhook/notificar-dono', method: 'POST', body: '{"reserva": "{{resultado_reserva}}", "cliente_phone": "{{phone}}", "cliente_nome": "{{name}}", "dados": "{{reserva_dados}}"}', saveResponseAs: 'notif_dono' } },
+
+        // Aguardar comprovante → atendente
+        { id: 'n40', type: 'send_message', position_x: 1200, position_y: 2440, data: { type: 'send_message', subtype: 'text', message: 'Quando enviar o comprovante aqui, um atendente vai confirmar e finalizar sua reserva! 🚀' } },
+        { id: 'n41', type: 'assign_agent', position_x: 1200, position_y: 2540, data: { type: 'assign_agent', agentId: 'round_robin', message: '📋 Nova reserva pendente de pagamento' } },
       ],
       edges: [
         // Menu principal
         { id: 'e1', source_node: 'n1', target_node: 'n2', source_handle: 'success' },
         { id: 'e2', source_node: 'n2', target_node: 'n3', source_handle: 'success' },
         { id: 'e3', source_node: 'n3', target_node: 'n4', source_handle: 'success' },
+        // Fallback menu → "não entendi" → volta menu
+        { id: 'ef1', source_node: 'n4', target_node: 'nf1', source_handle: 'fallback' },
+        { id: 'ef1b', source_node: 'nf1', target_node: 'n2', source_handle: 'success' },
 
         // Outro Assunto
         { id: 'e4', source_node: 'n4', target_node: 'n5', source_handle: 'branch_b1' },
         { id: 'e5', source_node: 'n5', target_node: 'n6', source_handle: 'success' },
         { id: 'e6', source_node: 'n6', target_node: 'n7', source_handle: 'success' },
         { id: 'e7', source_node: 'n7', target_node: 'n8', source_handle: 'branch_bo1' },
-        { id: 'e8', source_node: 'n8', target_node: 'n9', source_handle: 'success' },
         { id: 'e9', source_node: 'n7', target_node: 'n10', source_handle: 'branch_bo2' },
-        { id: 'e10', source_node: 'n10', target_node: 'n11', source_handle: 'success' },
         { id: 'e11', source_node: 'n7', target_node: 'n12', source_handle: 'branch_bo3' },
-        { id: 'e12', source_node: 'n12', target_node: 'n13', source_handle: 'success' },
+        // Fallback outro assunto
+        { id: 'ef2', source_node: 'n7', target_node: 'nf2', source_handle: 'fallback' },
+        { id: 'ef2b', source_node: 'nf2', target_node: 'n5', source_handle: 'success' },
+        // Infos → "Posso ajudar?"
+        { id: 'e8', source_node: 'n8', target_node: 'na1', source_handle: 'success' },
+        { id: 'e10', source_node: 'n10', target_node: 'na1', source_handle: 'success' },
+        { id: 'e12', source_node: 'n12', target_node: 'na1', source_handle: 'success' },
+        { id: 'ea1', source_node: 'na1', target_node: 'na2', source_handle: 'success' },
+        { id: 'ea2', source_node: 'na2', target_node: 'na3', source_handle: 'success' },
+        // Sim → volta menu | Não → encerra
+        { id: 'ea3', source_node: 'na3', target_node: 'n2', source_handle: 'branch_ba1' },
+        { id: 'ea4', source_node: 'na3', target_node: 'na4', source_handle: 'fallback' },
+        { id: 'ea5', source_node: 'na4', target_node: 'na5', source_handle: 'success' },
 
         // Reservas
         { id: 'e13', source_node: 'n4', target_node: 'n14', source_handle: 'branch_b2' },
@@ -445,6 +476,9 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e15', source_node: 'n15', target_node: 'n16', source_handle: 'success' },
         { id: 'e16', source_node: 'n16', target_node: 'n17', source_handle: 'branch_br1' },
         { id: 'e17', source_node: 'n16', target_node: 'n18', source_handle: 'branch_br2' },
+        // Fallback reservas
+        { id: 'ef3', source_node: 'n16', target_node: 'nf3', source_handle: 'fallback' },
+        { id: 'ef3b', source_node: 'nf3', target_node: 'n14', source_handle: 'success' },
 
         // Quadra
         { id: 'e18', source_node: 'n4', target_node: 'n19', source_handle: 'branch_b3' },
@@ -452,10 +486,17 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e20', source_node: 'n20', target_node: 'n21', source_handle: 'success' },
         { id: 'e21', source_node: 'n21', target_node: 'n22', source_handle: 'branch_bq2' },
         { id: 'e22', source_node: 'n21', target_node: 'n23', source_handle: 'branch_bq1' },
+        // Fallback quadra
+        { id: 'ef4', source_node: 'n21', target_node: 'nf4', source_handle: 'fallback' },
+        { id: 'ef4b', source_node: 'nf4', target_node: 'n19', source_handle: 'success' },
+
+        // Escolher quadra
         { id: 'e23', source_node: 'n23', target_node: 'n24', source_handle: 'success' },
         { id: 'e24', source_node: 'n24', target_node: 'n25', source_handle: 'success' },
+        // Fallback tipo quadra → volta escolher
+        { id: 'ef5', source_node: 'n25', target_node: 'n23', source_handle: 'fallback' },
 
-        // Quadra Interna/Externa → webhook → horários
+        // Webhook horários
         { id: 'e25', source_node: 'n25', target_node: 'n26', source_handle: 'branch_bt1' },
         { id: 'e26', source_node: 'n26', target_node: 'n27', source_handle: 'success' },
         { id: 'e27', source_node: 'n27', target_node: 'n30', source_handle: 'success' },
@@ -463,13 +504,17 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e29', source_node: 'n28', target_node: 'n29', source_handle: 'success' },
         { id: 'e30', source_node: 'n29', target_node: 'n30', source_handle: 'success' },
 
-        // Reservar ou ver outra
+        // Ações após horários
         { id: 'e31', source_node: 'n30', target_node: 'n31', source_handle: 'success' },
         { id: 'e32', source_node: 'n31', target_node: 'n32', source_handle: 'success' },
         { id: 'e33', source_node: 'n32', target_node: 'n23', source_handle: 'branch_bh2' },
         { id: 'e34', source_node: 'n32', target_node: 'n33', source_handle: 'branch_bh1' },
+        // Voltar ao menu
+        { id: 'e33m', source_node: 'n32', target_node: 'n2', source_handle: 'branch_bh3' },
+        // Fallback ações → volta
+        { id: 'ef6', source_node: 'n32', target_node: 'n30', source_handle: 'fallback' },
 
-        // Dados reserva → validação
+        // Dados reserva → validar + reservar
         { id: 'e35', source_node: 'n33', target_node: 'n34', source_handle: 'success' },
         { id: 'e36', source_node: 'n34', target_node: 'n35', source_handle: 'success' },
         { id: 'e37', source_node: 'n35', target_node: 'n36', source_handle: 'success' },
@@ -478,9 +523,11 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e38', source_node: 'n36', target_node: 'n37', source_handle: 'branch_bv1' },
         { id: 'e39', source_node: 'n37', target_node: 'n30', source_handle: 'success' },
 
-        // Válido → PIX → atendente
+        // Válido → confirmação + PIX + notifica dono → atendente
         { id: 'e40', source_node: 'n36', target_node: 'n38', source_handle: 'fallback' },
         { id: 'e41', source_node: 'n38', target_node: 'n39', source_handle: 'success' },
+        { id: 'e42', source_node: 'n39', target_node: 'n40', source_handle: 'success' },
+        { id: 'e43', source_node: 'n40', target_node: 'n41', source_handle: 'success' },
       ],
     },
   ]
