@@ -188,7 +188,7 @@ export default function DashboardPage() {
   const deliveryRate = analytics?.deliveryRate ?? 0
   const readRate = analytics?.readRate ?? 0
   const prev = analytics?.previous || {}
-  const deltaFn = (curr: number, prevVal: number) => prevVal === 0 ? null : Math.round(((curr - prevVal) / prevVal) * 100)
+  const deltaFn = (curr: number, prevVal: number | undefined) => (!prevVal || prevVal === 0) ? null : Math.round(((curr - prevVal) / prevVal) * 100)
   const byDay = analytics?.byDay || {}
   const byAgent: { name: string; count: number }[] = analytics?.byAgent || []
   const agentRanking: { name: string; messagesResponded: number; avgResponseMinutes: number | null; conversationsClosed: number; openConversations: number }[] = analytics?.agentRanking || []
