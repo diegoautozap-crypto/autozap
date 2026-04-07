@@ -778,31 +778,6 @@ export default function InboxPage() {
               </button>
             )
           })}
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowLabelFilter(p => !p)}
-              style={{ padding: '5px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: labelFilter !== 'all' ? '#ede9fe' : 'transparent', color: labelFilter !== 'all' ? '#7c3aed' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' }}
-              title="Filtrar por etiqueta">
-              <Tag size={13} />
-            </button>
-            {showLabelFilter && (
-              <>
-                <div onClick={() => setShowLabelFilter(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
-                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '150px', marginTop: '4px' }}>
-                  <button onClick={() => { setLabelFilter('all'); setShowLabelFilter(false) }}
-                    style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === 'all' ? '#ede9fe' : 'transparent', color: labelFilter === 'all' ? '#7c3aed' : 'var(--text-muted)', textAlign: 'left', transition: 'all 0.1s' }}>
-                    Todas
-                  </button>
-                  {CONVERSATION_LABELS.map(label => (
-                    <button key={label.id} onClick={() => { setLabelFilter(labelFilter === label.id ? 'all' : label.id); setShowLabelFilter(false) }}
-                      style={{ width: '100%', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: labelFilter === label.id ? `${label.color}18` : 'transparent', color: labelFilter === label.id ? label.color : 'var(--text-muted)', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s' }}>
-                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
-                      {label.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
         </div>
         {/* Barra de ações em massa */}
         {bulkMode && (
