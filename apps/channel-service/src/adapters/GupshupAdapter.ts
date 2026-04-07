@@ -55,11 +55,14 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'document') {
       message = { type: 'file', url: mediaUrl, filename: body || 'document' }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
-      message = {
+      // Gupshup: enviar via Meta Cloud API format
+      const interactivePayload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
         type: 'interactive',
         interactive: {
           type: 'button',
-          ...(input.header ? { header: { type: 'text', text: input.header } } : {}),
           body: { text: body || '' },
           ...(input.footer ? { footer: { text: input.footer } } : {}),
           action: {
@@ -70,27 +73,60 @@ export class GupshupAdapter implements IChannelAdapter {
           },
         },
       }
+      // Send via Gupshup v3 endpoint
+      const v3Response = await fetch('https://partner.gupshup.io/wa/api/v1/msg', {
+        method: 'POST',
+        headers: { apikey: creds.apiKey!, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          channel: 'whatsapp',
+          source: creds.source!,
+          destination: to,
+          'src.name': creds.srcName || creds.source!,
+          message: JSON.stringify(interactivePayload.interactive),
+          'message.type': 'interactive',
+        }).toString(),
+      })
+      const v3Data = await v3Response.json() as any
+      logger.debug('[GupshupAdapter] interactive send response:', JSON.stringify(v3Data).slice(0, 500))
+      if (!v3Response.ok || v3Data.status === 'error') {
+        throw new Error(`Gupshup interactive send failed: ${v3Data.message || `HTTP ${v3Response.status}`}`)
+      }
+      return { externalId: v3Data.messageId || v3Data.id || '', status: 'sent' as MessageStatus }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
-      message = {
-        type: 'interactive',
-        interactive: {
-          type: 'list',
-          ...(input.header ? { header: { type: 'text', text: input.header } } : {}),
-          body: { text: body || '' },
-          ...(input.footer ? { footer: { text: input.footer } } : {}),
-          action: {
-            button: input.listButtonText || 'Ver opções',
-            sections: [{
-              title: 'Opções',
-              rows: input.listRows.slice(0, 10).map(r => ({
-                id: r.id,
-                title: r.title.slice(0, 24),
-                ...(r.description ? { description: r.description.slice(0, 72) } : {}),
-              })),
-            }],
-          },
+      const interactiveList = {
+        type: 'list',
+        body: { text: body || '' },
+        ...(input.footer ? { footer: { text: input.footer } } : {}),
+        action: {
+          button: input.listButtonText || 'Ver opções',
+          sections: [{
+            title: 'Opções',
+            rows: input.listRows.slice(0, 10).map(r => ({
+              id: r.id,
+              title: r.title.slice(0, 24),
+              ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+            })),
+          }],
         },
       }
+      const listResponse = await fetch('https://partner.gupshup.io/wa/api/v1/msg', {
+        method: 'POST',
+        headers: { apikey: creds.apiKey!, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          channel: 'whatsapp',
+          source: creds.source!,
+          destination: to,
+          'src.name': creds.srcName || creds.source!,
+          message: JSON.stringify(interactiveList),
+          'message.type': 'interactive',
+        }).toString(),
+      })
+      const listData = await listResponse.json() as any
+      logger.debug('[GupshupAdapter] interactive list send response:', JSON.stringify(listData).slice(0, 500))
+      if (!listResponse.ok || listData.status === 'error') {
+        throw new Error(`Gupshup list send failed: ${listData.message || `HTTP ${listResponse.status}`}`)
+      }
+      return { externalId: listData.messageId || listData.id || '', status: 'sent' as MessageStatus }
     } else {
       message = { type: 'text', text: body || '' }
     }
