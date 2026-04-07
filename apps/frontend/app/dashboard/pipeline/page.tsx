@@ -358,11 +358,18 @@ export default function PipelinePage() {
   const { data: board, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pipeline-board', channelFilter, campaignFilter, selectedPipelineId],
     queryFn: async () => {
-      // Carrega pipeline cards (independentes por pipeline)
+      // Carrega pipeline cards APENAS da pipeline selecionada
       const cardsParams = new URLSearchParams()
-      if (selectedPipelineId) cardsParams.set('pipelineId', selectedPipelineId)
-      const { data: cardsRes } = await conversationApi.get(`/pipeline-cards?${cardsParams.toString()}`)
-      const cards = cardsRes.data || []
+      if (selectedPipelineId) {
+        cardsParams.set('pipelineId', selectedPipelineId)
+      } else {
+        cardsParams.set('pipelineId', 'null')  // Só cards sem pipeline (principal)
+      }
+      let cards: any[] = []
+      try {
+        const { data: cardsRes } = await conversationApi.get(`/pipeline-cards?${cardsParams.toString()}`)
+        cards = cardsRes.data || []
+      } catch {}
       const cardContactIds = new Set(cards.map((c: any) => c.contact_id))
 
       // Carrega colunas pra montar board vazio

@@ -557,7 +557,11 @@ router.get('/pipeline-cards', async (req, res, next) => {
       .select('*, contacts(id, name, phone, email, metadata, contact_tags(tags(id, name, color)))')
       .eq('tenant_id', req.auth.tid)
       .order('sort_order', { ascending: true })
-    if (pipelineId) query = query.eq('pipeline_id', pipelineId)
+    if (pipelineId === 'null') {
+      query = query.is('pipeline_id', null)
+    } else if (pipelineId) {
+      query = query.eq('pipeline_id', pipelineId)
+    }
     const { data, error } = await query
     if (error) throw error
     res.json(ok(data || []))
