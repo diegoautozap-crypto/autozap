@@ -7,6 +7,7 @@ import type { SendMessageJob } from '../services/types'
 
 const REDIS_URL = process.env.REDIS_URL!
 const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || 'http://localhost:3003'
+const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
 
 function getRedisConnection() {
@@ -25,6 +26,15 @@ function getRedisConnection() {
 }
 
 const connection = getRedisConnection()
+
+// ─── Auto-reply queue ────────────────────────────────────────────────────────
+export const autoReplyQueue = new Queue('auto-reply', {
+  connection,
+  defaultJobOptions: {
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  },
+})
 
 export const messageQueue = new Queue<SendMessageJob>('message_queue', {
   connection,
@@ -149,6 +159,88 @@ export function startRetryWorker(): Worker {
   )
 
   logger.info('Retry worker started')
+  return worker
+}
+
+// ─── Auto-reply worker ───────────────────────────────────────────────────────
+export function startAutoReplyWorker(): Worker {
+  const worker = new Worker(
+    'auto-reply',
+    async (job) => {
+      const { tenantId, conversationId, channelId, contactId, phone } = job.data
+
+      // Check if someone already replied
+      const { data: lastMsg } = await db
+        .from('messages')
+        .select('direction')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastMsg?.direction === 'outbound') return // Already replied, skip
+
+      // Check if bot is still active and conversation not closed
+      const { data: conv } = await db
+        .from('conversations')
+        .select('bot_active, status')
+        .eq('id', conversationId)
+        .single()
+
+      if (!conv?.bot_active || conv.status === 'closed') return
+
+      // Check tenant settings for auto-reply message
+      const { data: tenant } = await db
+        .from('tenants')
+        .select('settings')
+        .eq('id', tenantId)
+        .single()
+
+      const autoReplyEnabled = tenant?.settings?.autoReplyEnabled !== false // default true
+      if (!autoReplyEnabled) return
+
+      const autoReplyMsg =
+        tenant?.settings?.autoReplyMessage ||
+        'Recebemos sua mensagem! Um atendente vai te responder em breve. \u{1F60A}'
+
+      // Send auto-reply via internal endpoint
+      try {
+        const sendRes = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': INTERNAL_SECRET,
+          },
+          body: JSON.stringify({
+            tenantId,
+            channelId,
+            contactId,
+            conversationId,
+            to: phone,
+            contentType: 'text',
+            body: autoReplyMsg,
+          }),
+        })
+
+        if (!sendRes.ok) {
+          const err = await sendRes.json().catch(() => ({}))
+          logger.error('Auto-reply failed to send', { err, conversationId })
+          return
+        }
+
+        logger.info('Auto-reply sent', { conversationId, tenantId })
+      } catch (err) {
+        logger.error('Auto-reply send error', { err, conversationId })
+      }
+    },
+    { connection, concurrency: 5 },
+  )
+
+  worker.on('failed', (job, err) => {
+    logger.error('Auto-reply job failed', { jobId: job?.id, error: err.message })
+  })
+
+  logger.info('Auto-reply worker started')
   return worker
 }
 

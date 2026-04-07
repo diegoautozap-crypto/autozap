@@ -7,7 +7,7 @@ import { useT } from '@/lib/i18n'
 import {
   Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp,
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
-  Clock, UserCheck, Workflow, X,
+  Clock, UserCheck, Workflow, X, Trophy,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { GridSkeleton } from '@/components/ui/skeleton'
@@ -182,6 +182,7 @@ export default function DashboardPage() {
   const readRate = analytics?.readRate ?? 0
   const byDay = analytics?.byDay || {}
   const byAgent: { name: string; count: number }[] = analytics?.byAgent || []
+  const agentRanking: { name: string; messagesResponded: number; avgResponseMinutes: number | null; conversationsClosed: number; openConversations: number }[] = analytics?.agentRanking || []
   const avgResponseMinutes: number | null = analytics?.avgResponseMinutes ?? null
   const activeFlowsToday: number = analytics?.activeFlowsToday ?? 0
   const flowExecutionsToday: number = analytics?.flowExecutionsToday ?? 0
@@ -330,6 +331,53 @@ export default function DashboardPage() {
       </div>
 
       {/* Funil de conversão — removido do dashboard */}
+
+      {/* Ranking de atendentes */}
+      {(role === 'owner' || role === 'admin') && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '20px', boxShadow: 'var(--shadow)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <Trophy size={15} color="#d97706" />
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.agentRanking')}</h3>
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '0 0 16px' }}>{t('dashboard.agentRankingDesc')}</p>
+
+          {agentRanking.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noAgentRanking')}</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.byAgent')}</th>
+                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.messagesResponded')}</th>
+                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.avgTime')}</th>
+                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.closed')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentRanking.map((agent, i) => {
+                    const medalColors = ['#d97706', '#9ca3af', '#b45309']
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--divider)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: i < 3 ? medalColors[i] : 'var(--text-faint)' }}>
+                          {i + 1}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>{agent.name}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#22c55e' }}>{agent.messagesResponded}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>{agent.conversationsClosed}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Acesso rápido */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>

@@ -468,6 +468,18 @@ router.post('/conversations/:id/read', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+router.post('/conversations/:id/unread', async (req, res, next) => {
+  try {
+    const { error } = await db
+      .from('conversations')
+      .update({ unread_count: 1 })
+      .eq('id', req.params.id)
+      .eq('tenant_id', req.auth.tid)
+    if (error) throw error
+    res.json(ok({ message: 'Marked as unread' }))
+  } catch (err) { next(err) }
+})
+
 // ─── Tarefas / Follow-ups ─────────────────────────────────────────────────────
 
 router.get('/tasks', async (req, res, next) => {

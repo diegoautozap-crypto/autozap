@@ -78,6 +78,12 @@ const translations: Record<string, Record<string, string>> = {
     'dashboard.viewPerformanceOf': 'Ver desempenho de',
     'dashboard.viewPlan': 'Ver plano',
     'dashboard.wholeTeam': 'Toda a equipe',
+    'dashboard.agentRanking': 'Ranking de atendentes',
+    'dashboard.agentRankingDesc': 'Top atendentes nos ultimos 7 dias',
+    'dashboard.messagesResponded': 'Msgs respondidas',
+    'dashboard.avgTime': 'Tempo medio',
+    'dashboard.closed': 'Fechadas',
+    'dashboard.noAgentRanking': 'Nenhum atendente com atividade recente',
 
     // Inbox
     'inbox.title': 'Inbox',
@@ -1273,6 +1279,12 @@ const translations: Record<string, Record<string, string>> = {
     'dashboard.viewPerformanceOf': 'View performance of',
     'dashboard.viewPlan': 'View plan',
     'dashboard.wholeTeam': 'Whole team',
+    'dashboard.agentRanking': 'Agent ranking',
+    'dashboard.agentRankingDesc': 'Top agents in the last 7 days',
+    'dashboard.messagesResponded': 'Msgs responded',
+    'dashboard.avgTime': 'Avg time',
+    'dashboard.closed': 'Closed',
+    'dashboard.noAgentRanking': 'No agents with recent activity',
 
     'inbox.title': 'Inbox',
     'inbox.searchContact': 'Search contact...',
@@ -2454,6 +2466,12 @@ const translations: Record<string, Record<string, string>> = {
     'dashboard.viewPerformanceOf': 'Ver rendimiento de',
     'dashboard.viewPlan': 'Ver plan',
     'dashboard.wholeTeam': 'Todo el equipo',
+    'dashboard.agentRanking': 'Ranking de agentes',
+    'dashboard.agentRankingDesc': 'Top agentes en los ultimos 7 dias',
+    'dashboard.messagesResponded': 'Msgs respondidas',
+    'dashboard.avgTime': 'Tiempo medio',
+    'dashboard.closed': 'Cerradas',
+    'dashboard.noAgentRanking': 'Ningun agente con actividad reciente',
 
     // Inbox
     'inbox.title': 'Bandeja',

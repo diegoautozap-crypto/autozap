@@ -205,6 +205,18 @@ export class MessageService {
         .catch(err => logger.error('AI chatbot error', { err }))
     }
 
+    // ─── Schedule auto-reply check (5 min delay) ─────────────────────────────
+    try {
+      const { autoReplyQueue } = await import('../workers/message.worker')
+      await autoReplyQueue.add(
+        'auto-reply-check',
+        { tenantId, conversationId: conversation.id, channelId, contactId: contact.id, phone: msg.from },
+        { delay: 5 * 60 * 1000, jobId: `auto-reply-${conversation.id}-${Date.now()}` },
+      )
+    } catch (err) {
+      logger.error('Failed to schedule auto-reply', { err })
+    }
+
     logger.info('Inbound message processed', { tenantId, contactId: contact.id, conversationId: conversation.id })
   }
 

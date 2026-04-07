@@ -9,6 +9,7 @@ import {
   Search, Send, Loader2, MessageSquare, Check, CheckCheck, Music, FileText,
   User, Phone, Clock, Tag, ChevronRight, Paperclip, X, Mic, Square, Bot,
   UserCheck, Zap, StickyNote, Plus, Trash2, GitBranch, ChevronLeft, ShoppingBag, History,
+  Mail, Pin,
 } from 'lucide-react'
 import { subscribeTenant } from '@/lib/pusher'
 import { createClient } from '@supabase/supabase-js'
@@ -272,6 +273,11 @@ export default function InboxPage() {
   const [hasMoreConvs, setHasMoreConvs] = useState(true)
   const [showQuickReplies, setShowQuickReplies] = useState(false)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [inboxFilter, setInboxFilter] = useState<'all' | 'unanswered' | 'mine' | 'waiting'>('all')
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('autozap-pinned') || '[]')) } catch { return new Set() }
+  })
+  const [hoveredConvId, setHoveredConvId] = useState<string | null>(null)
   const dragCounterRef = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -290,6 +296,7 @@ export default function InboxPage() {
   })
   const allowedChannels: string[] = userPerms?.allowed_channels || []
   useEffect(() => { if (allowedChannels.length === 1 && channelFilter === 'all') setChannelFilter(allowedChannels[0]) }, [allowedChannels.join(',')])
+  useEffect(() => { localStorage.setItem('autozap-pinned', JSON.stringify([...pinnedIds])) }, [pinnedIds])
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
@@ -615,7 +622,19 @@ export default function InboxPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
   }
 
-  const conversations = allConvs.filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
+  const conversations = allConvs
+    .filter((c: any) => !search || c.contacts?.name?.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search))
+    .filter((c: any) => {
+      if (inboxFilter === 'unanswered') return c.unread_count > 0
+      if (inboxFilter === 'mine') return c.assigned_to === (user as any)?.id
+      if (inboxFilter === 'waiting') return c.status === 'waiting'
+      return true
+    })
+    .sort((a: any, b: any) => {
+      const aPinned = pinnedIds.has(a.id) ? 1 : 0
+      const bPinned = pinnedIds.has(b.id) ? 1 : 0
+      return bPinned - aPinned
+    })
   const selectedChannelName = channels?.find((ch: any) => ch.id === selectedConv?.channel_id)?.name
   const contactName = selectedConv?.contacts?.name || selectedConv?.contacts?.phone || ''
   const avatarColor = getAvatarColor(contactName)
@@ -648,6 +667,19 @@ export default function InboxPage() {
               onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
           </div>
+        </div>
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+          {([
+            { key: 'all' as const, label: 'Todas' },
+            { key: 'unanswered' as const, label: 'Sem resposta' },
+            { key: 'mine' as const, label: 'Minhas' },
+            { key: 'waiting' as const, label: 'Aguardando' },
+          ]).map(f => (
+            <button key={f.key} onClick={() => setInboxFilter(f.key)}
+              style={{ padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${inboxFilter === f.key ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: inboxFilter === f.key ? '#f0fdf4' : 'transparent', color: inboxFilter === f.key ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              {f.label}
+            </button>
+          ))}
         </div>
         {visibleChannels.length > 1 && (
           <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
@@ -717,9 +749,9 @@ export default function InboxPage() {
               const convBotActive = conv.bot_active !== false
               return (
                 <div key={conv.id} onClick={() => bulkMode ? setBulkSelected(prev => { const next = new Set(prev); next.has(conv.id) ? next.delete(conv.id) : next.add(conv.id); return next }) : handleSelectConv(conv.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderBottom: '1px solid var(--divider)', cursor: 'pointer', background: bulkSelected.has(conv.id) ? '#eff6ff' : isSel ? '#f0fdf4' : 'transparent', borderLeft: `3px solid ${isSel && !bulkMode ? '#22c55e' : 'transparent'}`, transition: 'background 0.1s' }}
-                  onMouseEnter={e => { if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card-hover)' }}
-                  onMouseLeave={e => { if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderBottom: '1px solid var(--divider)', cursor: 'pointer', background: bulkSelected.has(conv.id) ? '#eff6ff' : isSel ? '#f0fdf4' : 'transparent', borderLeft: `3px solid ${isSel && !bulkMode ? '#22c55e' : 'transparent'}`, transition: 'background 0.1s', position: 'relative' }}
+                  onMouseEnter={e => { setHoveredConvId(conv.id); if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card-hover)' }}
+                  onMouseLeave={e => { setHoveredConvId(null); if (!isSel && !bulkSelected.has(conv.id)) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
                   {bulkMode && (
                     <div style={{ width: '18px', height: '18px', borderRadius: '4px', border: `2px solid ${bulkSelected.has(conv.id) ? '#22c55e' : 'var(--text-faintest)'}`, background: bulkSelected.has(conv.id) ? '#22c55e' : 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.1s' }}>
                       {bulkSelected.has(conv.id) && <Check size={11} color="#fff" strokeWidth={3} />}
@@ -737,6 +769,21 @@ export default function InboxPage() {
                     {convChannelName && channelFilter === 'all' && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', display: 'inline-block', marginBottom: '2px' }}>{convChannelName}</span>}
                     <div style={{ color: 'var(--text-faint)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>
                   </div>
+                  {pinnedIds.has(conv.id) && <span style={{ fontSize: '12px', flexShrink: 0, lineHeight: 1 }} title="Fixada">📌</span>}
+                  {hoveredConvId === conv.id && !bulkMode && (
+                    <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={(e) => { e.stopPropagation(); setPinnedIds(prev => { const next = new Set(prev); next.has(conv.id) ? next.delete(conv.id) : next.add(conv.id); return next }) }}
+                        title={pinnedIds.has(conv.id) ? 'Desafixar' : 'Fixar'}
+                        style={{ width: '24px', height: '24px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: pinnedIds.has(conv.id) ? '#fef3c7' : 'var(--bg-input)', color: pinnedIds.has(conv.id) ? '#d97706' : 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, transition: 'all 0.1s' }}>
+                        <Pin size={12} />
+                      </button>
+                      <button onClick={async (e) => { e.stopPropagation(); await conversationApi.post(`/conversations/${conv.id}/unread`); queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false }) }}
+                        title="Marcar como não lida"
+                        style={{ width: '24px', height: '24px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, transition: 'all 0.1s' }}>
+                        <Mail size={12} />
+                      </button>
+                    </div>
+                  )}
                   {conv.unread_count > 0 && <div style={{ background: '#22c55e', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', flexShrink: 0, minWidth: '18px', textAlign: 'center' }}>{conv.unread_count}</div>}
                 </div>
               )

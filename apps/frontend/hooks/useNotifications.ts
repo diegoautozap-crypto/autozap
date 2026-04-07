@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth.store'
+import { useUnreadStore } from '@/store/unread.store'
 import { subscribeTenant } from '@/lib/pusher'
+import { conversationApi } from '@/lib/api'
 
 function playNotificationSound() {
   try {
@@ -21,24 +23,54 @@ function playNotificationSound() {
   } catch {}
 }
 
-let unreadCount = 0
-let originalTitle = ''
+const ORIGINAL_TITLE = 'AutoZap'
 
-function incrementBadge() {
-  if (!originalTitle) originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
-  unreadCount++
-  document.title = `(${unreadCount}) ${originalTitle}`
+function updateDocumentTitle(count: number) {
+  document.title = count > 0 ? `(${count}) AutoZap` : ORIGINAL_TITLE
 }
 
-function clearBadge() {
-  unreadCount = 0
-  if (originalTitle) document.title = originalTitle
+async function fetchTotalUnread(): Promise<number> {
+  try {
+    const { data } = await conversationApi.get('/conversations/counts')
+    // Use the open count as a proxy for unread — conversations with activity
+    return data?.data?.open || 0
+  } catch {
+    return 0
+  }
 }
 
 export function useNotifications() {
   const { user } = useAuthStore()
   const tenantId = (user as any)?.tenantId || (user as any)?.tid
   const swRegistered = useRef(false)
+  const { totalUnread, setTotalUnread, increment } = useUnreadStore()
+
+  // Sync document title with unread count
+  useEffect(() => {
+    updateDocumentTitle(totalUnread)
+  }, [totalUnread])
+
+  // Fetch real unread count on mount and periodically
+  useEffect(() => {
+    let mounted = true
+    const sync = async () => {
+      const count = await fetchTotalUnread()
+      if (mounted) setTotalUnread(count)
+    }
+    sync()
+    const interval = setInterval(sync, 30_000)
+    return () => { mounted = false; clearInterval(interval) }
+  }, [setTotalUnread])
+
+  // Clear badge on window focus
+  useEffect(() => {
+    const handleFocus = () => {
+      // Re-fetch actual count when user returns
+      fetchTotalUnread().then(setTotalUnread)
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [setTotalUnread])
 
   const registerSW = useCallback(async () => {
     if (swRegistered.current || typeof window === 'undefined') return
@@ -62,24 +94,17 @@ export function useNotifications() {
     if (typeof window === 'undefined') return
 
     playNotificationSound()
-    incrementBadge()
+    increment()
 
     if (Notification.permission !== 'granted') return
 
-    // Sem verificação de foco — notifica sempre
     const n = new Notification(title, { body })
     n.onclick = () => {
       window.focus()
       window.location.href = url
       n.close()
     }
-  }, [])
-
-  useEffect(() => {
-    const handleFocus = () => clearBadge()
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+  }, [increment])
 
   useEffect(() => {
     registerSW()
@@ -97,12 +122,12 @@ export function useNotifications() {
       const preview = data?.body
         ? data.body.slice(0, 60) + (data.body.length > 60 ? '...' : '')
         : 'Nova mensagem'
-      showNotification(`💬 ${contactName}`, preview, '/dashboard/inbox')
+      showNotification(`\u{1F4AC} ${contactName}`, preview, '/dashboard/inbox')
     }
 
     channel.bind('inbound.message', handler)
     return () => { channel.unbind('inbound.message', handler) }
   }, [tenantId, showNotification])
 
-  return { requestPermission, clearBadge }
+  return { requestPermission }
 }

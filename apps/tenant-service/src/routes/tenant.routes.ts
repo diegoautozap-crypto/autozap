@@ -382,6 +382,104 @@ router.get('/analytics', async (req, res, next) => {
     }
     const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count).slice(0, 5)
 
+    // ─── Agent ranking (top agents by activity in last 7 days) ───────────────
+    const { data: agentOutboundMsgs } = await db
+      .from('messages')
+      .select('conversation_id, created_at, direction')
+      .eq('tenant_id', tenantId)
+      .eq('direction', 'outbound')
+      .is('campaign_id', null)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: true })
+
+    const { data: agentInboundMsgs } = await db
+      .from('messages')
+      .select('conversation_id, created_at, direction')
+      .eq('tenant_id', tenantId)
+      .eq('direction', 'inbound')
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: true })
+
+    // Get all conversations with assigned agents
+    const { data: allAssignedConvs } = await db
+      .from('conversations')
+      .select('id, assigned_to, status, users(name)')
+      .eq('tenant_id', tenantId)
+      .not('assigned_to', 'is', null)
+
+    // Build per-agent ranking
+    const rankingMap: Record<string, { name: string; messagesResponded: number; avgResponseMinutes: number | null; conversationsClosed: number; openConversations: number }> = {}
+
+    // Map conversation_id -> assigned_to
+    const convToAgent: Record<string, string> = {}
+    const convToAgentName: Record<string, string> = {}
+    for (const conv of (allAssignedConvs || [])) {
+      convToAgent[conv.id] = conv.assigned_to
+      convToAgentName[conv.id] = (conv as any).users?.name || 'Atendente'
+      const agentId = conv.assigned_to
+      if (!rankingMap[agentId]) {
+        rankingMap[agentId] = { name: (conv as any).users?.name || 'Atendente', messagesResponded: 0, avgResponseMinutes: null, conversationsClosed: 0, openConversations: 0 }
+      }
+      if (conv.status === 'open') rankingMap[agentId].openConversations++
+    }
+
+    // Count closed conversations (last 7 days) per agent
+    const { data: closedConvsAll } = await db
+      .from('conversations')
+      .select('assigned_to')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'closed')
+      .not('assigned_to', 'is', null)
+      .gte('updated_at', sevenDaysAgo.toISOString())
+
+    for (const conv of (closedConvsAll || [])) {
+      if (rankingMap[conv.assigned_to]) {
+        rankingMap[conv.assigned_to].conversationsClosed++
+      }
+    }
+
+    // Count outbound messages per agent (non-campaign) and calculate avg response time
+    const inboundByConv: Record<string, number[]> = {}
+    for (const m of (agentInboundMsgs || [])) {
+      if (!inboundByConv[m.conversation_id]) inboundByConv[m.conversation_id] = []
+      inboundByConv[m.conversation_id].push(new Date(m.created_at).getTime())
+    }
+
+    const agentResponseTimes: Record<string, number[]> = {}
+    for (const m of (agentOutboundMsgs || [])) {
+      const agentId = convToAgent[m.conversation_id]
+      if (!agentId) continue
+      if (!rankingMap[agentId]) {
+        rankingMap[agentId] = { name: convToAgentName[m.conversation_id] || 'Atendente', messagesResponded: 0, avgResponseMinutes: null, conversationsClosed: 0, openConversations: 0 }
+      }
+      rankingMap[agentId].messagesResponded++
+
+      // Find closest inbound message before this outbound
+      const inbounds = inboundByConv[m.conversation_id] || []
+      const outTime = new Date(m.created_at).getTime()
+      let closestInbound: number | null = null
+      for (let i = inbounds.length - 1; i >= 0; i--) {
+        if (inbounds[i] < outTime) { closestInbound = inbounds[i]; break }
+      }
+      if (closestInbound) {
+        const diffMin = (outTime - closestInbound) / 1000 / 60
+        if (diffMin > 0 && diffMin < 1440) {
+          if (!agentResponseTimes[agentId]) agentResponseTimes[agentId] = []
+          agentResponseTimes[agentId].push(diffMin)
+        }
+      }
+    }
+
+    for (const [agentId, times] of Object.entries(agentResponseTimes)) {
+      if (rankingMap[agentId] && times.length > 0) {
+        rankingMap[agentId].avgResponseMinutes = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+      }
+    }
+
+    const agentRanking = Object.values(rankingMap)
+      .sort((a, b) => b.messagesResponded - a.messagesResponded)
+      .slice(0, 10)
+
     let agentConversations = 0
     let agentClosedLast7d = 0
     let agentAvgResponseMinutes: number | null = null
@@ -478,7 +576,7 @@ router.get('/analytics', async (req, res, next) => {
       totalSent, totalDelivered, totalRead,
       deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
       readRate: totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0,
-      byDay, byAgent,
+      byDay, byAgent, agentRanking,
       avgResponseMinutes: agentAvgResponseMinutes,
       activeFlowsToday, flowExecutionsToday,
       agentConversations: filterUserId ? agentConversations : null,

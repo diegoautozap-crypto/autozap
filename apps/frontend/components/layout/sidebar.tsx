@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { AutoZapLogo } from '@/components/ui/AutoZapLogo'
 import { useI18nStore, useT, LOCALES } from '@/lib/i18n'
+import { useUnreadStore } from '@/store/unread.store'
 
 const ALL_NAV = [
   { href: '/dashboard',           labelKey: 'nav.dashboard',  icon: LayoutDashboard },
@@ -74,6 +75,7 @@ export function Sidebar() {
   const roleFromStore = (user as any)?.role || 'agent'
   const t = useT()
   const { locale, setLocale } = useI18nStore()
+  const totalUnread = useUnreadStore(s => s.totalUnread)
 
   const [allowedPages, setAllowedPages] = useState<string[] | null>(null)
   const [currentRole, setCurrentRole]   = useState<string>(roleFromStore)
@@ -200,6 +202,11 @@ export function Sidebar() {
                 >
                   <Icon size={15} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
                   <span>{label}</span>
+                  {href === '/dashboard/inbox' && totalUnread > 0 && (
+                    <span style={{ background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', marginLeft: 'auto' }}>
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </span>
+                  )}
                 </button>
               )
             })}
