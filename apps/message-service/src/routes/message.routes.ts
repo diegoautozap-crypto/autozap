@@ -98,7 +98,7 @@ const sendSchema = z.object({
   conversationId: z.string().uuid(),
   tenantId: z.string().uuid().optional(),
   to: z.string().min(1),
-  contentType: z.enum(['text', 'image', 'audio', 'video', 'document', 'template']),
+  contentType: z.enum(['text', 'image', 'audio', 'video', 'document', 'template', 'interactive']),
   body: z.string().optional(),
   mediaUrl: z.string().url().optional(),
   campaignId: z.string().uuid().optional(),
@@ -106,7 +106,7 @@ const sendSchema = z.object({
 
 router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async (req, res, next) => {
   try {
-    const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, campaignId } = req.body
+    const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = req.body
     const secret = req.headers['x-internal-secret']
     const tenantId = secret === INTERNAL_SECRET
       ? (req.body.tenantId || req.auth?.tid)
@@ -134,6 +134,7 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
 
     await messageQueue.add('send', {
       messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount: 0,
+      interactiveType, buttons, listRows, listButtonText, footer,
     })
 
     res.json(ok({ messageUuid, status: 'queued' }))
