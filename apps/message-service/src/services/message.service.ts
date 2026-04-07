@@ -349,7 +349,21 @@ export class MessageService {
       .eq('tenant_id', tenantId)
       .eq('status', 'ai_response')
       .gte('created_at', monthStart.toISOString())
-    if (limits.aiResponses !== null && (aiCount ?? 0) >= limits.aiResponses) return
+    if (limits.aiResponses !== null && (aiCount ?? 0) >= limits.aiResponses) {
+      // Avisa o contato e encaminha pra atendente
+      try {
+        const { data: ctc } = await db.from('contacts').select('phone').eq('id', contactId).single()
+        if (ctc?.phone) {
+          await this.queueMessage({
+            tenantId, channelId, conversationId, contactId,
+            to: ctc.phone, contentType: 'text',
+            body: 'No momento nosso assistente automático está indisponível. Um atendente vai te atender em breve! 😊',
+          })
+        }
+        await db.from('conversations').update({ status: 'open', bot_active: false, updated_at: new Date() }).eq('id', conversationId)
+      } catch {}
+      return
+    }
 
     // 3. Get conversation history (last 20 messages)
     const { data: history } = await db.from('messages')

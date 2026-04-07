@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, channelApi } from '@/lib/api'
+import { authApi, channelApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { usePermissionsStore } from '@/store/permissions.store'
 import { toast } from 'sonner'
@@ -292,6 +292,15 @@ export default function TeamPage() {
     queryFn: async () => { const { data } = await authApi.get('/auth/team'); return data.data || [] },
   })
 
+  const { data: limitsData } = useQuery({
+    queryKey: ['tenant-limits'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+    staleTime: 60000,
+  })
+  const memberLimit = limitsData?.limits?.members ?? 999
+  const memberCount = members.filter((m: any) => m.is_active).length
+  const memberLimitReached = memberLimit !== null && memberCount >= memberLimit
+
   const inviteMutation = useMutation({
     mutationFn: async () => { const { data } = await authApi.post('/auth/team/invite', form); return data },
     onSuccess: () => {
@@ -338,14 +347,14 @@ export default function TeamPage() {
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{t('team.title')}</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginTop: '3px' }}>
-            {members.length} {members.length === 1 ? t('team.member') : t('team.members')}
+            {memberCount}/{memberLimit === 999 ? '∞' : memberLimit} {members.length === 1 ? t('team.member') : t('team.members')}
           </p>
         </div>
         {canManage && (
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
+          <button onClick={() => { if (memberLimitReached) { toast.error(`Limite de ${memberLimit} membros atingido. Faça upgrade em Configurações.`); return }; setShowForm(!showForm) }}
+            style={{ padding: '9px 16px', background: memberLimitReached ? 'var(--border)' : '#22c55e', color: memberLimitReached ? 'var(--text-faint)' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: memberLimitReached ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onMouseEnter={e => { if (!memberLimitReached) (e.currentTarget as HTMLButtonElement).style.background = '#16a34a' }}
+            onMouseLeave={e => { if (!memberLimitReached) (e.currentTarget as HTMLButtonElement).style.background = memberLimitReached ? 'var(--border)' : '#22c55e' }}>
             <Plus size={14} /> {t('team.addMember')}
           </button>
         )}

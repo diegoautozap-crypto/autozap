@@ -273,8 +273,9 @@ async function processCampaignJob(job: any) {
   })
 
   if (!await checkPlanLimit(tenantId)) {
-    await db.from('campaigns').update({ status: 'paused', pause_reason: 'Limite de mensagens atingido' }).eq('id', campaignId)
+    await db.from('campaigns').update({ status: 'paused', pause_reason: 'Limite de mensagens do plano atingido' }).eq('id', campaignId)
     logger.warn('Campaign paused — plan message limit reached before start', { campaignId, tenantId })
+    await emitProgress(campaignId, tenantId)
     return
   }
 
@@ -310,8 +311,9 @@ async function processCampaignJob(job: any) {
 
     if (processed > 0 && processed % 500 === 0) {
       if (!await checkPlanLimit(tenantId)) {
-        await db.from('campaigns').update({ status: 'paused', pause_reason: 'Limite de mensagens atingido' }).eq('id', campaignId)
+        await db.from('campaigns').update({ status: 'paused', pause_reason: 'Limite de mensagens do plano atingido' }).eq('id', campaignId)
         logger.warn('Campaign paused — plan message limit reached mid-run', { campaignId, tenantId, processed })
+        await emitProgress(campaignId, tenantId)
         break
       }
     }

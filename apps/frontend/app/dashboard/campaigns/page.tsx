@@ -348,6 +348,11 @@ export default function CampaignsPage() {
                             <Clock size={10} />{new Date(camp.scheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
+                        {camp.status === 'paused' && camp.pause_reason && (
+                          <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 500, marginTop: '2px' }}>
+                            {camp.pause_reason}
+                          </div>
+                        )}
                         <div style={{ height: '3px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden', marginTop: '6px', width: '80%' }}>
                           <div style={{ width: `${p}%`, height: '100%', background: s.bar, borderRadius: '99px', transition: 'width 0.4s' }} />
                         </div>
