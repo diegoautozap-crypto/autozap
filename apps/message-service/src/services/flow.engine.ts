@@ -1629,7 +1629,7 @@ export class FlowEngine {
       const [startH, startM] = workStart.split(':').map(Number)
       const [endH, endM] = workEnd.split(':').map(Number)
       let startMin = startH * 60 + startM
-      const endMin = endH * 60 + endM
+      const endMin = (endH === 0 && endM === 0) ? 24 * 60 : endH * 60 + endM
       const allSlots: string[] = []
       while (startMin + duration <= endMin) {
         const hh = String(Math.floor(startMin / 60)).padStart(2, '0')

@@ -1072,15 +1072,15 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   const [sh, sm] = start.split(':').map(Number)
                   const [eh, em2] = end.split(':').map(Number)
                   let startMin = sh * 60 + sm
-                  const endMin = eh * 60 + em2
+                  const endMin = (eh === 0 && em2 === 0) ? 24 * 60 : eh * 60 + em2
                   const slots: string[] = []
                   while (startMin + dur <= endMin) {
                     slots.push(`${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`)
                     startMin += dur
                   }
-                  const activeDays = Object.entries(d.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false })
-                    .filter(([, v]) => v)
-                    .map(([k]) => k)
+                  const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+                  const allDays = d.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
+                  const activeDays = dayOrder.filter(k => allDays[k])
                   const dayLabels: Record<string, string> = { mon: 'Seg', tue: 'Ter', wed: 'Qua', thu: 'Qui', fri: 'Sex', sat: 'Sáb', sun: 'Dom' }
                   const priceTable = d.priceTable || {}
 
@@ -1108,8 +1108,8 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                                   <td key={day} style={{ padding: '2px 2px', borderBottom: '1px solid #f4f4f5' }}>
                                     <input
                                       type="number" min="0" step="10"
-                                      style={{ width: '100%', padding: '3px 4px', border: '1px solid #e4e4e7', borderRadius: '4px', fontSize: '11px', textAlign: 'center', background: val === 0 ? '#fee2e2' : val ? '#f0fdf4' : '#fff', color: val === 0 ? '#ef4444' : '#374151', boxSizing: 'border-box' as const }}
-                                      placeholder="-"
+                                      style={{ width: '100%', padding: '4px 4px', border: '1px solid #e4e4e7', borderRadius: '5px', fontSize: '12px', textAlign: 'center', background: val === 0 ? '#fee2e2' : val ? '#f0fdf4' : '#fafafa', color: val === 0 ? '#ef4444' : '#374151', boxSizing: 'border-box' as const, fontWeight: val ? 600 : 400 }}
+                                      placeholder="—"
                                       value={val === 0 ? '0' : val || ''}
                                       onChange={e => {
                                         const newTable = { ...priceTable }
