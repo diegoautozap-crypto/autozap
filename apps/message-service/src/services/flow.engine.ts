@@ -252,9 +252,15 @@ export class FlowEngine {
 
       if (!flows || flows.length === 0) return false
 
-      // Busca campaign_id da conversa pra filtrar flows por campanha
-      const { data: convData } = await db.from('conversations').select('campaign_id').eq('id', ctx.conversationId).single()
+      // Busca dados da conversa pra filtrar
+      const { data: convData } = await db.from('conversations').select('campaign_id, assigned_to').eq('id', ctx.conversationId).single()
       const conversationCampaignId = convData?.campaign_id || null
+
+      // Se conversa está atribuída a um atendente, não dispara flow (atendimento humano em andamento)
+      if (convData?.assigned_to) {
+        logger.info('Flow skipped — conversation assigned to agent', { assignedTo: convData.assigned_to })
+        return false
+      }
 
       for (const flow of flows) {
         // Se flow tem campanha vinculada, só dispara pra contatos daquela campanha
