@@ -1563,7 +1563,9 @@ export class FlowEngine {
 
       if (dayRows.length === 0) {
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.msgNoSlots || 'Desculpe, não temos horários disponíveis no momento.' })
-        return null
+        variables['agendamento_status'] = 'sem_horario'
+        Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+        return { success: true }
       }
 
       const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
