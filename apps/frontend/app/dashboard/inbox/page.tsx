@@ -106,6 +106,7 @@ function MessageContent({ msg, isOut, channelId, tenantId, onImageClick }: { msg
       </a>
     )
   }
+  // Interactive ou texto normal
   return <p style={{ fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-line', color: tc }}>{cleanText(msg.body || '')}</p>
 }
 

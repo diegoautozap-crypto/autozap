@@ -132,9 +132,17 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
       }
     }
 
+    // Salva body completo com opções pra exibir no CRM
+    let savedBody = body
+    if (contentType === 'interactive' && interactiveType === 'button' && buttons?.length) {
+      savedBody = `${body || ''}\n\n${buttons.map((b: any, i: number) => `${i + 1}️⃣ ${b.title}`).join('\n')}`
+    } else if (contentType === 'interactive' && interactiveType === 'list' && listRows?.length) {
+      savedBody = `${body || ''}\n\n${listRows.map((r: any, i: number) => `${i + 1}️⃣ ${r.title}${r.description ? ` — ${r.description}` : ''}`).join('\n')}`
+    }
+
     const messageUuid = await messageService.queueMessage({
       tenantId, channelId, contactId, conversationId,
-      to, contentType, body, mediaUrl, campaignId,
+      to, contentType: contentType === 'interactive' ? 'text' : contentType, body: savedBody, mediaUrl, campaignId,
     })
 
     await messageQueue.add('send', {
