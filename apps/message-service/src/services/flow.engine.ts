@@ -1327,6 +1327,8 @@ export class FlowEngine {
 
         case 'end': {
           if (data?.message) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: this.interpolate(data.message, ctx, variables) })
+          // Limpa TODOS os states waiting dessa conversa pra não retomar depois
+          await db.from('flow_states').update({ status: 'completed', updated_at: new Date() }).eq('conversation_id', ctx.conversationId).eq('tenant_id', ctx.tenantId).eq('status', 'waiting')
           return { success: true, ended: true }
         }
 
