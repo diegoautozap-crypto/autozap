@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge,
   useNodesState, useEdgesState, Connection, Edge, Node,
-  Panel, BackgroundVariant, MarkerType, getBezierPath, BaseEdge,
+  Panel, BackgroundVariant, MarkerType, getSmoothStepPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { messageApi, contactApi, channelApi, tenantApi } from '@/lib/api'
@@ -21,7 +21,7 @@ import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
-  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, borderRadius: 12, offset: 25 })
   const [hovered, setHovered] = useState(false)
   const count = data?._count
   return (
