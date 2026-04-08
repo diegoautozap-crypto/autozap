@@ -1541,24 +1541,94 @@ export class FlowEngine {
     const fullDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
     if (step === '1') {
-      // Step 1: Show available days
+      // Step 1: Show only days that have at least 1 available slot
       const today = new Date()
       const days: string[] = []
+      const priceTable = data?.priceTable || {}
 
-      const dayRows: { id: string; title: string }[] = []
+      // Collect candidate days
+      const candidateDays: { dateStr: string; dayName: string; dd: string; mm: string; dayKey: string }[] = []
       for (let i = 1; i <= advanceDays; i++) {
         const d = new Date(today)
         d.setDate(d.getDate() + i)
         const dayKey = dayKeys[d.getDay()]
         if (workDays[dayKey]) {
-          const dateStr = d.toISOString().split('T')[0]
-          const dayName = fullDayNames[d.getDay()]
-          const dd = String(d.getDate()).padStart(2, '0')
-          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          candidateDays.push({
+            dateStr: d.toISOString().split('T')[0],
+            dayName: fullDayNames[d.getDay()],
+            dd: String(d.getDate()).padStart(2, '0'),
+            mm: String(d.getMonth() + 1).padStart(2, '0'),
+            dayKey,
+          })
+        }
+      }
+
+      // Query Google Calendar for the entire date range to check availability
+      let busyByDay: Record<string, { start: string; end: string }[]> = {}
+      if (candidateDays.length > 0) {
+        try {
+          const rangeStart = candidateDays[0].dateStr
+          const lastDate = candidateDays[candidateDays.length - 1].dateStr
+          const nextDay = new Date(`${lastDate}T12:00:00`)
+          nextDay.setDate(nextDay.getDate() + 1)
+          const rangeEnd = nextDay.toISOString().split('T')[0]
+
+          const { data: busyData } = await calendar.freebusy.query({
+            requestBody: {
+              timeMin: `${rangeStart}T00:00:00-03:00`,
+              timeMax: `${rangeEnd}T00:00:00-03:00`,
+              timeZone: 'America/Sao_Paulo',
+              items: [{ id: calendarId }],
+            },
+          })
+
+          const allBusy = busyData.calendars?.[calendarId]?.busy || []
+          for (const busy of allBusy) {
+            const busyDate = new Date(busy.start).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+            if (!busyByDay[busyDate]) busyByDay[busyDate] = []
+            busyByDay[busyDate].push(busy)
+          }
+        } catch (err: any) {
+          logger.warn('Freebusy pre-check failed, showing all days', { err: err.message })
+        }
+      }
+
+      // Generate time slots
+      const [sH, sM] = workStart.split(':').map(Number)
+      const [eH, eM] = workEnd.split(':').map(Number)
+      const slotEndMin = (eH === 0 && eM === 0) ? 24 * 60 : eH * 60 + eM
+
+      // Filter: only show days that have at least 1 available slot
+      const dayRows: { id: string; title: string }[] = []
+      for (const cd of candidateDays) {
+        let slotMin = sH * 60 + sM
+        let hasAvailable = false
+
+        while (slotMin + duration <= slotEndMin) {
+          const slotTime = `${String(Math.floor(slotMin / 60)).padStart(2, '0')}:${String(slotMin % 60).padStart(2, '0')}`
+          // Check price table (0 = unavailable)
+          const priceKey = `${cd.dayKey}_${slotTime}`
+          if (priceTable[priceKey] === 0) { slotMin += duration; continue }
+
+          // Check Google Calendar busy
+          const slotStartMs = new Date(`${cd.dateStr}T${slotTime}:00-03:00`).getTime()
+          const slotEndMs = slotStartMs + duration * 60 * 1000
+          const dayBusy = busyByDay[cd.dateStr] || []
+          const isBusy = dayBusy.some(b => {
+            const bStart = new Date(b.start).getTime()
+            const bEnd = new Date(b.end).getTime()
+            return slotStartMs < bEnd && slotEndMs > bStart
+          })
+
+          if (!isBusy) { hasAvailable = true; break }
+          slotMin += duration
+        }
+
+        if (hasAvailable) {
           const idx = dayRows.length + 1
-          dayRows.push({ id: `day_${idx}`, title: `${dayName} ${dd}/${mm}` })
+          dayRows.push({ id: `day_${idx}`, title: `${cd.dayName} ${cd.dd}/${cd.mm}` })
           days.push(`${idx}`)
-          variables[`_schedule_day_${idx}`] = dateStr
+          variables[`_schedule_day_${idx}`] = cd.dateStr
         }
       }
 
