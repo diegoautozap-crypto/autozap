@@ -27,7 +27,7 @@ const CHANNEL_LIMITS: Record<string, number> = {
 }
 
 type ChannelFormType = 'gupshup' | 'evolution' | 'instagram' | 'messenger'
-const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false, accessToken: '', pageId: '', appSecret: '' }
+const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', phoneNumberId: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false, accessToken: '', pageId: '', appSecret: '' }
 
 export default function ChannelsPage() {
   const t = useT()
@@ -60,7 +60,7 @@ export default function ChannelsPage() {
       } else if (form.channelType === 'evolution') {
         await channelApi.post('/channels', { name: form.name, type: 'evolution', phoneNumber: '', credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName }, settings: {} })
       } else {
-        await channelApi.post('/channels', { name: form.name, type: 'gupshup', phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: {} })
+        await channelApi.post('/channels', { name: form.name, type: 'gupshup', phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined, phoneNumberId: form.phoneNumberId || undefined }, settings: {} })
       }
     },
     onSuccess: () => { toast.success(t('channels.toast.created')); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setForm(emptyForm) },
@@ -74,7 +74,7 @@ export default function ChannelsPage() {
       } else if (form.channelType === 'evolution') {
         await channelApi.patch(`/channels/${editingId}`, { name: form.name, credentials: { apiKey: form.apiKey, baseUrl: form.baseUrl, instanceName: form.instanceName }, settings: settingsPayload })
       } else {
-        await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined }, settings: settingsPayload })
+        await channelApi.patch(`/channels/${editingId}`, { name: form.name, phoneNumber: form.source, credentials: { apiKey: form.apiKey, source: form.source, srcName: form.srcName, metaToken: form.metaToken || undefined, phoneNumberId: form.phoneNumberId || undefined }, settings: settingsPayload })
       }
     },
     onSuccess: () => { toast.success(t('channels.toast.updated')); queryClient.invalidateQueries({ queryKey: ['channels'] }); setShowForm(false); setEditingId(null); setForm(emptyForm) },
@@ -89,11 +89,11 @@ export default function ChannelsPage() {
   const openEdit = (ch: any) => {
     const aiEnabled = ch.settings?.aiChatbotEnabled ?? false
     if (ch.type === 'instagram' || ch.type === 'messenger') {
-      setForm({ name: ch.name || '', apiKey: '', source: '', srcName: '', metaToken: '', channelType: ch.type as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: ch.pageId || '', appSecret: '' })
+      setForm({ name: ch.name || '', apiKey: '', source: '', srcName: '', metaToken: '', phoneNumberId: '', channelType: ch.type as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: ch.pageId || '', appSecret: '' })
     } else if (ch.type === 'evolution') {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: '', srcName: '', metaToken: '', phoneNumberId: '', channelType: 'evolution', baseUrl: ch.baseUrl || '', instanceName: ch.instanceName || '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
     } else {
-      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', channelType: 'gupshup', baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
+      setForm({ name: ch.name || '', apiKey: ch.webhookApiKey || '', source: ch.source || ch.phoneNumber || '', srcName: ch.srcName || '', metaToken: '', phoneNumberId: '', channelType: 'gupshup', baseUrl: '', instanceName: '', aiChatbotEnabled: aiEnabled, accessToken: '', pageId: '', appSecret: '' })
     }
     setEditingId(ch.id); setShowForm(true)
   }
@@ -257,6 +257,11 @@ export default function ChannelsPage() {
                 <label style={lbl}>{t('channels.formMetaToken')} <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>({t('channels.formOptional')})</span></label>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>{t('channels.formMetaTokenHint')}</p>
                 <input style={inp} type="password" placeholder={editingId ? t('channels.formMetaTokenKeep') : 'EAAxxxxxxx...'} value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+              </div>
+              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+                <label style={lbl}>Phone Number ID <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>(opcional — necessário pra botões interativos)</span></label>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>ID do número no Meta Business. Encontre em business.facebook.com → WhatsApp Manager</p>
+                <input style={inp} placeholder="Ex: 1104144786108073" value={form.phoneNumberId} onChange={e => setForm({ ...form, phoneNumberId: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
               </div>
             </>
           ) : (
