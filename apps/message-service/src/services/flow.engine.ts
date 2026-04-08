@@ -107,6 +107,18 @@ interface FlowNodeData {
   askTimeMessage?: string
   noSlotsMessage?: string
   confirmMessage?: string
+  calendarMode?: 'google' | 'internal'
+  googleCalendarId?: string
+  eventDuration?: number
+  workStart?: string
+  workEnd?: string
+  workDays?: Record<string, boolean>
+  advanceDays?: number
+  eventTitle?: string
+  msgAskDate?: string
+  msgAskTime?: string
+  msgConfirm?: string
+  msgNoSlots?: string
   // set_variable
   variableName?: string
   variableValue?: string
@@ -1118,6 +1130,14 @@ export class FlowEngine {
         }
 
         case 'schedule_appointment': {
+          // Google Calendar mode
+          if ((data?.calendarMode || 'google') === 'google') {
+            const result = await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+            if (result) return result
+            break
+          }
+
+          // Internal mode (legacy)
           const configId = data?.schedulingConfigId
           if (!configId) { await this.logNode(flowId, node.id, ctx, 'error', 'schedulingConfigId não configurado'); break }
 
@@ -1456,6 +1476,253 @@ export class FlowEngine {
     else if (conditionType === 'phone') fv = ctx.phone || ''
     else fv = ctx.messageBody || ''
     return this.matchOperator(fv, operator || 'contains', value || '')
+  }
+
+  // ── Google Calendar scheduling ──────────────────────────────────────────────
+  private async executeGoogleCalendarNode(
+    node: any, ctx: FlowContext, flowId: string, data: any,
+    variables: Record<string, string>, loopCounters: Record<string, number>, stateId?: string
+  ): Promise<{ success: boolean; paused?: boolean; ended?: boolean } | null> {
+    const calendarId = data?.googleCalendarId
+    if (!calendarId) { await this.logNode(flowId, node.id, ctx, 'error', 'Google Calendar não configurado'); return null }
+
+    // Get tenant Google tokens
+    const { data: tenant } = await db.from('tenants').select('metadata').eq('id', ctx.tenantId).single()
+    const meta = tenant?.metadata || {}
+    if (!meta.google_access_token) { await this.logNode(flowId, node.id, ctx, 'error', 'Google não conectado'); return null }
+
+    const { google } = require('googleapis')
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI,
+    )
+    oauth2Client.setCredentials({
+      access_token: meta.google_access_token,
+      refresh_token: meta.google_refresh_token,
+    })
+
+    // Auto-refresh tokens
+    oauth2Client.on('tokens', async (tokens: any) => {
+      if (tokens.access_token) {
+        await db.from('tenants').update({
+          metadata: { ...meta, google_access_token: tokens.access_token, google_token_expiry: tokens.expiry_date },
+          updated_at: new Date(),
+        }).eq('id', ctx.tenantId)
+      }
+    })
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+    const step = variables['_schedule_step'] || '1'
+
+    const duration = data?.eventDuration || 60
+    const workStart = data?.workStart || '08:00'
+    const workEnd = data?.workEnd || '18:00'
+    const workDays = data?.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
+    const advanceDays = data?.advanceDays || 7
+    const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    const fullDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+
+    if (step === '1') {
+      // Step 1: Show available days
+      const today = new Date()
+      const days: string[] = []
+
+      for (let i = 1; i <= advanceDays; i++) {
+        const d = new Date(today)
+        d.setDate(d.getDate() + i)
+        const dayKey = dayKeys[d.getDay()]
+        if (workDays[dayKey]) {
+          const dateStr = d.toISOString().split('T')[0]
+          const dayName = fullDayNames[d.getDay()]
+          const dd = String(d.getDate()).padStart(2, '0')
+          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          days.push(`${days.length + 1}. ${dayName} ${dd}/${mm}`)
+          variables[`_schedule_day_${days.length}`] = dateStr
+        }
+      }
+
+      if (days.length === 0) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.msgNoSlots || 'Desculpe, não temos horários disponíveis no momento.' })
+        return null
+      }
+
+      const msg = (data?.msgAskDate || '📅 Escolha o dia para agendamento:') + '\n\n' + days.join('\n') + '\n\nDigite o número do dia.'
+      await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: msg })
+
+      variables['_schedule_step'] = '2'
+      variables['_schedule_total_days'] = String(days.length)
+      variables['_schedule_calendar_id'] = calendarId
+
+      const inputStateId = stateId || generateId()
+      await db.from('flow_states').upsert({
+        id: inputStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+        conversation_id: ctx.conversationId, current_node_id: node.id,
+        variables, loop_counters: loopCounters, waiting_variable: '_schedule_day_choice',
+        status: 'waiting', updated_at: new Date(),
+      }, { onConflict: 'flow_id,conversation_id' })
+      return { success: true, paused: true }
+    }
+
+    if (step === '2') {
+      // Step 2: User picked a day, check Google Calendar for busy times and show available slots
+      const choice = parseInt(variables['_schedule_day_choice'] || '0')
+      const totalDays = parseInt(variables['_schedule_total_days'] || '0')
+
+      if (choice < 1 || choice > totalDays) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalDays}.` })
+        const reStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_schedule_day_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+      }
+
+      const selectedDate = variables[`_schedule_day_${choice}`]
+      variables['_schedule_selected_date'] = selectedDate
+
+      // Generate all possible slots
+      const [startH, startM] = workStart.split(':').map(Number)
+      const [endH, endM] = workEnd.split(':').map(Number)
+      let startMin = startH * 60 + startM
+      const endMin = endH * 60 + endM
+      const allSlots: string[] = []
+      while (startMin + duration <= endMin) {
+        const hh = String(Math.floor(startMin / 60)).padStart(2, '0')
+        const mmSlot = String(startMin % 60).padStart(2, '0')
+        allSlots.push(`${hh}:${mmSlot}`)
+        startMin += duration
+      }
+
+      // Query Google Calendar for busy times on this date
+      try {
+        const dayStart = new Date(`${selectedDate}T${workStart}:00`)
+        const dayEnd = new Date(`${selectedDate}T${workEnd}:00`)
+
+        const { data: busyData } = await calendar.freebusy.query({
+          requestBody: {
+            timeMin: dayStart.toISOString(),
+            timeMax: dayEnd.toISOString(),
+            items: [{ id: calendarId }],
+          },
+        })
+
+        const busySlots = busyData.calendars?.[calendarId]?.busy || []
+        const available = allSlots.filter(slot => {
+          const [sh, sm] = slot.split(':').map(Number)
+          const slotStart = new Date(`${selectedDate}T${slot}:00`)
+          const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000)
+
+          return !busySlots.some((busy: any) => {
+            const busyStart = new Date(busy.start)
+            const busyEnd = new Date(busy.end)
+            return slotStart < busyEnd && slotEnd > busyStart
+          })
+        })
+
+        if (available.length === 0) {
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.msgNoSlots || 'Desculpe, não temos horários disponíveis nesse dia. Tente outro dia.' })
+          variables['_schedule_step'] = '1'
+          return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+        }
+
+        const slotList = available.map((s, i) => {
+          variables[`_schedule_slot_${i + 1}`] = s
+          return `${i + 1}. ${s}`
+        })
+
+        const dd2 = selectedDate.split('-')[2]
+        const mm2 = selectedDate.split('-')[1]
+        const timeMsg = (data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`) + '\n\n' + slotList.join('\n') + '\n\nDigite o número do horário.'
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: timeMsg })
+
+        variables['_schedule_step'] = '3'
+        variables['_schedule_total_slots'] = String(available.length)
+
+        const inputStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: inputStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_schedule_slot_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+
+      } catch (err: any) {
+        logger.error('Google Calendar freebusy error', { err: err.message })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao consultar horários. Tente novamente.' })
+        return null
+      }
+    }
+
+    if (step === '3') {
+      // Step 3: User picked a time, create Google Calendar event
+      const choice = parseInt(variables['_schedule_slot_choice'] || '0')
+      const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
+
+      if (choice < 1 || choice > totalSlots) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalSlots}.` })
+        const reStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_schedule_slot_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+      }
+
+      const selectedTime = variables[`_schedule_slot_${choice}`]
+      const selectedDate = variables['_schedule_selected_date']
+
+      // Get contact name for event title
+      const { data: contactInfo } = await db.from('contacts').select('name').eq('id', ctx.contactId).single()
+      const contactName = contactInfo?.name || ctx.phone
+
+      // Create event start/end
+      const eventStart = new Date(`${selectedDate}T${selectedTime}:00`)
+      const eventEnd = new Date(eventStart.getTime() + duration * 60 * 1000)
+
+      const eventTitle = this.interpolate(data?.eventTitle || 'Reserva - {{name}}', ctx, { ...variables, name: contactName })
+
+      try {
+        const event = await calendar.events.insert({
+          calendarId,
+          requestBody: {
+            summary: eventTitle,
+            description: `Agendado via WhatsApp\nCliente: ${contactName}\nTelefone: +${ctx.phone}`,
+            start: { dateTime: eventStart.toISOString() },
+            end: { dateTime: eventEnd.toISOString() },
+          },
+        })
+
+        const dd = selectedDate.split('-')[2]
+        const mm = selectedDate.split('-')[1]
+        const confirmMsg = data?.msgConfirm || `✅ Agendado com sucesso!\n\n📅 Data: ${dd}/${mm}\n⏰ Horário: ${selectedTime}\n\nTe enviaremos um lembrete antes do horário.`
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
+
+        // Save to flow variables
+        variables['agendamento_data'] = `${dd}/${mm}`
+        variables['agendamento_horario'] = selectedTime
+        variables['agendamento_google_event_id'] = event.data?.id || ''
+
+        // Clean up internal variables
+        Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+
+        await this.logNode(flowId, node.id, ctx, 'success', `Google Calendar: agendado ${selectedDate} ${selectedTime}`)
+        return { success: true }
+
+      } catch (err: any) {
+        logger.error('Google Calendar create event error', { err: err.message })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao agendar. Tente novamente.' })
+        return null
+      }
+    }
+
+    return null
   }
 
   private interpolate(template: string, ctx: FlowContext, variables: Record<string, string> = {}): string {

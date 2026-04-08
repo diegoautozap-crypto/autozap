@@ -7,7 +7,7 @@ import { Node } from '@xyflow/react'
 import { X, Copy, RefreshCw, Loader2, Plus, Play } from 'lucide-react'
 import { NODE_COLORS, DEFAULT_STAGES, getNodeLabels, getSendSubtypes, getTagSubtypes, getLoopSubtypes } from './constants'
 import { MediaUpload, ConditionPanel } from './ConditionPanel'
-import { messageApi, contactApi, conversationApi } from '@/lib/api'
+import { messageApi, contactApi, conversationApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -146,6 +146,21 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
     queryFn: async () => { const { data } = await conversationApi.get('/scheduling'); return data.data || [] },
     enabled: d.type === 'schedule_appointment',
   })
+
+  // ── Google Calendar calendars ────────────────────────────────────────────
+  const { data: googleCalendars = [] } = useQuery<{ id: string; name: string; primary: boolean }[]>({
+    queryKey: ['google-calendars'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/integrations/google/calendars'); return data.data || [] },
+    enabled: d.type === 'schedule_appointment',
+  })
+
+  // ── Google connection status ─────────────────────────────────────────────
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-google-flow'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
+    enabled: d.type === 'schedule_appointment',
+  })
+  const googleConnected = !!tenantData?.metadata?.google_email
 
   // ── Webhook token para trigger_webhook ────────────────────────────────────
   const { data: flowData, refetch: refetchFlow } = useQuery({
@@ -986,14 +1001,79 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#15803d' }}>
             📅 {t('nodes.scheduleAppointmentInfo')}
           </div>
-          <div><label style={labelStyle}>{t('nodes.schedulingConfig')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.schedulingConfigId || ''} onChange={e => onUpdate(node.id, { schedulingConfigId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
-            <option value="">{schedulingConfigs.length === 0 ? t('nodes.schedulingConfigNone') : t('nodes.schedulingConfigSelect')}</option>
-            {schedulingConfigs.map((cfg: any) => <option key={cfg.id} value={cfg.id}>{cfg.name}</option>)}
-          </select></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><input style={inputStyle} value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><input style={inputStyle} value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><input style={inputStyle} value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><input style={inputStyle} value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+
+          {/* Modo: Google Calendar ou Interno */}
+          <div><label style={labelStyle}>Modo</label>
+            <select style={{ ...inputStyle, background: '#fafafa' }} value={d.calendarMode || 'google'} onChange={e => onUpdate(node.id, { calendarMode: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+              <option value="google">Google Calendar</option>
+              <option value="internal">Interno (sem Google)</option>
+            </select>
+          </div>
+
+          {(d.calendarMode || 'google') === 'google' && (<>
+            {!googleConnected ? (
+              <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#92400e' }}>
+                ⚠️ Google Calendar não conectado. Vá em <strong>Configurações</strong> e conecte sua conta Google primeiro.
+              </div>
+            ) : (<>
+              <div><label style={labelStyle}>Calendário</label>
+                <select style={{ ...inputStyle, background: '#fafafa' }} value={d.googleCalendarId || ''} onChange={e => onUpdate(node.id, { googleCalendarId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+                  <option value="">Selecione um calendário...</option>
+                  {googleCalendars.map((cal: any) => <option key={cal.id} value={cal.id}>{cal.name}{cal.primary ? ' (Principal)' : ''}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Duração do evento (min)</label>
+                <select style={{ ...inputStyle, background: '#fafafa' }} value={d.eventDuration || 60} onChange={e => onUpdate(node.id, { eventDuration: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput}>
+                  <option value={30}>30 minutos</option>
+                  <option value={60}>1 hora</option>
+                  <option value={90}>1h30</option>
+                  <option value={120}>2 horas</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div><label style={labelStyle}>Horário início</label>
+                  <input type="time" style={inputStyle} value={d.workStart || '08:00'} onChange={e => onUpdate(node.id, { workStart: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                </div>
+                <div><label style={labelStyle}>Horário fim</label>
+                  <input type="time" style={inputStyle} value={d.workEnd || '18:00'} onChange={e => onUpdate(node.id, { workEnd: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                </div>
+              </div>
+              <div><label style={labelStyle}>Dias da semana</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {[{ k: 'mon', l: 'Seg' }, { k: 'tue', l: 'Ter' }, { k: 'wed', l: 'Qua' }, { k: 'thu', l: 'Qui' }, { k: 'fri', l: 'Sex' }, { k: 'sat', l: 'Sáb' }, { k: 'sun', l: 'Dom' }].map(day => {
+                    const days = d.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
+                    const active = days[day.k]
+                    return (
+                      <button key={day.k} onClick={() => onUpdate(node.id, { workDays: { ...days, [day.k]: !active } })}
+                        style={{ padding: '4px 8px', borderRadius: '6px', border: `1px solid ${active ? '#16a34a' : '#e4e4e7'}`, background: active ? '#f0fdf4' : '#fff', color: active ? '#16a34a' : '#a1a1aa', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        {day.l}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div><label style={labelStyle}>Dias à frente</label>
+                <input type="number" min={1} max={30} style={inputStyle} value={d.advanceDays || 7} onChange={e => onUpdate(node.id, { advanceDays: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Quantos dias à frente o cliente pode agendar</p>
+              </div>
+              <div><label style={labelStyle}>Título do evento</label>
+                <input style={inputStyle} placeholder="Reserva - {{name}}" value={d.eventTitle || ''} onChange={e => onUpdate(node.id, { eventTitle: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Use {'{{name}}'}, {'{{phone}}'} como variáveis</p>
+              </div>
+            </>)}
+          </>)}
+
+          {(d.calendarMode) === 'internal' && (<>
+            <div><label style={labelStyle}>{t('nodes.schedulingConfig')}</label><select style={{ ...inputStyle, background: '#fafafa' }} value={d.schedulingConfigId || ''} onChange={e => onUpdate(node.id, { schedulingConfigId: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+              <option value="">{schedulingConfigs.length === 0 ? t('nodes.schedulingConfigNone') : t('nodes.schedulingConfigSelect')}</option>
+              {schedulingConfigs.map((cfg: any) => <option key={cfg.id} value={cfg.id}>{cfg.name}</option>)}
+            </select></div>
+          </>)}
+
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><input style={inputStyle} placeholder="📅 Escolha o dia:" value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><input style={inputStyle} placeholder="⏰ Horários disponíveis:" value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><input style={inputStyle} placeholder="✅ Agendado com sucesso!" value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><input style={inputStyle} placeholder="Sem horários disponíveis" value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
         {d.type === 'end' && (
