@@ -335,7 +335,7 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'n1', type: 'trigger_first_message', position_x: 600, position_y: 0, data: { type: 'trigger_first_message' } },
 
         // ═══ NÍVEL 1: MENU PRINCIPAL ═══
-        { id: 'n2', type: 'send_message', position_x: 600, position_y: 150, data: { type: 'send_message', subtype: 'list', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', listButtonText: 'Ver opções', listRows: [{ title: 'Outro Assunto', description: 'Campeonato, Escolinha, etc' }, { title: 'Reservas', description: 'Churrasqueira, Eventos' }, { title: 'Quadra', description: 'Horários e reservas de quadra' }] } },
+        { id: 'n2', type: 'send_message', position_x: 600, position_y: 150, data: { type: 'send_message', subtype: 'buttons', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', buttons: [{ title: 'Outro Assunto' }, { title: 'Reservas' }, { title: 'Quadra' }] } },
         { id: 'n3', type: 'input', position_x: 600, position_y: 300, data: { type: 'input', question: '', saveAs: 'menu_principal', timeoutHours: 1 } },
         { id: 'n4', type: 'condition', position_x: 600, position_y: 450, data: { type: 'condition', branches: [
           { id: 'b1', label: 'Outro Assunto', logic: 'AND', rules: [{ id: 'r1', field: 'variable', fieldName: 'menu_principal', operator: 'contains', value: 'Outro' }] },
