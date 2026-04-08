@@ -227,14 +227,22 @@ router.post('/webhook/notify/:token', rateLimit({ max: 60 }), async (req, res, n
     const { data: tenant, error } = await db.from('tenants').select('id').eq('webhook_token', req.params.token).single()
     if (error || !tenant) { res.status(401).json({ error: 'Token inválido' }); return }
 
-    const { phone, message } = req.body
+    const { phone, message, channelId: bodyChannelId } = req.body
     if (!phone || !message) { res.status(400).json({ error: 'phone e message são obrigatórios' }); return }
 
     const tenantId = tenant.id
     const normalizedPhone = normalizeBRPhone(phone.replace(/\D/g, ''))
 
-    // Busca canal ativo do tenant
-    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', tenantId).eq('status', 'active').limit(1).single()
+    // Usa channelId do body se vier, senão busca canal ativo
+    let channel: any
+    if (bodyChannelId) {
+      const { data } = await db.from('channels').select('id, type').eq('id', bodyChannelId).eq('tenant_id', tenantId).single()
+      channel = data
+    }
+    if (!channel) {
+      const { data } = await db.from('channels').select('id, type').eq('tenant_id', tenantId).eq('status', 'active').limit(1).single()
+      channel = data
+    }
     if (!channel) { res.status(400).json({ error: 'Nenhum canal ativo encontrado' }); return }
 
     // Garante contato + conversa
