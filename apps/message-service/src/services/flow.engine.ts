@@ -1519,6 +1519,16 @@ export class FlowEngine {
     })
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+
+    // Se é um nó diferente do que estava em waiting, resetar pro step 1
+    // Isso evita que states de outro nó de agendamento interfiram
+    const prevNodeId = variables['_schedule_node_id']
+    if (prevNodeId && prevNodeId !== node.id) {
+      // Limpa variáveis de agendamento anterior
+      Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+    }
+    variables['_schedule_node_id'] = node.id
+
     const step = variables['_schedule_step'] || '1'
 
     const duration = data?.eventDuration || 60
