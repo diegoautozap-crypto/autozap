@@ -29,8 +29,16 @@ export class GupshupAdapter implements IChannelAdapter {
 
   // ─── Send ─────────────────────────────────────────────────────────────────
 
-  async send(input: SendMessageInput, creds: ChannelCredentials): Promise<SendMessageResult> {
+  async send(input: SendMessageInput, rawCreds: ChannelCredentials): Promise<SendMessageResult> {
     const { to, contentType, body, mediaUrl, templateName, templateParams } = input
+
+    // Decrypt credentials if needed
+    let creds = rawCreds
+    try {
+      const { decryptCredentials } = require('../lib/crypto')
+      const decrypted = decryptCredentials(rawCreds as Record<string, string>)
+      if (decrypted.apiKey) creds = { ...rawCreds, ...decrypted }
+    } catch {}
 
     let message: Record<string, unknown>
 
