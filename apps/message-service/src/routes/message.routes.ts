@@ -102,6 +102,11 @@ const sendSchema = z.object({
   body: z.string().optional(),
   mediaUrl: z.string().url().optional(),
   campaignId: z.string().uuid().optional(),
+  interactiveType: z.enum(['button', 'list']).optional(),
+  buttons: z.array(z.object({ id: z.string().optional(), title: z.string() })).optional(),
+  listRows: z.array(z.object({ id: z.string().optional(), title: z.string(), description: z.string().optional() })).optional(),
+  listButtonText: z.string().optional(),
+  footer: z.string().optional(),
 })
 
 router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async (req, res, next) => {
