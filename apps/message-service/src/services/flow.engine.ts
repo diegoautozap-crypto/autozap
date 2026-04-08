@@ -1579,18 +1579,21 @@ export class FlowEngine {
       const dayResponse = variables['_schedule_day_choice'] || ''
       const totalDays = parseInt(variables['_schedule_total_days'] || '0')
 
-      // Support both button response (day_1, day_2) and text number (1, 2)
+      // Support: button ID (day_1), text number (1), or title match (Sexta 10/04)
       let choice = 0
-      if (dayResponse.startsWith('day_')) {
-        choice = parseInt(dayResponse.replace('day_', ''))
+      const dayClean = dayResponse.trim()
+      if (dayClean.startsWith('day_')) {
+        choice = parseInt(dayClean.replace('day_', ''))
+      } else if (/^\d+$/.test(dayClean)) {
+        choice = parseInt(dayClean)
       } else {
-        choice = parseInt(dayResponse)
-        // If user typed text that matches a day title, find it
-        if (isNaN(choice)) {
-          for (let i = 1; i <= totalDays; i++) {
-            const dayDate = variables[`_schedule_day_${i}`]
-            if (dayDate && dayResponse.toLowerCase().includes(dayDate.split('-')[2])) { choice = i; break }
-          }
+        // Match by day/month in title (e.g. "Sexta 10/04")
+        for (let i = 1; i <= totalDays; i++) {
+          const dayDate = variables[`_schedule_day_${i}`]
+          if (!dayDate) continue
+          const dd = dayDate.split('-')[2]
+          const mm = dayDate.split('-')[1]
+          if (dayClean.includes(`${dd}/${mm}`)) { choice = i; break }
         }
       }
 
@@ -1687,17 +1690,17 @@ export class FlowEngine {
       const slotResponse = variables['_schedule_slot_choice'] || ''
       const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
 
-      // Support both button response (slot_1, slot_2) and text number (1, 2) and time text (08:00)
+      // Support: button ID (slot_1), text number (1), time text (21:00), or title match
       let choice = 0
-      if (slotResponse.startsWith('slot_')) {
-        choice = parseInt(slotResponse.replace('slot_', ''))
+      const slotClean = slotResponse.trim()
+      if (slotClean.startsWith('slot_')) {
+        choice = parseInt(slotClean.replace('slot_', ''))
+      } else if (/^\d+$/.test(slotClean)) {
+        choice = parseInt(slotClean)
       } else {
-        choice = parseInt(slotResponse)
-        // If user typed a time directly (e.g. "08:00"), find it
-        if (isNaN(choice)) {
-          for (let i = 1; i <= totalSlots; i++) {
-            if (variables[`_schedule_slot_${i}`] === slotResponse) { choice = i; break }
-          }
+        // Match by time value (e.g. "21:00") or title
+        for (let i = 1; i <= totalSlots; i++) {
+          if (variables[`_schedule_slot_${i}`] === slotClean) { choice = i; break }
         }
       }
 
