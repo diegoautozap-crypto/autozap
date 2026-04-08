@@ -221,6 +221,37 @@ router.post('/webhook/lead/:token', rateLimit({ max: 120 }), async (req, res, ne
   } catch (err) { next(err) }
 })
 
+// ─── Webhook de notificação (manda msg pro WhatsApp de um número) ─────────────
+router.post('/webhook/notify/:token', rateLimit({ max: 60 }), async (req, res, next) => {
+  try {
+    const { data: tenant, error } = await db.from('tenants').select('id').eq('webhook_token', req.params.token).single()
+    if (error || !tenant) { res.status(401).json({ error: 'Token inválido' }); return }
+
+    const { phone, message } = req.body
+    if (!phone || !message) { res.status(400).json({ error: 'phone e message são obrigatórios' }); return }
+
+    const tenantId = tenant.id
+    const normalizedPhone = normalizeBRPhone(phone.replace(/\D/g, ''))
+
+    // Busca canal do tenant
+    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', tenantId).limit(1).single()
+    if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado' }); return }
+
+    // Garante contato + conversa
+    const { contactId } = await ensureContact({ tenantId, phone: normalizedPhone, name: req.body.name || normalizedPhone, origin: 'notification' })
+    const { conversationId } = await ensureConversation({ tenantId, contactId, channelId: channel.id, channelType: channel.type, lastMessage: message })
+
+    // Envia mensagem
+    const messageUuid = await messageService.queueMessage({
+      tenantId, channelId: channel.id, contactId, conversationId,
+      to: normalizedPhone, contentType: 'text', body: message,
+    })
+    await messageQueue.add('send', { messageUuid, tenantId, channelId: channel.id, to: normalizedPhone, contentType: 'text', body: message, retryCount: 0 })
+
+    res.json(ok({ success: true, phone: normalizedPhone, message: 'Notificação enviada' }))
+  } catch (err) { next(err) }
+})
+
 // ─── Webhook de entrada para flows (com mapeamento de campos) ─────────────────
 // Gzip/deflate já é descomprimido pelo middleware global em index.ts
 router.post('/webhook/flow/:flowId/:token', rateLimit({ max: 120 }), async (req, res, next) => {
