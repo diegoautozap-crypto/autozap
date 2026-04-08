@@ -75,16 +75,18 @@ export class GupshupAdapter implements IChannelAdapter {
             },
           },
         }
+        logger.info('[GupshupAdapter] sending button via Meta Graph API', { phoneNumberId, hasMetaToken: !!metaToken })
         const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(metaBody),
         })
         const metaData = await metaRes.json() as any
-        logger.debug('[GupshupAdapter] interactive button via Meta:', JSON.stringify(metaData).slice(0, 300))
+        logger.info('[GupshupAdapter] Meta button response:', { status: metaRes.status, data: JSON.stringify(metaData).slice(0, 500) })
         if (metaData.messages?.[0]?.id) {
           return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
         }
+        logger.warn('[GupshupAdapter] Meta button failed, falling back to text')
       }
       // Fallback: texto numerado
       const btnText = input.buttons.slice(0, 3).map((b, i) => `${i + 1}️⃣ ${b.title}`).join('\n')
@@ -114,16 +116,18 @@ export class GupshupAdapter implements IChannelAdapter {
             },
           },
         }
+        logger.info('[GupshupAdapter] sending list via Meta Graph API', { phoneNumberId, hasMetaToken: !!metaToken, metaTokenStart: metaToken?.slice(0, 10) })
         const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(metaBody),
         })
         const metaData = await metaRes.json() as any
-        logger.debug('[GupshupAdapter] interactive list via Meta:', JSON.stringify(metaData).slice(0, 300))
+        logger.info('[GupshupAdapter] Meta list response:', { status: metaRes.status, data: JSON.stringify(metaData).slice(0, 500) })
         if (metaData.messages?.[0]?.id) {
           return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
         }
+        logger.warn('[GupshupAdapter] Meta list failed, falling back to text', { response: JSON.stringify(metaData).slice(0, 300) })
       }
       // Fallback: texto numerado
       const listText = input.listRows.slice(0, 10).map((r, i) => `${i + 1}️⃣ ${r.title}${r.description ? ` — ${r.description}` : ''}`).join('\n')
