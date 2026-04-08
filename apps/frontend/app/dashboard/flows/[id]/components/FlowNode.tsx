@@ -97,13 +97,13 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: '#fff',
-        border: `2px solid ${selected ? color : '#e5e7eb'}`,
+        border: `2px solid ${selected ? color : `${color}40`}`,
         borderRadius: '12px',
         padding: '14px 16px',
         minWidth: '220px',
         maxWidth: '260px',
         minHeight: isCondition && branches.length > 0 ? `${16 + (branches.length + 1) * 36 + 20}px` : 'auto',
-        boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 8px rgba(0,0,0,.08)',
+        boxShadow: selected ? `0 0 0 3px ${color}22` : '0 2px 12px rgba(0,0,0,.12)',
         transition: 'all 0.15s',
         position: 'relative',
       }}>
