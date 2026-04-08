@@ -1599,27 +1599,26 @@ export class FlowEngine {
 
       // Query Google Calendar for busy times on this date
       try {
-        const dayStart = new Date(`${selectedDate}T${workStart}:00`)
-        const dayEnd = new Date(`${selectedDate}T${workEnd}:00`)
+        const tz = 'America/Sao_Paulo'
 
         const { data: busyData } = await calendar.freebusy.query({
           requestBody: {
-            timeMin: dayStart.toISOString(),
-            timeMax: dayEnd.toISOString(),
+            timeMin: `${selectedDate}T${workStart}:00-03:00`,
+            timeMax: `${selectedDate}T${workEnd}:00-03:00`,
+            timeZone: tz,
             items: [{ id: calendarId }],
           },
         })
 
         const busySlots = busyData.calendars?.[calendarId]?.busy || []
         const available = allSlots.filter(slot => {
-          const [sh, sm] = slot.split(':').map(Number)
-          const slotStart = new Date(`${selectedDate}T${slot}:00`)
-          const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000)
+          const slotStartMs = new Date(`${selectedDate}T${slot}:00-03:00`).getTime()
+          const slotEndMs = slotStartMs + duration * 60 * 1000
 
           return !busySlots.some((busy: any) => {
-            const busyStart = new Date(busy.start)
-            const busyEnd = new Date(busy.end)
-            return slotStart < busyEnd && slotEnd > busyStart
+            const busyStartMs = new Date(busy.start).getTime()
+            const busyEndMs = new Date(busy.end).getTime()
+            return slotStartMs < busyEndMs && slotEndMs > busyStartMs
           })
         })
 
@@ -1682,9 +1681,11 @@ export class FlowEngine {
       const { data: contactInfo } = await db.from('contacts').select('name').eq('id', ctx.contactId).single()
       const contactName = contactInfo?.name || ctx.phone
 
-      // Create event start/end
-      const eventStart = new Date(`${selectedDate}T${selectedTime}:00`)
-      const eventEnd = new Date(eventStart.getTime() + duration * 60 * 1000)
+      // Create event start/end with timezone
+      const tz = 'America/Sao_Paulo'
+      const [sh, sm] = selectedTime.split(':').map(Number)
+      const endMinTotal = sh * 60 + sm + duration
+      const endTime = `${String(Math.floor(endMinTotal / 60)).padStart(2, '0')}:${String(endMinTotal % 60).padStart(2, '0')}`
 
       const eventTitle = this.interpolate(data?.eventTitle || 'Reserva - {{name}}', ctx, { ...variables, name: contactName })
 
@@ -1694,8 +1695,8 @@ export class FlowEngine {
           requestBody: {
             summary: eventTitle,
             description: `Agendado via WhatsApp\nCliente: ${contactName}\nTelefone: +${ctx.phone}`,
-            start: { dateTime: eventStart.toISOString() },
-            end: { dateTime: eventEnd.toISOString() },
+            start: { dateTime: `${selectedDate}T${selectedTime}:00`, timeZone: tz },
+            end: { dateTime: `${selectedDate}T${endTime}:00`, timeZone: tz },
           },
         })
 
