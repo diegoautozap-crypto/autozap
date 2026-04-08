@@ -1070,10 +1070,10 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             </select></div>
           </>)}
 
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><input style={inputStyle} placeholder="📅 Escolha o dia:" value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><input style={inputStyle} placeholder="⏰ Horários disponíveis:" value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><input style={inputStyle} placeholder="✅ Agendado com sucesso!" value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
-          <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><input style={inputStyle} placeholder="Sem horários disponíveis" value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="📅 Escolha o dia:" value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="⏰ Horários disponíveis:" value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="✅ Agendado com sucesso!&#10;&#10;📅 Data: {{agendamento_data}}&#10;⏰ Horário: {{agendamento_horario}}" value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Sem horários disponíveis" value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
         {d.type === 'end' && (
