@@ -1758,14 +1758,18 @@ export class FlowEngine {
 
         const dd = selectedDate.split('-')[2]
         const mm = selectedDate.split('-')[1]
-        const confirmMsg = data?.msgConfirm || `✅ Agendado com sucesso!\n\n📅 Data: ${dd}/${mm}\n⏰ Horário: ${selectedTime}\n\nTe enviaremos um lembrete antes do horário.`
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
 
-        // Save to flow variables
+        // Save to flow variables BEFORE sending confirm so {{variables}} work
         variables['agendamento_data'] = `${dd}/${mm}`
         variables['agendamento_horario'] = selectedTime
         variables['agendamento_status'] = 'agendado'
         variables['agendamento_google_event_id'] = event.data?.id || ''
+
+        const confirmMsg = this.interpolate(
+          data?.msgConfirm || `✅ Agendado com sucesso!\n\n📅 Data: ${dd}/${mm}\n⏰ Horário: ${selectedTime}\n\nTe enviaremos um lembrete antes do horário.`,
+          ctx, variables
+        )
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
 
         // Clean up internal variables
         Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
