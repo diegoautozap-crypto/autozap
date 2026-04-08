@@ -1836,7 +1836,18 @@ export class FlowEngine {
       const tz = 'America/Sao_Paulo'
       const [sh, sm] = selectedTime.split(':').map(Number)
       const endMinTotal = sh * 60 + sm + duration
-      const endTime = `${String(Math.floor(endMinTotal / 60)).padStart(2, '0')}:${String(endMinTotal % 60).padStart(2, '0')}`
+
+      // Handle midnight crossover (e.g. 23:00 + 60min = 00:00 next day)
+      let endDate = selectedDate
+      let endHour = Math.floor(endMinTotal / 60)
+      const endMinute = endMinTotal % 60
+      if (endHour >= 24) {
+        endHour -= 24
+        const nextDay = new Date(`${selectedDate}T12:00:00`)
+        nextDay.setDate(nextDay.getDate() + 1)
+        endDate = nextDay.toISOString().split('T')[0]
+      }
+      const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`
 
       const eventTitle = this.interpolate(data?.eventTitle || 'Reserva - {{name}}', ctx, { ...variables, name: contactName })
 
@@ -1847,7 +1858,7 @@ export class FlowEngine {
             summary: eventTitle,
             description: `Agendado via WhatsApp\nCliente: ${contactName}\nTelefone: +${ctx.phone}`,
             start: { dateTime: `${selectedDate}T${selectedTime}:00`, timeZone: tz },
-            end: { dateTime: `${selectedDate}T${endTime}:00`, timeZone: tz },
+            end: { dateTime: `${endDate}T${endTime}:00`, timeZone: tz },
           },
         })
 
