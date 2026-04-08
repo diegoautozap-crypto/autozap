@@ -332,7 +332,7 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
       categoryKey: 'advanced',
       nodes: [
         // ═══ NÍVEL 0: TRIGGER ═══
-        { id: 'n1', type: 'trigger_first_message', position_x: 600, position_y: 0, data: { type: 'trigger_first_message' } },
+        { id: 'n1', type: 'trigger_keyword', position_x: 600, position_y: 0, data: { type: 'trigger_keyword', keywords: ['menu', 'início', 'inicio', 'começar', 'opcoes', 'opções'], matchType: 'contains' } },
 
         // ═══ NÍVEL 1: MENU PRINCIPAL ═══
         { id: 'n2', type: 'send_message', position_x: 600, position_y: 150, data: { type: 'send_message', subtype: 'buttons', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', buttons: [{ title: 'Outro Assunto' }, { title: 'Reservas' }, { title: 'Quadra' }] } },
@@ -362,7 +362,7 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'na3', type: 'condition', position_x: 0, position_y: 1650, data: { type: 'condition', branches: [
           { id: 'ba1', label: 'Sim', logic: 'AND', rules: [{ id: 'ra1', field: 'variable', fieldName: 'ajudar_mais', operator: 'contains', value: 'Sim' }] },
         ] } },
-        { id: 'na4', type: 'send_message', position_x: 0, position_y: 1800, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo contato! Se precisar, é só chamar. 😊' } },
+        { id: 'na4', type: 'send_message', position_x: 0, position_y: 1800, data: { type: 'send_message', subtype: 'text', message: 'Obrigado pelo contato! Se precisar, digite *menu* para voltar ao início. 😊' } },
         { id: 'na5', type: 'end', position_x: 0, position_y: 1950, data: { type: 'end' } },
 
         // ═══ COLUNA CENTRAL: RESERVAS ═══
