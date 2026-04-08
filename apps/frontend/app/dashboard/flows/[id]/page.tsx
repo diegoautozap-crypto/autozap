@@ -432,6 +432,8 @@ export default function FlowEditorPage() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView fitViewOptions={{ padding: 0.3 }}
+            minZoom={0.05}
+            maxZoom={2}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
             selectionOnDrag
