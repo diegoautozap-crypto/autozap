@@ -1642,10 +1642,20 @@ export class FlowEngine {
       try {
         const tz = 'America/Sao_Paulo'
 
+        // Se workEnd é 00:00 (meia-noite), usa o dia seguinte
+        let endDateForQuery = selectedDate
+        let endTimeForQuery = workEnd
+        if (workEnd === '00:00') {
+          const nextDay = new Date(`${selectedDate}T12:00:00`)
+          nextDay.setDate(nextDay.getDate() + 1)
+          endDateForQuery = nextDay.toISOString().split('T')[0]
+          endTimeForQuery = '00:00'
+        }
+
         const { data: busyData } = await calendar.freebusy.query({
           requestBody: {
             timeMin: `${selectedDate}T${workStart}:00-03:00`,
-            timeMax: `${selectedDate}T${workEnd}:00-03:00`,
+            timeMax: `${endDateForQuery}T${endTimeForQuery}:00-03:00`,
             timeZone: tz,
             items: [{ id: calendarId }],
           },
