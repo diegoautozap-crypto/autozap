@@ -63,83 +63,34 @@ export class GupshupAdapter implements IChannelAdapter {
     } else if (contentType === 'document') {
       message = { type: 'file', url: mediaUrl, filename: body || 'document' }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
-      // Envia botões via Meta Graph API (requer metaToken/phoneNumberId do Gupshup v3)
-      const metaToken = creds.metaToken
-      const phoneNumberId = creds.phoneNumberId || creds.source
-      if (metaToken && phoneNumberId) {
-        const metaBody = {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'interactive',
-          interactive: {
-            type: 'button',
-            body: { text: body || '' },
-            ...(input.footer ? { footer: { text: input.footer } } : {}),
-            action: {
-              buttons: input.buttons.slice(0, 3).map(b => ({
-                type: 'reply',
-                reply: { id: b.id, title: b.title.slice(0, 20) },
-              })),
-            },
-          },
-        }
-        logger.info('[GupshupAdapter] sending button via Meta Graph API', { phoneNumberId, hasMetaToken: !!metaToken })
-        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(metaBody),
-        })
-        const metaData = await metaRes.json() as any
-        logger.info('[GupshupAdapter] Meta button response:', { status: metaRes.status, data: JSON.stringify(metaData).slice(0, 500) })
-        if (metaData.messages?.[0]?.id) {
-          return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
-        }
-        logger.warn('[GupshupAdapter] Meta button failed, falling back to text')
+      // Gupshup quick_reply (botões clicáveis)
+      message = {
+        type: 'quick_reply',
+        msgid: `qr_${Date.now()}`,
+        content: { type: 'text', header: input.header || '', text: body || '', caption: input.footer || '' },
+        options: input.buttons.slice(0, 3).map(b => ({ type: 'text', title: b.title.slice(0, 20), postbackText: b.title })),
       }
-      // Fallback: texto numerado
-      const btnText = input.buttons.slice(0, 3).map((b, i) => `${i + 1}️⃣ ${b.title}`).join('\n')
-      message = { type: 'text', text: `${body || ''}\n\n${btnText}` }
+      logger.info('[GupshupAdapter] sending quick_reply (buttons)', { count: input.buttons.length })
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
-      const metaToken = creds.metaToken
-      const phoneNumberId = creds.phoneNumberId || creds.source
-      if (metaToken && phoneNumberId) {
-        const metaBody = {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'interactive',
-          interactive: {
-            type: 'list',
-            body: { text: body || '' },
-            ...(input.footer ? { footer: { text: input.footer } } : {}),
-            action: {
-              button: input.listButtonText || 'Ver opções',
-              sections: [{
-                title: 'Opções',
-                rows: input.listRows.slice(0, 10).map(r => ({
-                  id: r.id,
-                  title: r.title.slice(0, 24),
-                  ...(r.description ? { description: r.description.slice(0, 72) } : {}),
-                })),
-              }],
-            },
-          },
-        }
-        logger.info('[GupshupAdapter] sending list via Meta Graph API', { phoneNumberId, hasMetaToken: !!metaToken, metaTokenStart: metaToken?.slice(0, 10) })
-        const metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${metaToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(metaBody),
-        })
-        const metaData = await metaRes.json() as any
-        logger.info('[GupshupAdapter] Meta list response:', { status: metaRes.status, data: JSON.stringify(metaData).slice(0, 500) })
-        if (metaData.messages?.[0]?.id) {
-          return { externalId: metaData.messages[0].id, status: 'sent' as MessageStatus }
-        }
-        logger.warn('[GupshupAdapter] Meta list failed, falling back to text', { response: JSON.stringify(metaData).slice(0, 300) })
+      // Gupshup list (lista clicável)
+      message = {
+        type: 'list',
+        title: input.header || '',
+        body: body || '',
+        msgid: `list_${Date.now()}`,
+        globalButtons: [{ type: 'text', title: input.listButtonText || 'Ver opções' }],
+        items: [{
+          title: 'Opções',
+          subtitle: '',
+          options: input.listRows.slice(0, 10).map((r, i) => ({
+            type: 'text',
+            title: r.title.slice(0, 24),
+            description: r.description?.slice(0, 72) || '',
+            postbackText: r.title,
+          })),
+        }],
       }
-      // Fallback: texto numerado
-      const listText = input.listRows.slice(0, 10).map((r, i) => `${i + 1}️⃣ ${r.title}${r.description ? ` — ${r.description}` : ''}`).join('\n')
-      message = { type: 'text', text: `${body || ''}\n\n${listText}` }
+      logger.info('[GupshupAdapter] sending list', { count: input.listRows.length })
     } else {
       message = { type: 'text', text: body || '' }
     }
