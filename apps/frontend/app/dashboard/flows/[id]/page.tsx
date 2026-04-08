@@ -21,7 +21,7 @@ import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
 function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: any) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, borderRadius: 12, offset: 25 })
+  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, borderRadius: 16, offset: 40 })
   const [hovered, setHovered] = useState(false)
   const count = data?._count
   return (
