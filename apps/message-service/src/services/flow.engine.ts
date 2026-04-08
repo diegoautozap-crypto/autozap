@@ -1528,6 +1528,7 @@ export class FlowEngine {
       const today = new Date()
       const days: string[] = []
 
+      const dayRows: { id: string; title: string }[] = []
       for (let i = 1; i <= advanceDays; i++) {
         const d = new Date(today)
         d.setDate(d.getDate() + i)
@@ -1537,18 +1538,27 @@ export class FlowEngine {
           const dayName = fullDayNames[d.getDay()]
           const dd = String(d.getDate()).padStart(2, '0')
           const mm = String(d.getMonth() + 1).padStart(2, '0')
-          days.push(`${days.length + 1}. ${dayName} ${dd}/${mm}`)
-          variables[`_schedule_day_${days.length}`] = dateStr
+          const idx = dayRows.length + 1
+          dayRows.push({ id: `day_${idx}`, title: `${dayName} ${dd}/${mm}` })
+          days.push(`${idx}`)
+          variables[`_schedule_day_${idx}`] = dateStr
         }
       }
 
-      if (days.length === 0) {
+      if (dayRows.length === 0) {
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.msgNoSlots || 'Desculpe, não temos horários disponíveis no momento.' })
         return null
       }
 
-      const msg = (data?.msgAskDate || '📅 Escolha o dia para agendamento:') + '\n\n' + days.join('\n') + '\n\nDigite o número do dia.'
-      await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: msg })
+      const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
+      if (dayRows.length <= 3) {
+        // Use buttons for 3 or fewer days
+        const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
+      } else {
+        // Use list for more than 3 days
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'list', listRows: dayRows, listButtonText: 'Ver dias' })
+      }
 
       variables['_schedule_step'] = '2'
       variables['_schedule_total_days'] = String(days.length)
@@ -1566,19 +1576,28 @@ export class FlowEngine {
 
     if (step === '2') {
       // Step 2: User picked a day, check Google Calendar for busy times and show available slots
-      const choice = parseInt(variables['_schedule_day_choice'] || '0')
+      const dayResponse = variables['_schedule_day_choice'] || ''
       const totalDays = parseInt(variables['_schedule_total_days'] || '0')
 
+      // Support both button response (day_1, day_2) and text number (1, 2)
+      let choice = 0
+      if (dayResponse.startsWith('day_')) {
+        choice = parseInt(dayResponse.replace('day_', ''))
+      } else {
+        choice = parseInt(dayResponse)
+        // If user typed text that matches a day title, find it
+        if (isNaN(choice)) {
+          for (let i = 1; i <= totalDays; i++) {
+            const dayDate = variables[`_schedule_day_${i}`]
+            if (dayDate && dayResponse.toLowerCase().includes(dayDate.split('-')[2])) { choice = i; break }
+          }
+        }
+      }
+
       if (choice < 1 || choice > totalDays) {
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalDays}.` })
-        const reStateId = stateId || generateId()
-        await db.from('flow_states').upsert({
-          id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
-          conversation_id: ctx.conversationId, current_node_id: node.id,
-          variables, loop_counters: loopCounters, waiting_variable: '_schedule_day_choice',
-          status: 'waiting', updated_at: new Date(),
-        }, { onConflict: 'flow_id,conversation_id' })
-        return { success: true, paused: true }
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, selecione uma das opções.` })
+        variables['_schedule_step'] = '1'
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
       }
 
       const selectedDate = variables[`_schedule_day_${choice}`]
@@ -1628,15 +1647,21 @@ export class FlowEngine {
           return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
         }
 
-        const slotList = available.map((s, i) => {
+        const slotRows: { id: string; title: string }[] = []
+        available.forEach((s, i) => {
           variables[`_schedule_slot_${i + 1}`] = s
-          return `${i + 1}. ${s}`
+          slotRows.push({ id: `slot_${i + 1}`, title: s })
         })
 
         const dd2 = selectedDate.split('-')[2]
         const mm2 = selectedDate.split('-')[1]
-        const timeMsg = (data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`) + '\n\n' + slotList.join('\n') + '\n\nDigite o número do horário.'
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: timeMsg })
+        const timeMsg = data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`
+        if (slotRows.length <= 3) {
+          const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
+        } else {
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'list', listRows: slotRows, listButtonText: 'Ver horários' })
+        }
 
         variables['_schedule_step'] = '3'
         variables['_schedule_total_slots'] = String(available.length)
@@ -1659,19 +1684,28 @@ export class FlowEngine {
 
     if (step === '3') {
       // Step 3: User picked a time, create Google Calendar event
-      const choice = parseInt(variables['_schedule_slot_choice'] || '0')
+      const slotResponse = variables['_schedule_slot_choice'] || ''
       const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
 
+      // Support both button response (slot_1, slot_2) and text number (1, 2) and time text (08:00)
+      let choice = 0
+      if (slotResponse.startsWith('slot_')) {
+        choice = parseInt(slotResponse.replace('slot_', ''))
+      } else {
+        choice = parseInt(slotResponse)
+        // If user typed a time directly (e.g. "08:00"), find it
+        if (isNaN(choice)) {
+          for (let i = 1; i <= totalSlots; i++) {
+            if (variables[`_schedule_slot_${i}`] === slotResponse) { choice = i; break }
+          }
+        }
+      }
+
       if (choice < 1 || choice > totalSlots) {
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, digite um número de 1 a ${totalSlots}.` })
-        const reStateId = stateId || generateId()
-        await db.from('flow_states').upsert({
-          id: reStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
-          conversation_id: ctx.conversationId, current_node_id: node.id,
-          variables, loop_counters: loopCounters, waiting_variable: '_schedule_slot_choice',
-          status: 'waiting', updated_at: new Date(),
-        }, { onConflict: 'flow_id,conversation_id' })
-        return { success: true, paused: true }
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: `Por favor, selecione uma das opções.` })
+        variables['_schedule_step'] = '2'
+        variables['_schedule_day_choice'] = variables['_schedule_selected_date'] ? `day_${Object.keys(variables).filter(k => k.startsWith('_schedule_day_') && !k.includes('choice')).findIndex(k => variables[k] === variables['_schedule_selected_date']) + 1}` : '1'
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
       }
 
       const selectedTime = variables[`_schedule_slot_${choice}`]
