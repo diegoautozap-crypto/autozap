@@ -1661,9 +1661,22 @@ export class FlowEngine {
         })
 
         if (available.length === 0) {
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: data?.msgNoSlots || 'Desculpe, não temos horários disponíveis nesse dia. Tente outro dia.' })
-          variables['_schedule_step'] = '1'
-          return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+          const noSlotsMsg = data?.msgNoSlots || 'Sem horários disponíveis nesse dia.'
+          const buttons = [
+            { id: 'outro_dia', title: 'Tentar outro dia' },
+            { id: 'voltar_menu', title: 'Voltar ao menu' },
+          ]
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: noSlotsMsg, interactiveType: 'button', buttons })
+
+          variables['_schedule_step'] = '4'
+          const noSlotStateId = stateId || generateId()
+          await db.from('flow_states').upsert({
+            id: noSlotStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+            conversation_id: ctx.conversationId, current_node_id: node.id,
+            variables, loop_counters: loopCounters, waiting_variable: '_schedule_no_slot_choice',
+            status: 'waiting', updated_at: new Date(),
+          }, { onConflict: 'flow_id,conversation_id' })
+          return { success: true, paused: true }
         }
 
         const slotRows: { id: string; title: string }[] = []
@@ -1699,6 +1712,19 @@ export class FlowEngine {
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao consultar horários. Tente novamente.' })
         return null
       }
+    }
+
+    if (step === '4') {
+      // Step 4: No slots — user chose "try another day" or "back to menu"
+      const noSlotChoice = (variables['_schedule_no_slot_choice'] || '').trim().toLowerCase()
+      if (noSlotChoice === 'outro_dia' || noSlotChoice.includes('outro')) {
+        variables['_schedule_step'] = '1'
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+      }
+      // "Voltar ao menu" or anything else — exit the node without scheduling
+      variables['agendamento_status'] = 'sem_horario'
+      Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+      return { success: true }
     }
 
     if (step === '3') {
@@ -1761,6 +1787,7 @@ export class FlowEngine {
         // Save to flow variables
         variables['agendamento_data'] = `${dd}/${mm}`
         variables['agendamento_horario'] = selectedTime
+        variables['agendamento_status'] = 'agendado'
         variables['agendamento_google_event_id'] = event.data?.id || ''
 
         // Clean up internal variables
