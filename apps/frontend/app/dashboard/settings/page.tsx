@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { tenantApi, conversationApi } from '@/lib/api'
-import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX, Upload } from 'lucide-react'
+import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX, Upload, MessageSquare } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
@@ -389,12 +389,38 @@ function WebhooksSection() {
 
 // ── Preferências de Notificação ──────────────────────────────────────────────
 function NotificationSection() {
+  const queryClient = useQueryClient()
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try { return localStorage.getItem('autozap-sound') !== 'off' } catch { return true }
   })
   const [pushEnabled, setPushEnabled] = useState(() => {
     try { return localStorage.getItem('autozap-push') !== 'off' } catch { return true }
   })
+
+  const { data: tenant } = useQuery({
+    queryKey: ['tenant-autoreply'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant'); return data.data },
+  })
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false)
+  const [autoReplyMsg, setAutoReplyMsg] = useState('')
+  const [autoReplyLoaded, setAutoReplyLoaded] = useState(false)
+
+  useEffect(() => {
+    if (tenant && !autoReplyLoaded) {
+      setAutoReplyEnabled(tenant.settings?.autoReplyEnabled !== false)
+      setAutoReplyMsg(tenant.settings?.autoReplyMessage || 'Recebemos sua mensagem! Um atendente vai te responder em breve. 😊')
+      setAutoReplyLoaded(true)
+    }
+  }, [tenant, autoReplyLoaded])
+
+  const saveAutoReply = async (enabled: boolean, msg?: string) => {
+    try {
+      await tenantApi.patch('/tenant/settings', { settings: { autoReplyEnabled: enabled, autoReplyMessage: msg || autoReplyMsg } })
+      setAutoReplyEnabled(enabled)
+      queryClient.invalidateQueries({ queryKey: ['tenant-autoreply'] })
+      toast.success(enabled ? 'Resposta automática ativada' : 'Resposta automática desativada')
+    } catch { toast.error('Erro ao salvar') }
+  }
 
   const toggleSound = () => {
     const next = !soundEnabled
@@ -443,6 +469,29 @@ function NotificationSection() {
           <button onClick={togglePush} style={{ width: '40px', height: '22px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: pushEnabled ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
             <span style={{ position: 'absolute', top: '2px', left: pushEnabled ? '20px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
           </button>
+        </div>
+        {/* Auto-reply */}
+        <div style={{ padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MessageSquare size={16} color={autoReplyEnabled ? '#22c55e' : 'var(--text-faint)'} />
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Resposta automática</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>Responde automaticamente quando ninguém atende em 5 min</p>
+              </div>
+            </div>
+            <button onClick={() => saveAutoReply(!autoReplyEnabled)} style={{ width: '40px', height: '22px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: autoReplyEnabled ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
+              <span style={{ position: 'absolute', top: '2px', left: autoReplyEnabled ? '20px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+            </button>
+          </div>
+          {autoReplyEnabled && (
+            <div style={{ marginTop: '10px' }}>
+              <textarea value={autoReplyMsg} onChange={e => setAutoReplyMsg(e.target.value)}
+                onBlur={() => saveAutoReply(true, autoReplyMsg)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '7px', fontSize: '12px', color: 'var(--text)', background: 'var(--bg-card)', resize: 'vertical', minHeight: '50px', outline: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' }} />
+              <p style={{ fontSize: '10px', color: 'var(--text-faintest)', margin: '4px 0 0' }}>Edite a mensagem e clique fora pra salvar</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
