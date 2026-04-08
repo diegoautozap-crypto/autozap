@@ -251,24 +251,6 @@ export class FlowEngine {
         const triggered = await this.checkFlowTrigger(flow, ctx)
         if (!triggered) continue
 
-        // Check if flow already completed for this conversation
-        // Only re-trigger if it's a keyword trigger (explicit re-entry)
-        const { data: completedState } = await db.from('flow_states')
-          .select('id')
-          .eq('flow_id', flow.id)
-          .eq('conversation_id', ctx.conversationId)
-          .eq('status', 'completed')
-          .limit(1)
-          .maybeSingle()
-        if (completedState) {
-          // Flow already completed — only re-trigger on keyword match
-          const triggerNode = (await db.from('flow_nodes').select('type').eq('flow_id', flow.id).like('type', 'trigger_%').limit(1)).data?.[0]
-          if (triggerNode?.type !== 'trigger_keyword') {
-            logger.info('Flow skipped — already completed for this conversation', { flowId: flow.id })
-            continue
-          }
-        }
-
         const onCooldown = await this.isOnCooldown(flow, ctx)
         if (onCooldown) { logger.info('Flow skipped — cooldown active', { flowId: flow.id }); continue }
         logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
