@@ -233,9 +233,9 @@ router.post('/webhook/notify/:token', rateLimit({ max: 60 }), async (req, res, n
     const tenantId = tenant.id
     const normalizedPhone = normalizeBRPhone(phone.replace(/\D/g, ''))
 
-    // Busca canal do tenant
-    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', tenantId).limit(1).single()
-    if (!channel) { res.status(400).json({ error: 'Nenhum canal encontrado' }); return }
+    // Busca canal ativo do tenant
+    const { data: channel } = await db.from('channels').select('id, type').eq('tenant_id', tenantId).eq('status', 'active').limit(1).single()
+    if (!channel) { res.status(400).json({ error: 'Nenhum canal ativo encontrado' }); return }
 
     // Garante contato + conversa
     const { contactId } = await ensureContact({ tenantId, phone: normalizedPhone, name: req.body.name || normalizedPhone, origin: 'notification' })
