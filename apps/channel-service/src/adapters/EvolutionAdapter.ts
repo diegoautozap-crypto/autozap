@@ -45,6 +45,28 @@ export class EvolutionAdapter implements IChannelAdapter {
         number: this.normalizePhone(to),
         text: body || '',
       }
+    } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
+      url = `${baseUrl}/message/sendButtons/${instanceName}`
+      payload = {
+        number: this.normalizePhone(to),
+        title: input.header || '',
+        description: body || '',
+        footer: input.footer || '',
+        buttons: input.buttons.slice(0, 3).map(b => ({ title: 'reply', displayText: b.title.slice(0, 20), id: b.id })),
+      }
+    } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
+      url = `${baseUrl}/message/sendList/${instanceName}`
+      payload = {
+        number: this.normalizePhone(to),
+        title: input.header || '',
+        description: body || '',
+        buttonText: input.listButtonText || 'Ver opções',
+        footerText: input.footer || '',
+        values: [{
+          title: 'Opções',
+          rows: input.listRows.slice(0, 10).map(r => ({ title: r.title.slice(0, 24), description: r.description?.slice(0, 72) || '', rowId: r.id })),
+        }],
+      }
     } else if (['image', 'video', 'audio', 'document'].includes(contentType)) {
       url = `${baseUrl}/message/sendMedia/${instanceName}`
       payload = {
