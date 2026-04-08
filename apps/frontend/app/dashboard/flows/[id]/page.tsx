@@ -169,6 +169,7 @@ export default function FlowEditorPage() {
     queryKey: ['channels'],
     queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data || [] },
   })
+  const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
   const [showAnalytics, setShowAnalytics] = useState(false)
   const { data: analytics } = useQuery({
     queryKey: ['flow-analytics', id],
@@ -200,12 +201,26 @@ export default function FlowEditorPage() {
         },
       }
     }))
-    setEdges((flowData.edges || []).map((e: any) => ({
-      id: e.id, source: e.source_node, target: e.target_node,
-      sourceHandle: e.source_handle || 'success',
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' },
-      style: { stroke: '#d1d5db', strokeWidth: 2 },
-    })))
+    setEdges((flowData.edges || []).map((e: any) => {
+      let edgeColor = '#d1d5db'
+      const handle = e.source_handle || 'success'
+      if (handle === 'fallback') edgeColor = '#9ca3af'
+      else if (handle === 'true') edgeColor = '#16a34a'
+      else if (handle === 'false') edgeColor = '#ef4444'
+      else if (handle === 'timeout') edgeColor = '#d97706'
+      else if (handle.startsWith('branch_')) {
+        const srcNode = (flowData.nodes || []).find((n: any) => n.id === e.source_node)
+        const branches = srcNode?.data?.branches || []
+        const idx = branches.findIndex((b: any) => b.id === handle.replace('branch_', ''))
+        if (idx >= 0) edgeColor = BRANCH_COLORS_MAP[idx % BRANCH_COLORS_MAP.length]
+      }
+      return {
+        id: e.id, source: e.source_node, target: e.target_node,
+        sourceHandle: handle,
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
+        style: { stroke: edgeColor, strokeWidth: 2 },
+      }
+    }))
     setInitialized(true)
   }, [flowData, initialized, setNodes, setEdges])
 
@@ -242,8 +257,6 @@ export default function FlowEditorPage() {
       data: { ...(e.data || {}), _count: stats[e.source]?.total || 0 },
     })))
   }, [analytics?.nodeStats, showAnalytics])
-
-  const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
 
   const onConnect = useCallback((params: Connection) => {
     let edgeColor = '#d1d5db'
