@@ -1060,6 +1060,77 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 <input style={inputStyle} placeholder="Reserva - {{name}}" value={d.eventTitle || ''} onChange={e => onUpdate(node.id, { eventTitle: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
                 <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Use {'{{name}}'}, {'{{phone}}'} como variáveis</p>
               </div>
+
+              {/* Tabela de preços */}
+              <div>
+                <label style={labelStyle}>Tabela de preços (opcional)</label>
+                <p style={{ fontSize: '10px', color: '#a1a1aa', marginBottom: '8px' }}>Preencha os valores por dia/horário. Deixe vazio = sem preço. Digite 0 = indisponível.</p>
+                {(() => {
+                  const start = d.workStart || '08:00'
+                  const end = d.workEnd || '18:00'
+                  const dur = d.eventDuration || 60
+                  const [sh, sm] = start.split(':').map(Number)
+                  const [eh, em2] = end.split(':').map(Number)
+                  let startMin = sh * 60 + sm
+                  const endMin = eh * 60 + em2
+                  const slots: string[] = []
+                  while (startMin + dur <= endMin) {
+                    slots.push(`${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`)
+                    startMin += dur
+                  }
+                  const activeDays = Object.entries(d.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false })
+                    .filter(([, v]) => v)
+                    .map(([k]) => k)
+                  const dayLabels: Record<string, string> = { mon: 'Seg', tue: 'Ter', wed: 'Qua', thu: 'Qui', fri: 'Sex', sat: 'Sáb', sun: 'Dom' }
+                  const priceTable = d.priceTable || {}
+
+                  if (slots.length === 0 || activeDays.length === 0) return <p style={{ fontSize: '11px', color: '#a1a1aa' }}>Configure horários e dias primeiro</p>
+
+                  return (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: '4px 6px', borderBottom: '1px solid #e4e4e7', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>Hora</th>
+                            {activeDays.map(day => (
+                              <th key={day} style={{ padding: '4px 4px', borderBottom: '1px solid #e4e4e7', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>{dayLabels[day]}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {slots.map(slot => (
+                            <tr key={slot}>
+                              <td style={{ padding: '3px 6px', borderBottom: '1px solid #f4f4f5', fontWeight: 600, color: '#374151' }}>{slot}</td>
+                              {activeDays.map(day => {
+                                const key = `${day}_${slot}`
+                                const val = priceTable[key]
+                                return (
+                                  <td key={day} style={{ padding: '2px 2px', borderBottom: '1px solid #f4f4f5' }}>
+                                    <input
+                                      type="number" min="0" step="10"
+                                      style={{ width: '100%', padding: '3px 4px', border: '1px solid #e4e4e7', borderRadius: '4px', fontSize: '11px', textAlign: 'center', background: val === 0 ? '#fee2e2' : val ? '#f0fdf4' : '#fff', color: val === 0 ? '#ef4444' : '#374151', boxSizing: 'border-box' as const }}
+                                      placeholder="-"
+                                      value={val === 0 ? '0' : val || ''}
+                                      onChange={e => {
+                                        const newTable = { ...priceTable }
+                                        const v = e.target.value
+                                        if (v === '' || v === undefined) delete newTable[key]
+                                        else newTable[key] = Number(v)
+                                        onUpdate(node.id, { priceTable: newTable })
+                                      }}
+                                      onFocus={focusInput} onBlur={blurInput}
+                                    />
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                })()}
+              </div>
             </>)}
           </>)}
 

@@ -115,6 +115,7 @@ interface FlowNodeData {
   workDays?: Record<string, boolean>
   advanceDays?: number
   eventTitle?: string
+  priceTable?: Record<string, number>
   msgAskDate?: string
   msgAskTime?: string
   msgConfirm?: string
@@ -1651,7 +1652,15 @@ export class FlowEngine {
         })
 
         const busySlots = busyData.calendars?.[calendarId]?.busy || []
+        const priceTable = data?.priceTable || {}
+        const selectedDayOfWeek = new Date(`${selectedDate}T12:00:00`).getDay()
+        const dayKeyForPrice = dayKeys[selectedDayOfWeek] // mon, tue, etc
+
         const available = allSlots.filter(slot => {
+          // Check if slot is marked as unavailable (price = 0) in price table
+          const priceKey = `${dayKeyForPrice}_${slot}`
+          if (priceTable[priceKey] === 0) return false
+
           const slotStartMs = new Date(`${selectedDate}T${slot}:00-03:00`).getTime()
           const slotEndMs = slotStartMs + duration * 60 * 1000
 
@@ -1672,7 +1681,11 @@ export class FlowEngine {
         const slotRows: { id: string; title: string }[] = []
         available.forEach((s, i) => {
           variables[`_schedule_slot_${i + 1}`] = s
-          slotRows.push({ id: `slot_${i + 1}`, title: s })
+          const priceKey = `${dayKeyForPrice}_${s}`
+          const price = priceTable[priceKey]
+          const priceLabel = price ? ` - R$ ${price}` : ''
+          variables[`_schedule_price_${i + 1}`] = price ? String(price) : ''
+          slotRows.push({ id: `slot_${i + 1}`, title: `${s}${priceLabel}` })
         })
 
         const dd2 = selectedDate.split('-')[2]
@@ -1709,7 +1722,7 @@ export class FlowEngine {
       const slotResponse = variables['_schedule_slot_choice'] || ''
       const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
 
-      // Support: button ID (slot_1), text number (1), time text (21:00), or title match
+      // Support: button ID (slot_1), text number (1), time text (21:00), title with price (21:00 - R$ 280)
       let choice = 0
       const slotClean = slotResponse.trim()
       if (slotClean.startsWith('slot_')) {
@@ -1717,9 +1730,11 @@ export class FlowEngine {
       } else if (/^\d+$/.test(slotClean)) {
         choice = parseInt(slotClean)
       } else {
-        // Match by time value (e.g. "21:00") or title
+        // Extract time from response (handles "21:00 - R$ 280" or just "21:00")
+        const timeMatch = slotClean.match(/(\d{2}:\d{2})/)
+        const timeFromResponse = timeMatch ? timeMatch[1] : slotClean
         for (let i = 1; i <= totalSlots; i++) {
-          if (variables[`_schedule_slot_${i}`] === slotClean) { choice = i; break }
+          if (variables[`_schedule_slot_${i}`] === timeFromResponse || variables[`_schedule_slot_${i}`] === slotClean) { choice = i; break }
         }
       }
 
@@ -1762,6 +1777,7 @@ export class FlowEngine {
         // Save to flow variables BEFORE sending confirm so {{variables}} work
         variables['agendamento_data'] = `${dd}/${mm}`
         variables['agendamento_horario'] = selectedTime
+        variables['agendamento_valor'] = variables[`_schedule_price_${choice}`] || ''
         variables['agendamento_status'] = 'agendado'
         variables['agendamento_google_event_id'] = event.data?.id || ''
 
