@@ -81,7 +81,7 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '32px',
         background: c.border, borderRadius: '10px 10px 0 0',
-        display: 'flex', alignItems: 'center', paddingLeft: '14px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           {data.title || 'Grupo'}
