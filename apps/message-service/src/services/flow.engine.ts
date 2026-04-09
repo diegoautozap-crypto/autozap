@@ -1725,7 +1725,7 @@ export class FlowEngine {
               summary: eventTitle,
               description: `Agendado via WhatsApp\nCliente: ${contactName}\nTelefone: +${ctx.phone}`,
               start: { date: selectedDate },
-              end: { date: selectedDate },
+              end: { date: (() => { const next = new Date(`${selectedDate}T12:00:00`); next.setDate(next.getDate() + 1); return next.toISOString().split('T')[0] })() },
             },
           })
 
