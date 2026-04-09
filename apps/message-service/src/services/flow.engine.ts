@@ -108,6 +108,7 @@ interface FlowNodeData {
   noSlotsMessage?: string
   confirmMessage?: string
   calendarMode?: 'google' | 'internal'
+  calendarAction?: 'schedule' | 'cancel'
   googleCalendarId?: string
   eventDuration?: number
   workStart?: string
@@ -1530,6 +1531,11 @@ export class FlowEngine {
     }
     variables['_schedule_node_id'] = node.id
 
+    // ── Cancel mode ──────────────────────────────────────────────────────────
+    if ((data?.calendarAction || 'schedule') === 'cancel') {
+      return await this.executeCancelAppointment(node, ctx, flowId, data, variables, loopCounters, stateId, calendar, calendarId)
+    }
+
     const step = variables['_schedule_step'] || '1'
 
     const duration = data?.eventDuration || 60
@@ -1898,6 +1904,132 @@ export class FlowEngine {
       } catch (err: any) {
         logger.error('Google Calendar create event error', { err: err.message })
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao agendar. Tente novamente.' })
+        return null
+      }
+    }
+
+    return null
+  }
+
+  // ── Cancel appointment via Google Calendar ──────────────────────────────────
+  private async executeCancelAppointment(
+    node: any, ctx: FlowContext, flowId: string, data: any,
+    variables: Record<string, string>, loopCounters: Record<string, number>,
+    stateId: string | undefined, calendar: any, calendarId: string
+  ): Promise<{ success: boolean; paused?: boolean } | null> {
+    const cancelStep = variables['_cancel_step'] || '1'
+
+    if (cancelStep === '1') {
+      // Step 1: Search for upcoming events with this contact's phone
+      try {
+        const now = new Date()
+        const futureLimit = new Date()
+        futureLimit.setDate(futureLimit.getDate() + 60)
+
+        const { data: events } = await calendar.events.list({
+          calendarId,
+          timeMin: now.toISOString(),
+          timeMax: futureLimit.toISOString(),
+          q: ctx.phone.slice(-8), // search by last 8 digits of phone
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 10,
+        })
+
+        const items = (events.items || []).filter((e: any) =>
+          e.description && e.description.includes(ctx.phone.slice(-8))
+        )
+
+        if (items.length === 0) {
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Você não tem agendamentos futuros para cancelar.' })
+          variables['cancelamento_status'] = 'nenhum'
+          return { success: true }
+        }
+
+        // Show events as list
+        const eventRows: { id: string; title: string }[] = []
+        items.forEach((e: any, i: number) => {
+          const start = new Date(e.start.dateTime || e.start.date)
+          const dd = String(start.getDate()).padStart(2, '0')
+          const mm = String(start.getMonth() + 1).padStart(2, '0')
+          const hh = String(start.getHours()).padStart(2, '0')
+          const min = String(start.getMinutes()).padStart(2, '0')
+          variables[`_cancel_event_${i + 1}`] = e.id
+          eventRows.push({ id: `cancel_${i + 1}`, title: `${dd}/${mm} ${hh}:${min} - ${e.summary || 'Reserva'}` })
+        })
+        eventRows.push({ id: 'cancel_voltar', title: '↩ Voltar' })
+
+        const msg = '📋 Seus agendamentos. Qual deseja cancelar?'
+        if (eventRows.length <= 3) {
+          const buttons = eventRows.map(r => ({ id: r.id, title: r.title }))
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
+        } else {
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'list', listRows: eventRows, listButtonText: 'Ver agendamentos' })
+        }
+
+        variables['_cancel_step'] = '2'
+        variables['_cancel_total'] = String(items.length)
+
+        const inputStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: inputStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_cancel_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+
+      } catch (err: any) {
+        logger.error('Google Calendar list events error', { err: err.message })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao buscar seus agendamentos.' })
+        return null
+      }
+    }
+
+    if (cancelStep === '2') {
+      // Step 2: User picked an event to cancel
+      const response = (variables['_cancel_choice'] || '').trim()
+      const total = parseInt(variables['_cancel_total'] || '0')
+
+      // Handle "Voltar"
+      if (response === 'cancel_voltar' || response.toLowerCase().includes('voltar')) {
+        variables['cancelamento_status'] = 'voltou'
+        Object.keys(variables).filter(k => k.startsWith('_cancel_')).forEach(k => delete variables[k])
+        return { success: true }
+      }
+
+      // Find which event was selected
+      let choice = 0
+      if (response.startsWith('cancel_')) {
+        choice = parseInt(response.replace('cancel_', ''))
+      } else if (/^\d+$/.test(response)) {
+        choice = parseInt(response)
+      } else {
+        // Match by date in title
+        for (let i = 1; i <= total; i++) {
+          if (response.includes('/')) { choice = i; break }
+        }
+      }
+
+      if (choice < 1 || choice > total) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Por favor, selecione uma das opções.' })
+        variables['_cancel_step'] = '1'
+        return await this.executeCancelAppointment(node, ctx, flowId, data, variables, loopCounters, stateId, calendar, calendarId)
+      }
+
+      const eventId = variables[`_cancel_event_${choice}`]
+      if (!eventId) { return null }
+
+      try {
+        await calendar.events.delete({ calendarId, eventId })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: '✅ Agendamento cancelado com sucesso!' })
+        variables['cancelamento_status'] = 'cancelado'
+        Object.keys(variables).filter(k => k.startsWith('_cancel_')).forEach(k => delete variables[k])
+        await this.logNode(flowId, node.id, ctx, 'success', `Google Calendar: evento ${eventId} cancelado`)
+        return { success: true }
+      } catch (err: any) {
+        logger.error('Google Calendar delete event error', { err: err.message })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao cancelar. Tente novamente.' })
         return null
       }
     }

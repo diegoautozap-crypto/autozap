@@ -1022,6 +1022,14 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
 
           {(d.calendarMode || 'google') === 'google' && (<>
+            {/* Ação: Agendar ou Cancelar */}
+            <div><label style={labelStyle}>Ação</label>
+              <select style={{ ...inputStyle, background: '#fafafa' }} value={d.calendarAction || 'schedule'} onChange={e => onUpdate(node.id, { calendarAction: e.target.value })} onFocus={focusInput} onBlur={blurInput}>
+                <option value="schedule">Agendar</option>
+                <option value="cancel">Cancelar agendamento</option>
+              </select>
+            </div>
+
             {!googleConnected ? (
               <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#92400e' }}>
                 ⚠️ Google Calendar não conectado. Vá em <strong>Configurações</strong> e conecte sua conta Google primeiro.
