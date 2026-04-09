@@ -1047,6 +1047,12 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   <option value={60}>1 hora</option>
                   <option value={90}>1h30</option>
                   <option value={120}>2 horas</option>
+                  <option value={180}>3 horas</option>
+                  <option value={240}>4 horas</option>
+                  <option value={360}>6 horas</option>
+                  <option value={480}>8 horas</option>
+                  <option value={720}>12 horas</option>
+                  <option value={1440}>Dia inteiro</option>
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
