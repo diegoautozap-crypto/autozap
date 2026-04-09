@@ -656,9 +656,20 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.useVariableHint')}: {'{{' }{d.saveAs || 'variavel'}{'}}' }</p>
           </div>
           <div>
-            <label style={labelStyle}>{t('nodes.timeoutHours')}</label>
-            <input type="number" min="0" max="168" step="1" style={inputStyle} placeholder={t('nodes.timeoutPlaceholder')} value={d.timeoutHours || ''} onChange={e => onUpdate(node.id, { timeoutHours: Number(e.target.value) || 0 })} onFocus={focusInput} onBlur={blurInput} />
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.timeoutHint').replace('{hours}', String(d.timeoutHours || 'X'))}</p>
+            <label style={labelStyle}>Timeout</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <input type="number" min="0" max="10080" step="1" style={inputStyle} placeholder="Minutos" value={d.timeoutMinutes || ''} onChange={e => onUpdate(node.id, { timeoutMinutes: Number(e.target.value) || 0, timeoutHours: 0 })} onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Minutos</p>
+              </div>
+              <div>
+                <input type="number" min="0" max="168" step="1" style={inputStyle} placeholder="Horas" value={d.timeoutHours || ''} onChange={e => onUpdate(node.id, { timeoutHours: Number(e.target.value) || 0, timeoutMinutes: 0 })} onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Horas</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>
+              {d.timeoutMinutes ? `Timeout: ${d.timeoutMinutes} min` : d.timeoutHours ? `Timeout: ${d.timeoutHours}h` : 'Sem timeout (espera indefinidamente)'}
+            </p>
           </div>
         </>)}
 

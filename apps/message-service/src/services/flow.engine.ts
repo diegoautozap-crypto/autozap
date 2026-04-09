@@ -594,8 +594,8 @@ export class FlowEngine {
             variables, loop_counters: loopCounters, waiting_variable: saveVar, status: 'waiting', updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
           // Schedule timeout if configured
-          if (data?.timeoutHours && data.timeoutHours > 0) {
-            const timeoutMs = data.timeoutHours * 3600000
+          const timeoutMs = data?.timeoutMinutes ? data.timeoutMinutes * 60000 : data?.timeoutHours ? data.timeoutHours * 3600000 : 0
+          if (timeoutMs > 0) {
             const { flowResumeQueue } = await import('../workers/flow.worker')
             const timeoutNodeId = this.getNextNode(node.id, 'timeout', edgeMap, nodeMap)?.id
             if (timeoutNodeId) {
