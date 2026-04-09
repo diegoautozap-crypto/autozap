@@ -1098,10 +1098,15 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   const [eh, em2] = end.split(':').map(Number)
                   let startMin = sh * 60 + sm
                   const endMin = (eh === 0 && em2 === 0) ? 24 * 60 : eh * 60 + em2
+                  const isFullDay = dur >= 720 // 12h+ = dia inteiro
                   const slots: string[] = []
-                  while (startMin + dur <= endMin) {
-                    slots.push(`${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`)
-                    startMin += dur
+                  if (isFullDay) {
+                    slots.push('dia')
+                  } else {
+                    while (startMin + dur <= endMin) {
+                      slots.push(`${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`)
+                      startMin += dur
+                    }
                   }
                   const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
                   const allDays = d.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
@@ -1116,7 +1121,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                         <thead>
                           <tr>
-                            <th style={{ padding: '4px 6px', borderBottom: '1px solid #e4e4e7', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>Hora</th>
+                            <th style={{ padding: '4px 6px', borderBottom: '1px solid #e4e4e7', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>{isFullDay ? 'Valor' : 'Hora'}</th>
                             {activeDays.map(day => (
                               <th key={day} style={{ padding: '4px 4px', borderBottom: '1px solid #e4e4e7', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>{dayLabels[day]}</th>
                             ))}
@@ -1125,7 +1130,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                         <tbody>
                           {slots.map(slot => (
                             <tr key={slot}>
-                              <td style={{ padding: '3px 6px', borderBottom: '1px solid #f4f4f5', fontWeight: 600, color: '#374151' }}>{slot}</td>
+                              <td style={{ padding: '3px 6px', borderBottom: '1px solid #f4f4f5', fontWeight: 600, color: '#374151' }}>{slot === 'dia' ? 'R$' : slot}</td>
                               {activeDays.map(day => {
                                 const key = `${day}_${slot}`
                                 const val = priceTable[key]

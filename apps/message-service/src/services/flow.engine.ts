@@ -1539,6 +1539,7 @@ export class FlowEngine {
     const step = variables['_schedule_step'] || '1'
 
     const duration = data?.eventDuration || 60
+    const isFullDay = duration >= 720 // 12h+ = dia inteiro
     const workStart = data?.workStart || '08:00'
     const workEnd = data?.workEnd || '18:00'
     const workDays = data?.workDays || { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false }
@@ -1607,27 +1608,33 @@ export class FlowEngine {
       // Filter: only show days that have at least 1 available slot
       const dayRows: { id: string; title: string }[] = []
       for (const cd of candidateDays) {
-        let slotMin = sH * 60 + sM
         let hasAvailable = false
 
-        while (slotMin + duration <= slotEndMin) {
-          const slotTime = `${String(Math.floor(slotMin / 60)).padStart(2, '0')}:${String(slotMin % 60).padStart(2, '0')}`
-          // Check price table (0 = unavailable)
-          const priceKey = `${cd.dayKey}_${slotTime}`
-          if (priceTable[priceKey] === 0) { slotMin += duration; continue }
-
-          // Check Google Calendar busy
-          const slotStartMs = new Date(`${cd.dateStr}T${slotTime}:00-03:00`).getTime()
-          const slotEndMs = slotStartMs + duration * 60 * 1000
+        if (isFullDay) {
+          // Full day: check if day has price=0 (unavailable) or any event
+          const priceKey = `${cd.dayKey}_dia`
+          if (priceTable[priceKey] === 0) continue
           const dayBusy = busyByDay[cd.dateStr] || []
-          const isBusy = dayBusy.some(b => {
-            const bStart = new Date(b.start).getTime()
-            const bEnd = new Date(b.end).getTime()
-            return slotStartMs < bEnd && slotEndMs > bStart
-          })
+          hasAvailable = dayBusy.length === 0
+        } else {
+          let slotMin = sH * 60 + sM
+          while (slotMin + duration <= slotEndMin) {
+            const slotTime = `${String(Math.floor(slotMin / 60)).padStart(2, '0')}:${String(slotMin % 60).padStart(2, '0')}`
+            const priceKey = `${cd.dayKey}_${slotTime}`
+            if (priceTable[priceKey] === 0) { slotMin += duration; continue }
 
-          if (!isBusy) { hasAvailable = true; break }
-          slotMin += duration
+            const slotStartMs = new Date(`${cd.dateStr}T${slotTime}:00-03:00`).getTime()
+            const slotEndMs = slotStartMs + duration * 60 * 1000
+            const dayBusy = busyByDay[cd.dateStr] || []
+            const isBusy = dayBusy.some(b => {
+              const bStart = new Date(b.start).getTime()
+              const bEnd = new Date(b.end).getTime()
+              return slotStartMs < bEnd && slotEndMs > bStart
+            })
+
+            if (!isBusy) { hasAvailable = true; break }
+            slotMin += duration
+          }
         }
 
         if (hasAvailable) {
@@ -1700,6 +1707,50 @@ export class FlowEngine {
 
       const selectedDate = variables[`_schedule_day_${choice}`]
       variables['_schedule_selected_date'] = selectedDate
+
+      // Full day: skip time selection, create event directly
+      if (isFullDay) {
+        const { data: contactInfo } = await db.from('contacts').select('name').eq('id', ctx.contactId).single()
+        const contactName = contactInfo?.name || ctx.phone
+        const eventTitle = this.interpolate(data?.eventTitle || 'Reserva - {{name}}', ctx, { ...variables, name: contactName })
+        const priceTable2 = data?.priceTable || {}
+        const selectedDow = new Date(`${selectedDate}T12:00:00`).getDay()
+        const dayKeyPrice = dayKeys[selectedDow]
+        const price = priceTable2[`${dayKeyPrice}_dia`]
+
+        try {
+          await calendar.events.insert({
+            calendarId,
+            requestBody: {
+              summary: eventTitle,
+              description: `Agendado via WhatsApp\nCliente: ${contactName}\nTelefone: +${ctx.phone}`,
+              start: { date: selectedDate },
+              end: { date: selectedDate },
+            },
+          })
+
+          const dd = selectedDate.split('-')[2]
+          const mm = selectedDate.split('-')[1]
+          variables['agendamento_data'] = `${dd}/${mm}`
+          variables['agendamento_horario'] = 'Dia inteiro'
+          variables['agendamento_valor'] = price ? String(price) : ''
+          variables['agendamento_status'] = 'agendado'
+
+          const confirmMsg = this.interpolate(
+            data?.msgConfirm || `✅ Agendado com sucesso!\n\n📅 Data: ${dd}/${mm}\n\nTe enviaremos um lembrete antes.`,
+            ctx, variables
+          )
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
+
+          Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+          await this.logNode(flowId, node.id, ctx, 'success', `Google Calendar: dia inteiro ${selectedDate}`)
+          return { success: true }
+        } catch (err: any) {
+          logger.error('Google Calendar full day event error', { err: err.message })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao agendar. Tente novamente.' })
+          return null
+        }
+      }
 
       // Generate all possible slots
       const [startH, startM] = workStart.split(':').map(Number)
