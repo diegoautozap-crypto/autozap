@@ -1555,7 +1555,7 @@ export class FlowEngine {
 
       // Collect candidate days
       const candidateDays: { dateStr: string; dayName: string; dd: string; mm: string; dayKey: string }[] = []
-      for (let i = 1; i <= advanceDays; i++) {
+      for (let i = 0; i <= advanceDays; i++) {
         const d = new Date(today)
         d.setDate(d.getDate() + i)
         const dayKey = dayKeys[d.getDay()]
