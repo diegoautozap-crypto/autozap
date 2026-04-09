@@ -1937,7 +1937,8 @@ export class FlowEngine {
         })
 
         const items = (events.items || []).filter((e: any) =>
-          e.description && e.description.includes(ctx.phone.slice(-8))
+          (e.description && e.description.includes(ctx.phone.slice(-8))) ||
+          (e.summary && e.summary.includes(ctx.phone.slice(-8)))
         )
 
         if (items.length === 0) {
