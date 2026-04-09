@@ -1956,16 +1956,15 @@ export class FlowEngine {
           return { success: true }
         }
 
-        // Show events as list
+        // Show events as list (with Brazil timezone)
         const eventRows: { id: string; title: string }[] = []
         items.forEach((e: any, i: number) => {
           const start = new Date(e.start.dateTime || e.start.date)
-          const dd = String(start.getDate()).padStart(2, '0')
-          const mm = String(start.getMonth() + 1).padStart(2, '0')
-          const hh = String(start.getHours()).padStart(2, '0')
-          const min = String(start.getMinutes()).padStart(2, '0')
+          const brDate = start.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })
+          const brTime = start.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false })
           variables[`_cancel_event_${i + 1}`] = e.id
-          eventRows.push({ id: `cancel_${i + 1}`, title: `${dd}/${mm} ${hh}:${min} - ${e.summary || 'Reserva'}` })
+          // WhatsApp list title max 24 chars
+          eventRows.push({ id: `cancel_${i + 1}`, title: `${brDate} ${brTime}` })
         })
         eventRows.push({ id: 'cancel_voltar', title: '↩ Voltar' })
 
