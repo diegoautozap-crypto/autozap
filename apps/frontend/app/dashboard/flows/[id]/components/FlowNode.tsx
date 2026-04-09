@@ -230,11 +230,11 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       {data.type === 'input' && (data.timeoutHours > 0 || data.timeoutMinutes > 0) ? (
         <>
           <Handle type="source" position={Position.Right} id="success"
-            style={{ background: color, width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
+            style={{ background: color, width: 14, height: 14, border: '3px solid #fff', top: '30%' }} />
           <Handle type="source" position={Position.Right} id="timeout"
-            style={{ background: '#ef4444', width: 10, height: 10, border: '2px solid #fff', top: '65%' }} />
-          <div style={{ position: 'absolute', right: -70, top: '28%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ {t('nodes.responseLabel')}</div>
-          <div style={{ position: 'absolute', right: -62, top: '58%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ {t('nodes.timeoutLabel')}</div>
+            style={{ background: '#ef4444', width: 14, height: 14, border: '3px solid #fff', top: '70%' }} />
+          <div style={{ position: 'absolute', right: -70, top: '23%', fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>✓ {t('nodes.responseLabel')}</div>
+          <div style={{ position: 'absolute', right: -62, top: '63%', fontSize: '9px', color: '#ef4444', fontWeight: 600 }}>⏰ {t('nodes.timeoutLabel')}</div>
         </>
       ) : (data.type === 'split_ab' || data.type === 'random_path') ? (
         <>
