@@ -93,6 +93,7 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
       )}
       {/* Resize handle */}
       <div
+        className="nodrag nopan"
         style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', cursor: 'nwse-resize', borderRadius: '0 0 10px 0' }}
         onMouseDown={(e) => {
           e.stopPropagation()
