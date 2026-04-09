@@ -1181,6 +1181,8 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 { k: 'blue', bg: '#dbeafe', border: '#60a5fa' },
                 { k: 'purple', bg: '#f3e8ff', border: '#c084fc' },
                 { k: 'pink', bg: '#fce7f3', border: '#f472b6' },
+                { k: 'red', bg: '#fee2e2', border: '#f87171' },
+                { k: 'gray', bg: '#f3f4f6', border: '#9ca3af' },
               ].map(c => (
                 <button key={c.k} onClick={() => onUpdate(node.id, { color: c.k })}
                   style={{ width: '28px', height: '28px', borderRadius: '50%', background: c.bg, border: `2.5px solid ${(d.color || 'yellow') === c.k ? c.border : 'transparent'}`, cursor: 'pointer' }} />

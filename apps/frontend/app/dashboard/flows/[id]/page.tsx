@@ -53,24 +53,59 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 }
 
 function StickyNote({ data, selected }: { data: any; selected: boolean }) {
-  const colors: Record<string, { bg: string; border: string }> = {
-    yellow: { bg: '#fef9c3', border: '#facc15' },
-    green: { bg: '#dcfce7', border: '#4ade80' },
-    blue: { bg: '#dbeafe', border: '#60a5fa' },
-    purple: { bg: '#f3e8ff', border: '#c084fc' },
-    pink: { bg: '#fce7f3', border: '#f472b6' },
+  const colors: Record<string, { bg: string; border: string; text: string }> = {
+    yellow: { bg: '#fef9c3', border: '#facc15', text: '#854d0e' },
+    green: { bg: '#dcfce7', border: '#4ade80', text: '#166534' },
+    blue: { bg: '#dbeafe', border: '#60a5fa', text: '#1e40af' },
+    purple: { bg: '#f3e8ff', border: '#c084fc', text: '#6b21a8' },
+    pink: { bg: '#fce7f3', border: '#f472b6', text: '#9d174d' },
+    red: { bg: '#fee2e2', border: '#f87171', text: '#991b1b' },
+    gray: { bg: '#f3f4f6', border: '#9ca3af', text: '#374151' },
   }
   const c = colors[data.color || 'yellow'] || colors.yellow
+  const w = data.width || 400
+  const h = data.height || 250
   return (
     <div style={{
-      background: c.bg, border: `2px solid ${selected ? c.border : `${c.border}80`}`,
-      borderRadius: '8px', padding: '12px 14px', minWidth: '180px', maxWidth: '300px',
-      boxShadow: '0 2px 8px rgba(0,0,0,.08)', cursor: 'grab',
+      background: `${c.bg}cc`, border: `2px ${selected ? 'solid' : 'dashed'} ${c.border}`,
+      borderRadius: '12px', width: `${w}px`, height: `${h}px`,
+      position: 'relative', cursor: 'grab',
     }}>
-      <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: data.text ? '6px' : 0 }}>
-        📝 {data.title || 'Nota'}
+      <div style={{
+        position: 'absolute', top: '-12px', left: '12px',
+        background: c.border, color: '#fff', fontSize: '11px', fontWeight: 700,
+        padding: '2px 10px', borderRadius: '6px', letterSpacing: '0.03em',
+        textTransform: 'uppercase',
+      }}>
+        {data.title || 'Grupo'}
       </div>
-      {data.text && <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{data.text}</div>}
+      {data.text && (
+        <div style={{ position: 'absolute', bottom: '8px', left: '12px', right: '12px', fontSize: '11px', color: c.text, opacity: 0.7 }}>
+          {data.text}
+        </div>
+      )}
+      {/* Resize handle */}
+      <div
+        style={{ position: 'absolute', bottom: 0, right: 0, width: '16px', height: '16px', cursor: 'nwse-resize', borderRadius: '0 0 10px 0' }}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          const startX = e.clientX, startY = e.clientY
+          const startW = w, startH = h
+          const onMove = (ev: MouseEvent) => {
+            const newW = Math.max(200, startW + (ev.clientX - startX))
+            const newH = Math.max(120, startH + (ev.clientY - startY))
+            data.onResize?.(data.nodeId, newW, newH)
+          }
+          const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+          document.addEventListener('mousemove', onMove)
+          document.addEventListener('mouseup', onUp)
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" style={{ position: 'absolute', bottom: '4px', right: '4px', opacity: 0.3 }}>
+          <line x1="8" y1="12" x2="12" y2="8" stroke={c.text} strokeWidth="1.5" />
+          <line x1="4" y1="12" x2="12" y2="4" stroke={c.text} strokeWidth="1.5" />
+        </svg>
+      </div>
     </div>
   )
 }
@@ -301,8 +336,8 @@ export default function FlowEditorPage() {
       const nodeId = `note_${Date.now()}`
       setNodes((nds: Node[]) => [...nds, {
         id: nodeId, type: 'stickyNote',
-        position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
-        data: { type: 'sticky_note', title: 'Nota', text: '', color: 'yellow' },
+        position: { x: 100 + Math.random() * 100, y: 50 + Math.random() * 100 },
+        data: { type: 'sticky_note', title: 'Grupo', text: '', color: 'yellow', width: 500, height: 300, nodeId },
         zIndex: -1,
       }])
       setIsDirty(true)
@@ -365,7 +400,11 @@ export default function FlowEditorPage() {
     toast.success(`${newNodes.length} ${t('nodes.nodesPasted')}!`)
   }
 
-  const nodesWithDelete = nodes.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onDelete: canEditFlows ? deleteNode : undefined } }))
+  const resizeStickyNote = (nodeId: string, width: number, height: number) => {
+    setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, width, height } } : n))
+    setIsDirty(true)
+  }
+  const nodesWithDelete = nodes.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onDelete: canEditFlows ? deleteNode : undefined, ...(n.type === 'stickyNote' ? { onResize: resizeStickyNote } : {}) } }))
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
