@@ -374,7 +374,7 @@ export default function FlowEditorPage() {
   }
 
   const updateNodeData = (nodeId: string, newData: any) => {
-    setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n))
+    setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...newData, _rev: Date.now() } } : n))
     if (selectedNode?.id === nodeId) setSelectedNode(prev => prev ? { ...prev, data: { ...prev.data, ...newData } } : prev)
     setIsDirty(true)
   }
