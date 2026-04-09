@@ -1590,11 +1590,13 @@ export class FlowEngine {
           })
 
           const allBusy = busyData.calendars?.[calendarId]?.busy || []
+          logger.info('Freebusy pre-check result', { calendarId: calendarId.slice(0, 20), rangeStart, rangeEnd, busyCount: allBusy.length, busyPeriods: allBusy.map((b: any) => `${b.start} - ${b.end}`) })
           for (const busy of allBusy) {
             const busyDate = new Date(busy.start).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
             if (!busyByDay[busyDate]) busyByDay[busyDate] = []
             busyByDay[busyDate].push(busy)
           }
+          logger.info('BusyByDay', { days: Object.keys(busyByDay), candidateDates: candidateDays.map(d => d.dateStr) })
         } catch (err: any) {
           logger.warn('Freebusy pre-check failed, showing all days', { err: err.message })
         }
