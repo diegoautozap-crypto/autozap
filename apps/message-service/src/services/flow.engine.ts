@@ -1592,9 +1592,16 @@ export class FlowEngine {
           const allBusy = busyData.calendars?.[calendarId]?.busy || []
           logger.info('Freebusy pre-check result', { calendarId: calendarId.slice(0, 20), rangeStart, rangeEnd, busyCount: allBusy.length, busyPeriods: allBusy.map((b: any) => `${b.start} - ${b.end}`) })
           for (const busy of allBusy) {
-            const busyDate = new Date(busy.start).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-            if (!busyByDay[busyDate]) busyByDay[busyDate] = []
-            busyByDay[busyDate].push(busy)
+            // Mark ALL days covered by this busy period, not just the start
+            const bStart = new Date(busy.start)
+            const bEnd = new Date(busy.end)
+            const cursor = new Date(bStart)
+            while (cursor < bEnd) {
+              const dayStr = cursor.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+              if (!busyByDay[dayStr]) busyByDay[dayStr] = []
+              busyByDay[dayStr].push(busy)
+              cursor.setDate(cursor.getDate() + 1)
+            }
           }
           logger.info('BusyByDay', { days: Object.keys(busyByDay), candidateDates: candidateDays.map(d => d.dateStr) })
         } catch (err: any) {
