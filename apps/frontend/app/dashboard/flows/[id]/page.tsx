@@ -52,7 +52,30 @@ function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   )
 }
 
-const nodeTypes = { flowNode: FlowNode }
+function StickyNote({ data, selected }: { data: any; selected: boolean }) {
+  const colors: Record<string, { bg: string; border: string }> = {
+    yellow: { bg: '#fef9c3', border: '#facc15' },
+    green: { bg: '#dcfce7', border: '#4ade80' },
+    blue: { bg: '#dbeafe', border: '#60a5fa' },
+    purple: { bg: '#f3e8ff', border: '#c084fc' },
+    pink: { bg: '#fce7f3', border: '#f472b6' },
+  }
+  const c = colors[data.color || 'yellow'] || colors.yellow
+  return (
+    <div style={{
+      background: c.bg, border: `2px solid ${selected ? c.border : `${c.border}80`}`,
+      borderRadius: '8px', padding: '12px 14px', minWidth: '180px', maxWidth: '300px',
+      boxShadow: '0 2px 8px rgba(0,0,0,.08)', cursor: 'grab',
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: data.text ? '6px' : 0 }}>
+        📝 {data.title || 'Nota'}
+      </div>
+      {data.text && <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{data.text}</div>}
+    </div>
+  )
+}
+
+const nodeTypes = { flowNode: FlowNode, stickyNote: StickyNote }
 const edgeTypes = { custom: CustomEdge }
 
 function getTriggerNodes(t: (key: string) => string) {
@@ -191,8 +214,9 @@ export default function FlowEditorPage() {
       const nodeType = legacy ? legacy.type : n.type
       const nodeSubtype = legacy ? legacy.subtype : (n.data?.subtype || undefined)
       return {
-        id: n.id, type: 'flowNode',
+        id: n.id, type: nodeType === 'sticky_note' ? 'stickyNote' : 'flowNode',
         position: { x: n.position_x, y: n.position_y },
+        ...(nodeType === 'sticky_note' ? { zIndex: -1 } : {}),
         data: {
           type: nodeType,
           ...n.data,
@@ -273,6 +297,17 @@ export default function FlowEditorPage() {
   }, [setEdges, nodes])
 
   const addNode = (type: string) => {
+    if (type === 'sticky_note') {
+      const nodeId = `note_${Date.now()}`
+      setNodes((nds: Node[]) => [...nds, {
+        id: nodeId, type: 'stickyNote',
+        position: { x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 },
+        data: { type: 'sticky_note', title: 'Nota', text: '', color: 'yellow' },
+        zIndex: -1,
+      }])
+      setIsDirty(true)
+      return
+    }
     const nodeId = `node_${Date.now()}`
     setNodes((nds: Node[]) => [...nds, {
       id: nodeId, type: 'flowNode',
@@ -431,6 +466,11 @@ export default function FlowEditorPage() {
               </button>
             )
           })}
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: '16px' }}>Anotações</p>
+          <button onClick={() => addNode('sticky_note')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#fef9c3', border: '1px solid #facc15', borderRadius: '8px', cursor: 'pointer', marginBottom: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', textAlign: 'left' }}>
+            📝 Sticky Note
+          </button>
         </div>}
 
         <div style={{ flex: 1, position: 'relative', background: '#f8fafc' }}>

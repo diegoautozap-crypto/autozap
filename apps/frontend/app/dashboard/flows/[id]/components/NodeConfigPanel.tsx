@@ -1166,6 +1166,29 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           <div><label style={labelStyle}>{t('nodes.schedulingMsgNoSlots')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Sem horários disponíveis" value={d.msgNoSlots || ''} onChange={e => onUpdate(node.id, { msgNoSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         </>)}
 
+        {d.type === 'sticky_note' && (<>
+          <div><label style={labelStyle}>Título</label>
+            <input style={inputStyle} placeholder="Título da nota" value={d.title || ''} onChange={e => onUpdate(node.id, { title: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div><label style={labelStyle}>Texto</label>
+            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="Descrição..." value={d.text || ''} onChange={e => onUpdate(node.id, { text: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div><label style={labelStyle}>Cor</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {[
+                { k: 'yellow', bg: '#fef9c3', border: '#facc15' },
+                { k: 'green', bg: '#dcfce7', border: '#4ade80' },
+                { k: 'blue', bg: '#dbeafe', border: '#60a5fa' },
+                { k: 'purple', bg: '#f3e8ff', border: '#c084fc' },
+                { k: 'pink', bg: '#fce7f3', border: '#f472b6' },
+              ].map(c => (
+                <button key={c.k} onClick={() => onUpdate(node.id, { color: c.k })}
+                  style={{ width: '28px', height: '28px', borderRadius: '50%', background: c.bg, border: `2.5px solid ${(d.color || 'yellow') === c.k ? c.border : 'transparent'}`, cursor: 'pointer' }} />
+              ))}
+            </div>
+          </div>
+        </>)}
+
         {d.type === 'end' && (
           <div><label style={labelStyle}>{t('nodes.endMessage')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.endPlaceholder')} value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         )}
