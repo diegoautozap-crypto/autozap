@@ -1771,6 +1771,8 @@ export class FlowEngine {
         const dd2 = selectedDate.split('-')[2]
         const mm2 = selectedDate.split('-')[1]
         const timeMsg = data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`
+        // Add "Voltar" option to see other days
+        slotRows.push({ id: 'voltar_dias', title: '↩ Voltar' })
         if (slotRows.length <= 3) {
           const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
@@ -1801,6 +1803,15 @@ export class FlowEngine {
       // Step 3: User picked a time, create Google Calendar event
       const slotResponse = variables['_schedule_slot_choice'] || ''
       const totalSlots = parseInt(variables['_schedule_total_slots'] || '0')
+
+      // Handle "Voltar" — go back to day selection
+      const slotLower = slotResponse.trim().toLowerCase()
+      if (slotLower === 'voltar_dias' || slotLower.includes('voltar')) {
+        variables['_schedule_step'] = '1'
+        // Clean slot variables
+        Object.keys(variables).filter(k => k.match(/^_schedule_(slot|price)_/)).forEach(k => delete variables[k])
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+      }
 
       // Support: button ID (slot_1), text number (1), time text (21:00), title with price (21:00 - R$ 280)
       let choice = 0
