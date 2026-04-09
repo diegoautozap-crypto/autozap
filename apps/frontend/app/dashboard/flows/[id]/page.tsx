@@ -79,12 +79,13 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
       position: 'relative', cursor: 'grab',
     }}>
       <div style={{
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        fontSize: '22px', fontWeight: 800, color: c.text, opacity: 0.25,
-        letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-        pointerEvents: 'none', userSelect: 'none',
+        position: 'absolute', top: 0, left: 0, right: 0, height: '32px',
+        background: c.border, borderRadius: '10px 10px 0 0',
+        display: 'flex', alignItems: 'center', paddingLeft: '14px',
       }}>
-        {data.title || 'Grupo'}
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          {data.title || 'Grupo'}
+        </span>
       </div>
       {data.text && (
         <div style={{ position: 'absolute', bottom: '8px', left: '12px', right: '12px', fontSize: '11px', color: c.text, opacity: 0.7 }}>
