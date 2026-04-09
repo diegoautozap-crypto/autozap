@@ -2031,7 +2031,8 @@ export class FlowEngine {
 
       try {
         await calendar.events.delete({ calendarId, eventId })
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: '✅ Agendamento cancelado com sucesso!' })
+        const cancelMsg = this.interpolate(data?.msgConfirm || '✅ Agendamento cancelado com sucesso!', ctx, variables)
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: cancelMsg })
         variables['cancelamento_status'] = 'cancelado'
         Object.keys(variables).filter(k => k.startsWith('_cancel_')).forEach(k => delete variables[k])
         await this.logNode(flowId, node.id, ctx, 'success', `Google Calendar: evento ${eventId} cancelado`)
