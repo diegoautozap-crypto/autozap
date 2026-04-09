@@ -1926,20 +1926,29 @@ export class FlowEngine {
         const futureLimit = new Date()
         futureLimit.setDate(futureLimit.getDate() + 60)
 
+        const phoneSearch = ctx.phone.slice(-8)
+        logger.info('Cancel: searching events', { calendarId, phone: ctx.phone, phoneSearch })
+
+        // First try with q parameter, then without (fallback)
         const { data: events } = await calendar.events.list({
           calendarId,
           timeMin: now.toISOString(),
           timeMax: futureLimit.toISOString(),
-          q: ctx.phone.slice(-8), // search by last 8 digits of phone
           singleEvents: true,
           orderBy: 'startTime',
-          maxResults: 10,
+          maxResults: 50,
         })
 
-        const items = (events.items || []).filter((e: any) =>
-          (e.description && e.description.includes(ctx.phone.slice(-8))) ||
-          (e.summary && e.summary.includes(ctx.phone.slice(-8)))
-        )
+        const allItems = events.items || []
+        logger.info('Cancel: total events found', { total: allItems.length, titles: allItems.slice(0, 5).map((e: any) => e.summary) })
+
+        const items = allItems.filter((e: any) => {
+          const inDesc = e.description && e.description.includes(phoneSearch)
+          const inTitle = e.summary && e.summary.includes(phoneSearch)
+          return inDesc || inTitle
+        })
+
+        logger.info('Cancel: events matching phone', { matched: items.length, phoneSearch })
 
         if (items.length === 0) {
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Você não tem agendamentos futuros para cancelar.' })
