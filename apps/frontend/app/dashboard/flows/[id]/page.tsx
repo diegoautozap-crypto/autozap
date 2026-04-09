@@ -74,7 +74,7 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
 
   return (
     <div style={{
-      background: `${c.bg}cc`, border: `2px ${selected ? 'solid' : 'dashed'} ${c.border}`,
+      background: `${c.bg}cc`, border: `3px solid ${c.border}`,
       borderRadius: '12px', width: `${localW}px`, height: `${localH}px`,
       position: 'relative', cursor: 'grab',
     }}>
