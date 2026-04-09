@@ -227,7 +227,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
       )}
 
       {/* Input com timeout: 2 saídas */}
-      {data.type === 'input' && data.timeoutHours > 0 ? (
+      {data.type === 'input' && (data.timeoutHours > 0 || data.timeoutMinutes > 0) ? (
         <>
           <Handle type="source" position={Position.Right} id="success"
             style={{ background: color, width: 10, height: 10, border: '2px solid #fff', top: '35%' }} />
