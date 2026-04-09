@@ -63,12 +63,19 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
     gray: { bg: '#f3f4f6', border: '#9ca3af', text: '#374151' },
   }
   const c = colors[data.color || 'yellow'] || colors.yellow
-  const w = data.width || 400
-  const h = data.height || 250
+  const [localW, setLocalW] = useState(data.width || 500)
+  const [localH, setLocalH] = useState(data.height || 300)
+  const [resizing, setResizing] = useState(false)
+
+  // Sync with data when not resizing
+  useEffect(() => {
+    if (!resizing) { setLocalW(data.width || 500); setLocalH(data.height || 300) }
+  }, [data.width, data.height, resizing])
+
   return (
     <div style={{
       background: `${c.bg}cc`, border: `2px ${selected ? 'solid' : 'dashed'} ${c.border}`,
-      borderRadius: '12px', width: `${w}px`, height: `${h}px`,
+      borderRadius: '12px', width: `${localW}px`, height: `${localH}px`,
       position: 'relative', cursor: 'grab',
     }}>
       <div style={{
@@ -86,22 +93,30 @@ function StickyNote({ data, selected }: { data: any; selected: boolean }) {
       )}
       {/* Resize handle */}
       <div
-        style={{ position: 'absolute', bottom: 0, right: 0, width: '16px', height: '16px', cursor: 'nwse-resize', borderRadius: '0 0 10px 0' }}
+        style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', cursor: 'nwse-resize', borderRadius: '0 0 10px 0' }}
         onMouseDown={(e) => {
           e.stopPropagation()
+          e.preventDefault()
+          setResizing(true)
           const startX = e.clientX, startY = e.clientY
-          const startW = w, startH = h
+          const startW = localW, startH = localH
           const onMove = (ev: MouseEvent) => {
-            const newW = Math.max(200, startW + (ev.clientX - startX))
-            const newH = Math.max(120, startH + (ev.clientY - startY))
-            data.onResize?.(data.nodeId, newW, newH)
+            setLocalW(Math.max(200, startW + (ev.clientX - startX)))
+            setLocalH(Math.max(120, startH + (ev.clientY - startY)))
           }
-          const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+          const onUp = (ev: MouseEvent) => {
+            document.removeEventListener('mousemove', onMove)
+            document.removeEventListener('mouseup', onUp)
+            const finalW = Math.max(200, startW + (ev.clientX - startX))
+            const finalH = Math.max(120, startH + (ev.clientY - startY))
+            data.onResize?.(data.nodeId, finalW, finalH)
+            setResizing(false)
+          }
           document.addEventListener('mousemove', onMove)
           document.addEventListener('mouseup', onUp)
         }}
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" style={{ position: 'absolute', bottom: '4px', right: '4px', opacity: 0.3 }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" style={{ position: 'absolute', bottom: '4px', right: '4px', opacity: 0.4 }}>
           <line x1="8" y1="12" x2="12" y2="8" stroke={c.text} strokeWidth="1.5" />
           <line x1="4" y1="12" x2="12" y2="4" stroke={c.text} strokeWidth="1.5" />
         </svg>
