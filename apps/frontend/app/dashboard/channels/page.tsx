@@ -456,7 +456,7 @@ export default function ChannelsPage() {
 
                 {/* Webhook URL — visível pra quem pode editar */}
                 {canEdit('/dashboard/channels') && <div>
-                  <label style={lbl}>{t('channels.webhookUrlLabel')}</label>
+                  <label style={lbl}>{isEvolution ? 'URL do Webhook — cole na Evolution API' : t('channels.webhookUrlLabel')}</label>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input readOnly value={webhookUrl}
                       style={{ ...inp, flex: 1, background: 'var(--bg-input)', color: '#52525b', fontSize: '11.5px', fontFamily: 'ui-monospace, monospace', cursor: 'default' }} />
@@ -475,6 +475,11 @@ export default function ChannelsPage() {
                     </a>
                     )}
                   </div>
+                  {isEvolution && (
+                    <div style={{ marginTop: '8px', padding: '10px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: '11.5px', color: '#0369a1', lineHeight: 1.5 }}>
+                      <strong>Como configurar:</strong> Na Evolution API, vá em Settings da instância → Webhook → cole a URL acima. Ative os eventos <strong>Messages</strong> e <strong>Message Status</strong> (ou Received).
+                    </div>
+                  )}
                   {!isEvolution && !ch.hasMetaToken && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '7px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px' }}>
                       <span style={{ fontSize: '13px' }}>⚠️</span>
