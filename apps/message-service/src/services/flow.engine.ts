@@ -116,6 +116,7 @@ interface FlowNodeData {
   workDays?: Record<string, boolean>
   advanceDays?: number
   eventTitle?: string
+  showBackButton?: boolean
   priceTable?: Record<string, number>
   msgAskDate?: string
   msgAskTime?: string
@@ -1837,15 +1838,18 @@ export class FlowEngine {
         const dd2 = selectedDate.split('-')[2]
         const mm2 = selectedDate.split('-')[1]
         const timeMsg = data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`
-        if (slotRows.length <= 2) {
-          // 2 slots + voltar = 3 buttons (max)
+        const showBack = data?.showBackButton !== false
+        if (showBack && slotRows.length <= 2) {
           slotRows.push({ id: 'voltar_dias', title: '↩ Voltar' })
           const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
+        } else if (slotRows.length <= 3) {
+          const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
+          if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_dias', title: '↩ Voltar' }] })
         } else {
-          // List with slots + separate "Voltar" button after
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'list', listRows: slotRows, listButtonText: 'Ver horários' })
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha voltar:', interactiveType: 'button', buttons: [{ id: 'voltar_dias', title: '↩ Voltar' }] })
+          if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_dias', title: '↩ Voltar' }] })
         }
 
         variables['_schedule_step'] = '3'
