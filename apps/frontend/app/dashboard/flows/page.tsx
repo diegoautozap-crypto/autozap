@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { messageApi, channelApi, tenantApi, campaignApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy } from 'lucide-react'
+import { Workflow, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, ChevronRight, X, Check, Clock, FileText, Copy, Upload, Download } from 'lucide-react'
 import { ListSkeleton } from '@/components/ui/skeleton'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
@@ -332,7 +332,7 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
       categoryKey: 'advanced',
       nodes: [
         // ═══ TRIGGER ═══
-        { id: 'n1', type: 'trigger_keyword', position_x: 600, position_y: 0, data: { type: 'trigger_keyword', keywords: ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'menu', 'início', 'inicio', 'começar', 'opções', 'opcoes', 'hi', 'hello'], matchType: 'contains' } },
+        { id: 'n1', type: 'trigger_first_message', position_x: 600, position_y: 0, data: { type: 'trigger_first_message' } },
 
         // ═══ MENU PRINCIPAL ═══
         { id: 'n2', type: 'send_message', position_x: 600, position_y: 150, data: { type: 'send_message', subtype: 'buttons', message: 'Olá! 👋 Sou o atendente digital.\nSelecione o setor que gostaria de informações:', buttons: [{ title: 'Outro Assunto' }, { title: 'Reservas' }, { title: 'Quadra' }] } },
@@ -699,6 +699,63 @@ export default function FlowsPage() {
     }
   }
 
+  const exportFlow = async (flow: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const { data: res } = await messageApi.get(`/flows/${flow.id}`)
+      const original = res.data
+      const exportData = {
+        _autozap_flow: true,
+        version: 1,
+        name: original.name,
+        cooldown_type: original.cooldown_type,
+        nodes: (original.nodes || []).map((n: any) => ({ id: n.id, type: n.type, position_x: n.position_x, position_y: n.position_y, data: n.data || {} })),
+        edges: (original.edges || []).map((e: any) => ({ id: e.id, source_node: e.source_node, target_node: e.target_node, source_handle: e.source_handle })),
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `${flow.name.replace(/\s+/g, '_')}.json`; a.click()
+      toast.success('Flow exportado!')
+    } catch { toast.error('Erro ao exportar') }
+  }
+
+  const importFlowRef = (document.getElementById('import-flow-input') as HTMLInputElement) || null
+  const handleImportFlow = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data._autozap_flow) { toast.error('Arquivo inválido — não é um flow do AutoZap'); return }
+      // Create flow
+      const { data: newFlowRes } = await messageApi.post('/flows', {
+        name: `${data.name || 'Flow importado'}`,
+        cooldown_type: data.cooldown_type || '24h',
+      })
+      const newFlow = newFlowRes.data
+      if (data.nodes && data.nodes.length > 0) {
+        const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        const idMap: Record<string, string> = {}
+        const nodes = data.nodes.map((n: any) => {
+          const newId = uid()
+          idMap[n.id] = newId
+          return { id: newId, type: n.type, position_x: n.position_x, position_y: n.position_y, data: n.data || {} }
+        })
+        const edges = (data.edges || []).map((edge: any) => ({
+          id: uid(),
+          source_node: idMap[edge.source_node] || edge.source_node,
+          target_node: idMap[edge.target_node] || edge.target_node,
+          source_handle: edge.source_handle || null,
+        }))
+        await messageApi.put(`/flows/${newFlow.id}/graph`, { nodes, edges })
+      }
+      toast.success(`Flow "${data.name}" importado!`)
+      queryClient.invalidateQueries({ queryKey: ['flows'] })
+    } catch { toast.error('Erro ao importar flow') }
+    e.target.value = ''
+  }
+
   const channelName = (channelId: string) => channels.find((c: any) => c.id === channelId)?.name || t('flows.allChannels')
   const cooldownLabel = (type: string) => COOLDOWN_OPTIONS.find(o => o.value === type)?.label || t('flows.cooldown24h')
 
@@ -730,6 +787,15 @@ export default function FlowsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
             <Plus size={14} /> {t('flows.new')}
           </button>
+          )}
+          {canEdit('/dashboard/flows') && (
+          <>
+            <button onClick={() => document.getElementById('import-flow-input')?.click()}
+              style={{ padding: '9px 16px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Upload size={14} /> Importar
+            </button>
+            <input id="import-flow-input" type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportFlow} />
+          </>
           )}
         </div>
       </div>
@@ -904,6 +970,12 @@ export default function FlowsPage() {
                   {duplicatingId === f.id ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Copy size={14} />}
                 </button>
                 )}
+                <button onClick={e => exportFlow(f, e)} title="Exportar flow"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; (e.currentTarget as HTMLButtonElement).style.color = '#2563eb' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)' }}>
+                  <FileText size={14} />
+                </button>
                 {canDelete('/dashboard/flows') && (
                 <button onClick={() => { if (confirm(t('flows.confirmDelete').replace('{name}', f.name))) deleteMutation.mutate(f.id) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px', display: 'flex', color: 'var(--text-faint)', borderRadius: '6px' }}
