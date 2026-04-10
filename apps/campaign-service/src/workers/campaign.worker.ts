@@ -5,6 +5,7 @@ import { campaignService } from '../services/campaign.service'
 import { sleep, generateId } from '@autozap/utils'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../lib/db'
+import { decryptCredentials } from '../lib/crypto'
 
 const REDIS_URL      = process.env.REDIS_URL!
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID
@@ -203,9 +204,40 @@ async function sendViaFetch(
   } catch (err: any) { return { ok: false, error: err.message } }
 }
 
+// ─── Evolution API send ─────────────────────────────────────────────────────
+async function sendViaEvolution(
+  phone: string, message: string, channelCreds: any, attempt = 0,
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  try {
+    const baseUrl = channelCreds.baseUrl?.replace(/\/+$/, '')
+    const instanceName = channelCreds.instanceName
+    const apiKey = channelCreds.apiKey
+    if (!baseUrl || !instanceName || !apiKey) return { ok: false, error: 'Evolution credentials missing' }
+
+    const normalizedPhone = phone.replace(/\D/g, '').replace(/^(\d{2})(\d{2})(\d+)$/, '$1$2$3')
+    const url = `${baseUrl}/message/sendText/${instanceName}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: apiKey },
+      body: JSON.stringify({ number: normalizedPhone, text: message }),
+    })
+
+    if (response.status === 429) {
+      if (attempt >= 5) return { ok: false, error: 'Rate limit exceeded after 5 retries' }
+      await sleep(1000 * (attempt + 1))
+      return sendViaEvolution(phone, message, channelCreds, attempt + 1)
+    }
+
+    const data = await response.json() as any
+    if (!response.ok) return { ok: false, error: data?.message || `HTTP ${response.status}` }
+    const messageId = data?.key?.id || data?.messageId || data?.id || uuidv4()
+    return { ok: true, messageId }
+  } catch (err: any) { return { ok: false, error: err.message } }
+}
+
 async function processContact(
   contact: any, campaignId: string, tenantId: string, channelId: string,
-  parsed: ParsedCurl, rateLimiter: RateLimiter,
+  parsed: ParsedCurl | null, rateLimiter: RateLimiter, channelType?: string, channelCreds?: any,
 ): Promise<'sent' | 'failed'> {
   let rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
   // Replace contact variables in message
@@ -223,10 +255,13 @@ async function processContact(
 
   try {
     await rateLimiter.acquire()
-    const result = await sendViaFetch(parsed, contact.phone, contactMessage)
+    // Use Evolution or Gupshup based on channel type
+    const result = channelType === 'evolution'
+      ? await sendViaEvolution(contact.phone, contactMessage, channelCreds)
+      : await sendViaFetch(parsed!, contact.phone, contactMessage)
 
     if (!result.ok || !result.messageId) {
-      logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed.url })
+      logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed?.url })
       await campaignService.markContactFailed(contact.id, result.error || 'Missing messageId')
       await campaignService.incrementCounter(campaignId, 'failed_count')
       return 'failed'
@@ -289,13 +324,28 @@ async function processCampaignJob(job: any) {
 
   const campaign = await campaignService.getCampaign(campaignId, tenantId)
 
-  // Parseia todas as copies — cada canal vai usar uma copy aleatória por contato
-  const curlTemplate = (campaign as any).curl_template
-  if (!curlTemplate && availableCopies.length === 0) throw new Error('No curl template configured')
+  // Busca tipo e credenciais dos canais
+  const channelInfoMap: Record<string, { type: string; credentials: any }> = {}
+  for (const chId of allChannelIds) {
+    const { data: ch } = await db.from('channels').select('type, credentials').eq('id', chId).single()
+    if (ch) {
+      let creds = ch.credentials
+      try { if (creds && typeof creds === 'object') creds = decryptCredentials(creds) } catch {}
+      channelInfoMap[chId] = { type: ch.type, credentials: creds }
+    }
+  }
 
-  // Se não tem copies salvas, usa o curl_template principal
-  const allCopies = availableCopies.length > 0 ? availableCopies : [curlTemplate]
-  const parsedCopies = allCopies.map(c => parseCurlTemplate(c))
+  // Detecta se o canal principal é Evolution
+  const primaryChannelType = channelInfoMap[channelId]?.type || 'gupshup'
+
+  // Parseia todas as copies — só necessário pra Gupshup
+  const curlTemplate = (campaign as any).curl_template
+  let parsedCopies: ParsedCurl[] = []
+  if (primaryChannelType !== 'evolution') {
+    if (!curlTemplate && availableCopies.length === 0) throw new Error('No curl template configured')
+    const allCopies = availableCopies.length > 0 ? availableCopies : [curlTemplate]
+    parsedCopies = allCopies.map(c => parseCurlTemplate(c))
+  }
 
   // Cria um rate limiter e um pool de concorrência por canal
   const channelLimiters = allChannelIds.map(() => new RateLimiter(intervalMs))
@@ -334,10 +384,11 @@ async function processCampaignJob(job: any) {
         const chId       = allChannelIds[channelIdx]
         const limiter    = channelLimiters[channelIdx]
         const pool       = channelLimits[channelIdx]
-        // Sorteia copy aleatória para este contato
-        const parsed     = parsedCopies[Math.floor(Math.random() * parsedCopies.length)]
+        const chInfo     = channelInfoMap[chId]
+        // Sorteia copy aleatória para este contato (só Gupshup usa parsed)
+        const parsed     = parsedCopies.length > 0 ? parsedCopies[Math.floor(Math.random() * parsedCopies.length)] : null
 
-        return pool(() => processContact(contact, campaignId, tenantId, chId, parsed, limiter))
+        return pool(() => processContact(contact, campaignId, tenantId, chId, parsed, limiter, chInfo?.type, chInfo?.credentials))
       })
     )
 
