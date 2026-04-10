@@ -605,7 +605,7 @@ export default function CampaignsPage() {
                     ? 'Use templates aprovados pela Meta. Ideal pra Gupshup e mensagens que precisam de aprovação prévia.'
                     : useTemplate === false
                     ? 'Cole o comando cURL gerado pela API. Pra usuários avançados com templates customizados.'
-                    : 'Escreva a mensagem direto. Funciona com qualquer canal (Evolution, Gupshup). Sem necessidade de template aprovado.'}
+                    : 'Escreva a mensagem direto. Funciona com Evolution a qualquer momento. Na Gupshup, só dentro da janela de 24h — fora dela, use Templates salvos com copy aprovada na Meta.'}
                 </p>
 
                 {useTemplate === true ? (
