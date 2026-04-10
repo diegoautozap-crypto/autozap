@@ -503,12 +503,16 @@ function NotificationSection() {
   }, [tenant, autoReplyLoaded])
 
   const saveAutoReply = async (enabled: boolean, msg?: string) => {
+    const prev = autoReplyEnabled
+    setAutoReplyEnabled(enabled)
     try {
       await tenantApi.patch('/tenant/settings', { settings: { autoReplyEnabled: enabled, autoReplyMessage: msg || autoReplyMsg } })
-      setAutoReplyEnabled(enabled)
       queryClient.invalidateQueries({ queryKey: ['tenant-autoreply'] })
       toast.success(enabled ? 'Resposta automática ativada' : 'Resposta automática desativada')
-    } catch { toast.error('Erro ao salvar') }
+    } catch {
+      setAutoReplyEnabled(prev)
+      toast.error('Sem permissão para alterar esta configuração')
+    }
   }
 
   const toggleSound = () => {
