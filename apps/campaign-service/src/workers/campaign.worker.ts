@@ -207,7 +207,15 @@ async function processContact(
   contact: any, campaignId: string, tenantId: string, channelId: string,
   parsed: ParsedCurl, rateLimiter: RateLimiter,
 ): Promise<'sent' | 'failed'> {
-  const rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
+  let rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
+  // Replace contact variables in message
+  const vars = contact.variables || {}
+  rawMessage = rawMessage
+    .replace(/\{\{nome\}\}/gi, vars.nome || contact.name || '')
+    .replace(/\{\{name\}\}/gi, vars.nome || contact.name || '')
+    .replace(/\{\{phone\}\}/gi, contact.phone || '')
+    .replace(/\{\{telefone\}\}/gi, contact.phone || '')
+    .replace(/\{\{email\}\}/gi, vars.email || '')
   const contactMessage = rawMessage.replace(/\\r\\n/g, '\r').replace(/\\r/g, '\r').replace(/\\n/g, '\n').trim()
   const bodyForDb   = contactMessage.replace(/\r/g, '\n')
   const messageUuid = uuidv4()
