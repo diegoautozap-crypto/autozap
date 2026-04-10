@@ -157,7 +157,7 @@ export default function CampaignsPage() {
     setCampaignName(''); setContactsText(''); setCurlCopies([''])
     setSelectedChannels([]); setSelectedTemplates([]); setSelectedTagIds([])
     setUseTemplate(true); setScheduleMode('now'); setScheduledAt('')
-    setMessagesPerMin(1000); setContactMode('manual')
+    setMessagesPerMin(1200); setContactMode('manual')
     setSegNoInteraction(0); setSegOrigin(''); setSegCustomField(''); setSegCustomValue('')
     setPreviewCount(null); setRecurrence('none')
   }
