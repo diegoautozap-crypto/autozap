@@ -1081,10 +1081,20 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 <input type="number" min={1} max={30} style={inputStyle} value={d.advanceDays || 7} onChange={e => onUpdate(node.id, { advanceDays: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} />
                 <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Quantos dias à frente o cliente pode agendar</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
                 <div>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Botão Voltar nos horários</p>
-                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0 }}>Permite o cliente voltar pra lista de dias</p>
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Voltar nos dias</p>
+                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0 }}>Voltar na seleção de dias</p>
+                </div>
+                <button onClick={() => onUpdate(node.id, { showBackDays: !(d.showBackDays !== false) })}
+                  style={{ width: '36px', height: '20px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: (d.showBackDays !== false) ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
+                  <span style={{ position: 'absolute', top: '2px', left: (d.showBackDays !== false) ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+                <div>
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Voltar nos horários</p>
+                  <p style={{ fontSize: '10px', color: '#a1a1aa', margin: 0 }}>Voltar na seleção de horários</p>
                 </div>
                 <button onClick={() => onUpdate(node.id, { showBackButton: !(d.showBackButton !== false) })}
                   style={{ width: '36px', height: '20px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: (d.showBackButton !== false) ? '#22c55e' : 'var(--border)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>

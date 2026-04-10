@@ -1663,18 +1663,18 @@ export class FlowEngine {
       }
 
       const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
-      const showBack = data?.showBackButton !== false
-      if (showBack && dayRows.length <= 2) {
+      const showBackDays = data?.showBackDays !== false
+      if (showBackDays && dayRows.length <= 2) {
         dayRows.push({ id: 'voltar_menu', title: '↩ Voltar' })
         const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
       } else if (dayRows.length <= 3) {
         const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
-        if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
+        if (showBackDays) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       } else {
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'list', listRows: dayRows, listButtonText: data?.listButtonDays || 'Ver dias' })
-        if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
+        if (showBackDays) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       }
 
       variables['_schedule_step'] = '2'
