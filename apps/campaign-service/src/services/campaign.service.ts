@@ -162,7 +162,7 @@ export class CampaignService {
     return { contacts: valid, total: valid.length }
   }
 
-  async addContactsByFilter(campaignId: string, tenantId: string, filter: SegmentFilter) {
+  async addContactsByFilter(campaignId: string, tenantId: string, filter: SegmentFilter & { variableValue?: string }) {
     const { contacts } = await this.queryContactsByFilter(tenantId, filter)
     if (contacts.length === 0) return 0
 
@@ -170,7 +170,7 @@ export class CampaignService {
       phone: c.phone,
       name: c.name || c.phone,
       contactId: c.id,
-      variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone },
+      variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone, message: filter.variableValue || '' },
     }))
 
     return this.addContacts(campaignId, tenantId, rows)

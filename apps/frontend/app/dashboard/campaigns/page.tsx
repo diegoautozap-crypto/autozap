@@ -94,6 +94,7 @@ export default function CampaignsPage() {
   const [scheduledAt, setScheduledAt]           = useState('')
   const [contactMode, setContactMode]           = useState<'manual' | 'segment'>('manual')
   const [selectedTagIds, setSelectedTagIds]     = useState<string[]>([])
+  const [segVariableValue, setSegVariableValue] = useState<string>('')
   const [segNoInteraction, setSegNoInteraction] = useState<number>(0)
   const [segOrigin, setSegOrigin]               = useState<string>('')
   const [segCustomField, setSegCustomField]     = useState<string>('')
@@ -226,7 +227,7 @@ export default function CampaignsPage() {
 
       if (contactMode === 'segment' && hasSegmentFilter) {
         toast.info(t('campaigns.toast.loadingSegment'))
-        const { data: filterResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-filter`, buildFilter())
+        const { data: filterResult } = await campaignApi.post(`/campaigns/${campId}/contacts/by-filter`, { ...buildFilter(), variableValue: segVariableValue || undefined })
         toast.info(`${filterResult?.data?.imported || 0} ${t('campaigns.toast.contactsLoaded')}`)
       } else {
         const rows = contactsText.split('\n').filter(Boolean).map(line => {
@@ -736,6 +737,15 @@ export default function CampaignsPage() {
                           })}
                         </div>
                       )}
+                    </div>
+
+                    {/* Variável personalizada */}
+                    <div>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Texto da variável (opcional)</p>
+                      <textarea style={{ ...inp, minHeight: '60px', resize: 'vertical' as const, fontSize: '12px' }}
+                        placeholder="Digite o texto que vai substituir a variável {{message}} na copy..."
+                        value={segVariableValue} onChange={e => setSegVariableValue(e.target.value)} />
+                      <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>Este texto será usado como {'{{message}}'} pra todos os contatos da tag</p>
                     </div>
 
                     {/* Passo 2: Refinar (opcional, colapsável) */}
