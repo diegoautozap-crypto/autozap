@@ -56,7 +56,7 @@ export class CampaignService {
       tenant_id: tenantId,
       channel_id: channelId,
       name,
-      message_template: messageTemplate || ' ',
+      message_template: (input as any).directMessage || messageTemplate || ' ',
       curl_template: curlTemplate || (copies?.[0] ?? null),
       copies: copies && copies.length > 0 ? copies : null,
       extra_channel_ids: extraChannelIds && extraChannelIds.length > 0 ? extraChannelIds : null,

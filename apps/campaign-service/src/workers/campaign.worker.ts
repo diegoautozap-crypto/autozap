@@ -237,9 +237,9 @@ async function sendViaEvolution(
 
 async function processContact(
   contact: any, campaignId: string, tenantId: string, channelId: string,
-  parsed: ParsedCurl | null, rateLimiter: RateLimiter, channelType?: string, channelCreds?: any,
+  parsed: ParsedCurl | null, rateLimiter: RateLimiter, channelType?: string, channelCreds?: any, directMsg?: string,
 ): Promise<'sent' | 'failed'> {
-  let rawMessage = contact.variables?.mensagem || contact.variables?.copy || ''
+  let rawMessage = directMsg || contact.variables?.mensagem || contact.variables?.copy || ''
   // Replace contact variables in message
   const vars = contact.variables || {}
   rawMessage = rawMessage
@@ -255,10 +255,27 @@ async function processContact(
 
   try {
     await rateLimiter.acquire()
-    // Use Evolution or Gupshup based on channel type
-    const result = channelType === 'evolution'
-      ? await sendViaEvolution(contact.phone, contactMessage, channelCreds)
-      : await sendViaFetch(parsed!, contact.phone, contactMessage)
+    // Use Evolution, direct message via channel-service, or Gupshup via curl
+    let result: { ok: boolean; messageId?: string; error?: string }
+    if (channelType === 'evolution') {
+      result = await sendViaEvolution(contact.phone, contactMessage, channelCreds)
+    } else if (!parsed || directMsg) {
+      // Direct message mode: send via internal message service
+      try {
+        const CHANNEL_SERVICE_URL = process.env.CHANNEL_SERVICE_URL || process.env.RAILWAY_SERVICE__AUTOZAP_CHANNEL_SERVICE_URL ? `https://${process.env.RAILWAY_SERVICE__AUTOZAP_CHANNEL_SERVICE_URL}` : 'http://localhost:3003'
+        const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || process.env.RAILWAY_SERVICE__AUTOZAP_MESSAGE_SERVICE_URL ? `https://${process.env.RAILWAY_SERVICE__AUTOZAP_MESSAGE_SERVICE_URL}` : 'http://localhost:3004'
+        const INTERNAL_SECRET = process.env.INTERNAL_SECRET || process.env.JWT_SECRET || ''
+        const res = await fetch(`${MESSAGE_SERVICE_URL}/messages/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
+          body: JSON.stringify({ tenantId, channelId, to: contact.phone, contentType: 'text', body: contactMessage }),
+        })
+        const data = await res.json() as any
+        result = res.ok ? { ok: true, messageId: data?.data?.externalId || uuidv4() } : { ok: false, error: data?.error?.message || `HTTP ${res.status}` }
+      } catch (err: any) { result = { ok: false, error: err.message } }
+    } else {
+      result = await sendViaFetch(parsed, contact.phone, contactMessage)
+    }
 
     if (!result.ok || !result.messageId) {
       logger.warn('Send failed', { phone: contact.phone, error: result.error, url: parsed?.url })
@@ -335,13 +352,17 @@ async function processCampaignJob(job: any) {
     }
   }
 
-  // Detecta se o canal principal é Evolution
+  // Detecta se o canal principal é Evolution ou mensagem direta
   const primaryChannelType = channelInfoMap[channelId]?.type || 'gupshup'
-
-  // Parseia todas as copies — só necessário pra Gupshup
   const curlTemplate = (campaign as any).curl_template
+  const isDirectMessage = curlTemplate === '__direct__'
+
+  // Se é mensagem direta, a mensagem vem do campo direct_message da campanha
+  const directMsg = (campaign as any).direct_message || ''
+
+  // Parseia todas as copies — só necessário pra Gupshup com curl
   let parsedCopies: ParsedCurl[] = []
-  if (primaryChannelType !== 'evolution') {
+  if (primaryChannelType !== 'evolution' && !isDirectMessage) {
     if (!curlTemplate && availableCopies.length === 0) throw new Error('No curl template configured')
     const allCopies = availableCopies.length > 0 ? availableCopies : [curlTemplate]
     parsedCopies = allCopies.map(c => parseCurlTemplate(c))
@@ -388,7 +409,7 @@ async function processCampaignJob(job: any) {
         // Sorteia copy aleatória para este contato (só Gupshup usa parsed)
         const parsed     = parsedCopies.length > 0 ? parsedCopies[Math.floor(Math.random() * parsedCopies.length)] : null
 
-        return pool(() => processContact(contact, campaignId, tenantId, chId, parsed, limiter, chInfo?.type, chInfo?.credentials))
+        return pool(() => processContact(contact, campaignId, tenantId, chId, parsed, limiter, chInfo?.type, chInfo?.credentials, isDirectMessage ? directMsg : undefined))
       })
     )
 

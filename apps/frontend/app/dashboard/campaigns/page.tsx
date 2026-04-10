@@ -93,13 +93,14 @@ export default function CampaignsPage() {
   const [messagesPerMin, setMessagesPerMin]     = useState(1200)
   const [selectedCamp, setSelectedCamp]         = useState<any>(null)
   const [page, setPage]                         = useState(1)
-  const [useTemplate, setUseTemplate]           = useState(true)
+  const [useTemplate, setUseTemplate]           = useState<boolean | 'direct'>(true)
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const [scheduleMode, setScheduleMode]         = useState<'now' | 'scheduled'>('now')
   const [scheduledAt, setScheduledAt]           = useState('')
   const [contactMode, setContactMode]           = useState<'manual' | 'segment'>('manual')
   const [selectedTagIds, setSelectedTagIds]     = useState<string[]>([])
   const [segVariableValue, setSegVariableValue] = useState<string>('')
+  const [directMessage, setDirectMessage] = useState<string>('')
   const [segNoInteraction, setSegNoInteraction] = useState<number>(0)
   const [segOrigin, setSegOrigin]               = useState<string>('')
   const [segCustomField, setSegCustomField]     = useState<string>('')
@@ -126,7 +127,7 @@ export default function CampaignsPage() {
   const { data: templates = [] } = useQuery({
     queryKey: ['templates', selectedChannels[0]],
     queryFn: async () => { const { data } = await campaignApi.get(`/templates?channelId=${selectedChannels[0]}`); return data.data || [] },
-    enabled: !!selectedChannels[0] && useTemplate,
+    enabled: !!selectedChannels[0] && useTemplate === true,
   })
   const { data: progress } = useQuery({
     queryKey: ['progress', selectedCamp?.id],
@@ -206,16 +207,19 @@ export default function CampaignsPage() {
   }, [useTemplate, templates, selectedTemplates])
 
   const isValid = campaignName && selectedChannels.length > 0 &&
-    (useTemplate ? selectedTemplates.length > 0 : validCurlCopies.length > 0) &&
+    (useTemplate === true ? selectedTemplates.length > 0 : useTemplate === 'direct' ? directMessage.trim().length > 0 : validCurlCopies.length > 0) &&
     (scheduleMode !== 'scheduled' || (scheduledAt && scheduleValidation.valid))
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const [primaryChannel, ...extraChannels] = selectedChannels
       const payload: any = { channelId: primaryChannel, extraChannelIds: extraChannels, name: campaignName, messageTemplate: ' ', messagesPerMin }
-      if (useTemplate) {
+      if (useTemplate === true) {
         payload.templateId  = selectedTemplates[0]
         if (selectedTemplates.length > 1) payload.templateIds = selectedTemplates
+      } else if (useTemplate === 'direct') {
+        payload.directMessage = directMessage
+        payload.curlTemplate = '__direct__'
       } else {
         payload.curlTemplate = validCurlCopies[0]
         payload.copies       = validCurlCopies
@@ -588,15 +592,15 @@ export default function CampaignsPage() {
               {/* Toggle Template / cURL */}
               <div>
                 <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '9px', padding: '3px', gap: '2px', marginBottom: '13px' }}>
-                  {[{ v: true, label: t('campaigns.savedTemplates') }, { v: false, label: t('campaigns.manualCurl') }].map(opt => (
+                  {[{ v: true as boolean | 'direct', label: t('campaigns.savedTemplates') }, { v: false as boolean | 'direct', label: t('campaigns.manualCurl') }, { v: 'direct' as boolean | 'direct', label: 'Mensagem direta' }].map(opt => (
                     <button key={String(opt.v)} onClick={() => { setUseTemplate(opt.v); setSelectedTemplates([]); setCurlCopies(['']) }}
-                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: useTemplate === opt.v ? 'var(--bg-card)' : 'transparent', color: useTemplate === opt.v ? 'var(--text)' : 'var(--text-muted)', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
+                      style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 500, background: useTemplate === opt.v ? 'var(--bg-card)' : 'transparent', color: useTemplate === opt.v ? 'var(--text)' : 'var(--text-muted)', boxShadow: useTemplate === opt.v ? '0 1px 3px rgba(0,0,0,.08)' : 'none', transition: 'all 0.15s' }}>
                       {opt.label}
                     </button>
                   ))}
                 </div>
 
-                {useTemplate ? (
+                {useTemplate === true ? (
                   // ── Modo Template: checkboxes múltiplos ──
                   selectedChannels.length > 0 ? (
                     (templates as any[]).length === 0 ? (
@@ -670,7 +674,7 @@ export default function CampaignsPage() {
                       <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>{t('campaigns.selectChannelForTemplates')}</p>
                     </div>
                   )
-                ) : (
+                ) : useTemplate === false ? (
                   // ── Modo cURL: múltiplas copies ──
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -737,7 +741,42 @@ export default function CampaignsPage() {
                       return null
                     })()}
                   </div>
-                )}
+                ) : useTemplate === 'direct' ? (
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Escreva a mensagem que será enviada:</p>
+                    <textarea id="direct-message-textarea" style={{ ...inp, minHeight: '100px', resize: 'vertical' as const, fontSize: '13px', lineHeight: 1.5 } as any}
+                      placeholder="Olá {{nome}}! Temos uma novidade exclusiva pra você..."
+                      value={directMessage} onChange={e => setDirectMessage(e.target.value)} />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                      {[
+                        { label: 'Nome', value: '{{nome}}' },
+                        { label: 'Telefone', value: '{{phone}}' },
+                        { label: 'Email', value: '{{email}}' },
+                      ].map(v => (
+                        <button key={v.value} onClick={() => {
+                          const ta = document.getElementById('direct-message-textarea') as HTMLTextAreaElement
+                          if (ta) {
+                            const start = ta.selectionStart || directMessage.length
+                            const end = ta.selectionEnd || directMessage.length
+                            const newVal = directMessage.slice(0, start) + v.value + directMessage.slice(end)
+                            setDirectMessage(newVal)
+                            setTimeout(() => { ta.focus(); ta.setSelectionRange(start + v.value.length, start + v.value.length) }, 50)
+                          } else { setDirectMessage(prev => prev + v.value) }
+                        }}
+                          style={{ padding: '3px 8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          {v.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>A mensagem será enviada como texto direto pelo canal selecionado.</p>
+                    {directMessage && (
+                      <div style={{ marginTop: '10px' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>Preview:</p>
+                        <WhatsAppPreview body={directMessage} />
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               {/* Contatos */}

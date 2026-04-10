@@ -30,6 +30,7 @@ const createCampaignSchema = z.object({
   name: z.string().min(2).max(255),
   messageTemplate: z.string().optional().default(' '),
   curlTemplate: z.string().optional(),
+  directMessage: z.string().optional(),
   templateId: z.string().uuid().optional(),
   contentType: z.enum(['text', 'image', 'video', 'document', 'audio']).optional(),
   mediaUrl: z.string().url().optional(),
