@@ -1181,6 +1181,14 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             </select></div>
           </>)}
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div><label style={labelStyle}>Botão lista dias</label>
+              <input style={inputStyle} placeholder="Ver dias" value={d.listButtonDays || ''} onChange={e => onUpdate(node.id, { listButtonDays: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            </div>
+            <div><label style={labelStyle}>Botão lista horários</label>
+              <input style={inputStyle} placeholder="Ver horários" value={d.listButtonSlots || ''} onChange={e => onUpdate(node.id, { listButtonSlots: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            </div>
+          </div>
           <div><label style={labelStyle}>{t('nodes.schedulingMsgAskDate')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="📅 Escolha o dia:" value={d.msgAskDate || ''} onChange={e => onUpdate(node.id, { msgAskDate: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>{t('nodes.schedulingMsgAskTime')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="⏰ Horários disponíveis:" value={d.msgAskTime || ''} onChange={e => onUpdate(node.id, { msgAskTime: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>{t('nodes.schedulingMsgConfirm')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder="✅ Agendado com sucesso!&#10;&#10;📅 Data: {{agendamento_data}}&#10;⏰ Horário: {{agendamento_horario}}" value={d.msgConfirm || ''} onChange={e => onUpdate(node.id, { msgConfirm: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
