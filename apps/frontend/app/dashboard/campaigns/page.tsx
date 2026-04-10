@@ -40,8 +40,11 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
   return `${speedLabel} · ${totalContacts.toLocaleString()} contatos = ~${timeLabel}`
 }
 
-function WhatsAppPreview({ body, header, footer }: { body: string; header?: string; footer?: string }) {
-  const exampleVars: Record<string, string> = { '{{1}}': 'João', '{{2}}': 'AutoZap', '{{3}}': '29/03/2026', '{{4}}': 'R$ 99,90', '{{5}}': '12345', '{{name}}': 'João', '{{company}}': 'AutoZap', '{{phone}}': '5511999990001', '{{date}}': '29/03/2026', '{{amount}}': 'R$ 99,90' }
+function WhatsAppPreview({ body, header, footer, variableValue }: { body: string; header?: string; footer?: string; variableValue?: string }) {
+  const varPreview = variableValue
+    ? variableValue.replace(/\{\{nome\}\}/gi, 'João').replace(/\{\{name\}\}/gi, 'João').replace(/\{\{phone\}\}/gi, '5511999990001').replace(/\{\{email\}\}/gi, 'joao@email.com')
+    : undefined
+  const exampleVars: Record<string, string> = { '{{1}}': varPreview || 'João', '{{2}}': 'AutoZap', '{{3}}': '29/03/2026', '{{4}}': 'R$ 99,90', '{{5}}': '12345', '{{name}}': 'João', '{{company}}': 'AutoZap', '{{phone}}': '5511999990001', '{{date}}': '29/03/2026', '{{amount}}': 'R$ 99,90' }
   const replaceVars = (text: string) => {
     if (!text) return ''
     return text.replace(/\{\{[^}]+\}\}/g, match => exampleVars[match] || match)
@@ -651,7 +654,7 @@ export default function CampaignsPage() {
                                     {selectedTemplateObjects.length > 1 && (
                                       <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>{tpl.name}</p>
                                     )}
-                                    <WhatsAppPreview body={tpl.body || ''} header={tpl.header} footer={tpl.footer} />
+                                    <WhatsAppPreview body={tpl.body || ''} header={tpl.header} footer={tpl.footer} variableValue={segVariableValue} />
                                   </div>
                                 ))}
                               </div>
