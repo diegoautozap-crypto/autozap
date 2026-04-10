@@ -702,6 +702,25 @@ export default function CampaignsPage() {
                         🎲 {validCurlCopies.length} copies — {t('campaigns.eachContactReceivesOneRandom')}
                       </p>
                     )}
+                    {validCurlCopies.length > 0 && (() => {
+                      // Extract template body from curl for preview
+                      const curl = validCurlCopies[0]
+                      const templateMatch = curl.match(/template[=:]\s*(%7B|{)(.*?)(?=["'\s]|--data|$)/i) || curl.match(/template=([^&]*)/i)
+                      if (!templateMatch) return null
+                      try {
+                        const decoded = decodeURIComponent(templateMatch[1] + (templateMatch[2] || ''))
+                        const obj = JSON.parse(decoded)
+                        if (obj.body) {
+                          return (
+                            <div style={{ marginTop: '8px' }}>
+                              <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>Preview:</p>
+                              <WhatsAppPreview body={obj.body} variableValue={segVariableValue} />
+                            </div>
+                          )
+                        }
+                      } catch { /* ignore parse errors */ }
+                      return null
+                    })()}
                   </div>
                 )}
               </div>
@@ -826,10 +845,24 @@ export default function CampaignsPage() {
                     <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
                       placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
                     {contactsText && (
-                      <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                        {contactsText.split('\n').filter(Boolean).length} {t('campaigns.contactsDetected')}
-                      </p>
+                      <>
+                        <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                          {contactsText.split('\n').filter(Boolean).length} {t('campaigns.contactsDetected')}
+                        </p>
+                        {selectedTemplateObjects.length > 0 && (() => {
+                          const firstLine = contactsText.split('\n').filter(Boolean)[0] || ''
+                          const parts = firstLine.split(',')
+                          const exampleMsg = parts.slice(1).join(',').trim() || ''
+                          if (!exampleMsg) return null
+                          return (
+                            <div style={{ marginTop: '8px' }}>
+                              <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>Preview (1º contato):</p>
+                              <WhatsAppPreview body={selectedTemplateObjects[0].body || ''} header={selectedTemplateObjects[0].header} footer={selectedTemplateObjects[0].footer} variableValue={exampleMsg} />
+                            </div>
+                          )
+                        })()}
+                      </>
                     )}
                   </>
                 )}
