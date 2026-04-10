@@ -28,6 +28,7 @@ const updateSettingsSchema = z.object({
   defaultLanguage: z.string().optional(),
   webhookUrl: z.string().url().optional().nullable(),
   webhookSecret: z.string().min(8).optional().nullable(),
+  settings: z.record(z.any()).optional(),
 })
 
 const updateRoleSchema = z.object({
@@ -250,7 +251,10 @@ router.get('/integrations/google/calendars', requireRole('admin', 'owner'), asyn
 
 router.patch('/settings', requireRole('admin', 'owner'), validate(updateSettingsSchema), async (req, res, next) => {
   try {
-    const tenant = await tenantService.updateSettings(req.auth.tid, req.body)
+    // Merge top-level fields + nested settings object
+    const { settings: nested, ...topLevel } = req.body
+    const merged = { ...topLevel, ...(nested || {}) }
+    const tenant = await tenantService.updateSettings(req.auth.tid, merged)
     res.json(ok(tenant))
   } catch (err) { next(err) }
 })
