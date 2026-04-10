@@ -805,7 +805,7 @@ export default function CampaignsPage() {
                           </button>
                         ))}
                       </div>
-                      <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>Clique nas variáveis acima pra inserir no texto</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>Clique nas variáveis acima pra inserir no texto. Use <strong>\r</strong> para quebrar linha (ex: Olá!\rComo vai?)</p>
                     </div>
 
                     {/* Passo 2: Refinar (opcional, colapsável) */}
