@@ -600,8 +600,15 @@ export default function CampaignsPage() {
                   ))}
                 </div>
 
+                <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '12px', lineHeight: 1.4 }}>
+                  {useTemplate === true
+                    ? 'Use templates aprovados pela Meta. Ideal pra Gupshup e mensagens que precisam de aprovação prévia.'
+                    : useTemplate === false
+                    ? 'Cole o comando cURL gerado pela API. Pra usuários avançados com templates customizados.'
+                    : 'Escreva a mensagem direto. Funciona com qualquer canal (Evolution, Gupshup). Sem necessidade de template aprovado.'}
+                </p>
+
                 {useTemplate === true ? (
-                  // ── Modo Template: checkboxes múltiplos ──
                   selectedChannels.length > 0 ? (
                     (templates as any[]).length === 0 ? (
                       <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '13px 15px' }}>
