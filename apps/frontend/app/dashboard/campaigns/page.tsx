@@ -42,7 +42,9 @@ function speedHint(messagesPerMin: number, contactsText: string, channelCount: n
 
 function WhatsAppPreview({ body, header, footer, variableValue }: { body: string; header?: string; footer?: string; variableValue?: string }) {
   const varPreview = variableValue
-    ? variableValue.replace(/\{\{nome\}\}/gi, 'João').replace(/\{\{name\}\}/gi, 'João').replace(/\{\{phone\}\}/gi, '5511999990001').replace(/\{\{email\}\}/gi, 'joao@email.com')
+    ? variableValue
+        .replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\n/g, '\n')
+        .replace(/\{\{nome\}\}/gi, 'João').replace(/\{\{name\}\}/gi, 'João').replace(/\{\{phone\}\}/gi, '5511999990001').replace(/\{\{email\}\}/gi, 'joao@email.com')
     : undefined
   const exampleVars: Record<string, string> = { '{{1}}': varPreview || 'João', '{{2}}': 'AutoZap', '{{3}}': '29/03/2026', '{{4}}': 'R$ 99,90', '{{5}}': '12345', '{{name}}': 'João', '{{company}}': 'AutoZap', '{{phone}}': '5511999990001', '{{date}}': '29/03/2026', '{{amount}}': 'R$ 99,90' }
   const replaceVars = (text: string) => {
