@@ -530,6 +530,7 @@ export default function ContactsPage() {
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [exportTagId, setExportTagId] = useState<string>('')
+  const [showExport, setShowExport] = useState(false)
   const [showCustomFields, setShowCustomFields] = useState(false)
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -595,6 +596,38 @@ export default function ContactsPage() {
   return (
     <div className="mobile-page" style={{ padding: '28px 32px', maxWidth: '1400px', background: 'var(--bg)', minHeight: '100%' }}>
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setPage(1) }} />}
+
+      {/* Modal de Exportação */}
+      {showExport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowExport(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', width: '400px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Exportar contatos</h3>
+              <button onClick={() => setShowExport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '4px' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>Filtrar por tag</p>
+              <select value={exportTagId} onChange={e => setExportTagId(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px' }}>
+                <option value="">Todos os contatos</option>
+                {tags.map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => { handleExport(); setShowExport(false) }}
+                style={{ flex: 1, padding: '10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <Download size={14} /> CSV
+              </button>
+              <button onClick={() => { handleExportExcel(); setShowExport(false) }}
+                style={{ flex: 1, padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#16a34a', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <FileSpreadsheet size={14} /> Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showCustomFields && <CustomFieldsModal tenantId={tenantId} onClose={() => setShowCustomFields(false)} onSaved={() => loadCustomFields()} />}
       {showDuplicates && <MergeDuplicatesModal onClose={() => setShowDuplicates(false)} onMerged={() => { queryClient.invalidateQueries({ queryKey: ['contacts'] }) }} />}
 
@@ -621,20 +654,8 @@ export default function ContactsPage() {
             </button>
           )}
           {canEdit('/dashboard/contacts') && reportsAllowed && (
-          <select value={exportTagId} onChange={e => setExportTagId(e.target.value)}
-            style={{ padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '12px', cursor: 'pointer' }}>
-            <option value="">Todos os contatos</option>
-            {tags.map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-          </select>
-          )}
-          {canEdit('/dashboard/contacts') && reportsAllowed && (
-          <button onClick={handleExport} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
-            <Download size={13} /> {t('contacts.csv')}
-          </button>
-          )}
-          {canEdit('/dashboard/contacts') && reportsAllowed && (
-          <button onClick={handleExportExcel} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#16a34a', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
-            <FileSpreadsheet size={13} /> {t('contacts.excel')}
+          <button onClick={() => setShowExport(true)} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>
+            <Download size={13} /> Exportar
           </button>
           )}
           {canEdit('/dashboard/contacts') && !contactLimitReached && (
