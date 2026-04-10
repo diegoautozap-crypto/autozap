@@ -275,6 +275,16 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
         )}
 
+        {d.type?.startsWith('trigger_') && d.type !== 'trigger_webhook' && d.type !== 'trigger_manual' && (
+          <div>
+            <label style={labelStyle}>Números ignorados</label>
+            <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }}
+              placeholder="Um número por linha:&#10;5547999999999&#10;5511888888888"
+              value={d.ignoredPhones || ''} onChange={e => onUpdate(node.id, { ignoredPhones: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Esses números não entram no flow. Um por linha, só números.</p>
+          </div>
+        )}
+
         {d.type === 'trigger_outside_hours' && (<>
           <div><label style={labelStyle}>{t('nodes.businessStart')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div><label style={labelStyle}>{t('nodes.businessEnd')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.end ?? 18} onChange={e => onUpdate(node.id, { end: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>

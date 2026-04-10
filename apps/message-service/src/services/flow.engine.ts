@@ -433,6 +433,18 @@ export class FlowEngine {
     if (!nodes || nodes.length === 0) return false
     const triggerNode = (nodes as FlowNodeRow[]).find(n => n.type.startsWith('trigger_'))
     if (!triggerNode) return false
+
+    // Check ignored phones list
+    const ignoredPhones = triggerNode.data?.ignoredPhones
+    if (ignoredPhones) {
+      const list = ignoredPhones.split('\n').map((p: string) => p.trim().replace(/\D/g, '')).filter(Boolean)
+      const phone = ctx.phone.replace(/\D/g, '')
+      if (list.some((p: string) => phone.endsWith(p) || p.endsWith(phone.slice(-8)))) {
+        logger.info('Flow skipped — phone in ignored list', { phone: ctx.phone })
+        return false
+      }
+    }
+
     return this.evaluateTrigger(triggerNode, ctx)
   }
 
