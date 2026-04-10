@@ -742,10 +742,33 @@ export default function CampaignsPage() {
                     {/* Variável personalizada */}
                     <div>
                       <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Texto da variável (opcional)</p>
-                      <textarea style={{ ...inp, minHeight: '60px', resize: 'vertical' as const, fontSize: '12px' }}
+                      <textarea id="seg-variable-textarea" style={{ ...inp, minHeight: '60px', resize: 'vertical' as const, fontSize: '12px' }}
                         placeholder="Digite o texto que vai substituir a variável {{message}} na copy..."
                         value={segVariableValue} onChange={e => setSegVariableValue(e.target.value)} />
-                      <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>Este texto será usado como {'{{message}}'} pra todos os contatos da tag</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {[
+                          { label: 'Nome', value: '{{nome}}' },
+                          { label: 'Telefone', value: '{{phone}}' },
+                          { label: 'Email', value: '{{email}}' },
+                        ].map(v => (
+                          <button key={v.value} onClick={() => {
+                            const ta = document.getElementById('seg-variable-textarea') as HTMLTextAreaElement
+                            if (ta) {
+                              const start = ta.selectionStart || segVariableValue.length
+                              const end = ta.selectionEnd || segVariableValue.length
+                              const newVal = segVariableValue.slice(0, start) + v.value + segVariableValue.slice(end)
+                              setSegVariableValue(newVal)
+                              setTimeout(() => { ta.focus(); ta.setSelectionRange(start + v.value.length, start + v.value.length) }, 50)
+                            } else {
+                              setSegVariableValue(prev => prev + v.value)
+                            }
+                          }}
+                            style={{ padding: '3px 8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            {v.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>Clique nas variáveis acima pra inserir no texto</p>
                     </div>
 
                     {/* Passo 2: Refinar (opcional, colapsável) */}
