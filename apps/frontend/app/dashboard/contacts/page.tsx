@@ -529,6 +529,7 @@ export default function ContactsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showTags, setShowTags] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [exportTagId, setExportTagId] = useState<string>('')
   const [showCustomFields, setShowCustomFields] = useState(false)
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -557,11 +558,11 @@ export default function ContactsPage() {
   const deleteMutation = useMutation({ mutationFn: async (ids: string[]) => { await Promise.all(ids.map(id => contactApi.delete(`/contacts/${id}`))) }, onSuccess: () => { toast.success(t('contacts.deleted')); setSelected(new Set()); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error(t('contacts.errorDeleteContacts')) })
   const deleteAllMutation = useMutation({ mutationFn: async () => { await contactApi.delete('/contacts/all') }, onSuccess: () => { toast.success(t('contacts.allDeleted')); setSelected(new Set()); setPage(1); queryClient.invalidateQueries({ queryKey: ['contacts'] }) }, onError: () => toast.error(t('contacts.error')) })
 
-  const handleExport = async () => { const { data } = await contactApi.get('/contacts/export', { responseType: 'blob' }); const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click(); toast.success(t('contacts.csvExported')) }
+  const handleExport = async () => { const { data } = await contactApi.get(`/contacts/export${exportTagId ? `?tagId=${exportTagId}` : ''}`, { responseType: 'blob' }); const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = 'contatos.csv'; a.click(); toast.success(t('contacts.csvExported')) }
   const handleExportExcel = async () => {
     try {
       let allContacts: any[] = []; let p = 1
-      while (true) { const { data } = await contactApi.get(`/contacts?page=${p}&limit=100`); const rows = data?.data || []; allContacts = [...allContacts, ...rows]; if (!data?.meta?.hasMore) break; p++ }
+      while (true) { const { data } = await contactApi.get(`/contacts?page=${p}&limit=100${exportTagId ? `&tagId=${exportTagId}` : ''}`); const rows = data?.data || []; allContacts = [...allContacts, ...rows]; if (!data?.meta?.hasMore) break; p++ }
       if (allContacts.length === 0) { toast.error(t('contacts.noContactsShort')); return }
       const rows = allContacts.map((c: any) => { const base: any = { telefone: c.phone || '', nome: c.name || '', email: c.email || '', empresa: c.company || '', tags: (c.contact_tags || []).map((ct: any) => ct.tags?.name).filter(Boolean).join(', '), ultima_interacao: c.last_interaction_at ? new Date(c.last_interaction_at).toLocaleDateString('pt-BR') : '' }; customFields.forEach(cf => { base[cf.label] = c.metadata?.[cf.name] ?? '' }); return base })
       const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Contatos'); XLSX.writeFile(wb, 'contatos.xlsx'); toast.success(`${allContacts.length} ${t('contacts.exported')}`)
@@ -618,6 +619,13 @@ export default function ContactsPage() {
               style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
               {deleteAllMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} {t('contacts.deleteAll')}
             </button>
+          )}
+          {canEdit('/dashboard/contacts') && reportsAllowed && (
+          <select value={exportTagId} onChange={e => setExportTagId(e.target.value)}
+            style={{ padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '12px', cursor: 'pointer' }}>
+            <option value="">Todos os contatos</option>
+            {tags.map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+          </select>
           )}
           {canEdit('/dashboard/contacts') && reportsAllowed && (
           <button onClick={handleExport} style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: '#52525b', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: 'var(--shadow)' }}>

@@ -283,14 +283,24 @@ export class ContactService {
 
   // ── Export CSV ────────────────────────────────────────────────────────────
 
-  async exportContacts(tenantId: string): Promise<string> {
-    const { data } = await db
+  async exportContacts(tenantId: string, tagId?: string): Promise<string> {
+    let contactIds: string[] | null = null
+    if (tagId) {
+      const { data: tagContacts } = await db.from('contact_tags').select('contact_id').eq('tag_id', tagId)
+      contactIds = (tagContacts || []).map((r: any) => r.contact_id)
+      if (contactIds.length === 0) return 'phone,name,email,company,status,origin,created_at'
+    }
+
+    let query = db
       .from('contacts')
       .select('phone, name, email, company, status, origin, created_at')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(50000)
 
+    if (contactIds) query = query.in('id', contactIds)
+
+    const { data } = await query
     const rows = data || []
     const header = 'phone,name,email,company,status,origin,created_at'
     const lines = rows.map((r: any) =>

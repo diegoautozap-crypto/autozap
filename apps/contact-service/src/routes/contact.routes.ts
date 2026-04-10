@@ -110,7 +110,8 @@ router.get('/contacts/export', async (req, res, next) => {
       throw new AppError('PLAN_LIMIT', 'Exportação de relatórios não disponível no seu plano', 403)
     }
 
-    const csv = await contactService.exportContacts(req.auth.tid)
+    const tagId = req.query.tagId as string | undefined
+    const csv = await contactService.exportContacts(req.auth.tid, tagId)
     res.setHeader('Content-Type', 'text/csv')
     res.setHeader('Content-Disposition', 'attachment; filename=contacts.csv')
     res.send(csv)
