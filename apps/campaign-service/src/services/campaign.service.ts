@@ -170,7 +170,7 @@ export class CampaignService {
       phone: c.phone,
       name: c.name || c.phone,
       contactId: c.id,
-      variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone, message: filter.variableValue || '' },
+      variables: { nome: c.name || c.phone, email: c.email || '', phone: c.phone, mensagem: filter.variableValue || '', copy: filter.variableValue || '', message: filter.variableValue || '' },
     }))
 
     return this.addContacts(campaignId, tenantId, rows)
