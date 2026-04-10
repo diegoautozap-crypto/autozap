@@ -707,16 +707,29 @@ export default function CampaignsPage() {
                     {validCurlCopies.length > 0 && (() => {
                       // Extract template body from curl for preview
                       const curl = validCurlCopies[0]
-                      const templateMatch = curl.match(/template[=:]\s*(%7B|{)(.*?)(?=["'\s]|--data|$)/i) || curl.match(/template=([^&]*)/i)
-                      if (!templateMatch) return null
                       try {
-                        const decoded = decodeURIComponent(templateMatch[1] + (templateMatch[2] || ''))
-                        const obj = JSON.parse(decoded)
-                        if (obj.body) {
+                        // Try to find template= parameter and decode it
+                        const templateParam = curl.match(/template=([^&"'\s]+)/i)
+                        if (templateParam) {
+                          const decoded = decodeURIComponent(templateParam[1])
+                          const obj = JSON.parse(decoded)
+                          if (obj.body) {
+                            return (
+                              <div style={{ marginTop: '8px' }}>
+                                <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>Preview:</p>
+                                <WhatsAppPreview body={obj.body} variableValue={segVariableValue} />
+                              </div>
+                            )
+                          }
+                        }
+                        // Try to find message= parameter
+                        const messageParam = curl.match(/message=([^&"'\s]+)/i)
+                        if (messageParam) {
+                          const decoded = decodeURIComponent(messageParam[1])
                           return (
                             <div style={{ marginTop: '8px' }}>
                               <p style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>Preview:</p>
-                              <WhatsAppPreview body={obj.body} variableValue={segVariableValue} />
+                              <WhatsAppPreview body={decoded} variableValue={segVariableValue} />
                             </div>
                           )
                         }
@@ -844,8 +857,29 @@ export default function CampaignsPage() {
                       <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>{t('campaigns.uploadCsv')} <strong style={{ color: 'var(--text)' }}>.csv</strong></p>
                     </div>
                     <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
-                    <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
+                    <textarea id="manual-contacts-textarea" style={{ ...inp, minHeight: '70px', resize: 'vertical' as const, fontFamily: 'ui-monospace, monospace', fontSize: '12px', lineHeight: 1.6 } as any}
                       placeholder="5511999990001,Olá!" value={contactsText} onChange={e => setContactsText(e.target.value)} />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      {[
+                        { label: 'Nome', value: '{{nome}}' },
+                        { label: 'Telefone', value: '{{phone}}' },
+                        { label: 'Email', value: '{{email}}' },
+                      ].map(v => (
+                        <button key={v.value} onClick={() => {
+                          const ta = document.getElementById('manual-contacts-textarea') as HTMLTextAreaElement
+                          if (ta) {
+                            const start = ta.selectionStart || contactsText.length
+                            const end = ta.selectionEnd || contactsText.length
+                            const newVal = contactsText.slice(0, start) + v.value + contactsText.slice(end)
+                            setContactsText(newVal)
+                            setTimeout(() => { ta.focus(); ta.setSelectionRange(start + v.value.length, start + v.value.length) }, 50)
+                          } else { setContactsText(prev => prev + v.value) }
+                        }}
+                          style={{ padding: '3px 8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          {v.label}
+                        </button>
+                      ))}
+                    </div>
                     {contactsText && (
                       <>
                         <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
