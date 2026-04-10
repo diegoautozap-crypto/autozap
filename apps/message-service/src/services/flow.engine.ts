@@ -1663,13 +1663,18 @@ export class FlowEngine {
       }
 
       const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
-      if (dayRows.length <= 3) {
-        // Use buttons for 3 or fewer days
+      const showBack = data?.showBackButton !== false
+      if (showBack && dayRows.length <= 2) {
+        dayRows.push({ id: 'voltar_menu', title: '↩ Voltar' })
         const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
+      } else if (dayRows.length <= 3) {
+        const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
+        if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       } else {
-        // Use list for more than 3 days
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'list', listRows: dayRows, listButtonText: 'Ver dias' })
+        if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       }
 
       variables['_schedule_step'] = '2'
@@ -1690,6 +1695,14 @@ export class FlowEngine {
       // Step 2: User picked a day, check Google Calendar for busy times and show available slots
       const dayResponse = variables['_schedule_day_choice'] || ''
       const totalDays = parseInt(variables['_schedule_total_days'] || '0')
+
+      // Handle "Voltar" — exit node, let flow handle it
+      const dayLower = dayResponse.trim().toLowerCase()
+      if (dayLower === 'voltar_menu' || dayLower.includes('voltar')) {
+        variables['agendamento_status'] = 'voltou'
+        Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+        return { success: true }
+      }
 
       // Support: button ID (day_1), text number (1), or title match (Sexta 10/04)
       let choice = 0
