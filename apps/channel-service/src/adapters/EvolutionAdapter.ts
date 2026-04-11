@@ -12,12 +12,20 @@ import { logger } from '../lib/logger'
 
 // ─── Evolution API v2 Adapter ────────────────────────────────────────────────
 
-const STATUS_MAP: Record<number, MessageStatus> = {
+const STATUS_MAP_NUM: Record<number, MessageStatus> = {
   1: 'queued',
   2: 'sent',
   3: 'delivered',
   4: 'read',
   5: 'read', // "played" maps to read
+}
+
+const STATUS_MAP_STR: Record<string, MessageStatus> = {
+  'PENDING': 'queued',
+  'SERVER_ACK': 'sent',
+  'DELIVERY_ACK': 'delivered',
+  'READ': 'read',
+  'PLAYED': 'read',
 }
 
 export class EvolutionAdapter implements IChannelAdapter {
@@ -192,12 +200,13 @@ export class EvolutionAdapter implements IChannelAdapter {
     if (!update) return null
 
     const statusCode = update.update?.status ?? update.status
-    logger.info('Evolution status update debug', { statusCode, updateKeys: Object.keys(update || {}), update: JSON.stringify(update).slice(0, 300) })
-    const status = STATUS_MAP[statusCode]
+    const status = typeof statusCode === 'number'
+      ? STATUS_MAP_NUM[statusCode]
+      : STATUS_MAP_STR[statusCode]
     if (!status) return null
 
     return {
-      externalId: update.key?.id || '',
+      externalId: update.key?.id || update.keyId || update.messageId || '',
       status,
       timestamp: new Date(),
     }
