@@ -70,7 +70,7 @@ export function startMessageWorker(): Worker {
   const worker = new Worker<SendMessageJob>(
     'message_queue',
     async (job) => {
-      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = job.data
+      const { messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, filename, retryCount, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = job.data
 
       logger.debug('Processing message job', { messageUuid, to, attempt: retryCount })
 
@@ -92,6 +92,7 @@ export function startMessageWorker(): Worker {
             contentType,
             body,
             mediaUrl,
+            filename,
             interactiveType,
             buttons,
             listRows,

@@ -602,7 +602,7 @@ export default function InboxPage() {
     onError: () => toast.error('Erro ao liberar bot'),
   })
   const sendMutation = useMutation({
-    mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string }) => {
+    mutationFn: async (payload: { contentType: string; body?: string; mediaUrl?: string; filename?: string }) => {
       if (!selectedConv) return
       if (role !== 'admin' && role !== 'owner' && allowedChannels.length > 0) {
         if (!allowedChannels.includes(selectedConv.channel_id)) throw new Error('Sem permissão para enviar neste canal')
@@ -640,7 +640,7 @@ export default function InboxPage() {
       const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' })
       if (error) throw error
       const { data: publicData } = supabase.storage.from('media').getPublicUrl(path)
-      await sendMutation.mutateAsync({ contentType, mediaUrl: publicData.publicUrl })
+      await sendMutation.mutateAsync({ contentType, mediaUrl: publicData.publicUrl, filename: file.name })
       toast.success('Enviado!')
     } catch (err: any) {
       toast.error('Erro ao enviar: ' + (err.message || 'tente novamente'))

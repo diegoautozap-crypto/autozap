@@ -514,10 +514,10 @@ router.post('/internal/send', async (req, res, next) => {
       res.status(401).json({ success: false, error: { message: 'Unauthorized' } })
       return
     }
-    const { messageUuid, channelId, tenantId, to, contentType, body, mediaUrl, interactiveType, buttons, listRows, listButtonText, footer } = req.body
+    const { messageUuid, channelId, tenantId, to, contentType, body, mediaUrl, filename, interactiveType, buttons, listRows, listButtonText, footer } = req.body
     console.log('[internal/send] contentType:', contentType, 'interactiveType:', interactiveType, 'hasButtons:', !!buttons?.length, 'hasListRows:', !!listRows?.length)
     const result = await channelService.sendMessage(channelId, tenantId, {
-      to, contentType, body, mediaUrl, messageUuid, interactiveType, buttons, listRows, listButtonText, header: undefined, footer,
+      to, contentType, body, mediaUrl, filename, messageUuid, interactiveType, buttons, listRows, listButtonText, header: undefined, footer,
     })
     res.json({ success: true, data: result })
   } catch (err) {

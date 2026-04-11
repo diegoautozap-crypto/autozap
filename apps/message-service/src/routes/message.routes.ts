@@ -101,6 +101,7 @@ const sendSchema = z.object({
   contentType: z.enum(['text', 'image', 'audio', 'video', 'document', 'template', 'interactive']),
   body: z.string().optional(),
   mediaUrl: z.string().url().optional(),
+  filename: z.string().optional(),
   campaignId: z.string().uuid().optional(),
   interactiveType: z.enum(['button', 'list']).optional(),
   buttons: z.array(z.object({ id: z.string().optional(), title: z.string() })).optional(),
@@ -111,7 +112,7 @@ const sendSchema = z.object({
 
 router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async (req, res, next) => {
   try {
-    const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = req.body
+    const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, filename, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = req.body
     const secret = req.headers['x-internal-secret']
     const tenantId = secret === INTERNAL_SECRET
       ? (req.body.tenantId || req.auth?.tid)
@@ -146,7 +147,7 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
     })
 
     await messageQueue.add('send', {
-      messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, retryCount: 0,
+      messageUuid, tenantId, channelId, to, contentType, body, mediaUrl, filename, retryCount: 0,
       interactiveType, buttons, listRows, listButtonText, footer,
     })
 
