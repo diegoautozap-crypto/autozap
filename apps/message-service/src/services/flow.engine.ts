@@ -388,11 +388,13 @@ export class FlowEngine {
               const rows = srcNode?.data?.listRows as any[] | undefined
               logger.info('Checking source node', { sourceNode: edge.source_node, hasBtns: !!btns?.length, hasRows: !!rows?.length, btnCount: btns?.length })
               if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
-                responseText = btns[num - 1]?.title || btns[num - 1] || responseText
+                const btn = btns[num - 1]
+                responseText = typeof btn === 'string' ? btn : (btn?.title || btn?.displayText || String(btn) || responseText)
                 logger.info('Mapped number to button title', { num, title: responseText })
                 break
               } else if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
-                responseText = rows[num - 1]?.title || rows[num - 1] || responseText
+                const row = rows[num - 1]
+                responseText = typeof row === 'string' ? row : (row?.title || row?.displayText || String(row) || responseText)
                 break
               }
             }
