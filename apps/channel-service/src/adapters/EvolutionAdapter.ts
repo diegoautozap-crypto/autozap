@@ -51,6 +51,7 @@ export class EvolutionAdapter implements IChannelAdapter {
       url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
+        text: body || '',
         textMessage: { text: body || '' },
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
