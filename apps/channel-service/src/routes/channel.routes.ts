@@ -342,11 +342,11 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
         // Download media via Evolution API if mediaUrl is a WhatsApp internal URL
         if (normalized.mediaUrl && normalized.mediaUrl.includes('mmg.whatsapp.net')) {
           try {
-            const creds = channel.credentials || {}
-            const baseUrl = (creds.baseUrl || '').replace(/\/+$/, '')
-            const instanceName = creds.instanceName
-            const apiKey = creds.apiKey
+            const baseUrl = (evoCreds.baseUrl || '').replace(/\/+$/, '')
+            const instanceName = evoCreds.instanceName
+            const apiKey = evoCreds.apiKey
             const messageId = normalized.externalId
+            logger.info('Evolution media download attempt', { baseUrl: !!baseUrl, instanceName, hasApiKey: !!apiKey, messageId })
             if (baseUrl && instanceName && apiKey && messageId) {
               const res = await fetch(`${baseUrl}/chat/getBase64FromMediaMessage/${instanceName}`, {
                 method: 'POST',
