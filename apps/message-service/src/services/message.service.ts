@@ -188,7 +188,7 @@ export class MessageService {
 
   async processInbound(tenantId: string, channelId: string, msg: NormalizedMessage): Promise<void> {
     const contact = await this.findOrCreateContact(tenantId, msg.from)
-    const senderName = (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
+    const senderName = msg.senderName || (msg.raw as any)?.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name
     if (senderName && (!contact.name || looksLikePhone(contact.name))) {
       await db.from('contacts').update({ name: senderName }).eq('id', contact.id).eq('tenant_id', tenantId)
     }

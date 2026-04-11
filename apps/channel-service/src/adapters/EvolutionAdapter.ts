@@ -168,6 +168,7 @@ export class EvolutionAdapter implements IChannelAdapter {
       channelId: '', // filled by the webhook handler
       externalId: data.key?.id || '',
       from,
+      senderName: data.pushName || undefined,
       to: payload.instance || '',
       contentType,
       body,

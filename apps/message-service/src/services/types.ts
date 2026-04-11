@@ -7,6 +7,7 @@ export interface NormalizedMessage {
   channelId: string
   externalId?: string
   from: string
+  senderName?: string
   to: string
   contentType: ContentType
   body?: string
