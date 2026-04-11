@@ -353,18 +353,30 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
                 headers: { 'Content-Type': 'application/json', apikey: apiKey },
                 body: JSON.stringify({ message: { key: { id: messageId } } }),
               })
-              const resText = await res.text()
-              logger.info('Evolution media download response', { status: res.status, bodyLength: resText.length, bodyPreview: resText.slice(0, 200) })
               if (res.ok) {
-                try {
-                  const data = JSON.parse(resText)
-                  const base64 = data?.base64 || data?.data?.base64 || data?.message?.base64
-                  const mimetype = data?.mimetype || data?.data?.mimetype || data?.message?.mimetype || normalized.mediaMimeType || 'image/jpeg'
-                  logger.info('Evolution media base64 result', { hasBase64: !!base64, base64Length: base64?.length, mimetype })
-                  if (base64) {
-                    normalized.mediaUrl = `data:${mimetype};base64,${base64}`
+                const data = await res.json() as any
+                const base64 = data?.base64 || data?.data?.base64 || data?.message?.base64
+                const mimetype = data?.mimetype || data?.data?.mimetype || data?.message?.mimetype || normalized.mediaMimeType || 'image/jpeg'
+                if (base64) {
+                  // Upload to Supabase Storage
+                  try {
+                    const { createClient } = await import('@supabase/supabase-js')
+                    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+                    const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin'
+                    const fileName = `evolution/${channel.tenantId}/${Date.now()}_${messageId}.${ext}`
+                    const buffer = Buffer.from(base64, 'base64')
+                    const { error: uploadError } = await supabase.storage.from('media').upload(fileName, buffer, { contentType: mimetype, upsert: true })
+                    if (!uploadError) {
+                      const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName)
+                      normalized.mediaUrl = urlData.publicUrl
+                      logger.info('Evolution media uploaded to storage', { fileName, size: buffer.length })
+                    } else {
+                      logger.warn('Failed to upload to storage', { error: uploadError.message })
+                    }
+                  } catch (storageErr) {
+                    logger.warn('Storage upload failed, keeping original URL', { err: (storageErr as Error).message })
                   }
-                } catch { logger.warn('Failed to parse Evolution media response') }
+                }
               }
             }
           } catch (err) {

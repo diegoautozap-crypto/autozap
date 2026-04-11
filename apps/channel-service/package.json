@@ -13,7 +13,7 @@
     "@autozap/utils": "*",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@sentry/node": "^10.47.0",
-    "@supabase/supabase-js": "^2.43.0",
+    "@supabase/supabase-js": "^2.103.0",
     "@types/fluent-ffmpeg": "^2.1.28",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
