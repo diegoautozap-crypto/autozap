@@ -607,7 +607,7 @@ export default function InboxPage() {
       if (role !== 'admin' && role !== 'owner' && allowedChannels.length > 0) {
         if (!allowedChannels.includes(selectedConv.channel_id)) throw new Error('Sem permissão para enviar neste canal')
       }
-      await messageApi.post('/messages/send', { channelId: sendChannelId || selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
+      await messageApi.post('/messages/send', { channelId: selectedConv.channel_id, contactId: selectedConv.contact_id, conversationId: selectedConvId, to: selectedConv.contacts?.phone, ...payload })
     },
     onSuccess: () => {
       setMessageText(''); setPendingFile(null)
@@ -1142,15 +1142,7 @@ export default function InboxPage() {
                   {visibleChannels.length > 1 && inputMode === 'message' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                       <Phone size={12} color="var(--text-faint)" />
-                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{t('inbox.sendVia')}</span>
-                      <select
-                        value={sendChannelId || selectedConv?.channel_id || ''}
-                        onChange={e => setSendChannelId(e.target.value)}
-                        style={{ fontSize: '11px', padding: '2px 6px', border: '1px solid var(--border)', borderRadius: '5px', background: 'var(--bg-input)', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
-                        {visibleChannels.map((ch: any) => (
-                          <option key={ch.id} value={ch.id}>{ch.name}{ch.phone_number ? ` (${ch.phone_number})` : ''}</option>
-                        ))}
-                      </select>
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{t('inbox.sendVia')} {selectedChannelName || 'Canal'}</span>
                     </div>
                   )}
                   {isRecording ? (
