@@ -100,13 +100,21 @@ export class EvolutionAdapter implements IChannelAdapter {
         audio: mediaUrl || '',
       }
     } else if (contentType === 'document') {
+      const docName = input.filename || body || `documento_${Date.now()}.pdf`
+      const mimeMap: Record<string, string> = {
+        pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        xls: 'application/vnd.ms-excel', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        doc: 'application/msword', csv: 'text/csv', txt: 'text/plain', zip: 'application/zip',
+      }
+      const ext = docName.split('.').pop()?.toLowerCase() || ''
       url = `${baseUrl}/message/sendMedia/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
         mediatype: 'document',
+        mimetype: mimeMap[ext] || 'application/octet-stream',
         media: mediaUrl || '',
         caption: body || '',
-        fileName: input.filename || body || `documento_${Date.now()}.pdf`,
+        fileName: docName,
       }
     } else {
       // fallback to text
