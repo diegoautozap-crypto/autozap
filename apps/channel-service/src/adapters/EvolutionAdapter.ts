@@ -75,13 +75,38 @@ export class EvolutionAdapter implements IChannelAdapter {
           rows: input.listRows.slice(0, 10).map(r => ({ title: r.title.slice(0, 24), description: r.description?.slice(0, 72) || '', rowId: r.id })),
         }],
       }
-    } else if (['image', 'video', 'audio', 'document'].includes(contentType)) {
+    } else if (contentType === 'image') {
       url = `${baseUrl}/message/sendMedia/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
-        mediatype: contentType,
+        mediatype: 'image',
         media: mediaUrl || '',
         caption: body || '',
+        fileName: `image_${Date.now()}.jpg`,
+      }
+    } else if (contentType === 'video') {
+      url = `${baseUrl}/message/sendMedia/${instanceName}`
+      payload = {
+        number: this.normalizePhone(to),
+        mediatype: 'video',
+        media: mediaUrl || '',
+        caption: body || '',
+        fileName: `video_${Date.now()}.mp4`,
+      }
+    } else if (contentType === 'audio') {
+      url = `${baseUrl}/message/sendWhatsAppAudio/${instanceName}`
+      payload = {
+        number: this.normalizePhone(to),
+        audio: mediaUrl || '',
+      }
+    } else if (contentType === 'document') {
+      url = `${baseUrl}/message/sendMedia/${instanceName}`
+      payload = {
+        number: this.normalizePhone(to),
+        mediatype: 'document',
+        media: mediaUrl || '',
+        caption: body || '',
+        fileName: input.filename || body || `documento_${Date.now()}.pdf`,
       }
     } else {
       // fallback to text

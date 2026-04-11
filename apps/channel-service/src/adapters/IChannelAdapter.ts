@@ -61,6 +61,7 @@ export interface SendMessageInput {
   contentType: ContentType
   body?: string
   mediaUrl?: string
+  filename?: string
   templateName?: string
   templateParams?: string[]
   messageUuid: string
