@@ -397,7 +397,7 @@ export default function InboxPage() {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['conversations-counts'] })
       if (data?.conversationId === selectedConvId) queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] })
-      playNotificationSound()
+      if (localStorage.getItem('autozap-sound') !== 'off') playNotificationSound()
     }
     const onConvUpdated = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'], exact: false })
