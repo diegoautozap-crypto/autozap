@@ -166,6 +166,9 @@ export class EvolutionAdapter implements IChannelAdapter {
 
     // Ignore group messages
     if (remoteJid.endsWith('@g.us')) return null
+
+    // Ignore LID messages (WhatsApp internal ID, not a real phone number)
+    if (remoteJid.endsWith('@lid')) return null
     const from = this.jidToPhone(remoteJid)
     const messageType = data.messageType as string || ''
 
