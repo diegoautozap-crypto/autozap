@@ -65,7 +65,7 @@ export class EvolutionAdapter implements IChannelAdapter {
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
       // Fallback: lista como texto numerado
-      const options = input.listRows.slice(0, 10).map((r, i) => `${i + 1}. ${r.title}`).join('\n')
+      const options = input.listRows.map((r, i) => `${i + 1}. ${r.title}`).join('\n')
       url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
