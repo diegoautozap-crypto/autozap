@@ -379,17 +379,25 @@ export class FlowEngine {
         try {
           const num = parseInt(responseText.trim())
           const { data: edges } = await db.from('flow_edges').select('source_node').eq('target_node', state.current_node_id).eq('flow_id', state.flow_id)
+          logger.info('Number-to-title mapping', { num, currentNode: state.current_node_id, edgeCount: edges?.length })
           if (edges && edges.length > 0) {
-            const { data: srcNode } = await db.from('flow_nodes').select('data').eq('id', edges[0].source_node).single()
-            const btns = srcNode?.data?.buttons as any[] | undefined
-            const rows = srcNode?.data?.listRows as any[] | undefined
-            if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
-              responseText = btns[num - 1]?.title || btns[num - 1] || responseText
-            } else if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
-              responseText = rows[num - 1]?.title || rows[num - 1] || responseText
+            // Try all source nodes to find one with buttons/listRows
+            for (const edge of edges) {
+              const { data: srcNode } = await db.from('flow_nodes').select('data').eq('id', edge.source_node).single()
+              const btns = srcNode?.data?.buttons as any[] | undefined
+              const rows = srcNode?.data?.listRows as any[] | undefined
+              logger.info('Checking source node', { sourceNode: edge.source_node, hasBtns: !!btns?.length, hasRows: !!rows?.length, btnCount: btns?.length })
+              if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
+                responseText = btns[num - 1]?.title || btns[num - 1] || responseText
+                logger.info('Mapped number to button title', { num, title: responseText })
+                break
+              } else if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
+                responseText = rows[num - 1]?.title || rows[num - 1] || responseText
+                break
+              }
             }
           }
-        } catch {}
+        } catch (mapErr) { logger.warn('Number mapping failed', { err: (mapErr as Error).message }) }
       }
 
       variables[state.waiting_variable] = responseText
