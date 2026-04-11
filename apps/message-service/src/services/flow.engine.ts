@@ -546,7 +546,7 @@ export class FlowEngine {
         case 'send_message': {
           const message = this.interpolate(data?.message || '', ctx, variables)
           if (!message) break
-          const ch = data?.channelId || ctx.channelId
+          const ch = ctx.channelId
           if (data?.delay && data.delay > 0) {
             const delayMs = data.delay * 1000
             if (delayMs <= 30000) {
@@ -572,25 +572,25 @@ export class FlowEngine {
 
         case 'send_image': {
           if (!data?.mediaUrl) break
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: data?.channelId || ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'image', mediaUrl: data.mediaUrl, body: data.caption || '' })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'image', mediaUrl: data.mediaUrl, body: data.caption || '' })
           break
         }
 
         case 'send_video': {
           if (!data?.mediaUrl) break
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: data?.channelId || ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'video', mediaUrl: data.mediaUrl, body: data.caption || '' })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'video', mediaUrl: data.mediaUrl, body: data.caption || '' })
           break
         }
 
         case 'send_audio': {
           if (!data?.mediaUrl) break
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: data?.channelId || ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'audio', mediaUrl: data.mediaUrl })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'audio', mediaUrl: data.mediaUrl })
           break
         }
 
         case 'send_document': {
           if (!data?.mediaUrl) break
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: data?.channelId || ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'document', mediaUrl: data.mediaUrl, body: data.filename || 'documento' })
+          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'document', mediaUrl: data.mediaUrl, body: data.filename || 'documento' })
           break
         }
 
