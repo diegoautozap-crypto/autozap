@@ -1723,7 +1723,10 @@ export class FlowEngine {
 
       // Handle "Voltar" — exit node, let flow handle it
       const dayLower = dayResponse.trim().toLowerCase()
-      if (dayLower === 'voltar_menu' || dayLower === '0' || dayLower.includes('voltar')) {
+      const showBackDays = data?.showBackDays !== false
+      // Check if user typed the number of the Voltar item (last in list)
+      const voltarDayNum = showBackDays ? totalDays + 1 : -1
+      if (dayLower === 'voltar_menu' || dayLower === '0' || dayLower.includes('voltar') || dayLower === String(voltarDayNum)) {
         variables['agendamento_status'] = 'voltou'
         Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
         return { success: true }
@@ -1911,7 +1914,9 @@ export class FlowEngine {
 
       // Handle "Voltar" — go back to day selection
       const slotLower = slotResponse.trim().toLowerCase()
-      if (slotLower === 'voltar_dias' || slotLower === '0' || slotLower.includes('voltar')) {
+      const showBack = data?.showBackButton !== false
+      const voltarSlotNum = showBack ? totalSlots + 1 : -1
+      if (slotLower === 'voltar_dias' || slotLower === '0' || slotLower.includes('voltar') || slotLower === String(voltarSlotNum)) {
         variables['_schedule_step'] = '1'
         // Clean slot variables
         Object.keys(variables).filter(k => k.match(/^_schedule_(slot|price)_/)).forEach(k => delete variables[k])
