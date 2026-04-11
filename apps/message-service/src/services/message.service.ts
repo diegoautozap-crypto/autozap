@@ -193,14 +193,24 @@ export class MessageService {
       await db.from('contacts').update({ name: senderName }).eq('id', contact.id).eq('tenant_id', tenantId)
     }
     const conversation = await this.findOrCreateConversation(tenantId, channelId, contact.id, msg.channelType)
+
+    // fromMe = mensagem enviada pelo celular (coexistência) — salva como outbound
+    const direction = msg.fromMe ? 'outbound' : 'inbound'
+
+    // Skip if already exists (avoid duplicating messages sent from CRM)
+    if (msg.fromMe && msg.externalId) {
+      const { data: existing } = await db.from('messages').select('id').eq('external_id', msg.externalId).eq('tenant_id', tenantId).maybeSingle()
+      if (existing) return
+    }
+
     const messageId = generateId()
     let messageBody = msg.body
     await db.from('messages').insert({
       id: messageId, message_uuid: uuidv4(), tenant_id: tenantId,
       conversation_id: conversation.id, channel_id: channelId, contact_id: contact.id,
-      direction: 'inbound', content_type: msg.contentType, body: messageBody,
+      direction, content_type: msg.contentType, body: messageBody,
       media_url: msg.mediaUrl, media_mime_type: msg.mediaMimeType,
-      external_id: msg.externalId, status: 'delivered',
+      external_id: msg.externalId, status: direction === 'outbound' ? 'sent' : 'delivered',
       sent_at: msg.timestamp, delivered_at: msg.timestamp,
     })
 
@@ -219,12 +229,20 @@ export class MessageService {
     await db.from('conversations').update({
       last_message: messageBody || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
-      status: 'waiting',
+      ...(!msg.fromMe ? { status: 'waiting' } : {}),
     }).eq('id', conversation.id)
-    try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {
-      await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
+    if (!msg.fromMe) {
+      try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {
+        await db.from('conversations').update({ unread_count: (conversation.unread_count || 0) + 1 }).eq('id', conversation.id)
+      }
     }
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id).eq('tenant_id', tenantId)
+
+    // fromMe (enviado pelo celular) — atualiza conversa mas não dispara flows/webhooks
+    if (msg.fromMe) {
+      emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id })
+      return
+    }
 
     emitPusher(tenantId, 'inbound.message', {
       conversationId: conversation.id,

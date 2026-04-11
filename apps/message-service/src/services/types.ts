@@ -8,6 +8,7 @@ export interface NormalizedMessage {
   externalId?: string
   from: string
   senderName?: string
+  fromMe?: boolean
   to: string
   contentType: ContentType
   body?: string

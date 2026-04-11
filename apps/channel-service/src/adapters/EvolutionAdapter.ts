@@ -124,9 +124,7 @@ export class EvolutionAdapter implements IChannelAdapter {
     const data = payload.data
     if (!data) return null
 
-    // Ignore outgoing messages
-    if (data.key?.fromMe) return null
-
+    const isFromMe = !!data.key?.fromMe
     const remoteJid = data.key?.remoteJid || ''
 
     // Ignore group messages
@@ -179,7 +177,8 @@ export class EvolutionAdapter implements IChannelAdapter {
       channelId: '', // filled by the webhook handler
       externalId: data.key?.id || '',
       from,
-      senderName: data.pushName || undefined,
+      fromMe: isFromMe,
+      senderName: isFromMe ? undefined : (data.pushName || undefined),
       to: payload.instance || '',
       contentType,
       body,
