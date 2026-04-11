@@ -338,6 +338,35 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
       const normalized = await channelService.parseInbound('evolution', payload)
       if (normalized) {
         normalized.channelId = channel.id
+
+        // Download media via Evolution API if mediaUrl is a WhatsApp internal URL
+        if (normalized.mediaUrl && normalized.mediaUrl.includes('mmg.whatsapp.net')) {
+          try {
+            const creds = channel.credentials || {}
+            const baseUrl = (creds.baseUrl || '').replace(/\/+$/, '')
+            const instanceName = creds.instanceName
+            const apiKey = creds.apiKey
+            const messageId = normalized.externalId
+            if (baseUrl && instanceName && apiKey && messageId) {
+              const res = await fetch(`${baseUrl}/chat/getBase64FromMediaMessage/${instanceName}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', apikey: apiKey },
+                body: JSON.stringify({ message: { key: { id: messageId } } }),
+              })
+              if (res.ok) {
+                const data = await res.json() as any
+                const base64 = data?.base64 || data?.data?.base64
+                const mimetype = data?.mimetype || data?.data?.mimetype || normalized.mediaMimeType || 'image/jpeg'
+                if (base64) {
+                  normalized.mediaUrl = `data:${mimetype};base64,${base64}`
+                }
+              }
+            }
+          } catch (err) {
+            logger.warn('Failed to download Evolution media', { err: (err as Error).message })
+          }
+        }
+
         await notifyMessageService('inbound', {
           tenantId: channel.tenantId,
           channelId: channel.id,
