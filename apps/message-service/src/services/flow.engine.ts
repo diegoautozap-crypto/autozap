@@ -1694,17 +1694,12 @@ export class FlowEngine {
 
       const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
       const showBackDays = data?.showBackDays !== false
-      if (showBackDays && dayRows.length <= 2) {
-        dayRows.push({ id: 'voltar_menu', title: '↩ Voltar' })
+      if (showBackDays) dayRows.push({ id: 'voltar_menu', title: '↩ Voltar' })
+      if (dayRows.length <= 3) {
         const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
-      } else if (dayRows.length <= 3) {
-        const buttons = dayRows.map(r => ({ id: r.id, title: r.title }))
-        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'button', buttons })
-        if (showBackDays) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       } else {
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: msg, interactiveType: 'list', listRows: dayRows, listButtonText: data?.listButtonDays || 'Ver dias' })
-        if (showBackDays) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_menu', title: '↩ Voltar' }] })
       }
 
       variables['_schedule_step'] = '2'
@@ -1728,7 +1723,7 @@ export class FlowEngine {
 
       // Handle "Voltar" — exit node, let flow handle it
       const dayLower = dayResponse.trim().toLowerCase()
-      if (dayLower === 'voltar_menu' || dayLower.includes('voltar')) {
+      if (dayLower === 'voltar_menu' || dayLower === '0' || dayLower.includes('voltar')) {
         variables['agendamento_status'] = 'voltou'
         Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
         return { success: true }
@@ -1882,17 +1877,12 @@ export class FlowEngine {
         const mm2 = selectedDate.split('-')[1]
         const timeMsg = data?.msgAskTime || `⏰ Horários disponíveis para ${dd2}/${mm2}:`
         const showBack = data?.showBackButton !== false
-        if (showBack && slotRows.length <= 2) {
-          slotRows.push({ id: 'voltar_dias', title: '↩ Voltar' })
+        if (showBack) slotRows.push({ id: 'voltar_dias', title: '↩ Voltar' })
+        if (slotRows.length <= 3) {
           const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
-        } else if (slotRows.length <= 3) {
-          const buttons = slotRows.map(r => ({ id: r.id, title: r.title }))
-          await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'button', buttons })
-          if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_dias', title: '↩ Voltar' }] })
         } else {
           await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: timeMsg, interactiveType: 'list', listRows: slotRows, listButtonText: data?.listButtonSlots || 'Ver horários' })
-          if (showBack) await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: 'Ou escolha:', interactiveType: 'button', buttons: [{ id: 'voltar_dias', title: '↩ Voltar' }] })
         }
 
         variables['_schedule_step'] = '3'
@@ -1921,7 +1911,7 @@ export class FlowEngine {
 
       // Handle "Voltar" — go back to day selection
       const slotLower = slotResponse.trim().toLowerCase()
-      if (slotLower === 'voltar_dias' || slotLower.includes('voltar')) {
+      if (slotLower === 'voltar_dias' || slotLower === '0' || slotLower.includes('voltar')) {
         variables['_schedule_step'] = '1'
         // Clean slot variables
         Object.keys(variables).filter(k => k.match(/^_schedule_(slot|price)_/)).forEach(k => delete variables[k])
