@@ -140,6 +140,10 @@ export class EvolutionAdapter implements IChannelAdapter {
 
     const msg = data.message || {}
 
+    if (messageType !== 'conversation' && messageType !== 'extendedTextMessage') {
+      logger.info('Evolution media debug', { messageType, msgKeys: Object.keys(msg), mediaUrl: msg[messageType]?.url, base64Length: msg[messageType]?.base64?.length })
+    }
+
     if (messageType === 'conversation') {
       body = msg.conversation
     } else if (messageType === 'extendedTextMessage') {
