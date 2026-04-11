@@ -60,7 +60,7 @@ export class EvolutionAdapter implements IChannelAdapter {
         title: input.header || '',
         description: body || '',
         footer: input.footer || '',
-        buttons: input.buttons.slice(0, 3).map(b => ({ title: 'reply', displayText: b.title.slice(0, 20), id: b.id })),
+        buttons: input.buttons.slice(0, 3).map(b => ({ type: 'reply', displayText: b.title.slice(0, 20), id: b.id })),
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
       url = `${baseUrl}/message/sendList/${instanceName}`
