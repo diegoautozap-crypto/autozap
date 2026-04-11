@@ -56,7 +56,8 @@ export class EvolutionAdapter implements IChannelAdapter {
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
       // Fallback: botões como texto numerado (WhatsApp bloqueia botões de APIs não-oficiais)
-      const options = input.buttons.slice(0, 3).map((b, i) => `${i + 1}. ${b.title}`).join('\n')
+      const numEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+      const options = input.buttons.slice(0, 3).map((b, i) => `${numEmojis[i] || (i + 1)} ${b.title}`).join('\n')
       url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
@@ -65,7 +66,8 @@ export class EvolutionAdapter implements IChannelAdapter {
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
       // Fallback: lista como texto numerado
-      const options = input.listRows.map((r, i) => `${i + 1}. ${r.title}`).join('\n')
+      const numEmojis2 = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+      const options = input.listRows.map((r, i) => `${numEmojis2[i] || (i + 1)} ${r.title}`).join('\n')
       url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
