@@ -138,7 +138,7 @@ export class EvolutionAdapter implements IChannelAdapter {
     })
 
     const data = await response.json() as any
-    logger.debug('[EvolutionAdapter] send response:', JSON.stringify(data).slice(0, 500))
+    logger.info('[EvolutionAdapter] send response', { status: response.status, ok: response.ok, body: JSON.stringify(data).slice(0, 300) })
 
     if (!response.ok) {
       const errMsg = data?.message || data?.error || `HTTP ${response.status}`
