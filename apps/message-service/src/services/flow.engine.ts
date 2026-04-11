@@ -208,6 +208,12 @@ async function emitPusher(tenantId: string, event: string, data: object): Promis
   }
 }
 
+const NUM_EMOJIS = ['0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟']
+function numEmoji(n: number): string {
+  if (n >= 0 && n <= 10) return NUM_EMOJIS[n]
+  return String(n).split('').map(d => NUM_EMOJIS[parseInt(d)] || d).join('')
+}
+
 export class FlowEngine {
 
   /** Check tenant plan limits for a specific resource */
@@ -1742,7 +1748,7 @@ export class FlowEngine {
             if (!isBusy) {
               const price = priceTable[priceKey]
               const priceLabel = price ? ` - R$ ${price}` : ''
-              daySlots.push(`${globalIdx}. ${slotTime}${priceLabel}`)
+              daySlots.push(`${numEmoji(globalIdx)} ${slotTime}${priceLabel}`)
               slotMap[globalIdx] = { date: cd.dateStr, time: slotTime, price }
               globalIdx++
             }
@@ -1762,7 +1768,7 @@ export class FlowEngine {
         }
 
         const showBackDays2 = data?.showBackDays !== false
-        if (showBackDays2) lines.push(`\n0. ↩ Voltar`)
+        if (showBackDays2) lines.push(`\n${numEmoji(0)} ↩ Voltar`)
 
         const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\nDigite o número.`
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: allMsg })
