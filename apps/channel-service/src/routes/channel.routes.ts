@@ -353,13 +353,18 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
                 headers: { 'Content-Type': 'application/json', apikey: apiKey },
                 body: JSON.stringify({ message: { key: { id: messageId } } }),
               })
+              const resText = await res.text()
+              logger.info('Evolution media download response', { status: res.status, bodyLength: resText.length, bodyPreview: resText.slice(0, 200) })
               if (res.ok) {
-                const data = await res.json() as any
-                const base64 = data?.base64 || data?.data?.base64
-                const mimetype = data?.mimetype || data?.data?.mimetype || normalized.mediaMimeType || 'image/jpeg'
-                if (base64) {
-                  normalized.mediaUrl = `data:${mimetype};base64,${base64}`
-                }
+                try {
+                  const data = JSON.parse(resText)
+                  const base64 = data?.base64 || data?.data?.base64 || data?.message?.base64
+                  const mimetype = data?.mimetype || data?.data?.mimetype || data?.message?.mimetype || normalized.mediaMimeType || 'image/jpeg'
+                  logger.info('Evolution media base64 result', { hasBase64: !!base64, base64Length: base64?.length, mimetype })
+                  if (base64) {
+                    normalized.mediaUrl = `data:${mimetype};base64,${base64}`
+                  }
+                } catch { logger.warn('Failed to parse Evolution media response') }
               }
             }
           } catch (err) {
