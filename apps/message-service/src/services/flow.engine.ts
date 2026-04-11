@@ -387,14 +387,16 @@ export class FlowEngine {
               const btns = srcNode?.data?.buttons as any[] | undefined
               const rows = srcNode?.data?.listRows as any[] | undefined
               logger.info('Checking source node', { sourceNode: edge.source_node, hasBtns: !!btns?.length, hasRows: !!rows?.length, btnCount: btns?.length })
-              if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
-                const btn = btns[num - 1]
-                responseText = typeof btn === 'string' ? btn : (btn?.title || btn?.displayText || String(btn) || responseText)
-                logger.info('Mapped number to button title', { num, title: responseText })
-                break
-              } else if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
+              // Check listRows first (priority over buttons for list-type nodes)
+              if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
                 const row = rows[num - 1]
-                responseText = typeof row === 'string' ? row : (row?.title || row?.displayText || String(row) || responseText)
+                responseText = typeof row === 'string' ? row : (row?.title || row?.displayText || JSON.stringify(row) !== '{}' ? (row?.title || row?.displayText || responseText) : responseText)
+                logger.info('Mapped number to list row title', { num, title: responseText })
+                break
+              } else if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
+                const btn = btns[num - 1]
+                responseText = typeof btn === 'string' ? btn : (btn?.title || btn?.displayText || responseText)
+                logger.info('Mapped number to button title', { num, title: responseText })
                 break
               }
             }
