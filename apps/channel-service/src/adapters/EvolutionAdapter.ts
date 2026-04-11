@@ -128,6 +128,9 @@ export class EvolutionAdapter implements IChannelAdapter {
     if (data.key?.fromMe) return null
 
     const remoteJid = data.key?.remoteJid || ''
+
+    // Ignore group messages
+    if (remoteJid.endsWith('@g.us')) return null
     const from = this.jidToPhone(remoteJid)
     const messageType = data.messageType as string || ''
 
