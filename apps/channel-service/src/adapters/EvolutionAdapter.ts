@@ -129,7 +129,7 @@ export class EvolutionAdapter implements IChannelAdapter {
       }
     }
 
-    logger.debug('[EvolutionAdapter] sending', { url, contentType })
+    logger.info('[EvolutionAdapter] sending', { url, contentType, fileName: (payload as any).fileName, mimetype: (payload as any).mimetype, mediatype: (payload as any).mediatype, mediaUrl: (payload as any).media?.slice(0, 80) })
 
     const response = await fetch(url, {
       method: 'POST',
