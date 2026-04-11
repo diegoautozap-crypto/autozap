@@ -1748,7 +1748,7 @@ export class FlowEngine {
             if (!isBusy) {
               const price = priceTable[priceKey]
               const priceLabel = price ? ` - R$ ${price}` : ''
-              daySlots.push(`${numEmoji(globalIdx)} ${slotTime}${priceLabel}`)
+              daySlots.push(`${globalIdx}. ${slotTime}${priceLabel}`)
               slotMap[globalIdx] = { date: cd.dateStr, time: slotTime, price }
               globalIdx++
             }
@@ -1768,7 +1768,7 @@ export class FlowEngine {
         }
 
         const showBackDays2 = data?.showBackDays !== false
-        if (showBackDays2) lines.push(`\n${numEmoji(0)} ↩ Voltar`)
+        if (showBackDays2) lines.push(`\n0. ↩ Voltar`)
 
         const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\nDigite o número.`
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: allMsg })
