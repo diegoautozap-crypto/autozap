@@ -104,7 +104,11 @@ export class EvolutionAdapter implements IChannelAdapter {
       const mimeMap: Record<string, string> = {
         pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         xls: 'application/vnd.ms-excel', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        doc: 'application/msword', csv: 'text/csv', txt: 'text/plain', zip: 'application/zip',
+        doc: 'application/msword', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ppt: 'application/vnd.ms-powerpoint', csv: 'text/csv', txt: 'text/plain',
+        zip: 'application/zip', rar: 'application/vnd.rar',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        mp3: 'audio/mpeg', mp4: 'video/mp4',
       }
       const ext = docName.split('.').pop()?.toLowerCase() || ''
       url = `${baseUrl}/message/sendMedia/${instanceName}`
