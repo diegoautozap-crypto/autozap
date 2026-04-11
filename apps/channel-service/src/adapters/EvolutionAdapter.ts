@@ -191,7 +191,8 @@ export class EvolutionAdapter implements IChannelAdapter {
     const update = updates[0]
     if (!update) return null
 
-    const statusCode = update.update?.status
+    const statusCode = update.update?.status ?? update.status
+    logger.info('Evolution status update debug', { statusCode, updateKeys: Object.keys(update || {}), update: JSON.stringify(update).slice(0, 300) })
     const status = STATUS_MAP[statusCode]
     if (!status) return null
 
