@@ -374,6 +374,24 @@ export class FlowEngine {
         // Se ainda vazio, usa o body da mensagem
         if (!responseText) responseText = lastMsg?.body || ''
       }
+      // If response is a number, try to map to button/list title from previous send_message node
+      if (responseText && /^\d+$/.test(responseText.trim())) {
+        try {
+          const num = parseInt(responseText.trim())
+          const { data: edges } = await db.from('flow_edges').select('source_node').eq('target_node', state.current_node_id).eq('flow_id', state.flow_id)
+          if (edges && edges.length > 0) {
+            const { data: srcNode } = await db.from('flow_nodes').select('data').eq('id', edges[0].source_node).single()
+            const btns = srcNode?.data?.buttons as any[] | undefined
+            const rows = srcNode?.data?.listRows as any[] | undefined
+            if (btns && btns.length > 0 && num >= 1 && num <= btns.length) {
+              responseText = btns[num - 1]?.title || btns[num - 1] || responseText
+            } else if (rows && rows.length > 0 && num >= 1 && num <= rows.length) {
+              responseText = rows[num - 1]?.title || rows[num - 1] || responseText
+            }
+          }
+        } catch {}
+      }
+
       variables[state.waiting_variable] = responseText
       ctx.messageBody = responseText || ctx.messageBody
     }

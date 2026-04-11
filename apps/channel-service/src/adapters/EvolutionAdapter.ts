@@ -55,26 +55,22 @@ export class EvolutionAdapter implements IChannelAdapter {
         textMessage: { text: body || '' },
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'button' && input.buttons?.length) {
-      url = `${baseUrl}/message/sendButtons/${instanceName}`
+      // Fallback: botões como texto numerado (WhatsApp bloqueia botões de APIs não-oficiais)
+      const options = input.buttons.slice(0, 3).map((b, i) => `${i + 1}. ${b.title}`).join('\n')
+      url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
-        title: input.header || '',
-        description: body || '',
-        footer: input.footer || '',
-        buttons: input.buttons.slice(0, 3).map(b => ({ type: 'reply', displayText: b.title.slice(0, 20), id: b.id })),
+        text: `${body || ''}\n\n${options}`,
+        textMessage: { text: `${body || ''}\n\n${options}` },
       }
     } else if (contentType === 'interactive' && input.interactiveType === 'list' && input.listRows?.length) {
-      url = `${baseUrl}/message/sendList/${instanceName}`
+      // Fallback: lista como texto numerado
+      const options = input.listRows.slice(0, 10).map((r, i) => `${i + 1}. ${r.title}`).join('\n')
+      url = `${baseUrl}/message/sendText/${instanceName}`
       payload = {
         number: this.normalizePhone(to),
-        title: input.header || '',
-        description: body || '',
-        buttonText: input.listButtonText || 'Ver opções',
-        footerText: input.footer || '',
-        values: [{
-          title: 'Opções',
-          rows: input.listRows.slice(0, 10).map(r => ({ title: r.title.slice(0, 24), description: r.description?.slice(0, 72) || '', rowId: r.id })),
-        }],
+        text: `${body || ''}\n\n${options}`,
+        textMessage: { text: `${body || ''}\n\n${options}` },
       }
     } else if (contentType === 'image') {
       url = `${baseUrl}/message/sendMedia/${instanceName}`
