@@ -1567,6 +1567,12 @@ export class FlowEngine {
       return await this.executeCancelAppointment(node, ctx, flowId, data, variables, loopCounters, stateId, calendar, calendarId)
     }
 
+    // Detect channel type for Evolution all-at-once mode
+    const { data: channelInfo } = await cached(`channel-type:${ctx.channelId}`, 60_000, async () => {
+      return await db.from('channels').select('type').eq('id', ctx.channelId).single()
+    })
+    const isEvolution = channelInfo?.type === 'evolution'
+
     const step = variables['_schedule_step'] || '1'
 
     const duration = data?.eventDuration || 60
@@ -1692,6 +1698,79 @@ export class FlowEngine {
         return { success: true }
       }
 
+      // ── Evolution: all-at-once mode (show all days + times + prices in one message) ──
+      if (isEvolution && !isFullDay) {
+        const priceTable = data?.priceTable || {}
+        const [sH, sM] = workStart.split(':').map(Number)
+        const [eH, eM] = workEnd.split(':').map(Number)
+        const slotEndMin = (eH === 0 && eM === 0) ? 24 * 60 : eH * 60 + eM
+
+        let globalIdx = 1
+        const lines: string[] = []
+        const slotMap: Record<number, { date: string; time: string; price?: number }> = {}
+
+        for (const cd of candidateDays.filter(c => dayRows.some(r => r.title.includes(c.dd + '/' + c.mm)))) {
+          const dayBusy = busyByDay[cd.dateStr] || []
+          let slotMin = sH * 60 + sM
+          const daySlots: string[] = []
+
+          while (slotMin + duration <= slotEndMin) {
+            const slotTime = `${String(Math.floor(slotMin / 60)).padStart(2, '0')}:${String(slotMin % 60).padStart(2, '0')}`
+            const priceKey = `${cd.dayKey}_${slotTime}`
+            if (priceTable[priceKey] === 0) { slotMin += duration; continue }
+
+            const slotStartMs = new Date(`${cd.dateStr}T${slotTime}:00-03:00`).getTime()
+            const slotEndMs2 = slotStartMs + duration * 60 * 1000
+            const isBusy = dayBusy.some((b: any) => {
+              const bStart = new Date(b.start).getTime()
+              const bEnd = new Date(b.end).getTime()
+              return slotStartMs < bEnd && slotEndMs2 > bStart
+            })
+
+            if (!isBusy) {
+              const price = priceTable[priceKey]
+              const priceLabel = price ? ` - R$ ${price}` : ''
+              daySlots.push(`${globalIdx}. ${slotTime}${priceLabel}`)
+              slotMap[globalIdx] = { date: cd.dateStr, time: slotTime, price }
+              globalIdx++
+            }
+            slotMin += duration
+          }
+
+          if (daySlots.length > 0) {
+            lines.push(`\n*${cd.dayName} ${cd.dd}/${cd.mm}:*`)
+            lines.push(...daySlots)
+          }
+        }
+
+        if (Object.keys(slotMap).length === 0) {
+          variables['agendamento_status'] = 'sem_horario'
+          Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+          return { success: true }
+        }
+
+        const showBackDays2 = data?.showBackDays !== false
+        if (showBackDays2) lines.push(`\n0. ↩ Voltar`)
+
+        const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\nDigite o número.`
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: allMsg })
+
+        // Save slot map in variables for step resolution
+        variables['_schedule_step'] = 'evo_pick'
+        variables['_schedule_slot_map'] = JSON.stringify(slotMap)
+        variables['_schedule_total_options'] = String(Object.keys(slotMap).length)
+
+        const inputStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: inputStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_schedule_evo_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+      }
+
+      // ── Standard mode (step by step) ──
       const msg = data?.msgAskDate || '📅 Escolha o dia para agendamento:'
       const showBackDays = data?.showBackDays !== false
       if (showBackDays) dayRows.push({ id: 'voltar_menu', title: '↩ Voltar' })
@@ -1714,6 +1793,78 @@ export class FlowEngine {
         status: 'waiting', updated_at: new Date(),
       }, { onConflict: 'flow_id,conversation_id' })
       return { success: true, paused: true }
+    }
+
+    // ── Evolution all-at-once: user picked a number ──
+    if (step === 'evo_pick') {
+      const evoResponse = (variables['_schedule_evo_choice'] || '').trim()
+
+      if (evoResponse === '0' || evoResponse.toLowerCase().includes('voltar')) {
+        variables['agendamento_status'] = 'voltou'
+        Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+        return { success: true }
+      }
+
+      const num = parseInt(evoResponse)
+      let slotMap: Record<string, { date: string; time: string; price?: number }> = {}
+      try { slotMap = JSON.parse(variables['_schedule_slot_map'] || '{}') } catch {}
+
+      const selected = slotMap[String(num)]
+      if (!selected) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Por favor, digite um número válido.' })
+        variables['_schedule_step'] = '1'
+        Object.keys(variables).filter(k => k.startsWith('_schedule_') && k !== '_schedule_node_id').forEach(k => delete variables[k])
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+      }
+
+      const selectedDate = selected.date
+      const selectedTime = selected.time
+      const { data: contactInfo2 } = await db.from('contacts').select('name').eq('id', ctx.contactId).single()
+      const contactName2 = contactInfo2?.name || ctx.phone
+
+      const tz = 'America/Sao_Paulo'
+      const [sh2, sm2] = selectedTime.split(':').map(Number)
+      const endMinTotal2 = sh2 * 60 + sm2 + duration
+      let endDate2 = selectedDate
+      let endHour2 = Math.floor(endMinTotal2 / 60)
+      const endMinute2 = endMinTotal2 % 60
+      if (endHour2 >= 24) { endHour2 -= 24; const nd = new Date(`${selectedDate}T12:00:00`); nd.setDate(nd.getDate() + 1); endDate2 = nd.toISOString().split('T')[0] }
+      const endTime2 = `${String(endHour2).padStart(2, '0')}:${String(endMinute2).padStart(2, '0')}`
+      const eventTitle2 = this.interpolate(data?.eventTitle || 'Reserva - {{name}}', ctx, { ...variables, name: contactName2 })
+
+      try {
+        const event = await calendar.events.insert({
+          calendarId,
+          requestBody: {
+            summary: eventTitle2,
+            description: `Agendado via WhatsApp\nCliente: ${contactName2}\nTelefone: +${ctx.phone}`,
+            start: { dateTime: `${selectedDate}T${selectedTime}:00`, timeZone: tz },
+            end: { dateTime: `${endDate2}T${endTime2}:00`, timeZone: tz },
+          },
+        })
+
+        const dd = selectedDate.split('-')[2]
+        const mm = selectedDate.split('-')[1]
+        variables['agendamento_data'] = `${dd}/${mm}`
+        variables['agendamento_horario'] = selectedTime
+        variables['agendamento_valor'] = selected.price ? String(selected.price) : ''
+        variables['agendamento_status'] = 'agendado'
+        variables['agendamento_google_event_id'] = event.data?.id || ''
+
+        const confirmMsg = this.interpolate(
+          data?.msgConfirm || `✅ Agendado com sucesso!\n\n📅 Data: ${dd}/${mm}\n⏰ Horário: ${selectedTime}`,
+          ctx, variables
+        )
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
+
+        Object.keys(variables).filter(k => k.startsWith('_schedule_')).forEach(k => delete variables[k])
+        await this.logNode(flowId, node.id, ctx, 'success', `Google Calendar: agendado ${selectedDate} ${selectedTime}`)
+        return { success: true }
+      } catch (err: any) {
+        logger.error('Google Calendar create event error (evo)', { err: err.message })
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Desculpe, houve um erro ao agendar. Tente novamente.' })
+        return null
+      }
     }
 
     if (step === '2') {
