@@ -417,6 +417,33 @@ export class TenantService {
       } catch (emailErr) {
         logger.error('Failed to send confirmation email', { tenantId, emailErr })
       }
+
+      // Notifica o dono do AutoZap sobre nova assinatura
+      try {
+        const { data: tenantData } = await db.from('tenants').select('name').eq('id', tenantId).single()
+        const { data: ownerData } = await db.from('users').select('name, email').eq('tenant_id', tenantId).eq('role', 'owner').single()
+        const planNames: Record<string, string> = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited' }
+        const planPrices: Record<string, string> = { starter: 'R$ 149,99', pro: 'R$ 299,99', enterprise: 'R$ 599,99', unlimited: 'R$ 999,99' }
+        await resend.emails.send({
+          from: RESEND_FROM,
+          to: 'autozapltda@gmail.com',
+          subject: `🎉 Nova assinatura — ${planNames[planSlug]} — ${tenantData?.name || tenantId}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+              <h1 style="color: #16a34a; font-size: 24px;">Nova assinatura!</h1>
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 16px 0;">
+                <p style="margin: 0 0 6px; color: #374151;"><strong>Empresa:</strong> ${tenantData?.name || '—'}</p>
+                <p style="margin: 0 0 6px; color: #374151;"><strong>Responsável:</strong> ${ownerData?.name || '—'}</p>
+                <p style="margin: 0 0 6px; color: #374151;"><strong>Email:</strong> ${ownerData?.email || '—'}</p>
+                <p style="margin: 0 0 6px; color: #374151;"><strong>Plano:</strong> ${planNames[planSlug]}</p>
+                <p style="margin: 0; color: #374151;"><strong>Valor:</strong> ${planPrices[planSlug]}/mês</p>
+              </div>
+              <p style="color: #9ca3af; font-size: 12px;">ID: ${tenantId}</p>
+            </div>`,
+        })
+      } catch (notifyErr) {
+        logger.error('Failed to send admin notification', { tenantId, notifyErr })
+      }
     }
 
     // Pagamento atrasado → bloqueia acesso (volta pra pending)
