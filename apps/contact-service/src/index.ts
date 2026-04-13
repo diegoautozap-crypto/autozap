@@ -5,6 +5,7 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import contactRoutes from './routes/contact.routes'
+import productRoutes from './routes/product.routes'
 import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
@@ -24,6 +25,7 @@ app.get('/health', async (_req, res) => {
   } catch { res.json({ status: 'degraded', service: 'contact-service', db: 'down' }) }
 })
 app.use('/', contactRoutes)
+app.use('/', productRoutes)
 app.use(errorHandler)
 app.listen(PORT, () => logger.info(`contact-service running on port ${PORT}`))
 

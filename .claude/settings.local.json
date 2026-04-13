@@ -64,7 +64,8 @@
       "Bash(git -C /c/Users/Adm/Desktop/autozap log --all --oneline -- \"*.sql\")",
       "Bash(git:*)",
       "Bash(railway variables:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(cp /tmp/google_clean.ts apps/tenant-service/src/routes/google.routes.ts)"
     ]
   }
 }
