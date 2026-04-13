@@ -164,6 +164,83 @@ function InboundWebhookSection() {
 }
 
 
+// ── Webhook de Notificação (Envio de Mensagens) ─────────────────────────────
+function NotifyWebhookSection() {
+  const t = useT()
+  const [showToken, setShowToken] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-webhook-token'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant')
+      return data.data
+    },
+  })
+
+  useEffect(() => {
+    if (tenantData?.webhookToken) setToken(tenantData.webhookToken)
+  }, [tenantData])
+
+  const notifyUrl = token
+    ? `${process.env.NEXT_PUBLIC_MESSAGE_SERVICE_URL || ''}/webhook/notify/${token}`
+    : null
+
+  const copyUrl = () => {
+    if (notifyUrl) { navigator.clipboard.writeText(notifyUrl); toast.success(t('settings.toast.urlCopied')) }
+  }
+
+  if (!token) return null
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>{t('settings.notifyWebhookTitle')}</span>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('settings.notifyWebhookDesc')}</p>
+      </div>
+
+      <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <code style={{ flex: 1, fontSize: '11px', color: 'var(--text)', wordBreak: 'break-all' as const }}>
+          {showToken ? notifyUrl : notifyUrl?.replace(/\/[^/]+$/, '/••••••••••••')}
+        </code>
+        <button onClick={() => setShowToken(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0 }}>
+          {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+        </button>
+        <button onClick={copyUrl} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', flexShrink: 0 }}>
+          <Copy size={14} />
+        </button>
+      </div>
+
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.6 }}>
+        <p style={{ fontWeight: 600, color: '#52525b', marginBottom: '6px' }}>{t('settings.fieldsAccepted')}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          {[
+            ['phone', t('settings.notifyFieldPhone')],
+            ['message', t('settings.notifyFieldMessage')],
+            ['channelId', t('settings.notifyFieldChannel')],
+            ['name', t('settings.notifyFieldName')],
+          ].map(([field, desc]) => (
+            <div key={field} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+              <code style={{ fontSize: '10px', background: 'var(--bg)', padding: '1px 5px', borderRadius: '4px', color: 'var(--text)', flexShrink: 0 }}>{field}</code>
+              <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <details>
+        <summary style={{ fontSize: '12px', color: 'var(--text-faint)', cursor: 'pointer', userSelect: 'none' as const }}>{t('settings.viewPayloadExample')}</summary>
+        <pre style={{ marginTop: '8px', padding: '12px', background: '#18181b', color: '#a3e635', borderRadius: '8px', fontSize: '11px', overflowX: 'auto' as const, lineHeight: 1.5 }}>{JSON.stringify({
+          phone: '5511999999999',
+          message: 'Olá! Sua reserva foi confirmada para amanhã às 14h.',
+          name: 'João Silva',
+        }, null, 2)}</pre>
+      </details>
+    </div>
+  )
+}
+
+
 // ── Seção de Webhooks ──────────────────────────────────────────────────────────
 function WebhooksSection() {
   const t = useT()
@@ -1383,6 +1460,9 @@ export default function SettingsPage() {
 
         {/* ── Webhook de Entrada ── */}
         {canEdit('/dashboard/settings') && <InboundWebhookSection />}
+
+        {/* ── Webhook de Notificação ── */}
+        {canEdit('/dashboard/settings') && <NotifyWebhookSection />}
 
         {/* ── Formulário de Captura ── */}
         {canEdit('/dashboard/settings') && <FormBuilderSection />}
