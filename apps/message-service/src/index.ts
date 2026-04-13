@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3004
 
 app.set('trust proxy', 1)
 app.use(helmet())
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
+app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || false, credentials: true }))
 app.use(cookieParser())
 
 // ─── Captura o body bruto ANTES do express.json() ─────────────────────────────

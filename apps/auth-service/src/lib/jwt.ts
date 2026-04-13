@@ -9,8 +9,8 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
 // Access token: 1 hora — renovado silenciosamente pelo frontend
 const ACCESS_EXPIRES = '1h'
 
-// Refresh token: 30 dias — se ficar 30 dias sem abrir o sistema, faz login de novo
-const REFRESH_EXPIRES_DAYS = 30
+// Refresh token: 14 dias — se ficar 14 dias sem abrir o sistema, faz login de novo
+const REFRESH_EXPIRES_DAYS = 14
 
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
   throw new Error('Missing JWT_SECRET or JWT_REFRESH_SECRET env vars')

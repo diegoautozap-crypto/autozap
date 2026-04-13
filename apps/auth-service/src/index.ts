@@ -61,11 +61,19 @@ app.get('/health', (_req, res) => {
 // ─── Internal Endpoints (service-to-service, no rate limit) ─────────────────
 
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET
+const { timingSafeEqual } = require('crypto')
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
 
 app.post('/internal/notify-agent', async (req, res) => {
   try {
-    const secret = req.headers['x-internal-secret']
-    if (!INTERNAL_SECRET || secret !== INTERNAL_SECRET) {
+    const secret = req.headers['x-internal-secret'] as string
+    if (!INTERNAL_SECRET || !safeCompare(secret, INTERNAL_SECRET)) {
       res.status(401).json({ success: false, error: 'Unauthorized' })
       return
     }

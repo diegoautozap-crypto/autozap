@@ -63,7 +63,7 @@ router.patch('/pipelines/:id', async (req, res, next) => {
 
 router.delete('/pipelines/:id', async (req, res, next) => {
   try {
-    await db.from('pipeline_columns').delete().eq('pipeline_id', req.params.id)
+    await db.from('pipeline_columns').delete().eq('pipeline_id', req.params.id).eq('tenant_id', req.auth.tid)
     const { error } = await db
       .from('pipelines')
       .delete()

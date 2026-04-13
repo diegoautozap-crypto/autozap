@@ -505,8 +505,11 @@ async function notifyMessageService(event: string, data: unknown): Promise<void>
 // ─── Internal: send message ───────────────────────────────────────────────────
 router.post('/internal/send', async (req, res, next) => {
   try {
-    const secret = req.headers['x-internal-secret']
-    if (secret !== (process.env.INTERNAL_SECRET!)) {
+    const secret = req.headers['x-internal-secret'] as string
+    const internalSecret = process.env.INTERNAL_SECRET || ''
+    const secretValid = secret && internalSecret && secret.length === internalSecret.length
+      && require('crypto').timingSafeEqual(Buffer.from(secret), Buffer.from(internalSecret))
+    if (!secretValid) {
       res.status(401).json({ success: false, error: { message: 'Unauthorized' } })
       return
     }

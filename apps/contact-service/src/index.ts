@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3005
 
 app.set('trust proxy', 1)
 app.use(helmet())
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
+app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || false, credentials: true }))
 app.use(cookieParser())
 app.use(express.json({ limit: '10mb' }))
 app.use(rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false }))

@@ -194,7 +194,7 @@ export class AuthService {
     const { data: user } = await db
       .from('users')
       .select('id, tenant_id, name, email, email_verified')
-      .eq('email_verify_token', token)
+      .eq('email_verify_token', hashToken(token))
       .maybeSingle()
 
     if (!user) throw new AppError('INVALID_TOKEN', 'Invalid or expired verification token', 400)
@@ -224,7 +224,7 @@ export class AuthService {
     const expires = new Date(Date.now() + 60 * 60 * 1000)
 
     await db.from('users').update({
-      password_reset_token: token,
+      password_reset_token: hashToken(token),
       password_reset_expires: expires,
     }).eq('id', user.id)
 
@@ -237,7 +237,7 @@ export class AuthService {
     const { data: user } = await db
       .from('users')
       .select('id, password_reset_expires')
-      .eq('password_reset_token', token)
+      .eq('password_reset_token', hashToken(token))
       .maybeSingle()
 
     if (!user) throw new AppError('INVALID_TOKEN', 'Invalid or expired reset token', 400)
@@ -321,7 +321,7 @@ export class AuthService {
     if (!user || user.email_verified) return
 
     const emailVerifyToken = randomBytes(32).toString('hex')
-    await db.from('users').update({ email_verify_token: emailVerifyToken }).eq('id', user.id)
+    await db.from('users').update({ email_verify_token: hashToken(emailVerifyToken) }).eq('id', user.id)
 
     sendVerificationEmail({ to: user.email, name: user.name, token: emailVerifyToken })
       .catch(err => logger.error('Failed to resend verification email', { err }))
