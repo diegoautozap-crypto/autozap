@@ -319,6 +319,10 @@ export default function InboxPage() {
   }, [])
   const [search, setSearch] = useState('')
   const [chatSearch, setChatSearch] = useState('')
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [newTaskPriority, setNewTaskPriority] = useState('medium')
   const [showChatSearch, setShowChatSearch] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [sendChannelId, setSendChannelId] = useState<string | null>(null)
@@ -1307,34 +1311,65 @@ export default function InboxPage() {
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={13} color="#2563eb" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('inbox.tasks')}</p></div>
-                {canEdit('/dashboard/inbox') && <button onClick={async () => {
-                  const title = prompt(t('inbox.taskTitlePrompt'))
-                  if (!title) return
-                  const dueDate = prompt(t('inbox.taskDueDatePrompt'))
-                  let due = null
-                  if (dueDate) { const [d, m, y] = dueDate.split('/'); due = new Date(Number(y), Number(m) - 1, Number(d), 23, 59).toISOString() }
-                  try {
-                    await conversationApi.post('/tasks', { title, conversationId: selectedConvId, contactId, dueDate: due })
-                    toast.success(t('inbox.taskCreated')); queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
-                  } catch { toast.error(t('inbox.taskCreateError')) }
-                }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{t('inbox.create')}</button>}
+                {canEdit('/dashboard/inbox') && <button onClick={() => setShowTaskForm((p: any) => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{showTaskForm ? 'Cancelar' : t('inbox.create')}</button>}
               </div>
+
+              {/* Formulário de nova tarefa */}
+              {showTaskForm && (
+                <div style={{ padding: '10px', background: 'var(--bg-input)', border: '1px solid var(--divider)', borderRadius: '8px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <input placeholder="Titulo da tarefa..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
+                    style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', color: 'var(--text)', background: 'var(--bg-card)', outline: 'none' }} />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input type="date" value={newTaskDueDate} onChange={e => setNewTaskDueDate(e.target.value)}
+                      style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px', color: 'var(--text)', background: 'var(--bg-card)', outline: 'none' }} />
+                    <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)}
+                      style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px', color: 'var(--text)', background: 'var(--bg-card)', outline: 'none' }}>
+                      <option value="low">Baixa</option>
+                      <option value="medium">Media</option>
+                      <option value="high">Alta</option>
+                    </select>
+                  </div>
+                  <button onClick={async () => {
+                    if (!newTaskTitle.trim()) return
+                    const due = newTaskDueDate ? new Date(newTaskDueDate + 'T23:59:00').toISOString() : null
+                    try {
+                      await conversationApi.post('/tasks', { title: newTaskTitle, conversationId: selectedConvId, contactId, dueDate: due, priority: newTaskPriority })
+                      toast.success(t('inbox.taskCreated'))
+                      queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                      queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+                      setNewTaskTitle(''); setNewTaskDueDate(''); setNewTaskPriority('medium'); setShowTaskForm(false)
+                    } catch { toast.error(t('inbox.taskCreateError')) }
+                  }} style={{ padding: '6px 12px', background: '#2563eb', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    Criar tarefa
+                  </button>
+                </div>
+              )}
+
               {convTasks.length === 0
                   ? <p style={{ fontSize: '12px', color: 'var(--text-faintest)', textAlign: 'center', padding: '4px 0' }}>{t('inbox.noTasks')}</p>
                   : <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {convTasks.map((t: any) => {
-                        const isOverdue = t.due_date && new Date(t.due_date) < new Date() && t.status === 'pending'
+                      {convTasks.map((tk: any) => {
+                        const isOverdue = tk.due_date && new Date(tk.due_date) < new Date() && tk.status === 'pending'
+                        const completedOnTime = tk.status === 'completed' && tk.due_date && tk.completed_at && new Date(tk.completed_at) <= new Date(tk.due_date)
+                        const completedLate = tk.status === 'completed' && tk.due_date && tk.completed_at && new Date(tk.completed_at) > new Date(tk.due_date)
+                        const priorityColors: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#6b7280' }
+                        const priorityLabels: Record<string, string> = { high: 'Alta', medium: 'Media', low: 'Baixa' }
                         return (
-                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', background: isOverdue ? '#fef2f2' : '#f0f9ff', border: `1px solid ${isOverdue ? '#fecaca' : '#bae6fd'}`, borderRadius: '7px' }}>
+                          <div key={tk.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '6px 8px', background: isOverdue ? '#fef2f2' : tk.status === 'completed' ? '#f0fdf4' : '#f0f9ff', border: `1px solid ${isOverdue ? '#fecaca' : tk.status === 'completed' ? '#bbf7d0' : '#bae6fd'}`, borderRadius: '7px' }}>
                             <button onClick={async () => {
-                              await conversationApi.patch(`/tasks/${t.id}`, { status: t.status === 'pending' ? 'completed' : 'pending' })
+                              await conversationApi.patch(`/tasks/${tk.id}`, { status: tk.status === 'pending' ? 'completed' : 'pending' })
                               queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
-                            }} style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${t.status === 'completed' ? '#22c55e' : isOverdue ? '#ef4444' : '#93c5fd'}`, background: t.status === 'completed' ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 }}>
-                              {t.status === 'completed' && <Check size={10} color="#fff" strokeWidth={3} />}
+                            }} style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${tk.status === 'completed' ? '#22c55e' : isOverdue ? '#ef4444' : '#93c5fd'}`, background: tk.status === 'completed' ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0, marginTop: '2px' }}>
+                              {tk.status === 'completed' && <Check size={10} color="#fff" strokeWidth={3} />}
                             </button>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: '11px', fontWeight: 600, color: t.status === 'completed' ? 'var(--text-faint)' : 'var(--text)', margin: 0, textDecoration: t.status === 'completed' ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
-                              {t.due_date && <p style={{ fontSize: '10px', color: isOverdue ? '#dc2626' : 'var(--text-muted)', margin: 0 }}>{isOverdue ? '⚠ ' : ''}{new Date(t.due_date).toLocaleDateString('pt-BR')}</p>}
+                              <p style={{ fontSize: '11px', fontWeight: 600, color: tk.status === 'completed' ? 'var(--text-faint)' : 'var(--text)', margin: 0, textDecoration: tk.status === 'completed' ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tk.title}</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                {tk.priority && <span style={{ fontSize: '9px', fontWeight: 700, color: priorityColors[tk.priority] || '#6b7280', textTransform: 'uppercase' }}>{priorityLabels[tk.priority] || tk.priority}</span>}
+                                {tk.due_date && <span style={{ fontSize: '10px', color: isOverdue ? '#dc2626' : 'var(--text-muted)' }}>{isOverdue ? '⚠ Atrasada ' : ''}{new Date(tk.due_date).toLocaleDateString('pt-BR')}</span>}
+                                {completedOnTime && <span style={{ fontSize: '9px', color: '#16a34a', fontWeight: 600 }}>No prazo</span>}
+                                {completedLate && <span style={{ fontSize: '9px', color: '#f59e0b', fontWeight: 600 }}>Fora do prazo</span>}
+                              </div>
                             </div>
                           </div>
                         )
