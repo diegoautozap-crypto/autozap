@@ -21,17 +21,17 @@ function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
   return {
     starter:    '10.000 msgs',
     pro:        '50.000 msgs',
-    enterprise: '150.000 msgs',
+    enterprise: '200.000 msgs',
     unlimited:  'Ilimitado',
   }
 }
 
 function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    ['10k msgs/mes', '5 canais', '5 membros', '3 flows', '10k contatos', '10k IA/mes', 'Campanhas ilimitadas', '15 produtos'],
-    pro:        ['50k msgs/mes', '10 canais', '10 membros', '15 flows', '50k contatos', '50k IA/mes', 'Campanhas ilimitadas', '100 produtos', 'Transcricao'],
-    enterprise: ['150k msgs/mes', '30 canais', '30 membros', 'Flows ilimitados', '150k contatos', '150k IA/mes', 'Campanhas ilimitadas', '500 produtos', 'Relatorios'],
-    unlimited:  ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'SLA garantido', 'Gerente de conta'],
+    starter:    ['10k msgs/mês', '3 canais', '3 membros', '5 flows', '10k contatos', '5k IA/mês', 'Campanhas ilimitadas', 'Google Calendar', 'Pipeline'],
+    pro:        ['50k msgs/mês', '10 canais', '10 membros', '20 flows', '50k contatos', '30k IA/mês', 'Campanhas ilimitadas', '50 produtos', 'Transcrição', 'Relatórios'],
+    enterprise: ['200k msgs/mês', '30 canais', '30 membros', 'Flows ilimitados', '100k contatos', '100k IA/mês', 'Campanhas ilimitadas', '500 produtos', 'Transcrição', 'Relatórios'],
+    unlimited:  ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'Suporte dedicado'],
   }
 }
 

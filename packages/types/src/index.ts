@@ -26,16 +26,16 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<PlanSlug, PlanLimits> = {
   pending:    { messages: 0, channels: 0, members: 0, flows: 0, contacts: 0, campaigns: null, aiResponses: 0, products: 0, transcription: false, reports: false },
-  starter:    { messages: 10_000, channels: 5, members: 5, flows: 3, contacts: 10_000, campaigns: null, aiResponses: 10_000, products: 15, transcription: false, reports: false },
-  pro:        { messages: 50_000, channels: 10, members: 10, flows: 15, contacts: 50_000, campaigns: null, aiResponses: 50_000, products: 100, transcription: true, reports: true },
-  enterprise: { messages: 150_000, channels: 30, members: 30, flows: null, contacts: 150_000, campaigns: null, aiResponses: 150_000, products: 500, transcription: true, reports: true },
+  starter:    { messages: 10_000, channels: 3, members: 3, flows: 5, contacts: 10_000, campaigns: null, aiResponses: 5_000, products: 0, transcription: false, reports: false },
+  pro:        { messages: 50_000, channels: 10, members: 10, flows: 20, contacts: 50_000, campaigns: null, aiResponses: 30_000, products: 50, transcription: true, reports: true },
+  enterprise: { messages: 200_000, channels: 30, members: 30, flows: null, contacts: 100_000, campaigns: null, aiResponses: 100_000, products: 500, transcription: true, reports: true },
   unlimited:  { messages: null, channels: 999, members: 999, flows: null, contacts: null, campaigns: null, aiResponses: null, products: null, transcription: true, reports: true },
 }
 
 /** @deprecated Use PLAN_LIMITS[slug].channels instead */
 export const PLAN_CHANNEL_LIMITS: Record<PlanSlug, number> = {
   pending:    0,
-  starter:    5,
+  starter:    3,
   pro:        10,
   enterprise: 30,
   unlimited:  999,
