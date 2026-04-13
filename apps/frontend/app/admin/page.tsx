@@ -110,6 +110,7 @@ function adminApi() {
     get: (url: string) => tenantApi.get(url, { headers: { 'x-admin-secret': secret } }),
     patch: (url: string, data?: any) => tenantApi.patch(url, data, { headers: { 'x-admin-secret': secret } }),
     post: (url: string, data?: any) => tenantApi.post(url, data, { headers: { 'x-admin-secret': secret } }),
+    delete: (url: string) => tenantApi.delete(url, { headers: { 'x-admin-secret': secret } }),
   }
 }
 
