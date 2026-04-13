@@ -13,6 +13,7 @@ import {
   ExternalLink, Trash2, Settings, Server, Globe, CreditCard,
   ArrowUpRight, ArrowDownRight, Minus, Eye, Calendar, LayoutDashboard,
 } from 'lucide-react'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 /* ══════════════════════════════════════════════════════════════════════════════
    CONSTANTS — LIGHT THEME
@@ -723,9 +724,9 @@ export default function AdminPage() {
                     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
                     gap: 20, marginBottom: 28,
                   }}>
-                    <StatCard label="Total Tenants" value={stats?.totalTenants} icon={Users} color={ORANGE} loading={statsLoading} />
+                    <StatCard label="Total de Clientes" value={stats?.totalTenants} icon={Users} color={ORANGE} loading={statsLoading} />
                     <StatCard label="Pagantes Ativos" value={stats?.activePaying} icon={DollarSign} color={BLUE} loading={statsLoading} />
-                    <StatCard label="Msgs Hoje" value={stats?.messagesTODAY} icon={MessageSquare} color={GREEN_DARK} loading={statsLoading} />
+                    <StatCard label="Mensagens Hoje" value={stats?.messagesTODAY} icon={MessageSquare} color={GREEN_DARK} loading={statsLoading} />
                     <StatCard
                       label="MRR"
                       value={stats?.mrr != null ? `R$ ${stats.mrr.toLocaleString('pt-BR')}` : totalMRR > 0 ? `R$ ${totalMRR.toLocaleString('pt-BR')}` : undefined}
@@ -741,92 +742,77 @@ export default function AdminPage() {
                     <StatCard label="Novos Hoje" value={stats?.newToday} icon={TrendingUp} color={GREEN_DARK} loading={statsLoading} />
                     <StatCard label="Novos esta Semana" value={stats?.newThisWeek} icon={Calendar} color={BLUE} loading={statsLoading} />
                     <StatCard label="Pendentes" value={stats?.pendingCount} icon={Clock} color={YELLOW} loading={statsLoading} />
-                    <StatCard label="Churn (mes)" value={churnedThisMonth} icon={ArrowDownRight} color={RED} loading={statsLoading} subtitle="cancelados este mes" />
+                    <StatCard label="Cancelados no Mes" value={churnedThisMonth} icon={ArrowDownRight} color={RED} loading={statsLoading} subtitle="churn mensal" />
                   </div>
 
                   {/* Charts area - 2 side by side */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
-                    {/* Tenants por plano */}
+                    {/* Clientes por Plano - Pizza */}
                     <div style={{
                       background: CARD_BG, borderRadius: 12, padding: 24,
                       boxShadow: CARD_SHADOW, border: `1px solid ${BORDER_LIGHT}`,
                     }}>
-                      <SectionTitle>Tenants por Plano</SectionTitle>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
-                        {['starter', 'pro', 'enterprise', 'unlimited', 'pending'].map(plan => {
-                          const info = revenueByPlan[plan]
-                          const count = info?.count || 0
-                          const total = tenants?.length || 1
-                          const pct = Math.round((count / total) * 100)
-                          const pc = PLAN_COLORS[plan]
-                          return (
-                            <div key={plan}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: pc.color }} />
-                                  <span style={{ fontSize: 14, fontWeight: 600, color: TEXT, textTransform: 'capitalize' }}>
-                                    {plan}
-                                  </span>
-                                </div>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>
-                                  {count} <span style={{ color: TEXT_DIM, fontSize: 12, fontWeight: 400 }}>({pct}%)</span>
-                                </span>
-                              </div>
-                              <div style={{ height: 10, borderRadius: 5, background: '#f1f5f9', overflow: 'hidden' }}>
-                                <div style={{
-                                  width: `${pct}%`, minWidth: count > 0 ? 4 : 0,
-                                  height: '100%', borderRadius: 5,
-                                  background: pc.color,
-                                  transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-                                }} />
-                              </div>
-                            </div>
-                          )
-                        })}
+                      <SectionTitle>Clientes por Plano</SectionTitle>
+                      <div style={{ width: '100%', height: 280 }}>
+                        <ResponsiveContainer>
+                          <PieChart>
+                            <Pie
+                              data={['starter', 'pro', 'enterprise', 'unlimited', 'pending'].map(plan => ({
+                                name: plan.charAt(0).toUpperCase() + plan.slice(1),
+                                value: revenueByPlan[plan]?.count || 0,
+                                color: PLAN_COLORS[plan]?.color || '#94a3b8',
+                              })).filter(d => d.value > 0)}
+                              cx="50%" cy="50%" innerRadius={60} outerRadius={100}
+                              paddingAngle={3} dataKey="value"
+                              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                              labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                            >
+                              {['starter', 'pro', 'enterprise', 'unlimited', 'pending'].map(plan => (
+                                <Cell key={plan} fill={PLAN_COLORS[plan]?.color || '#94a3b8'} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number, name: string) => [`${value} clientes`, name]} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
 
-                    {/* Receita Mensal - bar chart */}
+                    {/* Receita Mensal por Plano - Barras */}
                     <div style={{
                       background: CARD_BG, borderRadius: 12, padding: 24,
                       boxShadow: CARD_SHADOW, border: `1px solid ${BORDER_LIGHT}`,
                     }}>
-                      <SectionTitle>Receita Mensal</SectionTitle>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 200, marginTop: 16, padding: '0 8px' }}>
-                        {['starter', 'pro', 'enterprise', 'unlimited'].map(plan => {
-                          const info = revenueByPlan[plan]
-                          const revenue = info?.revenue || 0
-                          const maxRevenue = Math.max(...Object.values(revenueByPlan).map(r => r.revenue), 1)
-                          const barHeight = maxRevenue > 0 ? Math.max((revenue / maxRevenue) * 160, revenue > 0 ? 8 : 0) : 0
-                          const pc = PLAN_COLORS[plan]
-                          return (
-                            <div key={plan} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: TEXT, fontFamily: 'monospace' }}>
-                                R${revenue.toLocaleString('pt-BR')}
-                              </span>
-                              <div style={{
-                                width: '100%', maxWidth: 56, height: barHeight, borderRadius: '6px 6px 0 0',
-                                background: `linear-gradient(180deg, ${pc.color}, ${pc.color}aa)`,
-                                transition: 'height 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-                              }} />
-                              <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 600, textTransform: 'capitalize' }}>
-                                {plan}
-                              </span>
-                            </div>
-                          )
-                        })}
+                      <SectionTitle>Receita Mensal por Plano</SectionTitle>
+                      <div style={{ width: '100%', height: 280 }}>
+                        <ResponsiveContainer>
+                          <BarChart data={['starter', 'pro', 'enterprise', 'unlimited'].map(plan => ({
+                            plano: plan.charAt(0).toUpperCase() + plan.slice(1),
+                            receita: revenueByPlan[plan]?.revenue || 0,
+                            fill: PLAN_COLORS[plan]?.color || '#94a3b8',
+                          }))} margin={{ top: 10, right: 10, bottom: 5, left: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="plano" tick={{ fontSize: 12, fill: TEXT_MUTED }} />
+                            <YAxis tick={{ fontSize: 11, fill: TEXT_MUTED }} tickFormatter={(v: number) => `R$${v}`} />
+                            <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Receita']} />
+                            <Bar dataKey="receita" radius={[6, 6, 0, 0]}>
+                              {['starter', 'pro', 'enterprise', 'unlimited'].map(plan => (
+                                <Cell key={plan} fill={PLAN_COLORS[plan]?.color || '#94a3b8'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   </div>
 
-                  {/* Ultimos Tenants table */}
+                  {/* Clientes Recentes table */}
                   <div style={{
                     background: CARD_BG, borderRadius: 12,
                     boxShadow: CARD_SHADOW, border: `1px solid ${BORDER_LIGHT}`,
                     overflow: 'hidden',
                   }}>
                     <div style={{ padding: '20px 24px 0' }}>
-                      <SectionTitle>Ultimos Tenants</SectionTitle>
+                      <SectionTitle>Clientes Recentes</SectionTitle>
                     </div>
                     {/* Table header */}
                     <div style={{
@@ -836,7 +822,7 @@ export default function AdminPage() {
                       borderBottom: `1px solid ${BORDER}`,
                       background: '#f8f9fc',
                     }}>
-                      {['Empresa', 'Email', 'Plano', 'Status', 'Msgs', 'Data', 'Acoes'].map(h => (
+                      {['Empresa', 'Email', 'Plano', 'Status', 'Mensagens', 'Cadastro', 'Acoes'].map(h => (
                         <span key={h} style={{
                           fontSize: 11, fontWeight: 700, color: TEXT_MUTED,
                           textTransform: 'uppercase', letterSpacing: '0.06em',
@@ -1006,7 +992,7 @@ export default function AdminPage() {
                       borderBottom: `1px solid ${BORDER}`,
                       background: '#f8f9fc',
                     }}>
-                      {['Empresa', 'Owner', 'Plano', 'Status', 'Canais', 'Membros', 'Contatos', 'Msgs', 'Criado', 'Acoes'].map(h => (
+                      {['Empresa', 'Responsavel', 'Plano', 'Status', 'Canais', 'Membros', 'Contatos', 'Mensagens', 'Cadastro', 'Acoes'].map(h => (
                         <span key={h} style={{
                           fontSize: 11, fontWeight: 700, color: TEXT_MUTED,
                           textTransform: 'uppercase', letterSpacing: '0.06em',
