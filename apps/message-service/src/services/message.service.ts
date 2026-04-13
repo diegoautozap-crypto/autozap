@@ -237,6 +237,26 @@ export class MessageService {
 
     // fromMe (enviado pelo celular) — atualiza conversa mas não dispara flows/webhooks
     if (msg.fromMe) {
+      const body = (msg.body || '').trim().toLowerCase()
+
+      // Comando #bot → reativa o bot na conversa
+      if (body === '#bot') {
+        await db.from('conversations').update({ bot_active: true, updated_at: new Date() }).eq('id', conversation.id).eq('tenant_id', tenantId)
+        // Remove a mensagem de comando pra não aparecer pro cliente
+        await db.from('messages').delete().eq('id', messageId)
+        emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id, botActive: true })
+        logger.info('Bot reativado via comando #bot', { conversationId: conversation.id, tenantId })
+        return
+      }
+
+      // Qualquer outra mensagem enviada pelo celular → pausa o bot
+      const { data: convCheck } = await db.from('conversations').select('bot_active').eq('id', conversation.id).single()
+      if (convCheck?.bot_active !== false) {
+        await db.from('conversations').update({ bot_active: false, updated_at: new Date() }).eq('id', conversation.id).eq('tenant_id', tenantId)
+        emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id, botActive: false })
+        logger.info('Bot pausado — resposta pelo celular', { conversationId: conversation.id, tenantId })
+      }
+
       emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id })
       return
     }
