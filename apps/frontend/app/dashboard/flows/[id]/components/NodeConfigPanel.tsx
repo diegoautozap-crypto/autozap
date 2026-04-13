@@ -275,7 +275,15 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
         )}
 
-        {d.type?.startsWith('trigger_') && d.type !== 'trigger_webhook' && d.type !== 'trigger_manual' && (
+        {d.type?.startsWith('trigger_') && d.type !== 'trigger_webhook' && d.type !== 'trigger_manual' && (<>
+          <div>
+            <label style={labelStyle}>Intervalo anti-duplicação (segundos)</label>
+            <input type="number" min={1} max={120} style={inputStyle}
+              value={d.lockSeconds ?? 20}
+              onChange={e => onUpdate(node.id, { lockSeconds: Math.max(1, Math.min(120, Number(e.target.value) || 20)) })}
+              onFocus={focusInput} onBlur={blurInput} />
+            <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Se o cliente enviar várias mensagens seguidas, o flow só dispara uma vez dentro desse intervalo.</p>
+          </div>
           <div>
             <label style={labelStyle}>Números ignorados</label>
             <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const, fontFamily: 'monospace', fontSize: '12px' }}
@@ -283,7 +291,7 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               value={d.ignoredPhones || ''} onChange={e => onUpdate(node.id, { ignoredPhones: e.target.value })} onFocus={focusInput} onBlur={blurInput} />
             <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Esses números não entram no flow. Um por linha, só números.</p>
           </div>
-        )}
+        </>)}
 
         {d.type === 'trigger_outside_hours' && (<>
           <div><label style={labelStyle}>{t('nodes.businessStart')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.start ?? 9} onChange={e => onUpdate(node.id, { start: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>

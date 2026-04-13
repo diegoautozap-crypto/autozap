@@ -570,13 +570,10 @@ function NotificationSection() {
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false)
   const [autoReplyMsg, setAutoReplyMsg] = useState('')
   const [autoReplyLoaded, setAutoReplyLoaded] = useState(false)
-  const [flowLockSeconds, setFlowLockSeconds] = useState(20)
-
   useEffect(() => {
     if (tenant && !autoReplyLoaded) {
       setAutoReplyEnabled(tenant.settings?.autoReplyEnabled !== false)
       setAutoReplyMsg(tenant.settings?.autoReplyMessage || 'Recebemos sua mensagem! Um atendente vai te responder em breve. 😊')
-      setFlowLockSeconds(tenant.settings?.flowLockSeconds || 20)
       setAutoReplyLoaded(true)
     }
   }, [tenant, autoReplyLoaded])
@@ -664,31 +661,6 @@ function NotificationSection() {
               <p style={{ fontSize: '10px', color: 'var(--text-faintest)', margin: '4px 0 0' }}>Edite a mensagem e clique fora pra salvar</p>
             </div>
           )}
-        </div>
-        {/* Flow lock */}
-        <div style={{ padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Shield size={16} color="var(--text-faint)" />
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Intervalo anti-duplicação</p>
-                <p style={{ fontSize: '11px', color: 'var(--text-faint)', margin: 0 }}>Tempo (em segundos) para ignorar mensagens repetidas que ativariam o flow novamente</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input type="number" min={1} max={120} value={flowLockSeconds}
-                onChange={e => setFlowLockSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 20)))}
-                onBlur={async () => {
-                  try {
-                    await tenantApi.patch('/tenant/settings', { settings: { flowLockSeconds } })
-                    queryClient.invalidateQueries({ queryKey: ['tenant-autoreply'] })
-                    toast.success('Intervalo atualizado')
-                  } catch { toast.error('Erro ao salvar') }
-                }}
-                style={{ width: '60px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', color: 'var(--text)', background: 'var(--bg-card)', textAlign: 'center' as const, outline: 'none' }} />
-              <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>seg</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

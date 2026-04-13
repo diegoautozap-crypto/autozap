@@ -239,41 +239,33 @@ export class FlowEngine {
   private flowLocks = new Map<string, number>()
   private readonly DEFAULT_LOCK_TTL = 20_000 // 20 segundos padrão
 
-  private async getFlowLockTTL(tenantId: string): Promise<number> {
-    const { data } = await cached(`tenant-settings:${tenantId}`, 60_000, async () => {
-      return db.from('tenants').select('settings').eq('id', tenantId).single()
-    })
-    const seconds = data?.settings?.flowLockSeconds
-    if (seconds && typeof seconds === 'number' && seconds >= 1 && seconds <= 120) {
-      return seconds * 1000
-    }
-    return this.DEFAULT_LOCK_TTL
-  }
-
-  private acquireFlowLock(conversationId: string, ttl: number): boolean {
+  private acquireFlowLock(key: string, ttl: number): boolean {
     const now = Date.now()
-    const existing = this.flowLocks.get(conversationId)
+    const existing = this.flowLocks.get(key)
     if (existing && now - existing < ttl) return false
-    this.flowLocks.set(conversationId, now)
+    this.flowLocks.set(key, now)
     if (this.flowLocks.size > 1000) {
-      for (const [key, time] of this.flowLocks) {
-        if (now - time > ttl) this.flowLocks.delete(key)
+      for (const [k, time] of this.flowLocks) {
+        if (now - time > this.DEFAULT_LOCK_TTL) this.flowLocks.delete(k)
       }
     }
     return true
+  }
+
+  private async getFlowLockSeconds(flowId: string): Promise<number> {
+    const { data: nodes } = await cached(`flow-trigger-lock:${flowId}`, 60_000, async () => {
+      return db.from('flow_nodes').select('data').eq('flow_id', flowId).like('type', 'trigger_%').limit(1)
+    })
+    const triggerData = nodes?.[0]?.data
+    const seconds = triggerData?.lockSeconds
+    if (typeof seconds === 'number' && seconds >= 1 && seconds <= 120) return seconds
+    return 20
   }
 
   async processFlows(ctx: FlowContext): Promise<boolean> {
     try {
       const resumed = await this.resumeWaitingFlow(ctx)
       if (resumed) return true
-
-      // Evita disparar flow duplicado quando múltiplas mensagens chegam juntas
-      const lockTTL = await this.getFlowLockTTL(ctx.tenantId)
-      if (!this.acquireFlowLock(ctx.conversationId, lockTTL)) {
-        logger.info('Flow skipped — lock active (mensagem simultânea)', { conversationId: ctx.conversationId, lockTTL })
-        return false
-      }
 
       const { data: flows } = await cached(
         `flows:${ctx.channelId}:${ctx.tenantId}`,
@@ -312,6 +304,15 @@ export class FlowEngine {
 
         const onCooldown = await this.isOnCooldown(flow, ctx)
         if (onCooldown) { logger.info('Flow skipped — cooldown active', { flowId: flow.id }); continue }
+
+        // Lock anti-duplicação: lê lockSeconds do nó trigger do flow
+        const lockSeconds = await this.getFlowLockSeconds(flow.id)
+        const lockKey = `${flow.id}:${ctx.conversationId}`
+        if (!this.acquireFlowLock(lockKey, lockSeconds * 1000)) {
+          logger.info('Flow skipped — lock active (mensagem simultânea)', { flowId: flow.id, conversationId: ctx.conversationId, lockSeconds })
+          return false
+        }
+
         logger.info('Flow triggered', { flowId: flow.id, tenantId: ctx.tenantId })
         await this.executeFlow(flow, ctx, {})
         return true
