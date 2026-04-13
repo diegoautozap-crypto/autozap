@@ -235,10 +235,38 @@ export class FlowEngine {
     return count ?? 0
   }
 
+  // Lock para evitar execução simultânea do mesmo flow na mesma conversa
+  private flowLocks = new Map<string, number>()
+  private readonly FLOW_LOCK_TTL = 5_000 // 5 segundos
+
+  private acquireFlowLock(conversationId: string): boolean {
+    const now = Date.now()
+    const existing = this.flowLocks.get(conversationId)
+    if (existing && now - existing < this.FLOW_LOCK_TTL) return false
+    this.flowLocks.set(conversationId, now)
+    // Limpa locks antigos periodicamente
+    if (this.flowLocks.size > 1000) {
+      for (const [key, time] of this.flowLocks) {
+        if (now - time > this.FLOW_LOCK_TTL) this.flowLocks.delete(key)
+      }
+    }
+    return true
+  }
+
+  private releaseFlowLock(conversationId: string): void {
+    this.flowLocks.delete(conversationId)
+  }
+
   async processFlows(ctx: FlowContext): Promise<boolean> {
     try {
       const resumed = await this.resumeWaitingFlow(ctx)
       if (resumed) return true
+
+      // Evita disparar flow duplicado quando múltiplas mensagens chegam juntas
+      if (!this.acquireFlowLock(ctx.conversationId)) {
+        logger.info('Flow skipped — lock active (mensagem simultânea)', { conversationId: ctx.conversationId })
+        return false
+      }
 
       const { data: flows } = await cached(
         `flows:${ctx.channelId}:${ctx.tenantId}`,
