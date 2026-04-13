@@ -27,10 +27,10 @@ const features = [
 
 /* ─── Plans data ─── */
 const plans = [
-  { slug: 'starter', name: 'Starter', price: '149,99', msgs: '10.000 msgs/mês', agents: '5 membros', popular: false, features: ['5 canais WhatsApp', '3 flows de automação', '10.000 contatos', '10.000 respostas IA/mês', 'Campanhas ilimitadas', '15 produtos'] },
-  { slug: 'pro', name: 'Pro', price: '299,99', msgs: '50.000 msgs/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '15 flows de automação', '50.000 contatos', '50.000 respostas IA/mês', 'Campanhas ilimitadas', '100 produtos', 'Transcrição de áudio', 'Relatórios avançados'] },
-  { slug: 'enterprise', name: 'Enterprise', price: '599,99', msgs: '150.000 msgs/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Flows ilimitados', '150.000 contatos', '150.000 respostas IA/mês', 'Campanhas ilimitadas', '500 produtos', 'Suporte prioritário'] },
-  { slug: 'unlimited', name: 'Unlimited', price: '999,99', msgs: 'Msgs ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'SLA garantido', 'Gerente de conta', 'Integrações custom'] },
+  { slug: 'starter', name: 'Starter', price: '149,99', msgs: '10.000 mensagens/mês', agents: '3 membros', popular: false, features: ['3 canais WhatsApp', '5 automações de flow', '10.000 contatos', '5.000 respostas de IA por mês', 'Campanhas ilimitadas', 'Agendamento Google Calendar', 'Pipeline de vendas'] },
+  { slug: 'pro', name: 'Pro', price: '299,99', msgs: '50.000 mensagens/mês', agents: '10 membros', popular: true, features: ['10 canais WhatsApp', '20 automações de flow', '50.000 contatos', '30.000 respostas de IA por mês', 'Campanhas ilimitadas', '50 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'] },
+  { slug: 'enterprise', name: 'Enterprise', price: '599,99', msgs: '200.000 mensagens/mês', agents: '30 membros', popular: false, features: ['30 canais WhatsApp', 'Automações de flow ilimitadas', '100.000 contatos', '100.000 respostas de IA por mês', 'Campanhas ilimitadas', '500 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'] },
+  { slug: 'unlimited', name: 'Unlimited', price: '999,99', msgs: 'Mensagens ilimitadas', agents: 'Membros ilimitados', popular: false, features: ['Canais ilimitados', 'Automações ilimitadas', 'Contatos ilimitados', 'Respostas de IA ilimitadas', 'Produtos ilimitados', 'API sem limites', 'Suporte dedicado'] },
 ]
 
 /* ─── Steps data ─── */
