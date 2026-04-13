@@ -1,6 +1,7 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { requireSuperAdmin } from '../middleware/tenant.middleware'
-import { requireAuth, ok, db, logger } from '@autozap/utils'
+import { requireAuth, ok, db, logger, validate, generateId } from '@autozap/utils'
 
 const router = Router()
 router.use(requireAuth)
@@ -150,6 +151,160 @@ router.post('/tenants/:id/impersonate', async (req, res, next) => {
     })
 
     res.json(ok({ accessToken: token, tenantId: req.params.id }))
+  } catch (err) { next(err) }
+})
+
+// ─── PATCH /admin/tenants/:id/activate — Ativação manual de plano ─────────────
+const activateSchema = z.object({
+  planSlug: z.enum(['starter', 'pro', 'enterprise', 'unlimited']),
+  sendEmail: z.boolean().optional().default(true),
+  notes: z.string().max(500).optional(),
+})
+
+router.patch('/tenants/:id/activate', validate(activateSchema), async (req, res, next) => {
+  try {
+    const { planSlug, sendEmail, notes } = req.body
+    const tenantId = req.params.id
+
+    // 1. Atualiza tenant: plano + reseta contadores
+    await db.from('tenants').update({
+      plan_slug: planSlug,
+      messages_sent_this_period: 0,
+      current_period_start: new Date(),
+      is_active: true,
+      is_blocked: false,
+      blocked_reason: null,
+    }).eq('id', tenantId)
+
+    // 2. Verifica email do owner
+    await db.from('users').update({ email_verified: true }).eq('tenant_id', tenantId).eq('role', 'owner')
+
+    // 3. Cria/atualiza subscription
+    const { data: plan } = await db.from('plans').select('id').eq('slug', planSlug).single()
+    if (plan) {
+      const { data: existingSub } = await db.from('subscriptions').select('id').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(1).single()
+      const subData = {
+        tenant_id: tenantId,
+        plan_id: plan.id,
+        status: 'active',
+        payment_method: 'manual',
+        current_period_start: new Date(),
+        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        updated_at: new Date(),
+      }
+      if (existingSub) {
+        await db.from('subscriptions').update(subData).eq('id', existingSub.id)
+      } else {
+        await db.from('subscriptions').insert({ id: generateId(), ...subData })
+      }
+    }
+
+    // 4. Envia email de confirmação (opcional)
+    if (sendEmail) {
+      try {
+        const { data: owner } = await db.from('users').select('email, name').eq('tenant_id', tenantId).eq('role', 'owner').single()
+        if (owner?.email) {
+          const { Resend } = require('resend')
+          const resend = new Resend(process.env.RESEND_API_KEY)
+          const PLAN_NAMES: Record<string, string> = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise', unlimited: 'Unlimited' }
+          await resend.emails.send({
+            from: process.env.RESEND_FROM || 'AutoZap <noreply@useautozap.app>',
+            to: owner.email,
+            subject: `✅ Plano ${PLAN_NAMES[planSlug]} ativado — AutoZap`,
+            html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px"><h1 style="color:#16a34a;font-size:24px">Plano ativado!</h1><p>Olá, ${owner.name || 'cliente'}!</p><p>Seu plano <strong>${PLAN_NAMES[planSlug]}</strong> foi ativado com sucesso. Você já pode usar todas as funcionalidades.</p><a href="https://useautozap.app/dashboard" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Acessar AutoZap</a></div>`,
+          })
+        }
+      } catch (emailErr) { logger.error('Failed to send activation email', { tenantId, emailErr }) }
+    }
+
+    await auditLog(req.auth.sub, 'tenant.activate', tenantId, { planSlug, sendEmail, notes })
+    res.json(ok({ message: `Plano ${planSlug} ativado manualmente` }))
+  } catch (err) { next(err) }
+})
+
+// ─── PATCH /admin/tenants/:id/settings — Editar tenant ───────────────────────
+router.patch('/tenants/:id/settings', async (req, res, next) => {
+  try {
+    const update: any = { updated_at: new Date() }
+    if (req.body.name !== undefined) update.name = req.body.name
+    if (req.body.settings !== undefined) {
+      const { data: current } = await db.from('tenants').select('settings').eq('id', req.params.id).single()
+      update.settings = { ...(current?.settings || {}), ...req.body.settings }
+    }
+    await db.from('tenants').update(update).eq('id', req.params.id)
+    await auditLog(req.auth.sub, 'tenant.settings_update', req.params.id, { fields: Object.keys(update) })
+    res.json(ok({ message: 'Tenant atualizado' }))
+  } catch (err) { next(err) }
+})
+
+// ─── GET /admin/tenants/:id/users — Membros de um tenant ────────────────────
+router.get('/tenants/:id/users', async (req, res, next) => {
+  try {
+    const { data, error } = await db.from('users')
+      .select('id, name, email, role, is_active, email_verified, last_login_at, created_at')
+      .eq('tenant_id', req.params.id)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// ─── GET /admin/tenants/:id/stats — Stats detalhados ─────────────────────────
+router.get('/tenants/:id/stats', async (req, res, next) => {
+  try {
+    const tid = req.params.id
+    const [msgsRes, flowsRes, convsRes, contactsRes, campaignsRes, aiRes] = await Promise.all([
+      db.from('messages').select('id', { count: 'exact', head: true }).eq('tenant_id', tid),
+      db.from('flows').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).eq('is_active', true),
+      db.from('conversations').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'open'),
+      db.from('contacts').select('id', { count: 'exact', head: true }).eq('tenant_id', tid),
+      db.from('campaigns').select('id', { count: 'exact', head: true }).eq('tenant_id', tid),
+      db.from('flow_logs').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'ai_response'),
+    ])
+    res.json(ok({
+      messages: msgsRes.count || 0,
+      activeFlows: flowsRes.count || 0,
+      openConversations: convsRes.count || 0,
+      contacts: contactsRes.count || 0,
+      campaigns: campaignsRes.count || 0,
+      aiResponses: aiRes.count || 0,
+    }))
+  } catch (err) { next(err) }
+})
+
+// ─── GET /admin/audit-logs — Logs de auditoria ──────────────────────────────
+router.get('/audit-logs', async (req, res, next) => {
+  try {
+    const { action, targetId, limit: qLimit, offset: qOffset } = req.query as any
+    let query = db.from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(Number(qLimit) || 50)
+      .range(Number(qOffset) || 0, (Number(qOffset) || 0) + (Number(qLimit) || 50) - 1)
+    if (action) query = query.eq('action', action)
+    if (targetId) query = query.eq('target_id', targetId)
+    const { data, error } = await query
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// ─── POST /admin/tenants/:id/reset-usage — Resetar contadores ───────────────
+router.post('/tenants/:id/reset-usage', async (req, res, next) => {
+  try {
+    await db.from('tenants').update({ messages_sent_this_period: 0, current_period_start: new Date() }).eq('id', req.params.id)
+    await auditLog(req.auth.sub, 'tenant.reset_usage', req.params.id)
+    res.json(ok({ message: 'Contadores resetados' }))
+  } catch (err) { next(err) }
+})
+
+// ─── DELETE /admin/tenants/:id — Soft delete ─────────────────────────────────
+router.delete('/tenants/:id', async (req, res, next) => {
+  try {
+    await db.from('tenants').update({ is_active: false, is_blocked: true, blocked_reason: 'Deletado pelo admin' }).eq('id', req.params.id)
+    await db.from('users').update({ is_active: false }).eq('tenant_id', req.params.id)
+    await auditLog(req.auth.sub, 'tenant.delete', req.params.id)
+    res.json(ok({ message: 'Tenant desativado' }))
   } catch (err) { next(err) }
 })
 

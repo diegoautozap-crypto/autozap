@@ -69,13 +69,14 @@ const PLAN_LIMITS: Record<string, { messages: number; contacts: number; channels
   unlimited:  { messages: 999999, contacts: 999999, channels: 999, campaigns: 999999, ai: 999999, flows: 999 },
 }
 
-const TABS = ['Dashboard', 'Tenants', 'Receita', 'Sistema'] as const
+const TABS = ['Dashboard', 'Tenants', 'Receita', 'Auditoria', 'Sistema'] as const
 type Tab = typeof TABS[number]
 
 const TAB_ICONS: Record<Tab, any> = {
   Dashboard: LayoutDashboard,
   Tenants: Users,
   Receita: DollarSign,
+  Auditoria: FileText,
   Sistema: Server,
 }
 
@@ -326,6 +327,26 @@ export default function AdminPage() {
     },
     onSuccess: () => { toast.success('Plano atualizado'); invalidateAll() },
     onError: () => toast.error('Erro ao atualizar plano'),
+  })
+
+  const activateMutation = useMutation({
+    mutationFn: async ({ id, planSlug, sendEmail, notes }: { id: string; planSlug: string; sendEmail: boolean; notes?: string }) => {
+      await adminApi().patch(`/admin/tenants/${id}/activate`, { planSlug, sendEmail, notes })
+    },
+    onSuccess: () => { toast.success('Plano ativado manualmente!'); invalidateAll() },
+    onError: () => toast.error('Erro ao ativar plano'),
+  })
+
+  const resetUsageMutation = useMutation({
+    mutationFn: async (id: string) => { await adminApi().post(`/admin/tenants/${id}/reset-usage`) },
+    onSuccess: () => { toast.success('Contadores resetados'); invalidateAll() },
+    onError: () => toast.error('Erro ao resetar'),
+  })
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (id: string) => { await adminApi().delete(`/admin/tenants/${id}`) },
+    onSuccess: () => { toast.success('Tenant desativado'); invalidateAll() },
+    onError: () => toast.error('Erro ao deletar'),
   })
 
   const impersonateMutation = useMutation({
@@ -1329,6 +1350,57 @@ export default function AdminPage() {
                                       <Eye size={14} /> Impersonar tenant
                                     </button>
 
+                                    {/* Ativar Plano (bypass pagamento) */}
+                                    <button
+                                      onClick={() => {
+                                        const plan = prompt('Plano para ativar (starter, pro, enterprise, unlimited):')
+                                        if (!plan || !['starter', 'pro', 'enterprise', 'unlimited'].includes(plan)) return
+                                        const sendEmail = confirm('Enviar email de confirmação ao cliente?')
+                                        const notes = prompt('Notas (motivo da ativação manual):') || ''
+                                        activateMutation.mutate({ id: t.id, planSlug: plan, sendEmail, notes })
+                                      }}
+                                      disabled={activateMutation.isPending}
+                                      style={{
+                                        width: '100%', padding: '10px 16px', justifyContent: 'center',
+                                        background: GREEN_BG, border: `1px solid ${GREEN_BORDER}`,
+                                        borderRadius: 8, color: GREEN_DARK, fontSize: 13, fontWeight: 600,
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                                        marginBottom: 12,
+                                      }}
+                                    >
+                                      <Zap size={14} /> Ativar plano manualmente
+                                    </button>
+
+                                    {/* Resetar contadores */}
+                                    <button
+                                      onClick={() => { if (confirm('Resetar contadores de uso?')) resetUsageMutation.mutate(t.id) }}
+                                      disabled={resetUsageMutation.isPending}
+                                      style={{
+                                        width: '100%', padding: '10px 16px', justifyContent: 'center',
+                                        background: BLUE_BG, border: `1px solid ${BLUE_BORDER}`,
+                                        borderRadius: 8, color: BLUE, fontSize: 13, fontWeight: 600,
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                                        marginBottom: 12,
+                                      }}
+                                    >
+                                      <RefreshCw size={14} /> Resetar uso do mes
+                                    </button>
+
+                                    {/* Deletar tenant */}
+                                    <button
+                                      onClick={() => { if (confirm(`DELETAR ${t.name}? Essa ação desativa a conta e todos os usuários.`)) deleteTenantMutation.mutate(t.id) }}
+                                      disabled={deleteTenantMutation.isPending}
+                                      style={{
+                                        width: '100%', padding: '10px 16px', justifyContent: 'center',
+                                        background: RED_BG, border: `1px solid ${RED_BORDER}`,
+                                        borderRadius: 8, color: RED, fontSize: 13, fontWeight: 600,
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                                        marginBottom: 12,
+                                      }}
+                                    >
+                                      <Trash2 size={14} /> Deletar tenant
+                                    </button>
+
                                     {/* Notes */}
                                     <div>
                                       <label style={{ fontSize: 12, color: TEXT_MUTED, marginBottom: 6, display: 'block' }}>
@@ -1587,6 +1659,11 @@ export default function AdminPage() {
               )}
 
               {/* ═══════════════════════════════════════════════════════════════════
+                  TAB: AUDITORIA
+                  ═══════════════════════════════════════════════════════════════════ */}
+              {activeTab === 'Auditoria' && <AuditLogTab adminApi={adminApi} />}
+
+              {/* ═══════════════════════════════════════════════════════════════════
                   TAB 4: SISTEMA
                   ═══════════════════════════════════════════════════════════════════ */}
               {activeTab === 'Sistema' && (
@@ -1826,6 +1903,82 @@ export default function AdminPage() {
           }
         }
       `}</style>
+    </div>
+  )
+}
+
+// ─── Audit Log Tab ──────────────────────────────────────────────────────────
+function AuditLogTab({ adminApi }: { adminApi: () => any }) {
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['admin-audit-logs'],
+    queryFn: async () => {
+      const { data } = await adminApi().get('/admin/audit-logs?limit=100')
+      return data.data || []
+    },
+    refetchInterval: 30_000,
+  })
+
+  const actionColors: Record<string, { color: string; bg: string }> = {
+    'tenant.block': { color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+    'tenant.unblock': { color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
+    'tenant.plan_change': { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
+    'tenant.activate': { color: '#16a34a', bg: 'rgba(22,163,74,0.08)' },
+    'tenant.impersonate': { color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
+    'tenant.reset_usage': { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+    'tenant.delete': { color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+    'tenant.settings_update': { color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+  }
+
+  const actionLabels: Record<string, string> = {
+    'tenant.block': 'Bloqueou tenant',
+    'tenant.unblock': 'Desbloqueou tenant',
+    'tenant.plan_change': 'Mudou plano',
+    'tenant.activate': 'Ativou plano manualmente',
+    'tenant.impersonate': 'Impersonou tenant',
+    'tenant.reset_usage': 'Resetou contadores',
+    'tenant.delete': 'Deletou tenant',
+    'tenant.settings_update': 'Editou configurações',
+  }
+
+  return (
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: 12 }}>
+        Log de auditoria
+      </div>
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 200px 1fr', gap: 8, padding: '10px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8f9fc' }}>
+          {['Data/Hora', 'Ação', 'Alvo (ID)', 'Detalhes'].map(h => (
+            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{h}</span>
+          ))}
+        </div>
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : logs.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Nenhum log encontrado</div>
+        ) : logs.map((log: any) => {
+          const ac = actionColors[log.action] || { color: '#64748b', bg: 'rgba(100,116,139,0.08)' }
+          return (
+            <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 200px 1fr', gap: 8, padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 12 }}>
+              <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>
+                {new Date(log.created_at).toLocaleString('pt-BR')}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ padding: '2px 8px', borderRadius: 4, background: ac.bg, color: ac.color, fontWeight: 600, fontSize: 11 }}>
+                  {actionLabels[log.action] || log.action}
+                </span>
+              </span>
+              <span style={{ color: '#1e293b', fontFamily: 'monospace', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                {log.target_id || '—'}
+              </span>
+              <span style={{ color: '#64748b', fontSize: 11 }}>
+                {log.details ? (typeof log.details === 'string' ? log.details : JSON.stringify(log.details)) : '—'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
