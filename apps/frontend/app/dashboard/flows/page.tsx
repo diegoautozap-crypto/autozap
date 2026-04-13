@@ -1024,8 +1024,8 @@ export default function FlowsPage() {
                               const flowId = flowData.data.id
                               const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
                               const idMap: Record<string, string> = {}
-                              const nodes = tmpl.nodes.map(n => { const newId = uid(); idMap[n.id] = newId; return { ...n, id: newId } })
-                              const edges = tmpl.edges.map(e => ({ ...e, id: uid(), source_node: idMap[e.source_node], target_node: idMap[e.target_node] }))
+                              const nodes = tmpl.nodes.map((n: any) => { const newId = uid(); idMap[n.id] = newId; return { ...n, id: newId } })
+                              const edges = tmpl.edges.map((e: any) => ({ ...e, id: uid(), source_node: idMap[e.source_node], target_node: idMap[e.target_node] }))
                               await messageApi.put(`/flows/${flowId}/graph`, { nodes, edges })
                               toast.success(t('flows.toastTemplateCreated').replace('{name}', tmpl.name))
                               queryClient.invalidateQueries({ queryKey: ['flows'] })
