@@ -19,19 +19,19 @@ const PLAN_NAMES: Record<string, string> = {
 
 function getPlanMsgs(_t: (key: string) => string): Record<string, string> {
   return {
-    starter:    '10.000 msgs',
-    pro:        '50.000 msgs',
-    enterprise: '200.000 msgs',
+    starter:    '10.000 mensagens',
+    pro:        '50.000 mensagens',
+    enterprise: '200.000 mensagens',
     unlimited:  'Ilimitado',
   }
 }
 
 function getPlanFeatures(_t: (key: string) => string): Record<string, string[]> {
   return {
-    starter:    ['10k msgs/mês', '3 canais', '3 membros', '5 flows', '10k contatos', '5k IA/mês', 'Campanhas ilimitadas', 'Google Calendar', 'Pipeline'],
-    pro:        ['50k msgs/mês', '10 canais', '10 membros', '20 flows', '50k contatos', '30k IA/mês', 'Campanhas ilimitadas', '50 produtos', 'Transcrição', 'Relatórios'],
-    enterprise: ['200k msgs/mês', '30 canais', '30 membros', 'Flows ilimitados', '100k contatos', '100k IA/mês', 'Campanhas ilimitadas', '500 produtos', 'Transcrição', 'Relatórios'],
-    unlimited:  ['Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'Suporte dedicado'],
+    starter:    ['10.000 mensagens por mês', '3 canais WhatsApp', '3 membros na equipe', '5 automações de flow', '10.000 contatos', '5.000 respostas de IA por mês', 'Campanhas ilimitadas', 'Agendamento Google Calendar', 'Pipeline de vendas'],
+    pro:        ['50.000 mensagens por mês', '10 canais WhatsApp', '10 membros na equipe', '20 automações de flow', '50.000 contatos', '30.000 respostas de IA por mês', 'Campanhas ilimitadas', '50 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'],
+    enterprise: ['200.000 mensagens por mês', '30 canais WhatsApp', '30 membros na equipe', 'Automações de flow ilimitadas', '100.000 contatos', '100.000 respostas de IA por mês', 'Campanhas ilimitadas', '500 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'],
+    unlimited:  ['Mensagens ilimitadas', 'Canais ilimitados', 'Membros ilimitados', 'Tudo ilimitado', 'Produtos ilimitados', 'API sem limites', 'Suporte dedicado'],
   }
 }
 
