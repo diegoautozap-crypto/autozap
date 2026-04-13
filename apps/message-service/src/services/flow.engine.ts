@@ -1745,7 +1745,7 @@ export class FlowEngine {
             if (!isBusy) {
               const price = priceTable[priceKey]
               const priceLabel = price ? ` - R$ ${price}` : ''
-              daySlots.push(`(${globalIdx}) ${slotTime}${priceLabel}`)
+              daySlots.push(`*(${globalIdx})* ${slotTime}${priceLabel}`)
               slotMap[globalIdx] = { date: cd.dateStr, time: slotTime, price }
               globalIdx++
             }
