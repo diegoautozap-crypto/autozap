@@ -764,7 +764,7 @@ export default function AdminPage() {
                               })).filter(d => d.value > 0)}
                               cx="50%" cy="50%" innerRadius={60} outerRadius={100}
                               paddingAngle={3} dataKey="value"
-                              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                              label={({ name, value, percent }: any) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
                               labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                             >
                               {['starter', 'pro', 'enterprise', 'unlimited', 'pending'].map(plan => (
