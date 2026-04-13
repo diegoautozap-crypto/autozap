@@ -3,6 +3,7 @@ import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import rateLimit from 'express-rate-limit'
 import campaignRoutes from './routes/campaign.routes'
 import { errorHandler, logger } from '@autozap/utils'
 import { startCampaignWorker }    from './workers/campaign.worker'
@@ -18,6 +19,7 @@ app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(','), credentials: true }))
 app.use(cookieParser())
 app.use(express.json({ limit: '10mb' }))
+app.use(rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false }))
 
 app.get('/health', async (_req, res) => {
   try {

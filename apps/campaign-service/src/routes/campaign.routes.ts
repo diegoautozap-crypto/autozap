@@ -183,7 +183,7 @@ router.post('/campaigns', validate(createCampaignSchema), async (req, res, next)
       rest.copies = rest.copies.map((c: string) => replacePlaceholders(c))
     }
 
-    logger.debug('Curl after replace', { curl: curlTemplate?.slice(0, 200) })
+    logger.debug('Campaign curl template prepared', { hasTemplate: !!curlTemplate, channelId })
     const campaign = await campaignService.createCampaign({ tenantId: req.auth.tid, createdBy: req.auth.sub, channelId, curlTemplate, ...rest })
     res.status(201).json(ok(campaign))
   } catch (err: any) { logger.error('Create campaign error', { error: err?.message }); next(err) }

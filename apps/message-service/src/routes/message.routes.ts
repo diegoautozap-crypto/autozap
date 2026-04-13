@@ -112,9 +112,11 @@ router.post('/messages/send', requireAuthOrInternal, validate(sendSchema), async
   try {
     const { channelId, contactId, conversationId, to, contentType, body, mediaUrl, filename, campaignId, interactiveType, buttons, listRows, listButtonText, footer } = req.body
     const secret = req.headers['x-internal-secret']
-    const tenantId = secret === INTERNAL_SECRET
+    const isInternal = secret && INTERNAL_SECRET && secret === INTERNAL_SECRET
+    const tenantId = isInternal
       ? (req.body.tenantId || req.auth?.tid)
       : req.auth.tid
+    if (!tenantId) { res.status(401).json({ error: 'Tenant not resolved' }); return }
 
     // ── Hard message limit check (só pra campanhas) ──
     if (campaignId) {

@@ -225,7 +225,17 @@ router.delete('/tags/:id', requireRole('admin', 'owner'), async (req, res, next)
 
 // ─── Import CSV ───────────────────────────────────────────────────────────────
 
-router.post('/contacts/import', async (req, res, next) => {
+const importContactsSchema = z.object({
+  rows: z.array(z.object({
+    phone: z.string().min(8, 'Telefone deve ter pelo menos 8 dígitos'),
+    name: z.string().optional(),
+    email: z.string().email('Email inválido').optional().or(z.literal('')),
+    company: z.string().optional(),
+  })).min(1, 'Envie pelo menos 1 contato').max(10000, 'Máximo 10.000 contatos por importação'),
+  tagId: z.string().uuid('tagId inválido').optional(),
+})
+
+router.post('/contacts/import', validate(importContactsSchema), async (req, res, next) => {
   try {
     // ── Plan limit check ──
     const importPlanSlug = await cachedGet(`tenant-plan:${req.auth.tid}`, 120, async () => {
@@ -239,7 +249,6 @@ router.post('/contacts/import', async (req, res, next) => {
     }
 
     const { rows, tagId } = req.body
-    if (!Array.isArray(rows)) throw new Error('rows must be an array')
     const result = await contactService.importContacts(req.auth.tid, rows, tagId)
     res.json(ok(result))
   } catch (err) { next(err) }
@@ -318,6 +327,12 @@ router.get('/contacts/:contactId/purchases', async (req, res, next) => {
 })
 
 // POST /purchases/batch — pedido com múltiplos produtos
+// ── Tenant ownership helper ──────────────────────────────────────────────────
+async function validateContactOwnership(contactId: string, tenantId: string): Promise<void> {
+  const { data } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', tenantId).maybeSingle()
+  if (!data) throw new AppError('FORBIDDEN', 'Contato não encontrado ou não pertence à sua conta', 403)
+}
+
 const batchPurchaseSchema = z.object({
   contactId: z.string().uuid(),
   conversationId: z.string().uuid().optional().nullable(),
@@ -333,6 +348,7 @@ router.post('/purchases/batch', async (req, res, next) => {
     const parsed = batchPurchaseSchema.safeParse(req.body)
     if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message || 'Dados inválidos' }); return }
     const { contactId, conversationId, items, discount, surcharge, shipping, coupon } = parsed.data
+    await validateContactOwnership(contactId, req.auth.tid)
     // Busca preços de todos os produtos
     const productIds = items.map((i: any) => i.productId)
     const { data: productsData } = await db.from('products').select('id, price').in('id', productIds).eq('tenant_id', req.auth.tid)
@@ -379,10 +395,22 @@ router.post('/purchases/batch', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/purchases', async (req, res, next) => {
+const createPurchaseSchema = z.object({
+  contactId: z.string().uuid('contactId inválido'),
+  productId: z.string().uuid('productId inválido'),
+  quantity: z.number().int().min(1).optional().default(1),
+  notes: z.string().optional(),
+  conversationId: z.string().uuid().optional().nullable(),
+  discount: z.number().min(0).optional().default(0),
+  surcharge: z.number().min(0).optional().default(0),
+  shipping: z.number().min(0).optional().default(0),
+  coupon: z.string().optional(),
+})
+
+router.post('/purchases', validate(createPurchaseSchema), async (req, res, next) => {
   try {
     const { contactId, productId, quantity, notes, conversationId, discount, surcharge, shipping, coupon } = req.body
-    if (!contactId || !productId) { res.status(400).json({ error: 'contactId and productId required' }); return }
+    await validateContactOwnership(contactId, req.auth.tid)
     const { data: product } = await db.from('products').select('price')
       .eq('id', productId).eq('tenant_id', req.auth.tid).single()
     if (!product) { res.status(404).json({ error: 'Product not found' }); return }
