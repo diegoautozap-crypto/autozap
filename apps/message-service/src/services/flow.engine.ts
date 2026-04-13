@@ -1744,8 +1744,8 @@ export class FlowEngine {
 
             if (!isBusy) {
               const price = priceTable[priceKey]
-              const priceLabel = price ? ` - R$ ${price}` : ''
-              daySlots.push(`*(${globalIdx})* ${slotTime}${priceLabel}`)
+              const priceLabel = price ? ` — R$${price}` : ''
+              daySlots.push(`*${globalIdx}.* ${slotTime}${priceLabel}`)
               slotMap[globalIdx] = { date: cd.dateStr, time: slotTime, price }
               globalIdx++
             }
@@ -1753,7 +1753,7 @@ export class FlowEngine {
           }
 
           if (daySlots.length > 0) {
-            lines.push(`\n*${cd.dayName} ${cd.dd}/${cd.mm}:*`)
+            lines.push(`\n${cd.dayName.toUpperCase()} (${cd.dd}/${cd.mm})`)
             lines.push(...daySlots)
           }
         }
@@ -1765,9 +1765,9 @@ export class FlowEngine {
         }
 
         const showBackDays2 = data?.showBackDays !== false
-        if (showBackDays2) lines.push(`\n0. ↩ Voltar`)
+        if (showBackDays2) lines.push(`\n*0.* Voltar`)
 
-        const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\n👉 *Digite o número entre parênteses* para selecionar o dia e horário desejado.`
+        const allMsg = `Horários disponíveis:\n${lines.join('\n')}\n\nDigite o *número em negrito* do horário desejado.`
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: allMsg })
 
         // Save slot map in variables for step resolution
