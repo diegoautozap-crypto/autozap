@@ -193,6 +193,7 @@ router.post('/webhook/gupshup/:apikey', rateLimit({ max: 120 }), async (req, res
   try {
     const { apikey } = req.params
     const payload = req.body
+    if (!payload || typeof payload !== 'object') { res.status(400).json({ error: 'Invalid payload' }); return }
 
     logger.debug('Gupshup webhook received', { apikey, type: payload?.type })
 
@@ -309,6 +310,7 @@ router.post('/webhook/evolution/:instanceName', rateLimit({ max: 120 }), async (
   try {
     const { instanceName } = req.params
     const payload = req.body
+    if (!payload || typeof payload !== 'object') { res.status(400).json({ error: 'Invalid payload' }); return }
 
     logger.debug('Evolution webhook received', { instanceName, event: payload?.event })
 

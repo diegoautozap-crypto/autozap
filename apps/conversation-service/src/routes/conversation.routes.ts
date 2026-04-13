@@ -22,15 +22,11 @@ router.get('/conversations/media/:mediaId', async (req, res, next) => {
     const { channelId, token: queryToken } = req.query as any
     if (!channelId) { res.status(400).json({ error: 'channelId required' }); return }
 
-    // Auth: aceita JWT no header OU na query string (pra <img>, <audio>, <video>)
-    // TODO: deprecar query string token após migrar frontend pra usar header
+    // Auth: JWT via header (preferido) ou query string (necessário pra <img>/<audio>/<video>)
     let tenantId: string | null = null
     const authHeader = req.headers.authorization
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
     const jwtToken = headerToken || queryToken
-    if (queryToken && !headerToken) {
-      logger.warn('JWT via query string (deprecated)', { mediaId, ip: req.ip })
-    }
     if (jwtToken) {
       try {
         const jwt = require('jsonwebtoken')
