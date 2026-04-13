@@ -297,6 +297,43 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
   )
 }
 
+function LinkExistingTask({ conversationId, contactId, linkedTaskIds, onLinked }: { conversationId: string; contactId: string; linkedTaskIds: string[]; onLinked: () => void }) {
+  const { data: allTasks = [], isLoading } = useQuery({
+    queryKey: ['all-tasks-unlinked'],
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/tasks?status=all')
+      return (data.data || []).filter((t: any) => !t.conversation_id || !linkedTaskIds.includes(t.id))
+    },
+  })
+
+  const linkTask = async (taskId: string) => {
+    try {
+      await conversationApi.patch(`/tasks/${taskId}`, { conversationId, contactId })
+      toast.success('Tarefa vinculada!')
+      onLinked()
+    } catch { toast.error('Erro ao vincular') }
+  }
+
+  return (
+    <div style={{ padding: '8px', background: 'var(--bg-input)', border: '1px solid #c4b5fd', borderRadius: '8px', marginBottom: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+      {isLoading ? <p style={{ fontSize: '11px', color: 'var(--text-faint)', textAlign: 'center' }}>Carregando...</p>
+        : allTasks.length === 0 ? <p style={{ fontSize: '11px', color: 'var(--text-faint)', textAlign: 'center' }}>Nenhuma tarefa disponivel</p>
+        : allTasks.map((tk: any) => (
+          <div key={tk.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 6px', borderBottom: '1px solid var(--divider)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tk.title}</p>
+              <p style={{ fontSize: '9px', color: 'var(--text-faint)', margin: 0 }}>
+                {tk.priority === 'high' ? 'Alta' : tk.priority === 'medium' ? 'Media' : 'Baixa'}
+                {tk.due_date ? ` · ${new Date(tk.due_date).toLocaleDateString('pt-BR')}` : ''}
+              </p>
+            </div>
+            <button onClick={() => linkTask(tk.id)} style={{ padding: '3px 8px', background: '#8b5cf6', border: 'none', borderRadius: '5px', color: '#fff', fontSize: '10px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Vincular</button>
+          </div>
+        ))}
+    </div>
+  )
+}
+
 export default function InboxPage() {
   const t = useT()
   const { canEdit } = usePermissions()
@@ -320,6 +357,7 @@ export default function InboxPage() {
   const [search, setSearch] = useState('')
   const [chatSearch, setChatSearch] = useState('')
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showTaskLink, setShowTaskLink] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [newTaskPriority, setNewTaskPriority] = useState('medium')
@@ -1311,8 +1349,23 @@ export default function InboxPage() {
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--divider)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={13} color="#2563eb" /><p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('inbox.tasks')}</p></div>
-                {canEdit('/dashboard/inbox') && <button onClick={() => setShowTaskForm((p: any) => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{showTaskForm ? 'Cancelar' : t('inbox.create')}</button>}
+                {canEdit('/dashboard/inbox') && <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => { setShowTaskLink(p => !p); setShowTaskForm(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#8b5cf6', fontWeight: 600 }}>{showTaskLink ? 'Fechar' : 'Vincular'}</button>
+                  <button onClick={() => { setShowTaskForm((p: any) => !p); setShowTaskLink(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#2563eb', fontWeight: 600 }}>{showTaskForm ? 'Cancelar' : t('inbox.create')}</button>
+                </div>}
               </div>
+
+              {/* Vincular tarefa existente */}
+              {showTaskLink && <LinkExistingTask
+                conversationId={selectedConvId!}
+                contactId={contactId}
+                linkedTaskIds={convTasks.map((t: any) => t.id)}
+                onLinked={() => {
+                  queryClient.invalidateQueries({ queryKey: ['tasks', selectedConvId] })
+                  queryClient.invalidateQueries({ queryKey: ['tasks-summary'] })
+                  setShowTaskLink(false)
+                }}
+              />}
 
               {/* Formulário de nova tarefa */}
               {showTaskForm && (

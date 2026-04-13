@@ -105,6 +105,8 @@ const updateTaskSchema2 = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).optional(),
   dueDate: z.string().optional(),
+  conversationId: z.string().uuid().nullable().optional(),
+  contactId: z.string().uuid().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   status: z.enum(['pending', 'in_progress', 'completed']).optional(),
@@ -429,6 +431,8 @@ router.patch('/tasks/:id', validate(updateTaskSchema2), async (req, res, next) =
     if (req.body.title !== undefined) update.title = req.body.title
     if (req.body.description !== undefined) update.description = req.body.description
     if (req.body.dueDate !== undefined) update.due_date = req.body.dueDate
+    if (req.body.conversationId !== undefined) update.conversation_id = req.body.conversationId
+    if (req.body.contactId !== undefined) update.contact_id = req.body.contactId
     if (req.body.assignedTo !== undefined) update.assigned_to = req.body.assignedTo
     if (req.body.priority !== undefined) update.priority = req.body.priority
     if (req.body.status !== undefined) {
