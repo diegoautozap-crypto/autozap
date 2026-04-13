@@ -2324,6 +2324,8 @@ export class FlowEngine {
       .replace(/\{\{message\}\}/gi, ctx.messageBody)
       .replace(/\{\{contactId\}\}/gi, ctx.contactId)
       .replace(/\{\{conversationId\}\}/gi, ctx.conversationId)
+      .replace(/\{\{channelId\}\}/gi, ctx.channelId)
+      .replace(/\{\{tenantId\}\}/gi, ctx.tenantId)
     for (const [key, value] of Object.entries(variables)) {
       result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'gi'), String(value))
     }
