@@ -771,7 +771,7 @@ export default function AdminPage() {
                                 <Cell key={plan} fill={PLAN_COLORS[plan]?.color || '#94a3b8'} />
                               ))}
                             </Pie>
-                            <Tooltip formatter={(value: number, name: string) => [`${value} clientes`, name]} />
+                            <Tooltip formatter={(value: any, name: any) => [`${value} clientes`, name]} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
@@ -792,8 +792,8 @@ export default function AdminPage() {
                           }))} margin={{ top: 10, right: 10, bottom: 5, left: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis dataKey="plano" tick={{ fontSize: 12, fill: TEXT_MUTED }} />
-                            <YAxis tick={{ fontSize: 11, fill: TEXT_MUTED }} tickFormatter={(v: number) => `R$${v}`} />
-                            <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Receita']} />
+                            <YAxis tick={{ fontSize: 11, fill: TEXT_MUTED }} tickFormatter={(v: any) => `R$${v}`} />
+                            <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Receita']} />
                             <Bar dataKey="receita" radius={[6, 6, 0, 0]}>
                               {['starter', 'pro', 'enterprise', 'unlimited'].map(plan => (
                                 <Cell key={plan} fill={PLAN_COLORS[plan]?.color || '#94a3b8'} />
