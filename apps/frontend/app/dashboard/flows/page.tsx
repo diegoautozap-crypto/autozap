@@ -323,12 +323,14 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e19', source_node: 'n16', target_node: 'n17', source_handle: 'success' },
       ],
     },
-    {
-      id: 'full_service_scheduling',
-      emoji: '🏟️',
-      name: '🏟️ Atendimento completo com agendamento e reservas',
-      desc: 'Menu multinível: informações, reservas com atendente, consulta de horários via webhook, validação, pagamento PIX. Ideal pra complexos, clínicas, quadras.',
-      category: t('flows.categoryAdvanced'),
+    /* removido: full_service_scheduling */
+    undefined as any,
+    false && {
+      id: '_x',
+      emoji: '',
+      name: '',
+      desc: '',
+      category: '',
       categoryKey: 'advanced',
       nodes: [
         // ═══ TRIGGER ═══
@@ -528,7 +530,7 @@ IMPORTANTE: Personalize este prompt com informações do seu negócio (serviços
         { id: 'e43', source_node: 'n40', target_node: 'n41', source_handle: 'success' },
       ],
     },
-  ]
+  ].filter(Boolean)
 }
 
 function getCooldownOptions(t: (key: string) => string) {
