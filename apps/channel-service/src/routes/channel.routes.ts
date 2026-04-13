@@ -511,7 +511,7 @@ router.post('/internal/send', async (req, res, next) => {
       return
     }
     const { messageUuid, channelId, tenantId, to, contentType, body, mediaUrl, filename, interactiveType, buttons, listRows, listButtonText, footer } = req.body
-    console.log('[internal/send] contentType:', contentType, 'interactiveType:', interactiveType, 'hasButtons:', !!buttons?.length, 'hasListRows:', !!listRows?.length)
+    logger.debug('[internal/send]', { contentType, interactiveType, hasButtons: !!buttons?.length, hasListRows: !!listRows?.length })
     const result = await channelService.sendMessage(channelId, tenantId, {
       to, contentType, body, mediaUrl, filename, messageUuid, interactiveType, buttons, listRows, listButtonText, header: undefined, footer,
     })

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { conversationService } from '../services/conversation.service'
-import { requireAuth, validate, ok, paginationSchema, generateId, db, decryptCredentials } from '@autozap/utils'
+import { requireAuth, validate, ok, paginationSchema, generateId, db, decryptCredentials, logger } from '@autozap/utils'
 
 const router = Router()
 
@@ -641,7 +641,7 @@ router.post('/conversations/bulk/read', validate(bulkIdsSchema), async (req, res
       )
     )
     const updated = results.filter(Boolean).length
-    console.log('Bulk read', { tenantId: req.auth.tid, requested: ids.length, updated })
+    logger.info('Bulk read', { tenantId: req.auth.tid, requested: ids.length, updated })
     res.json(ok({ updated }))
   } catch (err) { next(err) }
 })

@@ -50,7 +50,8 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(422).json(fail('VALIDATION_ERROR', 'Validation failed', issues))
     return
   }
-  console.error('Unhandled error:', err instanceof Error ? err.message : err)
+  const { logger: log } = require('./logger')
+  log.error('Unhandled error', { error: err instanceof Error ? err.message : String(err) })
   res.status(500).json(fail('INTERNAL_ERROR', 'Internal server error'))
 }
 

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
-import { requireAuth, errorHandler, validate, fail } from '@autozap/utils'
+import { requireAuth, errorHandler, validate, fail, logger } from '@autozap/utils'
 
 export { requireAuth, errorHandler, validate }
 
@@ -10,7 +10,7 @@ declare global {
 }
 
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
-if (!INTERNAL_SECRET) console.error('⚠ INTERNAL_SECRET não configurado — rotas internas desprotegidas')
+if (!INTERNAL_SECRET) logger.error('⚠ INTERNAL_SECRET não configurado — rotas internas desprotegidas')
 
 // Internal routes between services use a shared secret header
 export function requireInternal(req: Request, res: Response, next: NextFunction): void {

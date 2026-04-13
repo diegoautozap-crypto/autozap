@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { tenantService } from '../services/tenant.service'
-import { requireAuth, requireRole, validate, ok, paginationSchema, rateLimit } from '@autozap/utils'
+import { requireAuth, requireRole, validate, ok, paginationSchema, rateLimit, logger } from '@autozap/utils'
 import { PLAN_LIMITS } from '@autozap/types'
 
 const router = Router()
@@ -73,14 +73,14 @@ asaasWebhookRouter.post('/billing/webhook/asaas', rateLimit({ max: 30 }), async 
   try {
     // Verifica token de autenticação do webhook Asaas (obrigatório)
     const asaasToken = process.env.ASAAS_WEBHOOK_TOKEN
-    if (!asaasToken) { console.error('ASAAS_WEBHOOK_TOKEN not configured'); res.status(500).json({ error: 'Server misconfigured' }); return }
+    if (!asaasToken) { logger.error('ASAAS_WEBHOOK_TOKEN not configured'); res.status(500).json({ error: 'Server misconfigured' }); return }
     const provided = req.headers['asaas-access-token']
     if (!provided || provided !== asaasToken) { res.status(401).json({ error: 'Invalid webhook token' }); return }
     const { event, payment, subscription } = req.body
     await tenantService.processAsaasWebhook(event, { payment, subscription })
     res.json({ success: true })
   } catch (err) {
-    console.error('Asaas webhook error:', err)
+    logger.error('Asaas webhook error', { err })
     res.status(500).json({ success: false })
   }
 })
@@ -121,7 +121,7 @@ asaasWebhookRouter.get('/integrations/google/callback', async (req, res) => {
     const frontendUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'
     res.redirect(`${frontendUrl}/dashboard/settings?google=connected`)
   } catch (err) {
-    console.error('Google OAuth callback error:', err)
+    logger.error('Google OAuth callback error', { err })
     const frontendUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'
     res.redirect(`${frontendUrl}/dashboard/settings?google=error`)
   }
