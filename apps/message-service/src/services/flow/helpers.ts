@@ -1,4 +1,5 @@
-import { db, logger, generateId } from '@autozap/utils'
+import { db, logger, generateId, decryptCredentials } from '@autozap/utils'
+import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import type { FlowContext, FlowNodeData, ConditionBranch, ConditionRule } from './types'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
@@ -78,6 +79,28 @@ export async function sendMessage(opts: { tenantId: string; channelId: string; c
 // ─── Log Node ────────────────────────────────────────────────────────────────
 export async function logNode(flowId: string, nodeId: string, ctx: FlowContext, status: string, detail: string): Promise<void> {
   try { await db.from('flow_logs').insert({ id: generateId(), flow_id: flowId, node_id: nodeId, tenant_id: ctx.tenantId, contact_id: ctx.contactId, conversation_id: ctx.conversationId, status, detail }) } catch (err) { logger.warn('Failed to log flow node', { flowId, nodeId, err }) }
+}
+
+// ─── Plan Limits ─────────────────────────────────────────────────────────────
+export async function getTenantPlanLimits(tenantId: string): Promise<{ planSlug: PlanSlug; limits: typeof PLAN_LIMITS[PlanSlug] }> {
+  const { data: tenant } = await cached(`tenant-plan:${tenantId}`, 60_000, async () => {
+    const r = await db.from('tenants').select('plan_slug').eq('id', tenantId).single()
+    return r
+  })
+  const planSlug = (tenant?.plan_slug || 'pending') as PlanSlug
+  const limits = PLAN_LIMITS[planSlug] ?? PLAN_LIMITS.pending
+  return { planSlug, limits }
+}
+
+export async function getMonthlyAiCount(tenantId: string): Promise<number> {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const { count } = await db
+    .from('flow_logs').select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('status', 'ai_response')
+    .gte('created_at', monthStart)
+  return count ?? 0
 }
 
 // ─── Condition Helpers ───────────────────────────────────────────────────────
