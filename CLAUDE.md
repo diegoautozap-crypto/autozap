@@ -1,397 +1,646 @@
-# AutoZap - Architecture Guide
+# AutoZap — Developer Guide
 
-## Overview
-AutoZap is a multi-tenant WhatsApp CRM platform with flow automation, Google Calendar scheduling, campaign management, and multi-channel support (Gupshup + Evolution API).
+> Multi-tenant WhatsApp CRM with flow automation, Google Calendar scheduling, campaigns, and multi-channel support.
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/diegoautozap-crypto/autozap.git
+cd autozap
+npm install
+
+# 2. Copy env files (each service needs its own .env)
+cp apps/auth-service/.env.example apps/auth-service/.env
+# repeat for each service...
+
+# 3. Run all services
+npm run dev          # or start each service individually
+```
+
+**Required env vars** (all services):
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key | `eyJ...` |
+| `JWT_SECRET` | JWT signing secret (min 32 chars) | `random-64-char-string` |
+| `ENCRYPTION_KEY` | AES-256-GCM key for credentials | `32-byte-hex-string` |
+| `REDIS_URL` | Redis connection | `redis://localhost:6379` |
+| `CORS_ORIGIN` | Allowed origins (comma-separated) | `https://useautozap.app` |
+| `INTERNAL_SECRET` | Service-to-service auth token | `random-secret` |
+
+**Service-specific:**
+
+| Variable | Service | Description |
+|----------|---------|-------------|
+| `PUSHER_APP_ID/KEY/SECRET/CLUSTER` | All | Real-time events |
+| `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI` | tenant-service | Google Calendar OAuth |
+| `ASAAS_WEBHOOK_TOKEN` | tenant-service | Billing webhook auth |
+| `SENTRY_DSN` | All | Error tracking |
+| `MESSAGE_SERVICE_URL` | message-service | Internal URL for sending |
+| `OPENAI_API_KEY` | message-service | AI responses (or per-tenant in metadata) |
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (Next.js 14+)                         │
+│                        useautozap.app — port 3000                      │
+│   Pages: inbox, contacts, flows, pipeline, campaigns, scheduling...    │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               │ API calls (JWT in header)
+        ┌──────────┬───────────┼───────────┬──────────┬──────────┐
+        ▼          ▼           ▼           ▼          ▼          ▼
+  ┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐
+  │  AUTH     ││ TENANT   ││ CHANNEL  ││ MESSAGE  ││ CONTACT  ││CONVERSA- │
+  │ :3001    ││ :3002    ││ :3003    ││ :3004    ││ :3005    ││TION :3006│
+  │          ││          ││          ││          ││          ││          │
+  │ Login    ││ Settings ││ WhatsApp ││ Flows    ││ CRM      ││ Inbox    │
+  │ 2FA      ││ Billing  ││ Gupshup  ││ AI       ││ Tags     ││ Pipeline │
+  │ Team     ││ Google   ││ Evolution││ Webhooks ││ Products ││ Tasks    │
+  │ Perms    ││ Admin    ││ Meta     ││ Workers  ││ Purchases││ Schedule │
+  └──────────┘└──────────┘└──────────┘└──────────┘└──────────┘└──────────┘
+        │          │           │           │          │          │
+        └──────────┴───────────┴─────┬─────┴──────────┴──────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    ▼                ▼                ▼
+              ┌──────────┐   ┌──────────┐   ┌──────────────┐
+              │ Supabase │   │  Redis   │   │   CAMPAIGN   │
+              │ Postgres │   │ BullMQ   │   │   :3007      │
+              │ Storage  │   │ Queues   │   │              │
+              └──────────┘   └──────────┘   │ Templates    │
+                                            │ Mass send    │
+                                            │ Scheduler    │
+                                            └──────────────┘
+```
+
+---
 
 ## Monorepo Structure
 
 ```
 autozap/
 ├── apps/
-│   ├── frontend/                    # Next.js 14+ App Router (port 3000)
-│   ├── auth-service/                # Authentication, JWT, 2FA (port 3001)
-│   ├── tenant-service/              # Tenant management, billing, settings (port 3002)
-│   ├── channel-service/             # WhatsApp adapters, webhooks (port 3003)
-│   ├── message-service/             # Messages, flows, automations (port 3004)
-│   ├── contact-service/             # CRM contacts, tags, products (port 3005)
-│   ├── conversation-service/        # Inbox, pipeline, scheduling (port 3006)
-│   └── campaign-service/            # Mass messaging, templates (port 3007)
+│   ├── frontend/                 # Next.js 14+ App Router
+│   ├── auth-service/             # port 3001 — Authentication
+│   ├── tenant-service/           # port 3002 — Tenant management
+│   ├── channel-service/          # port 3003 — WhatsApp adapters
+│   ├── message-service/          # port 3004 — Messages & flows
+│   ├── contact-service/          # port 3005 — CRM contacts
+│   ├── conversation-service/     # port 3006 — Inbox & pipeline
+│   └── campaign-service/         # port 3007 — Mass messaging
+│
 ├── packages/
-│   ├── utils/                       # Shared: logger, db, crypto, middleware
-│   ├── types/                       # Shared TypeScript types & constants
-│   └── database/                    # SQL migrations
+│   ├── utils/                    # Shared code (ALL services import from here)
+│   │   └── src/
+│   │       ├── index.ts          # ok(), fail(), AppError, generateId, schemas
+│   │       ├── db.ts             # Supabase client singleton
+│   │       ├── logger.ts         # Winston logger factory
+│   │       ├── crypto.ts         # AES-256-GCM encrypt/decrypt
+│   │       ├── middleware.ts     # requireAuth, requireRole, errorHandler, validate
+│   │       ├── redis-cache.ts    # cachedGet, cacheInvalidate
+│   │       ├── sentry.ts         # initSentry, captureError
+│   │       └── rate-limit.ts     # Express rate limiter
+│   │
+│   ├── types/                    # Shared TypeScript types
+│   │   └── src/index.ts          # PlanSlug, UserRole, PLAN_LIMITS, Tenant, User, JwtPayload
+│   │
+│   └── database/                 # SQL migrations
+│       └── src/migrations/       # 001 through 006
+│
+└── CLAUDE.md                     # This file
 ```
 
-## Shared Packages
+---
 
-### @autozap/utils
-
-All backend services import shared code from `@autozap/utils`:
+## Shared Package Rules
 
 ```typescript
+// ALWAYS import from the shared package:
 import { db, logger, requireAuth, requireRole, validate, errorHandler,
          encrypt, decrypt, encryptCredentials, decryptCredentials,
          ok, fail, AppError, generateId, cachedGet, initSentry,
          rateLimit, paginationSchema } from '@autozap/utils'
+
+import { PLAN_LIMITS, type PlanSlug, type UserRole, type JwtPayload } from '@autozap/types'
 ```
 
-| Module | Exports |
-|--------|---------|
-| `db.ts` | Supabase client singleton |
-| `logger.ts` | Winston logger factory (`logger`, `createLogger`) |
-| `crypto.ts` | AES-256-GCM (`encrypt`, `decrypt`, `encryptCredentials`, `decryptCredentials`) |
-| `middleware.ts` | `requireAuth`, `requireRole`, `errorHandler`, `validate` |
-| `redis-cache.ts` | `cachedGet`, `cacheInvalidate` |
-| `sentry.ts` | `initSentry`, `captureError`, `Sentry` |
-| `rate-limit.ts` | Express rate limiter wrapper |
-| `index.ts` | Response helpers (`ok`, `fail`), error classes (`AppError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `PlanLimitError`), utility functions (`generateId`, `slugify`, `sleep`, `normalizePhone`, `normalizeBRPhone`), Zod schemas (`loginSchema`, `registerSchema`, `paginationSchema`) |
-
-**Never create local lib/logger.ts, lib/db.ts, lib/crypto.ts, or middleware files in services.** Use the shared package.
-
-### @autozap/types
-
-```typescript
-import { PLAN_LIMITS, type PlanSlug, type UserRole, type JwtPayload,
-         type Tenant, type User, type ApiResponse } from '@autozap/types'
-```
-
-| Export | Description |
-|--------|-------------|
-| `PlanSlug` | `'pending' \| 'starter' \| 'pro' \| 'enterprise' \| 'unlimited'` |
-| `UserRole` | `'owner' \| 'admin' \| 'agent' \| 'viewer'` |
-| `PLAN_LIMITS` | Plan configuration (messages, channels, members, flows, contacts, AI, products, transcription, reports) |
-| `Tenant` | Tenant entity with settings, metadata, webhook token |
-| `User` | User entity with role, 2FA, email verification |
-| `JwtPayload` | JWT claims (`sub`, `tid`, `role`, `email`) |
-| `ApiResponse<T>` | Standard API response with success, data, error, meta |
-
-**Plan Limits:**
-
-| Feature | Starter | Pro | Enterprise | Unlimited |
-|---------|---------|-----|------------|-----------|
-| Messages/mês | 10K | 50K | 200K | Ilimitado |
-| Canais | 3 | 10 | 30 | 999 |
-| Membros | 3 | 10 | 30 | 999 |
-| Flows | 5 | 20 | Ilimitado | Ilimitado |
-| Contatos | 10K | 50K | 100K | Ilimitado |
-| Respostas IA | 5K | 30K | 100K | Ilimitado |
-| Produtos | 0 | 50 | 500 | Ilimitado |
-| Transcrição | Nao | Sim | Sim | Sim |
-| Relatórios | Nao | Sim | Sim | Sim |
+**NEVER create local `lib/logger.ts`, `lib/db.ts`, `lib/crypto.ts`, or middleware files inside services.** Everything shared lives in `packages/utils`.
 
 ---
 
-## Services Detail
+## Services — Detailed Reference
 
 ### auth-service (port 3001)
 
-**Files:** 7 source files, ~1,200 lines
+**What it does:** User registration, login, JWT tokens, 2FA, team management, permissions.
 
-| File | Description |
-|------|-------------|
-| `routes/auth.routes.ts` | 20 endpoints: register, login, 2FA, team management, permissions |
-| `services/auth.service.ts` | Business logic: JWT, password hashing, TOTP, team invites |
-| `lib/jwt.ts` | JWT sign/verify helpers |
-| `lib/totp.ts` | TOTP (2FA) setup and verification |
-| `lib/email.ts` | Email templates via Resend (verification, reset, invite, notifications) |
+**Files:**
+
+| File | Lines | What |
+|------|-------|------|
+| `routes/auth.routes.ts` | ~340 | 20 endpoints |
+| `services/auth.service.ts` | ~378 | Business logic |
+| `lib/jwt.ts` | ~57 | JWT sign/verify (HS256 explicit) |
+| `lib/totp.ts` | ~50 | TOTP 2FA with otplib |
+| `lib/email.ts` | ~184 | Resend email templates |
 
 **Route mount:** `app.use('/auth', authRoutes)`
 
-**Key endpoints:**
-- `POST /auth/register` — User registration with tenant creation
-- `POST /auth/login` — Login with optional 2FA
-- `POST /auth/2fa/setup|confirm|disable` — Two-factor authentication
-- `GET /auth/team` — Team member management
-- `PATCH /auth/team/:id/permissions` — Per-user channel/conversation permissions
+**All endpoints:**
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/auth/register` | No | Create account + tenant |
+| POST | `/auth/login` | No | Login (2FA optional). 5 fails = 15min lockout |
+| POST | `/auth/refresh` | No | Refresh JWT token |
+| POST | `/auth/logout` | Yes | Revoke current session |
+| POST | `/auth/logout-all` | Yes | Revoke all sessions |
+| POST | `/auth/forgot-password` | No | Send reset email (token hashed in DB) |
+| POST | `/auth/reset-password` | No | Reset with token |
+| POST | `/auth/verify-email` | No | Verify email (token hashed in DB) |
+| POST | `/auth/resend-verification` | No | Resend verification email |
+| GET | `/auth/me` | Yes | Current user + permissions |
+| POST | `/auth/2fa/setup` | Yes | Get QR code for authenticator |
+| POST | `/auth/2fa/confirm` | Yes | Confirm 2FA with code |
+| POST | `/auth/2fa/disable` | Yes | Disable 2FA |
+| GET | `/auth/team` | Yes | List team members |
+| POST | `/auth/team/invite` | Admin | Invite team member |
+| PATCH | `/auth/team/:id` | Admin | Update member (role, active) |
+| DELETE | `/auth/team/:id` | Admin | Remove member |
+| POST | `/auth/team/:id/reset-password` | Admin | Reset member password (128-bit temp) |
+| GET | `/auth/team/:id/permissions` | Admin | Get member permissions |
+| PATCH | `/auth/team/:id/permissions` | Admin | Update permissions (channels, conversations) |
+
+**Security features:**
+- Passwords hashed with bcrypt
+- Refresh token rotation with family tracking + reuse detection
+- Password reset & email verify tokens hashed (SHA256) before DB storage
+- Account lockout after 5 failed login attempts (15 min)
+- Failed logins logged with IP for brute force detection
+- JWT algorithm explicitly HS256 (sign + verify)
+- Generic error message on register (no email enumeration)
+- Refresh tokens expire in 14 days
 
 ---
 
 ### tenant-service (port 3002)
 
-**Files:** 7 source files, ~1,580 lines
+**What it does:** Tenant settings, billing (Asaas), webhooks, analytics, Google Calendar OAuth, super admin panel.
 
-| File | Description |
-|------|-------------|
-| `routes/tenant.routes.ts` | Tenant CRUD, settings, billing, webhooks, analytics, users |
-| `routes/google.routes.ts` | Google OAuth2 flow, Calendar list |
-| `routes/admin.routes.ts` | Super admin: list tenants, stats, block/unblock, impersonate |
-| `services/tenant.service.ts` | Business logic: Asaas billing, plan limits, analytics |
-| `middleware/tenant.middleware.ts` | `requireSuperAdmin` middleware |
+**Files:**
+
+| File | Lines | What |
+|------|-------|------|
+| `routes/tenant.routes.ts` | ~700 | Tenant CRUD, settings, billing, webhooks, analytics, users |
+| `routes/google.routes.ts` | ~130 | Google OAuth2 flow + Calendar list |
+| `routes/admin.routes.ts` | ~155 | Super admin panel |
+| `services/tenant.service.ts` | ~500 | Business logic |
+| `middleware/tenant.middleware.ts` | ~36 | `requireSuperAdmin` |
 
 **Route mounts:**
-- `app.use('/tenant', asaasWebhookRouter)` — Public billing webhook
-- `app.use('/tenant', googleRoutes)` — Google OAuth (callback is public)
-- `app.use('/tenant', tenantRoutes)` — Tenant operations (auth required)
-- `app.use('/admin', adminRoutes)` — Super admin panel
+```
+app.use('/tenant', asaasWebhookRouter)   // Public: billing webhook
+app.use('/tenant', googleRoutes)          // Public: Google OAuth callback
+app.use('/tenant', tenantRoutes)          // Protected: tenant operations
+app.use('/admin', adminRoutes)            // Super admin only
+```
 
 **Key endpoints:**
-- `PATCH /tenant/settings` — Update AI config, auto-reply, timezone
-- `GET /tenant/usage` — Message usage with monthly reset
-- `GET /tenant/analytics` — Dashboard analytics (conversations, messages, contacts, response time)
-- `POST /tenant/billing/subscribe` — Asaas subscription
-- `GET /tenant/integrations/google/auth-url` — Google OAuth start
-- `GET /tenant/integrations/google/calendars` — List Google calendars
-- `POST /admin/tenants/:id/impersonate` — Login as tenant owner
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/tenant/` | Yes | Get tenant info |
+| PATCH | `/tenant/settings` | Admin | AI config, auto-reply, timezone |
+| GET | `/tenant/usage` | Yes | Message usage with monthly reset |
+| GET | `/tenant/analytics` | Yes | Dashboard stats |
+| POST | `/tenant/webhook-token` | Admin | Generate webhook token |
+| GET | `/tenant/integrations/google/auth-url` | Admin | Start Google OAuth |
+| GET | `/tenant/integrations/google/callback` | No | Google OAuth callback |
+| GET | `/tenant/integrations/google/calendars` | Admin | List Google calendars |
+| DELETE | `/tenant/integrations/google` | Admin | Disconnect Google |
+| POST | `/tenant/billing/subscribe` | Yes | Subscribe via Asaas |
+| POST | `/tenant/billing/webhook/asaas` | No | Asaas payment webhook |
+| POST | `/admin/tenants/:id/impersonate` | SuperAdmin | Login as tenant owner |
 
 ---
 
 ### channel-service (port 3003)
 
-**Files:** 9 source files, ~1,954 lines
+**What it does:** Multi-channel message routing. Adapters for WhatsApp (Gupshup + Evolution), Instagram, Messenger.
 
-| File | Description |
-|------|-------------|
-| `routes/channel.routes.ts` | Channel CRUD, webhooks (Gupshup, Evolution, Meta), internal send |
-| `services/channel.service.ts` | Channel creation with encrypted credentials |
-| `adapters/GupshupAdapter.ts` | Official WhatsApp API (native buttons/lists) |
-| `adapters/EvolutionAdapter.ts` | Unofficial API (text fallback for buttons, Supabase media proxy) |
-| `adapters/InstagramAdapter.ts` | Instagram DM adapter |
-| `adapters/MessengerAdapter.ts` | Facebook Messenger adapter |
-| `adapters/ChannelRouter.ts` | Routes messages to correct adapter by channel type |
-| `adapters/IChannelAdapter.ts` | Adapter interface contract |
+**Files:**
 
-**Route mount:** `app.use('/', channelRoutes)`
+| File | Lines | What |
+|------|-------|------|
+| `routes/channel.routes.ts` | ~523 | CRUD, webhooks, internal send |
+| `services/channel.service.ts` | ~273 | Channel creation with encrypted creds |
+| `adapters/GupshupAdapter.ts` | ~300 | Official WhatsApp API |
+| `adapters/EvolutionAdapter.ts` | ~297 | Unofficial WhatsApp API |
+| `adapters/InstagramAdapter.ts` | ~190 | Instagram DM |
+| `adapters/MessengerAdapter.ts` | ~186 | Facebook Messenger |
+| `adapters/ChannelRouter.ts` | ~43 | Routes to correct adapter |
+| `adapters/IChannelAdapter.ts` | ~108 | Adapter interface |
 
-**Channel Adapters:**
+**How channel adapters work:**
+
+```
+Inbound message arrives
+  → POST /webhook/gupshup/:apikey   (or /evolution/:instance, /meta)
+  → channelRouter.resolve(channel.type)
+  → adapter.normalizeInbound(payload)
+  → POST /internal/inbound → message-service
+
+Outbound message
+  → message-service calls POST /internal/send
+  → channelRouter.resolve(channel.type)
+  → adapter.send(to, message)
+```
+
+**Gupshup vs Evolution:**
 
 | Feature | Gupshup (Official) | Evolution (Unofficial) |
 |---------|---------------------|------------------------|
-| Buttons | Native clickable | Text with numbered options |
-| Lists | Native dropdown | Text with numbered options |
-| Media | Direct URLs | Download via API → Supabase Storage → public URL |
-| Status | sent/delivered/read | sent/delivered/read |
-| Auth | API key | Instance name + API key |
+| Buttons | Native WhatsApp clickable buttons | Auto-converted to numbered text |
+| Lists | Native dropdown | Auto-converted to numbered text |
+| Media receive | Direct CDN URLs | Download via API → upload to Supabase Storage |
+| Number mapping | Not needed | "1" → maps to button title |
+| Auth | API key in URL | Instance name + API key |
 
-**Key endpoints:**
-- `POST /webhook/gupshup/:apikey` — Gupshup inbound webhook
-- `POST /webhook/evolution/:instanceName` — Evolution inbound webhook
-- `GET/POST /webhook/meta` — Instagram/Messenger webhooks
-- `POST /internal/send` — Internal service-to-service message sending
-- `GET /channels/:id/evolution/qrcode` — QR code for Evolution pairing
+**Why Evolution needs special handling:**
+WhatsApp blocks buttons/lists from unofficial APIs. The `EvolutionAdapter` automatically converts interactive messages to numbered text format (`1️⃣ Option A`, `2️⃣ Option B`). When the user replies "1", the flow engine maps it back to the original button title.
 
 ---
 
 ### message-service (port 3004)
 
-**Files:** 20 source files, ~6,766 lines (largest service)
+**What it does:** Core message processing, flow engine (20+ node types), automations, AI responses, webhooks.
 
-| File | Description |
-|------|-------------|
-| `routes/message.routes.ts` | Send messages, webhooks (lead/notify/flow), internal inbound |
-| `routes/automation.routes.ts` | Automation CRUD (keyword triggers) |
-| `routes/flow.routes.ts` | Flow CRUD, graph editor, manual execution, analytics |
-| `services/message.service.ts` | Message processing, bot/human takeover, read receipts |
-| `services/automation.service.ts` | Automation matching and execution |
-| `services/flow.engine.ts` | **Main flow engine (2,346 lines)** — executes all node types |
-| `services/contact.helper.ts` | Contact upsert helper |
-| `workers/message.worker.ts` | BullMQ worker for async message processing |
-| `workers/flow.worker.ts` | BullMQ worker for delayed flow nodes |
-| `middleware/message.middleware.ts` | Internal secret validation (timing-safe) |
+**This is the largest and most complex service (~6,700 lines).**
 
-**Flow Engine Modules** (created alongside flow.engine.ts, not yet wired in):
+**Files:**
+
+| File | Lines | What |
+|------|-------|------|
+| `routes/message.routes.ts` | ~320 | Send, webhooks (lead/notify/flow), inbound |
+| `routes/automation.routes.ts` | ~188 | Automation CRUD |
+| `routes/flow.routes.ts` | ~352 | Flow CRUD, graph editor, run |
+| `services/message.service.ts` | ~638 | Message processing, bot takeover |
+| `services/automation.service.ts` | ~274 | Keyword matching |
+| `services/flow.engine.ts` | ~2,346 | **Main flow engine** |
+| `services/contact.helper.ts` | ~103 | Contact/conversation upsert |
+| `workers/message.worker.ts` | ~357 | Async message processing |
+| `workers/flow.worker.ts` | ~159 | Delayed flow nodes |
+| `middleware/message.middleware.ts` | ~32 | Internal secret (timing-safe) |
+
+**Flow engine modular files** (created alongside, not yet wired in):
 
 ```
 services/flow/
-├── types.ts          # FlowContext, FlowNodeData, NodeResult, ConditionRule
-├── helpers.ts        # interpolate, sendMessage, evaluateCondition, cached, emitPusher
-├── triggers.ts       # isOnCooldown, checkFlowTrigger, evaluateTrigger
+├── types.ts           # FlowContext, FlowNodeData, NodeResult
+├── helpers.ts         # interpolate, sendMessage, evaluateCondition
+├── triggers.ts        # isOnCooldown, checkFlowTrigger
 └── nodes/
-    ├── message.ts    # handleSendMessage, handleSendMedia
-    ├── logic.ts      # handleWait, handleCondition, handleLoop*, handleSplitAB, handleEnd
-    ├── integration.ts # handleTranscribeAudio, handleAi, handleWebhook
-    ├── crm.ts        # handleCreateContact, handleTagContact, handleMovePipeline, handleAssignAgent
-    └── schedule.ts   # executeGoogleCalendarNode, executeCancelAppointment
+    ├── message.ts     # send_message, send_media
+    ├── logic.ts       # wait, condition, loops, split_ab, end
+    ├── integration.ts # transcribe_audio, ai, webhook
+    ├── crm.ts         # contacts, tags, pipeline, assign, tasks
+    └── schedule.ts    # Google Calendar scheduling
 ```
 
-**Supported Node Types (20+):**
-- **Message:** send_message, send_media, input
-- **Logic:** wait, condition, loop_repeat, loop_retry, loop_while, split_ab, random_path, go_to, end
-- **Integration:** transcribe_audio, ai, webhook
-- **CRM:** create_contact, map_fields, tag_contact, update_contact, move_pipeline, assign_agent, create_task, send_notification
-- **Scheduling:** schedule_appointment (Google Calendar with freebusy, pricing, cancellation)
+**All supported flow node types:**
 
-**Key endpoints:**
-- `POST /internal/inbound` — Process inbound message (triggers automations/flows)
-- `POST /messages/send` — Send message (with bot/human mode check)
-- `PUT /flows/:id/graph` — Save flow graph (nodes + edges)
-- `POST /flows/:id/run` — Execute flow for specific contacts
-- `POST /webhook/lead/:token` — External lead capture
-- `POST /webhook/notify/:token` — External notification trigger
-- `POST /webhook/flow/:flowId/:token` — External flow trigger
+| Category | Nodes | Description |
+|----------|-------|-------------|
+| Message | `send_message`, `send_media`, `input` | Text, buttons, lists, images, audio, video |
+| Logic | `wait`, `condition`, `loop_repeat`, `loop_retry`, `loop_while`, `split_ab`, `random_path`, `go_to`, `end` | Delays (inline ≤5min, BullMQ >5min), branching, A/B testing |
+| Integration | `transcribe_audio`, `ai`, `webhook` | Whisper transcription, OpenAI (4 modes), HTTP requests |
+| CRM | `create_contact`, `map_fields`, `tag_contact`, `update_contact`, `move_pipeline`, `assign_agent`, `create_task`, `send_notification` | Contact operations, agent assignment (round-robin) |
+| Scheduling | `schedule_appointment` | Google Calendar freebusy, pricing tables, cancellation |
+
+**Bot pause/resume:**
+- **From CRM:** "Assumir" button pauses bot, "Liberar bot" reactivates
+- **From phone:** Replying from WhatsApp auto-pauses bot. Send `#bot` to reactivate (message is hidden from client)
+- **From flow:** `assign_agent` and `end` nodes can pause the bot
+- Controlled by `conversations.bot_active` column
+
+**Webhook endpoints (public, token-based):**
+
+| Endpoint | What it does | Body |
+|----------|-------------|------|
+| `POST /webhook/lead/:token` | Captures lead → creates contact + conversation | `{ phone, name, email, source, message }` |
+| `POST /webhook/notify/:token` | Sends message to a number | `{ phone, message, channelId?, name? }` |
+| `POST /webhook/flow/:flowId/:token` | Triggers a specific flow | `{ phone, name, message, ...custom }` |
+
+All three use the same `webhook_token` from the tenant (generated in Settings).
 
 ---
 
 ### contact-service (port 3005)
 
-**Files:** 4 source files, ~889 lines
+**What it does:** CRM contacts, tags, CSV import/export, products catalog, purchases (single/batch), sales analytics.
 
-| File | Description |
-|------|-------------|
-| `routes/contact.routes.ts` | Contacts CRUD, tags, import/export, deal adjustments |
-| `routes/product.routes.ts` | Products CRUD, purchases (single/batch), purchase summary |
-| `services/contact.service.ts` | Contact business logic, CSV import/export |
+**Files:**
 
-**Route mount:** `app.use('/', contactRoutes)` + `app.use('/', productRoutes)`
+| File | Lines | What |
+|------|-------|------|
+| `routes/contact.routes.ts` | ~238 | Contacts CRUD, tags, import/export |
+| `routes/product.routes.ts` | ~304 | Products CRUD, purchases, summary |
+| `services/contact.service.ts` | ~312 | Business logic, CSV handling |
+
+**Route mount:** Both at `/`
 
 **Key endpoints:**
-- `POST /contacts/import` — CSV import (up to 10K contacts)
-- `GET /contacts/export` — CSV export (plan-gated)
-- `POST /purchases/batch` — Multi-product order with proportional discount/surcharge
-- `GET /purchases/summary` — Product sales analytics (qty, revenue, avg ticket)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/contacts` | List with pagination, search, filters |
+| POST | `/contacts` | Create (plan limit checked) |
+| POST | `/contacts/import` | CSV import (max 10K rows, Zod validated) |
+| GET | `/contacts/export` | CSV export (plan-gated: Pro+) |
+| DELETE | `/contacts/all` | Delete all (admin/owner only) |
+| GET | `/products` | List active products |
+| POST | `/products` | Create (plan limit checked) |
+| POST | `/purchases/batch` | Multi-product order with proportional discount |
+| GET | `/purchases/summary` | Sales analytics (qty, revenue, avg ticket) |
 
 ---
 
 ### conversation-service (port 3006)
 
-**Files:** 5 source files, ~1,388 lines
+**What it does:** Inbox, conversations, notes, quick replies, tasks, pipeline (Kanban), scheduling/appointments.
 
-| File | Description |
-|------|-------------|
-| `routes/conversation.routes.ts` | Conversations, notes, quick replies, tasks, bulk ops, labels |
-| `routes/pipeline.routes.ts` | Pipeline CRUD, columns, cards (Kanban board) |
-| `routes/scheduling.routes.ts` | Scheduling config, appointments, available slots |
-| `services/conversation.service.ts` | Conversation business logic, inbox queries |
+**Files:**
 
-**Route mount:** `app.use('/', conversationRoutes)` + `app.use('/', pipelineRoutes)` + `app.use('/', schedulingRoutes)`
+| File | Lines | What |
+|------|-------|------|
+| `routes/conversation.routes.ts` | ~563 | Inbox, notes, tasks, bulk ops, labels |
+| `routes/pipeline.routes.ts` | ~218 | Pipeline CRUD, columns, cards |
+| `routes/scheduling.routes.ts` | ~345 | Scheduling config, appointments |
+| `services/conversation.service.ts` | ~226 | Business logic |
+
+**Route mount:** All three at `/`
 
 **Key endpoints:**
-- `GET /conversations` — Inbox with filters (status, channel, assigned, search)
-- `GET /conversations/counts` — Status counts for sidebar badges
-- `GET /conversations/pipeline` — Pipeline/Kanban board view
-- `POST /conversations/bulk/read|close|assign|labels` — Bulk operations
-- `GET /pipeline-cards` — Independent deal cards (not tied to conversations)
-- `GET /appointments/available-slots` — Available scheduling slots with break/conflict detection
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/conversations` | Inbox with filters (status, channel, assigned, search) |
+| GET | `/conversations/counts` | Status counts for sidebar badges |
+| GET | `/conversations/pipeline` | Pipeline/Kanban board view |
+| POST | `/conversations/bulk/read\|close\|assign\|labels` | Bulk operations (Zod validated) |
+| GET | `/pipelines` | List pipelines |
+| POST | `/pipeline-cards` | Create deal card (Zod validated) |
+| GET | `/appointments/available-slots` | Available slots with break/conflict detection |
+| POST | `/appointments` | Create appointment (conflict check) |
 
 ---
 
 ### campaign-service (port 3007)
 
-**Files:** 8 source files, ~1,575 lines
+**What it does:** Mass messaging campaigns, message templates, scheduled sending, contact import.
 
-| File | Description |
-|------|-------------|
-| `routes/campaign.routes.ts` | Campaign CRUD, template management, contact import |
-| `services/campaign.service.ts` | Campaign creation, contact management |
-| `workers/campaign.worker.ts` | BullMQ worker for sending campaign messages |
-| `workers/inbox.worker.ts` | Inbound message routing to conversations |
-| `workers/reconciliation.worker.ts` | Message status reconciliation |
-| `workers/scheduler.worker.ts` | Scheduled campaign execution |
-| `lib/email.ts` | Campaign notification emails |
+**Files:**
 
-**Route mount:** `app.use('/', campaignRoutes)`
+| File | Lines | What |
+|------|-------|------|
+| `routes/campaign.routes.ts` | ~291 | Campaign CRUD, templates, contacts |
+| `services/campaign.service.ts` | ~344 | Campaign logic |
+| `workers/campaign.worker.ts` | ~459 | BullMQ: sends messages with throttling |
+| `workers/inbox.worker.ts` | ~131 | Routes inbound to conversations |
+| `workers/reconciliation.worker.ts` | ~103 | Reconciles message status |
+| `workers/scheduler.worker.ts` | ~99 | Scheduled campaign execution |
+| `lib/email.ts` | ~96 | Campaign notification emails |
 
-**Key endpoints:**
-- `POST /campaigns/:id/start` — Start campaign (queues messages via BullMQ)
-- `POST /campaigns/:id/contacts/import` — Import contacts from CSV
-- `POST /campaigns/:id/contacts/by-tag` — Add contacts by tag filter
+**How campaigns work:**
+1. Create campaign → add contacts (by CSV, tag, or filter)
+2. Start campaign → jobs queued in BullMQ
+3. `campaign.worker` sends messages with throttling per channel
+4. Status tracked: pending → sent → delivered → read
+5. `reconciliation.worker` syncs statuses periodically
 
 ---
 
 ## Frontend (Next.js 14+)
 
-**Stack:** Next.js App Router, shadcn/ui, Zustand, Pusher, Supabase
+**Stack:** Next.js App Router, shadcn/ui, Zustand, Pusher (real-time), Supabase
 
-### Pages
+### All Pages
 
 ```
 app/
-├── page.tsx                    # Landing page
-├── login/                      # Authentication
-├── register/
-├── forgot-password/
-├── reset-password/
-├── verify-email/
-├── admin/                      # Super admin panel
-├── form/[token]/               # External form (lead capture)
+├── page.tsx                     # Landing page (public)
+├── login/                       # Login form
+├── register/                    # Registration form
+├── forgot-password/             # Password recovery
+├── reset-password/              # Password reset
+├── verify-email/                # Email verification
+├── admin/                       # Super admin panel
+├── form/[token]/                # External lead capture form (public)
+│
 └── dashboard/
-    ├── page.tsx                # Dashboard home
-    ├── inbox/                  # Conversation inbox
-    ├── contacts/               # CRM contacts
-    ├── products/               # Product catalog
-    ├── flows/                  # Flow builder
-    │   └── [id]/               # Visual flow editor
-    ├── automations/            # Keyword automations
-    ├── campaigns/              # Mass messaging
-    ├── templates/              # Message templates
-    ├── pipeline/               # Kanban board
-    ├── scheduling/             # Appointment scheduling
-    ├── tasks/                  # Task management
-    ├── channels/               # Channel management
-    ├── team/                   # Team members
-    └── settings/               # Tenant settings
+    ├── page.tsx                 # Dashboard home (stats)
+    ├── inbox/                   # Conversation inbox (real-time)
+    ├── contacts/                # CRM contact list
+    ├── products/                # Product catalog
+    ├── flows/                   # Flow list
+    │   └── [id]/                # Visual flow editor (drag & drop)
+    ├── automations/             # Keyword automations
+    ├── campaigns/               # Mass messaging campaigns
+    ├── templates/               # Message templates
+    ├── pipeline/                # Kanban deal board
+    ├── scheduling/              # Appointment scheduling
+    ├── tasks/                   # Task management
+    ├── channels/                # Channel management (connect WhatsApp)
+    ├── team/                    # Team members & invites
+    └── settings/                # Tenant settings, webhooks, billing, Google
 ```
 
-### Key Libraries
+### Key Frontend Files
 
-| Directory | Files | Description |
-|-----------|-------|-------------|
-| `components/ui/` | 13 | shadcn/ui primitives (button, card, input, etc.) |
-| `components/layout/` | 2 | Sidebar, TrialBanner |
-| `lib/api.ts` | 1 | API client (all service calls) |
-| `lib/i18n/` | 4 | Translations: pt-BR, en, es |
-| `lib/pusher.ts` | 1 | Real-time event listener |
-| `store/` | 4 | Zustand stores (auth, permissions, theme, unread) |
-| `hooks/` | 1 | useNotifications |
+| Path | What |
+|------|------|
+| `lib/api.ts` | Axios API client — all backend calls go through here |
+| `lib/i18n/` | Translations: `pt-BR.ts`, `en.ts`, `es.ts` |
+| `lib/pusher.ts` | Pusher event listener for real-time updates |
+| `lib/supabase.ts` | Supabase client (frontend) |
+| `store/auth.store.ts` | Zustand — user session, login state |
+| `store/permissions.store.ts` | Zustand — role-based UI permissions |
+| `store/theme.store.ts` | Zustand — dark/light theme |
+| `store/unread.store.ts` | Zustand — unread message counts |
+| `components/ui/` | 13 shadcn/ui primitives (button, card, input, etc.) |
+| `components/layout/` | Sidebar, TrialBanner |
 
 ---
 
 ## Database
 
-- **Supabase** (PostgreSQL) for all data
-- **Redis** (BullMQ) for job queues (campaigns, message sending, flow resume)
-- **Supabase Storage** (bucket: `media`) for Evolution media files
+### Storage
+
+| System | Purpose |
+|--------|---------|
+| **Supabase (PostgreSQL)** | All relational data (tenants, users, contacts, conversations, messages, flows, campaigns) |
+| **Redis (BullMQ)** | Job queues (campaign sending, delayed flow nodes, message processing, auto-reply) |
+| **Supabase Storage** | `media` bucket — Evolution media files (images, audio, video) |
 
 ### Migrations
 
 ```
 packages/database/src/migrations/
-├── 001_base_schema.sql       # Core tables (tenants, users, contacts, conversations, messages)
-├── 002_functions.sql         # Database functions
-├── 003_channels_messages.sql # Channels and message tables
-├── 004_campaigns.sql         # Campaign tables
-├── 005_fixes.sql             # Schema corrections
-└── 006_webhook_token.sql     # Webhook token support
+├── 001_base_schema.sql        # tenants, users, contacts, conversations, messages
+├── 002_functions.sql          # Database functions (increment_unread, etc.)
+├── 003_channels_messages.sql  # channels, message status tracking
+├── 004_campaigns.sql          # campaigns, campaign_contacts, templates
+├── 005_fixes.sql              # Schema corrections and indexes
+└── 006_webhook_token.sql      # webhook_token column on tenants
 ```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `tenants` | Multi-tenant root. Has `plan_slug`, `settings`, `metadata`, `webhook_token` |
+| `users` | Users belong to a tenant. Has `role`, `2FA`, `email_verified` |
+| `contacts` | CRM contacts. Has `phone`, `metadata`, `deal_adjustments` |
+| `conversations` | Chat threads. Has `bot_active`, `status`, `pipeline_stage`, `labels` |
+| `messages` | Individual messages. Has `direction`, `content_type`, `external_id` |
+| `channels` | WhatsApp/Meta connections. `credentials` encrypted with AES-256-GCM |
+| `flows` | Flow automations. Graph stored as `nodes[]` + `edges[]` |
+| `flow_states` | Running flow state per conversation (variables, current node, waiting input) |
+| `products` | Product catalog with `price`, `sku`, `category` |
+| `purchases` | Purchase records with `order_id`, discount, surcharge, shipping |
+| `pipelines` | Multiple pipeline boards per tenant |
+| `pipeline_columns` | Kanban columns (key, label, color, sort_order) |
+| `pipeline_cards` | Deal cards on the Kanban board |
+| `scheduling_config` | Appointment scheduling settings (hours, days, slot duration) |
+| `appointments` | Booked appointments (date, time, status, conflict checking) |
+| `tasks` | Tasks/follow-ups with due dates and assignment |
+| `campaigns` | Mass messaging campaigns with status tracking |
 
 ---
 
-## Environment Variables
+## Plans & Limits
 
-Required in all backend services:
-- `SUPABASE_URL` — Supabase project URL
-- `SUPABASE_SERVICE_KEY` — Supabase service role key
-- `JWT_SECRET` — JWT signing secret
-- `ENCRYPTION_KEY` — AES-256-GCM encryption key (channel credentials)
-- `REDIS_URL` — Redis connection URL
-- `CORS_ORIGIN` — Comma-separated allowed origins
-- `INTERNAL_SECRET` — Service-to-service auth token
+| Feature | Starter | Pro | Enterprise | Unlimited |
+|---------|---------|-----|------------|-----------|
+| Messages/month | 10,000 | 50,000 | 200,000 | Unlimited |
+| Channels | 3 | 10 | 30 | 999 |
+| Team members | 3 | 10 | 30 | 999 |
+| Flows | 5 | 20 | Unlimited | Unlimited |
+| Contacts | 10,000 | 50,000 | 100,000 | Unlimited |
+| AI responses | 5,000 | 30,000 | 100,000 | Unlimited |
+| Products | 0 | 50 | 500 | Unlimited |
+| Transcription | No | Yes | Yes | Yes |
+| Reports/Export | No | Yes | Yes | Yes |
 
-Service-specific:
-- `PUSHER_*` — Real-time updates (all services that emit events)
-- `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI` — Google Calendar (tenant-service)
-- `ASAAS_WEBHOOK_TOKEN` — Billing webhook auth (tenant-service)
-- `SENTRY_DSN` — Error tracking (all services)
-- `MESSAGE_SERVICE_URL` — Internal URL for message sending (message-service)
+Plan limits are enforced server-side via `PLAN_LIMITS` constant from `@autozap/types`. Every create operation checks the tenant's plan before proceeding.
+
+---
+
+## Security
+
+### Authentication & Authorization
+
+| Layer | How |
+|-------|-----|
+| JWT | HS256 explicit, 1h access token, 14-day refresh token |
+| Refresh tokens | Hashed (SHA256) in DB, family rotation, reuse detection |
+| Password reset tokens | Hashed (SHA256) before storage |
+| Email verify tokens | Hashed (SHA256) before storage |
+| Password hashing | bcrypt |
+| 2FA | TOTP via otplib (Google Authenticator compatible) |
+| Account lockout | 5 failed logins = 15-minute lockout |
+| Temp passwords | 128-bit random (16 bytes hex) |
+| Role hierarchy | viewer(0) < agent(1) < admin(2) < owner(3) |
+| Super admin | Requires `is_superadmin` in DB + `ADMIN_SECRET` header |
+
+### API Security
+
+| Protection | Implementation |
+|------------|----------------|
+| Input validation | Zod schemas on all POST/PATCH/PUT endpoints |
+| Tenant isolation | `.eq('tenant_id', req.auth.tid)` on every query |
+| Rate limiting | `express-rate-limit` on all 7 services (120 req/min default) |
+| CORS | Whitelist from `CORS_ORIGIN` env var, rejects all if unset |
+| Helmet | Security headers on all services |
+| Internal auth | `INTERNAL_SECRET` with `crypto.timingSafeEqual` |
+| Webhook auth | Per-tenant `webhook_token` (48 hex chars) |
+| Credentials | Channel API keys encrypted with AES-256-GCM |
+| Error handling | No stack traces leaked; generic "Internal server error" in production |
 
 ---
 
 ## Coding Standards
 
-1. **Imports**: Always from `@autozap/utils`, never local duplicates
-2. **Logging**: Use `logger` from utils, never `console.*`
-3. **Errors**: Use `AppError` classes, handled by shared `errorHandler`
-4. **Types**: Use `@autozap/types`, minimize `any` usage
-5. **Responses**: Use `ok(data)` and `fail(code, message)` helpers
-6. **i18n**: Translations in `apps/frontend/lib/i18n/` (pt-BR, en, es)
-7. **Security**: Zod validation on all inputs, tenant isolation on all queries, timing-safe comparison for secrets
-8. **Rate Limiting**: All services use `express-rate-limit` (120 req/min default)
+### Rules for all backend code:
+
+1. **Imports** — Always from `@autozap/utils`, never create local duplicates
+2. **Logging** — Use `logger` from utils, never `console.*`
+3. **Errors** — Use `AppError` classes, caught by shared `errorHandler`
+4. **Types** — Use `@autozap/types`, minimize `any` usage
+5. **Responses** — `ok(data)` for success, `fail(code, message)` for errors
+6. **Validation** — Every POST/PATCH/PUT endpoint must use `validate(zodSchema)`
+7. **Tenant isolation** — Every DB query must include `.eq('tenant_id', req.auth.tid)`
+8. **Secrets** — Use `crypto.timingSafeEqual` for constant-time comparison
+9. **Rate limiting** — Every service must have rate limiting in `index.ts`
+10. **i18n** — All user-facing strings in `apps/frontend/lib/i18n/` (pt-BR, en, es)
+
+### Adding a new endpoint:
+
+```typescript
+// 1. Define Zod schema
+const mySchema = z.object({
+  name: z.string().min(1).max(255),
+  value: z.number().optional(),
+})
+
+// 2. Use validate middleware + tenant isolation
+router.post('/my-endpoint', validate(mySchema), async (req, res, next) => {
+  try {
+    const { name, value } = req.body
+    const { data, error } = await db
+      .from('my_table')
+      .insert({ tenant_id: req.auth.tid, name, value })  // Always include tenant_id
+      .select()
+      .single()
+    if (error) throw error
+    res.status(201).json(ok(data))
+  } catch (err) { next(err) }
+})
+```
+
+### Adding a new service:
+
+1. Create `apps/my-service/` with `src/index.ts`, `src/routes/`, `package.json`
+2. Import `helmet`, `cors`, `express-rate-limit`, `cookieParser` from deps
+3. Import `errorHandler`, `logger`, `initSentry` from `@autozap/utils`
+4. Add `CORS_ORIGIN?.split(',') || false` (never undefined)
+5. Add rate limiting: `app.use(rateLimit({ windowMs: 60_000, max: 120 }))`
+6. Add health check at `GET /health`
+7. Mount routes, then `app.use(errorHandler)` last
+
+---
 
 ## Deploy
 
-- **Railway** — All services deployed as Docker containers
-- **Pusher** — Real-time updates
-- **Sentry** — Error tracking
-- Push to `main` triggers automatic deploy on all services
+| Service | Platform | Trigger |
+|---------|----------|---------|
+| All backend services | **Railway** (Docker) | Push to `main` → auto-deploy |
+| Frontend | **Railway** or **Vercel** | Push to `main` → auto-deploy |
+| Database | **Supabase** | Managed PostgreSQL |
+| Cache/Queues | **Railway Redis** | Managed Redis |
+| Real-time | **Pusher** | Managed WebSocket |
+| Error tracking | **Sentry** | All services send errors |
+| Emails | **Resend** | Transactional emails |
+| Billing | **Asaas** | Brazilian payment gateway |
+
+---
 
 ## Project Stats
 
@@ -399,9 +648,10 @@ Service-specific:
 |--------|-------|
 | Backend services | 7 |
 | Frontend pages | 25 |
-| Total source files | 70+ |
-| Total lines of code | ~16,000 (backend) |
+| Source files | 70+ |
+| Lines of code (backend) | ~16,000 |
 | API endpoints | 180+ |
 | Flow node types | 20+ |
-| Supported languages | 3 (pt-BR, en, es) |
+| Languages | 3 (pt-BR, en, es) |
 | Channel adapters | 4 (Gupshup, Evolution, Instagram, Messenger) |
+| Security fixes applied | 15 (CRITICAL to LOW) |
