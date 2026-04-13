@@ -102,7 +102,7 @@ asaasWebhookRouter.get('/integrations/google/callback', async (req, res) => {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
     const { data: profile } = await oauth2.userinfo.get()
 
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: tenant } = await db.from('tenants').select('metadata').eq('id', tenantId).single()
     const metadata = tenant?.metadata || {}
 
@@ -149,7 +149,7 @@ router.patch('/name', requireRole('owner'), validate(updateNameSchema), async (r
 router.post('/webhook-token', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const crypto = require('crypto')
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const token = crypto.randomBytes(24).toString('hex')
     const { data, error } = await db.from('tenants').update({
       webhook_token: token,
@@ -164,7 +164,7 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
   try {
     const { message, prompt, model } = req.body
     if (!message || !prompt) { res.status(400).json({ success: false, error: { message: 'message and prompt required' } }); return }
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: tenant } = await db.from('tenants').select('metadata').eq('id', req.auth.tid).single()
     const apiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
     if (!apiKey) { res.status(400).json({ success: false, error: { message: 'OpenAI API key not configured' } }); return }
@@ -201,7 +201,7 @@ router.get('/integrations/google/auth-url', requireRole('admin', 'owner'), async
 
 router.delete('/integrations/google', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: tenant } = await db.from('tenants').select('metadata').eq('id', req.auth.tid).single()
     const metadata = { ...(tenant?.metadata || {}) }
     delete metadata.google_access_token
@@ -215,7 +215,7 @@ router.delete('/integrations/google', requireRole('admin', 'owner'), async (req,
 
 router.get('/integrations/google/calendars', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: tenant } = await db.from('tenants').select('metadata').eq('id', req.auth.tid).single()
     const meta = tenant?.metadata || {}
     if (!meta.google_access_token) { res.status(400).json({ error: 'Google não conectado' }); return }
@@ -283,7 +283,7 @@ router.get('/usage', async (req, res, next) => {
 
 router.get('/limits', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const tenant = await tenantService.getTenant(req.auth.tid)
     const planLimits = PLAN_LIMITS[tenant.planSlug as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.pending
 
@@ -353,7 +353,7 @@ router.get('/limits', async (req, res, next) => {
 
 router.get('/permissions', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data } = await db
       .from('tenants')
       .select('role_permissions')
@@ -374,7 +374,7 @@ router.get('/permissions', async (req, res, next) => {
 
 router.patch('/permissions', requireRole('admin', 'owner'), validate(permissionsSchema), async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { error } = await db
       .from('tenants')
       .update({ role_permissions: req.body.permissions })
@@ -389,7 +389,7 @@ router.patch('/permissions', requireRole('admin', 'owner'), validate(permissions
 
 router.get('/webhooks', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data, error } = await db
       .from('webhook_configs')
       .select('id, url, events, active, created_at')
@@ -402,7 +402,7 @@ router.get('/webhooks', async (req, res, next) => {
 
 router.post('/webhooks', validate(webhookSchema), async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { url, events, secret } = req.body
     if (!validateWebhookUrl(url)) { res.status(400).json({ error: 'Webhook URL is not allowed (blocked destination)' }); return }
     const { data, error } = await db
@@ -417,7 +417,7 @@ router.post('/webhooks', validate(webhookSchema), async (req, res, next) => {
 
 router.patch('/webhooks/:id', validate(webhookUpdateSchema), async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     if (req.body.url && !validateWebhookUrl(req.body.url)) { res.status(400).json({ error: 'Webhook URL is not allowed (blocked destination)' }); return }
     const { data, error } = await db
       .from('webhook_configs')
@@ -433,7 +433,7 @@ router.patch('/webhooks/:id', validate(webhookUpdateSchema), async (req, res, ne
 
 router.delete('/webhooks/:id', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { error } = await db
       .from('webhook_configs')
       .delete()
@@ -446,7 +446,7 @@ router.delete('/webhooks/:id', async (req, res, next) => {
 
 router.post('/webhooks/:id/test', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: wh, error } = await db
       .from('webhook_configs')
       .select('url, secret')
@@ -482,7 +482,7 @@ router.post('/webhooks/:id/test', async (req, res, next) => {
 
 router.get('/analytics', async (req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const tenantId = req.auth.tid
     const filterUserId = req.query.userId as string | undefined
 
@@ -774,7 +774,7 @@ router.get('/analytics', async (req, res, next) => {
 router.post('/billing/subscribe', validate(subscribeSchema), async (req, res, next) => {
   try {
     const { planSlug, cpfCnpj } = req.body
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: user } = await db.from('users').select('name, email').eq('id', req.auth.sub).single()
     if (!user) { res.status(404).json({ success: false, error: { message: 'User not found' } }); return }
     const result = await tenantService.createSubscription(req.auth.tid, planSlug, user.email, user.name, cpfCnpj)
@@ -784,7 +784,7 @@ router.post('/billing/subscribe', validate(subscribeSchema), async (req, res, ne
 
 router.get('/billing/plans', async (_req, res, next) => {
   try {
-    const { db } = await import('../lib/db')
+    const { db } = await import('@autozap/utils')
     const { data: plans } = await db
       .from('plans')
       .select('id, name, slug, price_monthly, message_limit, features')

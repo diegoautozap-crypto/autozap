@@ -16,7 +16,8 @@ app.use(cookieParser())
 app.use(express.json({ limit: '10mb' })) // large for CSV imports
 app.get('/health', async (_req, res) => {
   try {
-    const { error } = await (await import('./lib/db')).db.from('contacts').select('id').limit(1)
+    const { db: dbCheck } = await import('@autozap/utils')
+    const { error } = await dbCheck.from('contacts').select('id').limit(1)
     res.json({ status: error ? 'degraded' : 'ok', service: 'contact-service', db: error ? 'down' : 'ok' })
   } catch { res.json({ status: 'degraded', service: 'contact-service', db: 'down' }) }
 })

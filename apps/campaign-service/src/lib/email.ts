@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { logger } from './logger'
+import { logger } from '@autozap/utils'
 
 // Lazy — só instancia quando for usar, evita crash no startup sem RESEND_API_KEY
 function getResend(): Resend {

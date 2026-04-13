@@ -42,7 +42,29 @@
       "Read(//tmp/**)",
       "Bash(find /c/Users/Adm/Desktop/autozap -path */supabase/* -name *.sql)",
       "Bash(npx next:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(git reset:*)",
+      "Bash(git log:*)",
+      "Bash(find /c/Users/Adm/Desktop/autozap -name .env* -o -name *.env*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(wc -l /c/Users/Adm/Desktop/autozap/packages/database/src/migrations/*.sql)",
+      "Bash(xargs basename:*)",
+      "Bash(xargs wc:*)",
+      "Bash(xargs head:*)",
+      "Bash(railway redeploy:*)",
+      "Bash(railway service:*)",
+      "Bash(railway status:*)",
+      "Bash(railway logs:*)",
+      "Bash(railway up:*)",
+      "WebSearch",
+      "WebFetch(domain:doc.evolution-api.com)",
+      "Bash(git -C /c/Users/Adm/Desktop/autozap log --all --source --full-history -- \"*.sql\")",
+      "Bash(git -C /c/Users/Adm/Desktop/autozap log --all --oneline -- \"*.sql\")",
+      "Bash(git:*)",
+      "Bash(railway variables:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
