@@ -6,6 +6,8 @@ import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import conversationRoutes from './routes/conversation.routes'
+import pipelineRoutes from './routes/pipeline.routes'
+import schedulingRoutes from './routes/scheduling.routes'
 import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
@@ -24,6 +26,8 @@ app.get('/health', async (_req, res) => {
   } catch { res.json({ status: 'degraded', service: 'conversation-service', db: 'down' }) }
 })
 app.use('/', conversationRoutes)
+app.use('/', pipelineRoutes)
+app.use('/', schedulingRoutes)
 app.use(errorHandler)
 app.listen(PORT, () => logger.info(`conversation-service running on port ${PORT}`))
 
