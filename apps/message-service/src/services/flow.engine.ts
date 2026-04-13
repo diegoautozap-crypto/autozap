@@ -237,24 +237,30 @@ export class FlowEngine {
 
   // Lock para evitar execução simultânea do mesmo flow na mesma conversa
   private flowLocks = new Map<string, number>()
-  private readonly FLOW_LOCK_TTL = 5_000 // 5 segundos
+  private readonly DEFAULT_LOCK_TTL = 20_000 // 20 segundos padrão
 
-  private acquireFlowLock(conversationId: string): boolean {
+  private async getFlowLockTTL(tenantId: string): Promise<number> {
+    const { data } = await cached(`tenant-settings:${tenantId}`, 60_000, async () => {
+      return db.from('tenants').select('settings').eq('id', tenantId).single()
+    })
+    const seconds = data?.settings?.flowLockSeconds
+    if (seconds && typeof seconds === 'number' && seconds >= 1 && seconds <= 120) {
+      return seconds * 1000
+    }
+    return this.DEFAULT_LOCK_TTL
+  }
+
+  private acquireFlowLock(conversationId: string, ttl: number): boolean {
     const now = Date.now()
     const existing = this.flowLocks.get(conversationId)
-    if (existing && now - existing < this.FLOW_LOCK_TTL) return false
+    if (existing && now - existing < ttl) return false
     this.flowLocks.set(conversationId, now)
-    // Limpa locks antigos periodicamente
     if (this.flowLocks.size > 1000) {
       for (const [key, time] of this.flowLocks) {
-        if (now - time > this.FLOW_LOCK_TTL) this.flowLocks.delete(key)
+        if (now - time > ttl) this.flowLocks.delete(key)
       }
     }
     return true
-  }
-
-  private releaseFlowLock(conversationId: string): void {
-    this.flowLocks.delete(conversationId)
   }
 
   async processFlows(ctx: FlowContext): Promise<boolean> {
@@ -263,8 +269,9 @@ export class FlowEngine {
       if (resumed) return true
 
       // Evita disparar flow duplicado quando múltiplas mensagens chegam juntas
-      if (!this.acquireFlowLock(ctx.conversationId)) {
-        logger.info('Flow skipped — lock active (mensagem simultânea)', { conversationId: ctx.conversationId })
+      const lockTTL = await this.getFlowLockTTL(ctx.tenantId)
+      if (!this.acquireFlowLock(ctx.conversationId, lockTTL)) {
+        logger.info('Flow skipped — lock active (mensagem simultânea)', { conversationId: ctx.conversationId, lockTTL })
         return false
       }
 
