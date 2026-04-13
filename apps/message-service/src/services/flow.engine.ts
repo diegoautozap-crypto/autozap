@@ -1767,7 +1767,7 @@ export class FlowEngine {
         const showBackDays2 = data?.showBackDays !== false
         if (showBackDays2) lines.push(`\n0. ↩ Voltar`)
 
-        const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\nDigite o número.`
+        const allMsg = `📅 Horários disponíveis:\n${lines.join('\n')}\n\n👉 *Digite o número entre parênteses* para selecionar o dia e horário desejado.`
         await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: allMsg })
 
         // Save slot map in variables for step resolution
