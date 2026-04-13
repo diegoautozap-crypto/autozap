@@ -7,6 +7,7 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import tenantRoutes, { asaasWebhookRouter } from './routes/tenant.routes'
+import googleRoutes from './routes/google.routes'
 import adminRoutes from './routes/admin.routes'
 import { errorHandler, logger } from '@autozap/utils'
 
@@ -25,6 +26,7 @@ app.get('/health', (_req, res) => {
 })
 
 app.use('/tenant', asaasWebhookRouter)
+app.use('/tenant', googleRoutes)
 app.use('/tenant', tenantRoutes)
 app.use('/admin', adminRoutes)
 app.use(errorHandler)
