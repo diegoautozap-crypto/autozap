@@ -236,27 +236,30 @@ export class MessageService {
     await db.from('contacts').update({ last_interaction_at: msg.timestamp }).eq('id', contact.id).eq('tenant_id', tenantId)
 
     // fromMe (enviado pelo celular) — atualiza conversa mas não dispara flows/webhooks
+    // O cooldown do flow controla quando o bot pode disparar novamente
     if (msg.fromMe) {
       const body = (msg.body || '').trim().toLowerCase()
 
-      // Comando #bot → reativa o bot na conversa
+      // Comando #bot → reativa o bot na conversa (caso tenha sido pausado manualmente pelo CRM)
       if (body === '#bot') {
         await db.from('conversations').update({ bot_active: true, updated_at: new Date() }).eq('id', conversation.id).eq('tenant_id', tenantId)
-        // Remove a mensagem de comando pra não aparecer pro cliente
         await db.from('messages').delete().eq('id', messageId)
         emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id, botActive: true })
         logger.info('Bot reativado via comando #bot', { conversationId: conversation.id, tenantId })
         return
       }
 
-      // Qualquer outra mensagem enviada pelo celular → pausa o bot
-      const { data: convCheck } = await db.from('conversations').select('bot_active').eq('id', conversation.id).single()
-      if (convCheck?.bot_active !== false) {
+      // Comando #pausar → pausa o bot manualmente (pra atendimento humano prolongado)
+      if (body === '#pausar' || body === '#pause') {
         await db.from('conversations').update({ bot_active: false, updated_at: new Date() }).eq('id', conversation.id).eq('tenant_id', tenantId)
+        await db.from('messages').delete().eq('id', messageId)
         emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id, botActive: false })
-        logger.info('Bot pausado — resposta pelo celular', { conversationId: conversation.id, tenantId })
+        logger.info('Bot pausado via comando #pausar', { conversationId: conversation.id, tenantId })
+        return
       }
 
+      // Mensagem normal do celular → NÃO pausa o bot automaticamente
+      // O cooldown do flow já controla quando pode disparar novamente
       emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id })
       return
     }
