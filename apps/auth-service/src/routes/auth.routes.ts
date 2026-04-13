@@ -276,7 +276,7 @@ router.post('/team/:id/reset-password', requireAuth, requireRole('admin', 'owner
     if (!member) throw new AppError('NOT_FOUND', 'Membro não encontrado', 404)
     if (member.role === 'owner') throw new AppError('FORBIDDEN', 'Não é possível redefinir senha do dono', 403)
 
-    const tempPassword = randomBytes(4).toString('hex').toUpperCase()
+    const tempPassword = randomBytes(16).toString('hex').toUpperCase()
     await db.from('users').update({ password_hash: await hashPassword(tempPassword) }).eq('id', req.params.id)
     await db.from('refresh_tokens').update({ revoked_at: new Date() }).eq('user_id', req.params.id).is('revoked_at', null)
 

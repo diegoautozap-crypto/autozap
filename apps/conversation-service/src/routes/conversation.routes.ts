@@ -105,6 +105,33 @@ const labelsSchema = z.object({
   })).max(10),
 })
 
+const updateTaskSchema2 = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(5000).optional(),
+  dueDate: z.string().optional(),
+  assignedTo: z.string().uuid().nullable().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  status: z.enum(['pending', 'in_progress', 'completed']).optional(),
+})
+
+const bulkAssignSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+  userId: z.string().uuid().nullable().optional(),
+})
+
+const dealValueSchema = z.object({
+  dealValue: z.number().nullable().optional(),
+})
+
+const bulkLabelsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+  labels: z.array(z.object({
+    id: z.string().min(1).max(100),
+    name: z.string().min(1).max(100),
+    color: z.string().min(1).max(20),
+  })).max(10),
+})
+
 const bulkIdsSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(100),
 })
@@ -400,7 +427,7 @@ router.post('/tasks', validate(createTaskSchema), async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/tasks/:id', async (req, res, next) => {
+router.patch('/tasks/:id', validate(updateTaskSchema2), async (req, res, next) => {
   try {
     const update: any = { updated_at: new Date() }
     if (req.body.title !== undefined) update.title = req.body.title
@@ -449,11 +476,9 @@ router.post('/conversations/bulk/close', validate(bulkIdsSchema), async (req, re
   } catch (err) { next(err) }
 })
 
-router.post('/conversations/bulk/assign', async (req, res, next) => {
+router.post('/conversations/bulk/assign', validate(bulkAssignSchema), async (req, res, next) => {
   try {
     const { ids, userId } = req.body
-    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
-    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
     if (userId) {
       const { data: user } = await db.from('users').select('id').eq('id', userId).eq('tenant_id', req.auth.tid).single()
       if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }
@@ -506,13 +531,9 @@ router.get('/conversations/:id/messages', async (req, res, next) => {
 })
 
 // ─── Valor monetário do negócio (pipeline) ────────────────────────────────────
-router.patch('/conversations/:id/deal-value', async (req, res, next) => {
+router.patch('/conversations/:id/deal-value', validate(dealValueSchema), async (req, res, next) => {
   try {
-    const { dealValue } = req.body
-    const parsed = dealValue === null || dealValue === undefined ? null : Number(dealValue)
-    if (parsed !== null && isNaN(parsed)) {
-      res.status(400).json({ error: 'dealValue must be a number or null' }); return
-    }
+    const parsed = req.body.dealValue === undefined ? null : req.body.dealValue
     const { data, error } = await db
       .from('conversations')
       .update({ deal_value: parsed })
@@ -549,12 +570,9 @@ router.patch('/conversations/:id/labels', validate(labelsSchema), async (req, re
   } catch (err) { next(err) }
 })
 
-router.post('/conversations/bulk/labels', async (req, res, next) => {
+router.post('/conversations/bulk/labels', validate(bulkLabelsSchema), async (req, res, next) => {
   try {
     const { ids, labels } = req.body
-    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: 'ids required' }); return }
-    if (ids.length > 100) { res.status(400).json({ error: 'Maximum 100 IDs per request' }); return }
-    if (!Array.isArray(labels)) { res.status(400).json({ error: 'labels required' }); return }
     await db.from('conversations').update({ labels }).eq('tenant_id', req.auth.tid).in('id', ids)
     res.json(ok({ updated: ids.length }))
   } catch (err) { next(err) }

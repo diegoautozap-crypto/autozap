@@ -57,7 +57,7 @@ export class AuthService {
       .eq('email', email.toLowerCase())
       .maybeSingle()
 
-    if (existingUser) throw new ConflictError('Email already registered')
+    if (existingUser) throw new AppError('REGISTER_ERROR', 'Unable to complete registration', 409)
 
     // 2. Create tenant com plano pending (precisa assinar)
     const tenantId = generateId()

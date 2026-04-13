@@ -7,6 +7,13 @@ import { logger, db, requireAuth, validate, ok, generateId, normalizeBRPhone, ra
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { ensureContact, ensureConversation } from '../services/contact.helper'
 
+const notifySchema = z.object({
+  phone: z.string().min(8),
+  message: z.string().min(1).max(10000),
+  channelId: z.string().uuid().optional(),
+  name: z.string().max(255).optional(),
+})
+
 const router = Router()
 
 import crypto from 'crypto'
@@ -223,13 +230,12 @@ router.post('/webhook/lead/:token', rateLimit({ max: 120 }), async (req, res, ne
 })
 
 // ─── Webhook de notificação (manda msg pro WhatsApp de um número) ─────────────
-router.post('/webhook/notify/:token', rateLimit({ max: 60 }), async (req, res, next) => {
+router.post('/webhook/notify/:token', rateLimit({ max: 60 }), validate(notifySchema), async (req, res, next) => {
   try {
     const { data: tenant, error } = await db.from('tenants').select('id').eq('webhook_token', req.params.token).single()
     if (error || !tenant) { res.status(401).json({ error: 'Token inválido' }); return }
 
     const { phone, message, channelId: bodyChannelId } = req.body
-    if (!phone || !message) { res.status(400).json({ error: 'phone e message são obrigatórios' }); return }
 
     const tenantId = tenant.id
     const normalizedPhone = normalizeBRPhone(phone.replace(/\D/g, ''))

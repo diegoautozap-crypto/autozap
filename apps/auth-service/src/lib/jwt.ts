@@ -19,11 +19,11 @@ if (!ACCESS_SECRET || !REFRESH_SECRET) {
 // ─── Access Token ─────────────────────────────────────────────────────────────
 
 export function signAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRES })
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRES, algorithm: 'HS256' })
 }
 
 export function verifyAccessToken(token: string): JwtPayload {
-  return jwt.verify(token, ACCESS_SECRET) as JwtPayload
+  return jwt.verify(token, ACCESS_SECRET, { algorithms: ['HS256'] }) as JwtPayload
 }
 
 // ─── Refresh Token ────────────────────────────────────────────────────────────

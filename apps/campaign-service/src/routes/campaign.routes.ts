@@ -5,6 +5,14 @@ import { campaignQueue } from '../workers/campaign.worker'
 import { requireAuth, requireRole, validate, ok, paginationSchema, AppError, db, decryptCredentials, logger } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 
+const byTagSchema = z.object({ tagIds: z.array(z.string().uuid()).min(1) })
+const filterSchema = z.object({
+  status: z.string().optional(),
+  tagId: z.string().uuid().optional(),
+  origin: z.string().optional(),
+  search: z.string().optional(),
+}).passthrough()
+
 const router = Router()
 router.use(requireAuth)
 
@@ -223,19 +231,16 @@ router.post('/campaigns/:id/contacts/import', validate(importContactsSchema), as
 })
 
 // Adicionar contatos por tag
-router.post('/campaigns/:id/contacts/by-tag', async (req, res, next) => {
+router.post('/campaigns/:id/contacts/by-tag', validate(byTagSchema), async (req, res, next) => {
   try {
     const { tagIds } = req.body
-    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
-      throw new AppError('VALIDATION', 'tagIds é obrigatório', 400)
-    }
     const count = await campaignService.addContactsByTag(req.params.id, req.auth.tid, tagIds)
     res.json(ok({ imported: count }))
   } catch (err) { next(err) }
 })
 
 // Preview de contatos por filtro (retorna contagem sem criar campanha)
-router.post('/contacts/preview', async (req, res, next) => {
+router.post('/contacts/preview', validate(filterSchema), async (req, res, next) => {
   try {
     const { total } = await campaignService.queryContactsByFilter(req.auth.tid, req.body)
     res.json(ok({ total }))
@@ -243,7 +248,7 @@ router.post('/contacts/preview', async (req, res, next) => {
 })
 
 // Adicionar contatos por filtro avançado (segmento)
-router.post('/campaigns/:id/contacts/by-filter', async (req, res, next) => {
+router.post('/campaigns/:id/contacts/by-filter', validate(filterSchema), async (req, res, next) => {
   try {
     const count = await campaignService.addContactsByFilter(req.params.id, req.auth.tid, req.body)
     res.json(ok({ imported: count }))

@@ -6,6 +6,19 @@ import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 const router = Router()
 router.use(requireAuth)
 
+const updateFlowSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  is_active: z.boolean().optional(),
+  channelId: z.string().uuid().nullable().optional(),
+  campaignId: z.string().uuid().nullable().optional(),
+  cooldown_type: z.enum(['24h', 'once', 'always']).optional(),
+  channel_id: z.string().uuid().nullable().optional(),
+})
+
+const runFlowSchema = z.object({
+  tagIds: z.array(z.string().uuid()).min(1),
+})
+
 const flowSchema = z.object({
   name: z.string().min(1).max(255),
   channelId: z.string().uuid().nullable().optional(),
@@ -121,7 +134,7 @@ router.get('/flows/:id', async (req, res, next) => {
 })
 
 // PATCH /flows/:id
-router.patch('/flows/:id', async (req, res, next) => {
+router.patch('/flows/:id', validate(updateFlowSchema), async (req, res, next) => {
   try {
     const update: any = {}
     const allowed = ['name', 'is_active', 'channel_id', 'cooldown_type']
@@ -234,12 +247,9 @@ router.delete('/flows/:id', async (req, res, next) => {
 })
 
 // POST /flows/:id/run — executa flow manualmente para contatos de tags específicas
-router.post('/flows/:id/run', async (req, res, next) => {
+router.post('/flows/:id/run', validate(runFlowSchema), async (req, res, next) => {
   try {
     const { tagIds } = req.body
-    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) {
-      throw new AppError('VALIDATION', 'tagIds é obrigatório', 400)
-    }
 
     const { data: flow } = await db.from('flows').select('*').eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
     if (!flow) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)

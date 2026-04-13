@@ -213,7 +213,16 @@ router.post('/purchases', validate(createPurchaseSchema), async (req, res, next)
   } catch (err) { next(err) }
 })
 
-router.patch('/purchases/:id', async (req, res, next) => {
+const updatePurchaseSchema = z.object({
+  quantity: z.number().int().min(1).optional(),
+  discount: z.number().min(0).optional(),
+  surcharge: z.number().min(0).optional(),
+  shipping: z.number().min(0).optional(),
+  coupon: z.string().max(50).optional(),
+  notes: z.string().max(2000).optional(),
+})
+
+router.patch('/purchases/:id', validate(updatePurchaseSchema), async (req, res, next) => {
   try {
     const update: any = {}
     if (req.body.quantity !== undefined) update.quantity = req.body.quantity

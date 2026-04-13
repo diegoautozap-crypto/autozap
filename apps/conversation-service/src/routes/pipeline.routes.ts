@@ -5,6 +5,23 @@ import { requireAuth, validate, ok, db, generateId } from '@autozap/utils'
 const router = Router()
 router.use(requireAuth)
 
+const pipelineNameSchema = z.object({ name: z.string().min(1).max(255) })
+const pipelineCardSchema = z.object({
+  contactId: z.string().uuid(),
+  pipelineId: z.string().uuid().nullable().optional(),
+  columnKey: z.string().max(100).optional(),
+  title: z.string().max(255).nullable().optional(),
+  dealValue: z.number().nullable().optional(),
+})
+const updateCardSchema = z.object({
+  columnKey: z.string().max(100).optional(),
+  pipelineId: z.string().uuid().nullable().optional(),
+  dealValue: z.number().nullable().optional(),
+  title: z.string().max(255).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  assignedTo: z.string().uuid().nullable().optional(),
+})
+
 const pipelineColumnSchema = z.object({
   columns: z.array(z.object({
     id: z.string().optional(),
@@ -32,10 +49,9 @@ router.get('/pipelines', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/pipelines', async (req, res, next) => {
+router.post('/pipelines', validate(pipelineNameSchema), async (req, res, next) => {
   try {
     const { name } = req.body
-    if (!name) { res.status(400).json({ error: 'name is required' }); return }
     const { data, error } = await db
       .from('pipelines')
       .insert({ tenant_id: req.auth.tid, name })
@@ -46,7 +62,7 @@ router.post('/pipelines', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/pipelines/:id', async (req, res, next) => {
+router.patch('/pipelines/:id', validate(pipelineNameSchema), async (req, res, next) => {
   try {
     const { name } = req.body
     const { data, error } = await db
@@ -169,10 +185,9 @@ router.get('/pipeline-cards', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/pipeline-cards', async (req, res, next) => {
+router.post('/pipeline-cards', validate(pipelineCardSchema), async (req, res, next) => {
   try {
     const { contactId, pipelineId, columnKey, title, dealValue } = req.body
-    if (!contactId) { res.status(400).json({ error: 'contactId required' }); return }
 
     const { data: contact } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
     if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
@@ -190,7 +205,7 @@ router.post('/pipeline-cards', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/pipeline-cards/:id', async (req, res, next) => {
+router.patch('/pipeline-cards/:id', validate(updateCardSchema), async (req, res, next) => {
   try {
     const update: any = { updated_at: new Date() }
     if (req.body.columnKey !== undefined) update.column_key = req.body.columnKey
