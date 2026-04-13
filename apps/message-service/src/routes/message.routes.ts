@@ -10,7 +10,7 @@ import { ensureContact, ensureConversation } from '../services/contact.helper'
 const notifySchema = z.object({
   phone: z.string().min(8),
   message: z.string().min(1).max(10000),
-  channelId: z.string().uuid().optional(),
+  channelId: z.string().optional(),
   name: z.string().max(255).optional(),
 })
 
@@ -240,9 +240,10 @@ router.post('/webhook/notify/:token', rateLimit({ max: 60 }), validate(notifySch
     const tenantId = tenant.id
     const normalizedPhone = normalizeBRPhone(phone.replace(/\D/g, ''))
 
-    // Usa channelId do body se vier, senão busca canal ativo
+    // Usa channelId do body se vier como UUID válido, senão busca canal ativo
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
     let channel: any
-    if (bodyChannelId) {
+    if (bodyChannelId && isUUID(bodyChannelId)) {
       const { data } = await db.from('channels').select('id, type').eq('id', bodyChannelId).eq('tenant_id', tenantId).single()
       channel = data
     }
