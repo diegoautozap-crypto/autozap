@@ -1,10 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { conversationService } from '../services/conversation.service'
-import { requireAuth, validate } from '../middleware/conversation.middleware'
-import { ok, paginationSchema, generateId } from '@autozap/utils'
-import { db } from '../lib/db'
-import { decryptCredentials } from '../lib/crypto'
+import { requireAuth, validate, ok, paginationSchema, generateId, db, decryptCredentials } from '@autozap/utils'
 
 const router = Router()
 

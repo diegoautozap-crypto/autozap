@@ -1,5 +1,4 @@
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
+import { db, logger } from '@autozap/utils'
 import { AppError, NotFoundError, ConflictError, generateId, normalizePhone, paginationMeta } from '@autozap/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

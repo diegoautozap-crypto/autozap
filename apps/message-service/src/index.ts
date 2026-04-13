@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { initSentry, captureError } from '@autozap/utils'
+import { initSentry, captureError, logger, errorHandler } from '@autozap/utils'
 initSentry('message-service')
 import express from 'express'
 import helmet from 'helmet'
@@ -10,8 +10,6 @@ import zlib from 'zlib'
 import messageRoutes from './routes/message.routes'
 import automationRoutes from './routes/automation.routes'
 import flowRoutes from './routes/flow.routes'
-import { errorHandler } from './middleware/message.middleware'
-import { logger } from './lib/logger'
 import { startMessageWorker, startRetryWorker, startAutoReplyWorker, startAgentNotifyWorker, startReconciliationJob } from './workers/message.worker'
 import { startFlowResumeWorker, startManualFlowWorker } from './workers/flow.worker'
 

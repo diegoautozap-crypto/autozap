@@ -1,8 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { tenantService } from '../services/tenant.service'
-import { requireAuth, requireRole, validate } from '../middleware/tenant.middleware'
-import { ok, paginationSchema, rateLimit } from '@autozap/utils'
+import { requireAuth, requireRole, validate, ok, paginationSchema, rateLimit } from '@autozap/utils'
 import { PLAN_LIMITS } from '@autozap/types'
 
 const router = Router()

@@ -1,6 +1,4 @@
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
-import { AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
+import { db, logger, AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
 
 export type ConversationStatus = 'open' | 'waiting' | 'closed'
 export type PipelineStage = string

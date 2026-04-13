@@ -1,11 +1,8 @@
 import { Worker, Queue } from 'bullmq'
 import pLimit from 'p-limit'
-import { logger } from '../lib/logger'
+import { logger, sleep, generateId, db, decryptCredentials } from '@autozap/utils'
 import { campaignService } from '../services/campaign.service'
-import { sleep, generateId } from '@autozap/utils'
 import { v4 as uuidv4 } from 'uuid'
-import { db } from '../lib/db'
-import { decryptCredentials } from '../lib/crypto'
 
 const REDIS_URL      = process.env.REDIS_URL!
 const PUSHER_APP_ID  = process.env.PUSHER_APP_ID

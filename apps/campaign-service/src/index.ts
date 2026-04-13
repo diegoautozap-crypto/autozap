@@ -4,8 +4,7 @@ import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import campaignRoutes from './routes/campaign.routes'
-import { errorHandler } from './middleware/campaign.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 import { startCampaignWorker }    from './workers/campaign.worker'
 import { startInboxWorker }       from './workers/inbox.worker'
 import { startReconciliationJob } from './workers/reconciliation.worker'
@@ -22,7 +21,8 @@ app.use(express.json({ limit: '10mb' }))
 
 app.get('/health', async (_req, res) => {
   try {
-    const { error } = await (await import('./lib/db')).db.from('campaigns').select('id').limit(1)
+    const { db } = await import('@autozap/utils')
+    const { error } = await db.from('campaigns').select('id').limit(1)
     res.json({ status: error ? 'degraded' : 'ok', service: 'campaign-service', db: error ? 'down' : 'ok' })
   } catch { res.json({ status: 'degraded', service: 'campaign-service', db: 'down' }) }
 })

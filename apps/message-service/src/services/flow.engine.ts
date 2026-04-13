@@ -1,7 +1,4 @@
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
-import { decryptCredentials } from '../lib/crypto'
-import { generateId, normalizeBRPhone } from '@autozap/utils'
+import { db, logger, decryptCredentials, generateId, normalizeBRPhone } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { ensureContact, ensureConversation } from './contact.helper'
 

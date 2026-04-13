@@ -2,12 +2,8 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { campaignService } from '../services/campaign.service'
 import { campaignQueue } from '../workers/campaign.worker'
-import { requireAuth, requireRole, validate } from '../middleware/campaign.middleware'
-import { ok, paginationSchema, AppError } from '@autozap/utils'
+import { requireAuth, requireRole, validate, ok, paginationSchema, AppError, db, decryptCredentials, logger } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
-import { db } from '../lib/db'
-import { decryptCredentials } from '../lib/crypto'
-import { logger } from '../lib/logger'
 
 const router = Router()
 router.use(requireAuth)

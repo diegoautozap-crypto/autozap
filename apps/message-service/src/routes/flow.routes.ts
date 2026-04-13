@@ -1,9 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth, validate } from '../middleware/message.middleware'
-import { ok, AppError, cachedGet } from '@autozap/utils'
+import { db, requireAuth, validate, ok, AppError, cachedGet } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
-import { db } from '../lib/db'
 
 const router = Router()
 router.use(requireAuth)

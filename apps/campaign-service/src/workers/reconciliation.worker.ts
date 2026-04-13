@@ -1,5 +1,4 @@
-import { logger } from '../lib/logger'
-import { db } from '../lib/db'
+import { logger, db } from '@autozap/utils'
 
 const INTERVAL_MS  = 30_000
 const BATCH_SIZE   = 100

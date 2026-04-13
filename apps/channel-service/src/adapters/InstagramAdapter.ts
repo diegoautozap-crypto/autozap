@@ -8,7 +8,7 @@ import type {
   ChannelCredentials,
   ContentType,
 } from './IChannelAdapter'
-import { logger } from '../lib/logger'
+import { logger } from '@autozap/utils'
 
 const INSTAGRAM_API_URL = 'https://graph.instagram.com/v21.0'
 

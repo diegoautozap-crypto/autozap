@@ -6,8 +6,7 @@ import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import conversationRoutes from './routes/conversation.routes'
-import { errorHandler } from './middleware/conversation.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
 const PORT = process.env.PORT || 3006

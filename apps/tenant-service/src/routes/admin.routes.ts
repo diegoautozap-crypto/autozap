@@ -1,8 +1,6 @@
 import { Router } from 'express'
-import { requireAuth, requireSuperAdmin } from '../middleware/tenant.middleware'
-import { ok } from '@autozap/utils'
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
+import { requireSuperAdmin } from '../middleware/tenant.middleware'
+import { requireAuth, ok, db, logger } from '@autozap/utils'
 
 const router = Router()
 router.use(requireAuth)

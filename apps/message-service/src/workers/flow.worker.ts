@@ -1,6 +1,5 @@
 import { Worker, Queue } from 'bullmq'
-import { logger } from '../lib/logger'
-import { db } from '../lib/db'
+import { logger, db } from '@autozap/utils'
 import { flowEngine } from '../services/flow.engine'
 import { ensureConversation } from '../services/contact.helper'
 

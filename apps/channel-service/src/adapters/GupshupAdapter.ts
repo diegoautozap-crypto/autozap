@@ -8,7 +8,7 @@ import type {
   MessageStatus,
   ContentType,
 } from './IChannelAdapter'
-import { logger } from '../lib/logger'
+import { logger } from '@autozap/utils'
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1'
 // Interactive messages: buttons + list via Meta Graph API

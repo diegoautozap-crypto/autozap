@@ -1,8 +1,6 @@
 import { Worker, Queue } from 'bullmq'
-import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
-import { db } from '../lib/db'
-import { sleep, randomBetween } from '@autozap/utils'
+import { logger, db, sleep, randomBetween } from '@autozap/utils'
 import type { SendMessageJob } from '../services/types'
 
 const REDIS_URL = process.env.REDIS_URL!

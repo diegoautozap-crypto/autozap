@@ -1,7 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
-import { AppError, generateId } from '@autozap/utils'
+import { db, logger, AppError, generateId, decryptCredentials } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
@@ -111,7 +109,6 @@ export class MessageService {
       const { data: channel } = await db.from('channels').select('credentials, type').eq('id', channelId).single()
       const rawCreds = channel?.credentials || {}
       const creds = typeof rawCreds === 'string' ? JSON.parse(rawCreds) : rawCreds
-      const { decryptCredentials } = await import('../lib/crypto')
       let metaToken: string | undefined
       let apiKey: string | undefined
       try {

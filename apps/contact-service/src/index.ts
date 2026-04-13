@@ -4,8 +4,7 @@ import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import contactRoutes from './routes/contact.routes'
-import { errorHandler } from './middleware/contact.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
 const PORT = process.env.PORT || 3005

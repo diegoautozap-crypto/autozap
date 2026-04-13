@@ -1,7 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
-import { AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
+import { db, logger, AppError, NotFoundError, generateId, paginationMeta } from '@autozap/utils'
 import { sendCampaignCompletedEmail } from '../lib/email'
 import { getTenantCampaignQueue, ensureTenantWorker } from '../workers/campaign.worker'
 

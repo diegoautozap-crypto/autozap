@@ -8,7 +8,7 @@ import type {
   MessageStatus,
   ContentType,
 } from './IChannelAdapter'
-import { logger } from '../lib/logger'
+import { logger } from '@autozap/utils'
 
 // ─── Evolution API v2 Adapter ────────────────────────────────────────────────
 

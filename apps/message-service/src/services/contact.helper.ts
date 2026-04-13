@@ -1,5 +1,4 @@
-import { db } from '../lib/db'
-import { generateId } from '@autozap/utils'
+import { db, generateId } from '@autozap/utils'
 
 interface EnsureContactOpts {
   tenantId: string

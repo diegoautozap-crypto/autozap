@@ -148,6 +148,10 @@ export function normalizePhone(phone: string): string {
 export { rateLimit } from './rate-limit'
 export { initSentry, captureError, Sentry } from './sentry'
 export { cachedGet, cacheInvalidate } from './redis-cache'
+export { createLogger, logger } from './logger'
+export { db } from './db'
+export { encrypt, decrypt, encryptCredentials, decryptCredentials } from './crypto'
+export { requireAuth, requireRole, errorHandler, validate } from './middleware'
 
 export function normalizeBRPhone(phone: string): string {
   // Remove tudo que não é dígito, adiciona 9° dígito em celulares BR se necessário

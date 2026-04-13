@@ -8,8 +8,7 @@ import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import tenantRoutes, { asaasWebhookRouter } from './routes/tenant.routes'
 import adminRoutes from './routes/admin.routes'
-import { errorHandler } from './middleware/tenant.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
 const PORT = process.env.PORT || 3002

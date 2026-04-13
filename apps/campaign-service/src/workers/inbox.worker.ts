@@ -1,7 +1,5 @@
 import { Worker } from 'bullmq'
-import { logger } from '../lib/logger'
-import { generateId } from '@autozap/utils'
-import { db } from '../lib/db'
+import { logger, generateId, db } from '@autozap/utils'
 import type { InboxJob } from './campaign.worker'
 
 function getRedisConnection() {

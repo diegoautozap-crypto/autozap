@@ -1,6 +1,4 @@
-import { db } from '../lib/db'
-import { logger } from '../lib/logger'
-import { generateId } from '@autozap/utils'
+import { db, logger, generateId } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!

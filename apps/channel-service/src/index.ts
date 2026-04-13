@@ -8,8 +8,7 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import channelRoutes from './routes/channel.routes'
-import { errorHandler } from './middleware/channel.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 
 const app = express()
 const PORT = process.env.PORT || 3003

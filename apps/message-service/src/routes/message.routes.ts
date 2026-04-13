@@ -1,12 +1,10 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { logger } from '../lib/logger'
 import { messageService } from '../services/message.service'
 import { messageQueue } from '../workers/message.worker'
-import { requireAuth, validate, requireInternal } from '../middleware/message.middleware'
-import { ok, generateId, normalizeBRPhone, rateLimit, AppError, cachedGet } from '@autozap/utils'
+import { requireInternal } from '../middleware/message.middleware'
+import { logger, db, requireAuth, validate, ok, generateId, normalizeBRPhone, rateLimit, AppError, cachedGet } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
-import { db } from '../lib/db'
 import { ensureContact, ensureConversation } from '../services/contact.helper'
 
 const router = Router()

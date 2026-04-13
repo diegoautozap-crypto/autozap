@@ -4,8 +4,7 @@ import helmet from 'helmet'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import authRoutes from './routes/auth.routes'
-import { errorHandler } from './middleware/auth.middleware'
-import { logger } from './lib/logger'
+import { errorHandler, logger } from '@autozap/utils'
 import { sendAgentNotificationEmail } from './lib/email'
 
 const app = express()

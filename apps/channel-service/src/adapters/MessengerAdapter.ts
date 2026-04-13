@@ -8,7 +8,7 @@ import type {
   ChannelCredentials,
   ContentType,
 } from './IChannelAdapter'
-import { logger } from '../lib/logger'
+import { logger } from '@autozap/utils'
 
 const MESSENGER_API_URL = 'https://graph.facebook.com/v21.0'
 

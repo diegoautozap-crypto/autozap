@@ -1,6 +1,5 @@
-import { db } from '../lib/db'
+import { db, logger } from '@autozap/utils'
 import { campaignService } from '../services/campaign.service'
-import { logger } from '../lib/logger'
 
 function getNextRecurrenceDate(type: string, from: Date): Date {
   const next = new Date(from)
