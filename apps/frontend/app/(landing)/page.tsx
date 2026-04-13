@@ -128,10 +128,10 @@ export default function LandingPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {[
-              { name: 'Starter', price: 'R$ 149', period: ',99/mês', msgs: '10.000 msgs', features: ['3 canais', '3 membros', '5 flows', '10k contatos', '5k IA/mês', 'Google Calendar', 'Campanhas ilimitadas'], highlight: false },
-              { name: 'Pro', price: 'R$ 299', period: ',99/mês', msgs: '50.000 msgs', features: ['10 canais', '10 membros', '20 flows', '50k contatos', '30k IA/mês', '50 produtos', 'Transcrição de áudio', 'Relatórios e export'], highlight: true },
-              { name: 'Enterprise', price: 'R$ 599', period: ',99/mês', msgs: '200.000 msgs', features: ['30 canais', '30 membros', 'Flows ilimitados', '100k contatos', '100k IA/mês', '500 produtos', 'Transcrição', 'Relatórios'], highlight: false },
-              { name: 'Unlimited', price: 'R$ 999', period: ',99/mês', msgs: 'Ilimitado', features: ['Canais ilimitados', 'Membros ilimitados', 'Tudo ilimitado', 'Suporte dedicado'], highlight: false },
+              { name: 'Starter', price: 'R$ 149', period: ',99/mês', msgs: '10.000 mensagens', features: ['3 canais WhatsApp', '3 membros na equipe', '5 automações de flow', '10.000 contatos', '5.000 respostas de IA por mês', 'Agendamento Google Calendar', 'Pipeline de vendas', 'Campanhas ilimitadas'], highlight: false },
+              { name: 'Pro', price: 'R$ 299', period: ',99/mês', msgs: '50.000 mensagens', features: ['10 canais WhatsApp', '10 membros na equipe', '20 automações de flow', '50.000 contatos', '30.000 respostas de IA por mês', '50 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'], highlight: true },
+              { name: 'Enterprise', price: 'R$ 599', period: ',99/mês', msgs: '200.000 mensagens', features: ['30 canais WhatsApp', '30 membros na equipe', 'Automações de flow ilimitadas', '100.000 contatos', '100.000 respostas de IA por mês', '500 produtos no catálogo', 'Transcrição de áudio', 'Relatórios e exportação'], highlight: false },
+              { name: 'Unlimited', price: 'R$ 999', period: ',99/mês', msgs: 'Mensagens ilimitadas', features: ['Canais ilimitados', 'Membros ilimitados', 'Automações ilimitadas', 'Contatos ilimitados', 'Respostas de IA ilimitadas', 'Produtos ilimitados', 'API sem limites', 'Suporte dedicado'], highlight: false },
             ].map((p, i) => (
               <div key={i} style={{ background: p.highlight ? '#0a1f0a' : '#141414', border: `1px solid ${p.highlight ? '#16a34a' : '#1e1e1e'}`, borderRadius: '12px', padding: '28px 24px', position: 'relative' }}>
                 {p.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '99px', whiteSpace: 'nowrap' }}>Mais popular</div>}
