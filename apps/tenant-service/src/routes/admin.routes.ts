@@ -6,6 +6,15 @@ const router = Router()
 router.use(requireAuth)
 router.use(requireSuperAdmin)
 
+// Audit log for admin actions
+async function auditLog(adminId: string, action: string, targetId: string, details?: Record<string, unknown>) {
+  const entry = { admin_id: adminId, action, target_id: targetId, details: details || {}, ip: '', timestamp: new Date().toISOString() }
+  logger.warn('[AUDIT]', entry)
+  try {
+    await db.from('audit_logs').insert({ id: require('crypto').randomUUID(), ...entry, created_at: new Date() })
+  } catch { /* table may not exist yet — log is the primary record */ }
+}
+
 // GET /admin/tenants
 router.get('/tenants', async (req, res, next) => {
   try {
@@ -86,7 +95,7 @@ router.patch('/tenants/:id/block', async (req, res, next) => {
   try {
     const { reason } = req.body
     await db.from('tenants').update({ is_blocked: true, blocked_reason: reason || 'Bloqueado pelo admin', is_active: false }).eq('id', req.params.id)
-    logger.info('Tenant blocked', { tenantId: req.params.id })
+    await auditLog(req.auth.sub, 'tenant.block', req.params.id, { reason })
     res.json(ok({ message: 'Tenant bloqueado' }))
   } catch (err) { next(err) }
 })
@@ -95,7 +104,7 @@ router.patch('/tenants/:id/block', async (req, res, next) => {
 router.patch('/tenants/:id/unblock', async (req, res, next) => {
   try {
     await db.from('tenants').update({ is_blocked: false, blocked_reason: null, is_active: true }).eq('id', req.params.id)
-    logger.info('Tenant unblocked', { tenantId: req.params.id })
+    await auditLog(req.auth.sub, 'tenant.unblock', req.params.id)
     res.json(ok({ message: 'Tenant desbloqueado' }))
   } catch (err) { next(err) }
 })
@@ -105,7 +114,7 @@ router.patch('/tenants/:id/plan', async (req, res, next) => {
   try {
     const { planSlug } = req.body
     await db.from('tenants').update({ plan_slug: planSlug }).eq('id', req.params.id)
-    logger.info('Tenant plan changed', { tenantId: req.params.id, planSlug })
+    await auditLog(req.auth.sub, 'tenant.plan_change', req.params.id, { planSlug })
     res.json(ok({ message: 'Plano atualizado' }))
   } catch (err) { next(err) }
 })
@@ -128,7 +137,7 @@ router.post('/tenants/:id/impersonate', async (req, res, next) => {
     const { signAccessToken } = await import('../lib/jwt')
     const token = signAccessToken({ sub: owner.id, tid: owner.tenant_id, role: owner.role as any, email: owner.email })
 
-    logger.info('Admin impersonating tenant', { adminId: req.auth.sub, tenantId: req.params.id })
+    await auditLog(req.auth.sub, 'tenant.impersonate', req.params.id, { targetUserId: owner.id })
 
     // Set httpOnly cookie for impersonation
     const isProduction = process.env.NODE_ENV === 'production'
