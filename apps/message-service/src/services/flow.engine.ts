@@ -369,9 +369,16 @@ export class FlowEngine {
     // Ignora se o state acabou de ser criado (< 2 segundos) — evita que a mesma mensagem
     // que criou o waiting state seja usada como resposta
     const stateAge = Date.now() - new Date(state.updated_at).getTime()
-    if (stateAge < 2000) {
+    if (stateAge < 5000) {
       logger.info('Waiting state too fresh, ignoring this message', { flowId: state.flow_id, stateAge })
       return true // retorna true pra não disparar novo flow
+    }
+
+    // Lock pra evitar resume duplicado na mesma conversa
+    const resumeKey = `resume:${state.flow_id}:${ctx.conversationId}`
+    if (!this.acquireFlowLock(resumeKey, 5000)) {
+      logger.info('Resume skipped — already processing', { flowId: state.flow_id, conversationId: ctx.conversationId })
+      return true
     }
 
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
