@@ -297,6 +297,39 @@ function InboxTagEditor({ contactId, contactTags, onChanged }: { contactId: stri
   )
 }
 
+const EMOJI_DATA: { cat: string; emojis: string[] }[] = [
+  { cat: '😀', emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐'] },
+  { cat: '👋', emojis: ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','🦾'] },
+  { cat: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','🗨️','🗯️','💭'] },
+  { cat: '🎉', emojis: ['🎉','🎊','🎈','🎁','🎀','🏆','🥇','🥈','🥉','⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥊','🎯','⛳','🎣','🎿','🛷','🎮','🎰','🎲','🧩','🎭','🎨','🎬','🎤','🎧','🎼','🎵','🎶','🎙️'] },
+  { cat: '🍔', emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥖','🍞','🥨','🧀','🍖','🍗','🥩','🥓','🍔','🍟','🍕','🌭','🥪','🌮','🌯','🫔','🥙','🧆','🥚','🍳','🥘','🍲','🫕','🥣','🥗','🍿','🧈','🧂','🥫'] },
+  { cat: '✅', emojis: ['✅','❌','⭕','🚫','⛔','📛','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔶','🔷','🔸','🔹','▪️','▫️','◾','◽','◼️','◻️','🔲','🔳','⬛','⬜','🔔','🔕','📢','📣','💡','🔍','🔎','📌','📍','🏷️','📎','🔗','📅','📆','🗓️','⏰','⏱️','⏳','📞','📱','💻','🖥️'] },
+]
+
+function EmojiPickerPopup({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+  const [activeCat, setActiveCat] = useState(0)
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
+      <div style={{ position: 'absolute', bottom: '45px', left: 0, width: '280px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,.15)', zIndex: 1000, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', padding: '4px' }}>
+          {EMOJI_DATA.map((c, i) => (
+            <button key={i} onClick={() => setActiveCat(i)} style={{ flex: 1, padding: '6px', background: activeCat === i ? 'var(--bg)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '16px' }}>{c.cat}</button>
+          ))}
+        </div>
+        <div style={{ height: '200px', overflowY: 'auto', padding: '8px', display: 'flex', flexWrap: 'wrap', gap: '2px', alignContent: 'flex-start' }}>
+          {EMOJI_DATA[activeCat].emojis.map(e => (
+            <button key={e} onClick={() => onSelect(e)} style={{ width: '32px', height: '32px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={ev => (ev.currentTarget.style.background = 'var(--bg)')} onMouseLeave={ev => (ev.currentTarget.style.background = 'none')}>
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 function LinkExistingTask({ conversationId, contactId, linkedTaskIds, onLinked }: { conversationId: string; contactId: string; linkedTaskIds: string[]; onLinked: () => void }) {
   const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ['all-tasks-unlinked'],
@@ -358,6 +391,7 @@ export default function InboxPage() {
   const [chatSearch, setChatSearch] = useState('')
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showTaskLink, setShowTaskLink] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [newTaskPriority, setNewTaskPriority] = useState('medium')
@@ -1219,6 +1253,12 @@ export default function InboxPage() {
                       }} style={{ ...btnStyle, background: loadingSuggestions ? '#eef2ff' : 'var(--bg-input)', color: loadingSuggestions ? '#4338ca' : 'var(--text-muted)', border: `1px solid ${loadingSuggestions ? '#c7d2fe' : 'var(--border)'}` }}>
                         {loadingSuggestions ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={15} />}
                       </button>
+                      <div style={{ position: 'relative' }}>
+                        <button onClick={() => setShowEmojiPicker(p => !p)} style={{ ...btnStyle, background: showEmojiPicker ? '#fef3c7' : 'var(--bg-input)', color: showEmojiPicker ? '#d97706' : 'var(--text-muted)', border: `1px solid ${showEmojiPicker ? '#fde68a' : 'var(--border)'}` }}>
+                          <span style={{ fontSize: '16px', lineHeight: 1 }}>😀</span>
+                        </button>
+                        {showEmojiPicker && <EmojiPickerPopup onSelect={(emoji: string) => { setMessageText(prev => prev + emoji); setShowEmojiPicker(false) }} onClose={() => setShowEmojiPicker(false)} />}
+                      </div>
                       <textarea style={{ flex: 1, padding: '9px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none', color: 'var(--text)', resize: 'none', height: '40px', lineHeight: 1.5, fontFamily: 'inherit', overflowY: 'auto', transition: 'all 0.1s' }} placeholder={t('inbox.typePlaceholder')} value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={handleKeyDown}
                         onFocus={e => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.background = 'var(--bg-card)' }}
                         onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-input)' }} />
