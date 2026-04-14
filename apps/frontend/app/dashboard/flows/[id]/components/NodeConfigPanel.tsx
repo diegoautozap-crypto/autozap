@@ -656,16 +656,20 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </>)}
           {d.subtype === 'image' && (<>
             <div><label style={labelStyle}>{t('nodes.image')}</label><MediaUpload accept="image/*" label={t('nodes.imageUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
-            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Legenda do arquivo. Aceita variáveis: {{name}}, {{phone}}" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
           {d.subtype === 'video' && (<>
             <div><label style={labelStyle}>{t('nodes.video')}</label><MediaUpload accept="video/*" label={t('nodes.videoUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
-            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Legenda do arquivo. Aceita variáveis: {{name}}, {{phone}}" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
-          {d.subtype === 'audio' && (<div><label style={labelStyle}>{t('nodes.audio')}</label><MediaUpload accept="audio/*" label={t('nodes.audioUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
+          {d.subtype === 'audio' && (<>
+            <div><label style={labelStyle}>{t('nodes.audio')}</label><MediaUpload accept="audio/*" label={t('nodes.audioUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Legenda do arquivo. Aceita variáveis: {{name}}, {{phone}}" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          </>)}
           {d.subtype === 'document' && (<>
             <div><label style={labelStyle}>{t('nodes.document')}</label><MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label={t('nodes.documentUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
             <div><label style={labelStyle}>{t('nodes.filename')}</label><input style={inputStyle} placeholder={t('nodes.filenamePlaceholder')} value={d.filename || ''} onChange={e => onUpdate(node.id, { filename: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }} placeholder="Legenda do arquivo. Aceita variáveis: {{name}}, {{phone}}" value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
         </>)}
 
