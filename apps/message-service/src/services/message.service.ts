@@ -687,9 +687,9 @@ Regras:
       logger.info('ProfilePic: response', { status: res.status })
       if (!res.ok) { const txt = await res.text(); logger.info('ProfilePic: error response', { status: res.status, body: txt.slice(0, 200) }); return }
       const data = await res.json() as any
-      logger.info('ProfilePic: response data', { data })
-      const pictureUrl = data?.profilePictureUrl
-      if (!pictureUrl) { logger.info('ProfilePic: no URL in response'); return }
+      logger.info('ProfilePic: response data', { keys: Object.keys(data || {}), raw: JSON.stringify(data).slice(0, 500) })
+      const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.imgUrl || data?.wuid?.profilePictureUrl
+      if (!pictureUrl) { logger.info('ProfilePic: no URL found in any field'); return }
 
       await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
       logger.info('ProfilePic: SAVED', { contactId, phone: cleanPhone, pictureUrl: pictureUrl.slice(0, 80) })
