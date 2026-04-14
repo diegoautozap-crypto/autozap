@@ -622,7 +622,8 @@ export class FlowEngine {
 
         case 'send_message': {
           const message = this.interpolate(data?.message || '', ctx, variables)
-          if (!message) break
+          const isMediaSubtype = ['image', 'video', 'audio', 'document'].includes(data?.subtype)
+          if (!message && !isMediaSubtype) break
           const ch = ctx.channelId
           if (data?.delay && data.delay > 0) {
             const delayMs = data.delay * 1000
