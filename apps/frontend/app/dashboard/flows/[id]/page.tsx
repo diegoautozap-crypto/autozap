@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -12,7 +12,7 @@ import '@xyflow/react/dist/style.css'
 import { messageApi, contactApi, channelApi, tenantApi } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
-import { Save, ArrowLeft, Loader2, Workflow, BarChart2 } from 'lucide-react'
+import { Save, ArrowLeft, Loader2, Workflow, BarChart2, Undo2, Redo2 } from 'lucide-react'
 import { subscribeTenant } from '@/lib/pusher'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
@@ -196,6 +196,60 @@ export default function FlowEditorPage() {
   const [flowName, setFlowName] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [initialized, setInitialized] = useState(false)
+
+  // ── Undo/Redo ──
+  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([])
+  const historyIndexRef = useRef(-1)
+  const isUndoRedoRef = useRef(false)
+  const MAX_HISTORY = 50
+
+  const pushHistory = useCallback(() => {
+    if (isUndoRedoRef.current) return
+    const snapshot = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }
+    const idx = historyIndexRef.current
+    historyRef.current = historyRef.current.slice(0, idx + 1)
+    historyRef.current.push(snapshot)
+    if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift()
+    historyIndexRef.current = historyRef.current.length - 1
+  }, [nodes, edges])
+
+  // Salva snapshot quando isDirty muda (operação de edição)
+  useEffect(() => {
+    if (isDirty && initialized) pushHistory()
+  }, [isDirty]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return
+    historyIndexRef.current--
+    const snapshot = historyRef.current[historyIndexRef.current]
+    if (!snapshot) return
+    isUndoRedoRef.current = true
+    setNodes(snapshot.nodes)
+    setEdges(snapshot.edges)
+    setTimeout(() => { isUndoRedoRef.current = false }, 100)
+    toast.success('Desfeito')
+  }, [setNodes, setEdges])
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return
+    historyIndexRef.current++
+    const snapshot = historyRef.current[historyIndexRef.current]
+    if (!snapshot) return
+    isUndoRedoRef.current = true
+    setNodes(snapshot.nodes)
+    setEdges(snapshot.edges)
+    setTimeout(() => { isUndoRedoRef.current = false }, 100)
+    toast.success('Refeito')
+  }, [setNodes, setEdges])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undo, redo])
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
   const [doneNodes, setDoneNodes] = useState<Record<string, 'success' | 'error'>>({})
@@ -458,6 +512,14 @@ export default function FlowEditorPage() {
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           {t('nodes.copySelected')}
+        </button>}
+        {canEditFlows && <button onClick={undo} title="Desfazer (Ctrl+Z)"
+          style={{ padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+          <Undo2 size={14} />
+        </button>}
+        {canEditFlows && <button onClick={redo} title="Refazer (Ctrl+Y)"
+          style={{ padding: '7px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+          <Redo2 size={14} />
         </button>}
         {canEditFlows && <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
           style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
