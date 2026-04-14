@@ -607,6 +607,8 @@ export default function FlowEditorPage() {
             nodes={nodesWithDelete}
             edges={edges.map(e => ({ ...e, type: 'custom', data: { ...((e.data as any) || {}), onDelete: (eid: string) => { setEdges(eds => eds.filter(ed => ed.id !== eid)); setIsDirty(true) } } }))}
             onNodesChange={ch => { onNodesChange(ch); setIsDirty(true) }}
+            onNodeDragStart={() => saveSnapshot()}
+            onSelectionDragStart={() => saveSnapshot()}
             onEdgesChange={ch => { onEdgesChange(ch); setIsDirty(true) }}
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
