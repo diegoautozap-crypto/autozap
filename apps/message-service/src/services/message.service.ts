@@ -646,10 +646,7 @@ Regras:
     const { data: existing } = await db.from('contacts').select('id, name, avatar_url').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
     if (existing) {
       // Busca foto se não tem
-      if (!existing.avatar_url) {
-        logger.info('Fetching profile photo for existing contact', { contactId: existing.id, phone })
-        this.fetchProfilePhoto(existing.id, tenantId, phone).catch(err => logger.error('fetchProfilePhoto crashed', { err: (err as Error).message }))
-      }
+      if (!existing.avatar_url) this.fetchProfilePhoto(existing.id, tenantId, phone).catch(() => {})
       return existing
     }
     const { data: created, error } = await db.from('contacts').insert({ id: generateId(), tenant_id: tenantId, phone, name: phone, origin: 'inbound', status: 'active', last_interaction_at: new Date() }).select('id, name').single()
@@ -661,41 +658,35 @@ Regras:
 
   private async fetchProfilePhoto(contactId: string, tenantId: string, phone: string): Promise<void> {
     try {
-      logger.info('ProfilePic: querying channel', { contactId })
       const { data: channel } = await db.from('channels').select('credentials, type')
         .eq('tenant_id', tenantId).eq('type', 'evolution').eq('status', 'active').limit(1).maybeSingle()
-      if (!channel) { logger.info('ProfilePic: no evolution channel found'); return }
+      if (!channel) return
 
       const creds = decryptCredentials(channel.credentials)
       const baseUrl = creds.baseUrl?.replace(/\/+$/, '')
       const instanceName = creds.instanceName
       const apiKey = creds.apiKey
-      if (!baseUrl || !instanceName || !apiKey) { logger.info('ProfilePic: missing creds', { hasBaseUrl: !!baseUrl, hasInstance: !!instanceName, hasKey: !!apiKey }); return }
+      if (!baseUrl || !instanceName || !apiKey) return
 
       const cleanPhone = phone.replace(/\D/g, '')
       const remoteJid = `${cleanPhone}@s.whatsapp.net`
-      const url = `${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`
 
-      logger.info('ProfilePic: calling Evolution API', { url, remoteJid })
-      const res = await fetch(url, {
+      const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: apiKey },
         body: JSON.stringify({ number: remoteJid }),
         signal: AbortSignal.timeout(10000),
       })
 
-      const responseText = await res.text()
-      logger.info(`ProfilePic: status=${res.status} body=${responseText.slice(0, 300)}`)
       if (!res.ok) return
-      let data: any
-      try { data = JSON.parse(responseText) } catch { logger.info('ProfilePic: invalid JSON'); return }
+      const data = await res.json() as any
       const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.imgUrl || data?.url
-      if (!pictureUrl) { logger.info('ProfilePic: no URL field found'); return }
+      if (!pictureUrl) return
 
       await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
-      logger.info('ProfilePic: SAVED', { contactId, phone: cleanPhone, pictureUrl: pictureUrl.slice(0, 80) })
-    } catch (err) {
-      logger.info('ProfilePic: EXCEPTION', { contactId, err: (err as Error).message })
+      logger.info('Profile photo saved', { contactId })
+    } catch {
+      // Silencioso — foto é opcional
     }
   }
 
