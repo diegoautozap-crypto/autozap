@@ -933,7 +933,12 @@ export class FlowEngine {
           const customHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
           if (data?.headers && Array.isArray(data.headers)) {
             for (const h of data.headers) {
-              if (h.key && h.value) customHeaders[this.interpolate(h.key, ctx, variables)] = this.interpolate(h.value, ctx, variables)
+              if (h.key && h.value) {
+                // Sanitiza headers contra CRLF injection
+                const key = this.interpolate(h.key, ctx, variables).replace(/[\r\n]/g, '')
+                const value = this.interpolate(h.value, ctx, variables).replace(/[\r\n]/g, '')
+                customHeaders[key] = value
+              }
             }
           }
           const response = await fetch(url, { method, headers: customHeaders, body: method !== 'GET' ? body : undefined, signal: AbortSignal.timeout(10000) })

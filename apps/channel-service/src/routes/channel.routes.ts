@@ -11,6 +11,23 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path)
 
 const router = Router()
 
+// ─── SSRF protection: block internal URLs in channel credentials ──────────────
+function validateBaseUrl(url: string): boolean {
+  if (!url) return true
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+    // Block internal/private IPs and hostnames
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1') return false
+    if (host.endsWith('.internal') || host.endsWith('.local')) return false
+    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('172.16.')) return false
+    if (host.match(/^172\.(1[6-9]|2\d|3[01])\./)) return false
+    if (host === 'metadata.google.internal' || host === '169.254.169.254') return false
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+    return true
+  } catch { return false }
+}
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const createChannelSchema = z.object({
   name: z.string().min(2).max(255),
@@ -52,6 +69,9 @@ router.get('/channels', async (req, res, next) => {
 // POST /channels
 router.post('/channels', requireRole('admin', 'owner'), validate(createChannelSchema), async (req, res, next) => {
   try {
+    if (req.body.credentials?.baseUrl && !validateBaseUrl(req.body.credentials.baseUrl)) {
+      res.status(400).json({ error: 'URL inválida ou bloqueada' }); return
+    }
     const channel = await channelService.createChannel({
       tenantId: req.auth.tid,
       ...req.body,
@@ -72,6 +92,9 @@ router.get('/channels/:id', async (req, res, next) => {
 router.patch('/channels/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {
     const { name, phoneNumber, credentials } = req.body
+    if (credentials?.baseUrl && !validateBaseUrl(credentials.baseUrl)) {
+      res.status(400).json({ error: 'URL inválida ou bloqueada' }); return
+    }
 
     // Busca credenciais atuais para fazer merge
     const { data: current } = await db

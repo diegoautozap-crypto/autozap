@@ -408,6 +408,11 @@ router.post('/tasks', validate(createTaskSchema), async (req, res, next) => {
       const { data: conv } = await db.from('conversations').select('id').eq('id', conversationId).eq('tenant_id', req.auth.tid).single()
       if (!conv) { res.status(404).json({ error: 'Conversa não encontrada' }); return }
     }
+    // Valida contato pertence ao tenant
+    if (contactId) {
+      const { data: contact } = await db.from('contacts').select('id').eq('id', contactId).eq('tenant_id', req.auth.tid).single()
+      if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
+    }
     const { data, error } = await db.from('tasks').insert({
       tenant_id: req.auth.tid,
       conversation_id: conversationId || null,

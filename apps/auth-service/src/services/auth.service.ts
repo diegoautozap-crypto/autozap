@@ -97,40 +97,37 @@ export class AuthService {
     return { userId, tenantId, tempToken }
   }
 
-  // In-memory login attempt tracking (per-process, resets on restart)
-  private loginAttempts = new Map<string, { count: number; lockedUntil: number }>()
   private readonly MAX_LOGIN_ATTEMPTS = 5
   private readonly LOCKOUT_MINUTES = 15
 
-  private checkLoginLockout(email: string): void {
-    const key = email.toLowerCase()
-    const attempt = this.loginAttempts.get(key)
-    if (attempt && attempt.lockedUntil > Date.now()) {
-      const minutesLeft = Math.ceil((attempt.lockedUntil - Date.now()) / 60_000)
+  private async checkLoginLockout(email: string): Promise<void> {
+    const { data: user } = await db.from('users').select('locked_until').eq('email', email.toLowerCase()).maybeSingle()
+    if (user?.locked_until && new Date(user.locked_until) > new Date()) {
+      const minutesLeft = Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60_000)
       throw new AppError('ACCOUNT_LOCKED', `Conta bloqueada. Tente novamente em ${minutesLeft} minutos.`, 429)
     }
   }
 
-  private recordFailedLogin(email: string): void {
-    const key = email.toLowerCase()
-    const attempt = this.loginAttempts.get(key) || { count: 0, lockedUntil: 0 }
-    attempt.count++
-    if (attempt.count >= this.MAX_LOGIN_ATTEMPTS) {
-      attempt.lockedUntil = Date.now() + this.LOCKOUT_MINUTES * 60_000
-      attempt.count = 0
-      logger.warn('Account locked after failed attempts', { email: key, lockoutMinutes: this.LOCKOUT_MINUTES })
+  private async recordFailedLogin(email: string): Promise<void> {
+    const { data: user } = await db.from('users').select('id, login_attempts').eq('email', email.toLowerCase()).maybeSingle()
+    if (!user) return
+    const attempts = (user.login_attempts || 0) + 1
+    if (attempts >= this.MAX_LOGIN_ATTEMPTS) {
+      await db.from('users').update({ login_attempts: 0, locked_until: new Date(Date.now() + this.LOCKOUT_MINUTES * 60_000) }).eq('id', user.id)
+      logger.warn('Account locked after failed attempts', { email: email.toLowerCase(), lockoutMinutes: this.LOCKOUT_MINUTES })
+    } else {
+      await db.from('users').update({ login_attempts: attempts }).eq('id', user.id)
     }
-    this.loginAttempts.set(key, attempt)
   }
 
-  private clearFailedLogins(email: string): void {
-    this.loginAttempts.delete(email.toLowerCase())
+  private async clearFailedLogins(email: string): Promise<void> {
+    await db.from('users').update({ login_attempts: 0, locked_until: null }).eq('email', email.toLowerCase())
   }
 
   async login(input: LoginInput): Promise<TokenPair> {
     const { email, password, totpCode, userAgent, ipAddress } = input
 
-    this.checkLoginLockout(email)
+    await this.checkLoginLockout(email)
 
     const { data: user } = await db
       .from('users')
@@ -139,7 +136,7 @@ export class AuthService {
       .maybeSingle()
 
     if (!user) {
-      this.recordFailedLogin(email)
+      await this.recordFailedLogin(email)
       throw new UnauthorizedError('Invalid email or password')
     }
     if (!user.is_active) throw new UnauthorizedError('Account suspended')
@@ -147,7 +144,7 @@ export class AuthService {
 
     const valid = await comparePassword(password, user.password_hash)
     if (!valid) {
-      this.recordFailedLogin(email)
+      await this.recordFailedLogin(email)
       logger.warn('Failed login attempt', { email: email.toLowerCase(), ip: ipAddress })
       throw new UnauthorizedError('Invalid email or password')
     }
@@ -169,7 +166,7 @@ export class AuthService {
       ipAddress,
     })
 
-    this.clearFailedLogins(email)
+    await this.clearFailedLogins(email)
     db.from('users').update({ last_login_at: new Date() }).eq('id', user.id).then()
     this.audit(user.tenant_id, user.id, 'user.login', 'user', user.id, { ipAddress })
 
