@@ -885,6 +885,21 @@ export class FlowEngine {
               logger.warn('AI node blocked — monthly AI limit reached', { tenantId: ctx.tenantId, limit: aiLimits.aiResponses, used: currentAiCount })
               await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Nosso atendimento automático está temporariamente indisponível. Um atendente vai te responder em breve!' })
               await db.from('conversations').update({ bot_active: false }).eq('id', ctx.conversationId).eq('tenant_id', ctx.tenantId)
+              // Notifica o gestor via Pusher + email
+              emitPusher(ctx.tenantId, 'plan.limit_reached', { type: 'aiResponses', limit: aiLimits.aiResponses, used: currentAiCount, message: `Limite de ${aiLimits.aiResponses.toLocaleString()} respostas IA/mês atingido. Faça upgrade do plano.` })
+              try {
+                const { data: owner } = await db.from('users').select('email, name').eq('tenant_id', ctx.tenantId).eq('role', 'owner').single()
+                if (owner?.email) {
+                  const { Resend } = require('resend')
+                  const resend = new Resend(process.env.RESEND_API_KEY || process.env.SMTP_PASS)
+                  await resend.emails.send({
+                    from: process.env.RESEND_FROM || 'AutoZap <noreply@useautozap.app>',
+                    to: owner.email,
+                    subject: '⚠️ Limite de respostas IA atingido — AutoZap',
+                    html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px"><h1 style="color:#f59e0b;font-size:24px">Limite de IA atingido</h1><p>Olá, ${owner.name || 'gestor'}!</p><p>Seu plano atingiu o limite de <strong>${aiLimits.aiResponses.toLocaleString()} respostas IA</strong> neste mês. Os flows com nó de IA foram pausados automaticamente.</p><p>Para reativar, faça upgrade do seu plano:</p><a href="https://useautozap.app/dashboard/settings#planos" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Ver planos</a></div>`,
+                  })
+                }
+              } catch {}
               break
             }
           }
