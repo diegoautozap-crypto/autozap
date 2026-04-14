@@ -113,8 +113,22 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
     const { message, prompt, model } = req.body
     if (!message || !prompt) { res.status(400).json({ success: false, error: { message: 'message and prompt required' } }); return }
     const { db } = await import('@autozap/utils')
-    const { data: tenant } = await db.from('tenants').select('metadata').eq('id', req.auth.tid).single()
-    const apiKey = tenant?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
+
+    // Check AI response limit
+    const { data: tenantData } = await db.from('tenants').select('plan_slug, metadata').eq('id', req.auth.tid).single()
+    const planSlug = tenantData?.plan_slug || 'pending'
+    const { PLAN_LIMITS } = await import('@autozap/types')
+    const limits = PLAN_LIMITS[planSlug as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.pending
+    if (limits.aiResponses !== null) {
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const { count } = await db.from('flow_logs').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', req.auth.tid).eq('status', 'ai_response').gte('created_at', monthStart.toISOString())
+      if ((count ?? 0) >= limits.aiResponses) {
+        res.status(403).json({ success: false, error: { message: `Limite de ${limits.aiResponses} respostas IA/mês atingido` } }); return
+      }
+    }
+
+    const apiKey = tenantData?.metadata?.openai_api_key || process.env.OPENAI_API_KEY
     if (!apiKey) { res.status(400).json({ success: false, error: { message: 'OpenAI API key not configured' } }); return }
     const { default: OpenAI } = await import('openai')
     const openai = new OpenAI({ apiKey })
@@ -123,6 +137,15 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
       messages: [{ role: 'system', content: prompt }, { role: 'user', content: message }],
       max_tokens: 500,
     })
+
+    // Contabiliza uso de IA
+    await db.from('flow_logs').insert({
+      id: require('crypto').randomUUID(),
+      tenant_id: req.auth.tid,
+      status: 'ai_response',
+      detail: `AI suggestion (inbox): ${(completion.choices[0]?.message?.content || '').slice(0, 100)}`,
+    }).then(() => {}).catch(() => {})
+
     res.json(ok({ reply: completion.choices[0]?.message?.content || '' }))
   } catch (err) { next(err) }
 })
