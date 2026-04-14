@@ -1876,8 +1876,55 @@ export class FlowEngine {
         return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
       }
 
-      const selectedDate = selected.date
-      const selectedTime = selected.time
+      // Salva seleção e pede confirmação antes de criar o evento
+      variables['_schedule_selected_date'] = selected.date
+      variables['_schedule_selected_time'] = selected.time
+      variables['_schedule_selected_price'] = selected.price ? String(selected.price) : ''
+
+      const dd3 = selected.date.split('-')[2]
+      const mm3 = selected.date.split('-')[1]
+      const priceConfirm = selected.price ? `\n💰 Valor: R$ ${selected.price}` : ''
+      const confirmMsg = data?.confirmMessage || `*Confirma a reserva?*\n\n📅 Data: ${dd3}/${mm3}\n⏰ Horário: ${selected.time}${priceConfirm}\n\n*1.* Sim, confirmar\n*2.* Não, voltar`
+      await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: confirmMsg })
+
+      variables['_schedule_step'] = 'evo_confirm'
+      const confirmStateId = stateId || generateId()
+      await db.from('flow_states').upsert({
+        id: confirmStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+        conversation_id: ctx.conversationId, current_node_id: node.id,
+        variables, loop_counters: loopCounters, waiting_variable: '_schedule_confirm_choice',
+        status: 'waiting', updated_at: new Date(),
+      }, { onConflict: 'flow_id,conversation_id' })
+      return { success: true, paused: true }
+    }
+
+    // ── Evolution all-at-once: user confirms or cancels ──
+    if (step === 'evo_confirm') {
+      const confirmResponse = (variables['_schedule_confirm_choice'] || '').trim().toLowerCase()
+
+      // Não confirmou → volta pra lista de horários
+      if (confirmResponse === '2' || confirmResponse.includes('não') || confirmResponse.includes('nao') || confirmResponse.includes('voltar')) {
+        variables['_schedule_step'] = '1'
+        Object.keys(variables).filter(k => k.startsWith('_schedule_') && k !== '_schedule_node_id').forEach(k => delete variables[k])
+        return await this.executeGoogleCalendarNode(node, ctx, flowId, data, variables, loopCounters, stateId)
+      }
+
+      // Confirmou → criar evento
+      if (confirmResponse !== '1' && !confirmResponse.includes('sim')) {
+        await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: 'Por favor, digite *1* para confirmar ou *2* para voltar.' })
+        const retryStateId = stateId || generateId()
+        await db.from('flow_states').upsert({
+          id: retryStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+          conversation_id: ctx.conversationId, current_node_id: node.id,
+          variables, loop_counters: loopCounters, waiting_variable: '_schedule_confirm_choice',
+          status: 'waiting', updated_at: new Date(),
+        }, { onConflict: 'flow_id,conversation_id' })
+        return { success: true, paused: true }
+      }
+
+      const selectedDate = variables['_schedule_selected_date']
+      const selectedTime = variables['_schedule_selected_time']
+      const selectedPrice = variables['_schedule_selected_price'] ? Number(variables['_schedule_selected_price']) : undefined
       const { data: contactInfo2 } = await db.from('contacts').select('name').eq('id', ctx.contactId).single()
       const contactName2 = contactInfo2?.name || ctx.phone
 
@@ -1906,7 +1953,7 @@ export class FlowEngine {
         const mm = selectedDate.split('-')[1]
         variables['agendamento_data'] = `${dd}/${mm}`
         variables['agendamento_horario'] = selectedTime
-        variables['agendamento_valor'] = selected.price ? String(selected.price) : ''
+        variables['agendamento_valor'] = selectedPrice ? String(selectedPrice) : ''
         variables['agendamento_status'] = 'agendado'
         variables['agendamento_google_event_id'] = event.data?.id || ''
 
