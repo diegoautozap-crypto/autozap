@@ -475,6 +475,11 @@ export default function FlowEditorPage() {
   // Keyboard shortcuts (after all functions are defined)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignora atalhos quando o foco está em input, textarea ou contenteditable
+      const tag = (e.target as HTMLElement)?.tagName
+      const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable
+      if (isEditable) return
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') { copySelected() }
