@@ -85,22 +85,35 @@ async function fetchProfilePhoto(contactId: string, tenantId: string, phone: str
     const apiKey = creds.apiKey
     if (!baseUrl || !instanceName || !apiKey) return
 
-    const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: apiKey },
-      body: JSON.stringify({ number: phone }),
-      signal: AbortSignal.timeout(5000),
-    })
+    const cleanPhone = phone.replace(/\D/g, '')
 
-    if (!res.ok) return
-    const data = await res.json() as any
-    const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture
+    // Tenta endpoint v2 da Evolution
+    let pictureUrl: string | null = null
+
+    for (const endpoint of [
+      `${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`,
+      `${baseUrl}/chat/profilePicture/${instanceName}`,
+    ]) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: apiKey },
+          body: JSON.stringify({ number: cleanPhone }),
+          signal: AbortSignal.timeout(5000),
+        })
+        if (!res.ok) continue
+        const data = await res.json() as any
+        pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.wpiUrl || data?.imgUrl || null
+        if (pictureUrl) break
+      } catch { continue }
+    }
+
     if (!pictureUrl) return
 
     await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
-    logger.info('Profile photo fetched', { contactId, phone })
-  } catch {
-    // Silencioso — foto é opcional
+    logger.info('Profile photo fetched', { contactId, phone: cleanPhone })
+  } catch (err) {
+    logger.debug('Profile photo fetch failed', { contactId, err: (err as Error).message })
   }
 }
 
