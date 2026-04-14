@@ -142,6 +142,10 @@ export default function CampaignsPage() {
     staleTime: 60000,
   })
 
+  const msgLimit = limitsData?.limits?.messages
+  const msgUsage = limitsData?.usage?.messages ?? 0
+  const msgLimitReached = msgLimit !== null && msgLimit !== undefined && msgUsage >= msgLimit
+
   const totalCampaigns     = campaigns?.length ?? 0
   const totalPages         = Math.ceil(totalCampaigns / PAGE_SIZE)
   const paginatedCampaigns = campaigns?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? []
@@ -301,7 +305,12 @@ export default function CampaignsPage() {
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'}>
             <RefreshCw size={13} /> {t('campaigns.refresh')}
           </button>
-          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && (
+          {msgLimitReached && (
+            <div style={{ padding: '6px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Limite de mensagens atingido ({msgUsage.toLocaleString()}/{msgLimit?.toLocaleString()}) — faça upgrade
+            </div>
+          )}
+          {canEdit('/dashboard/campaigns') && canCreateCampaigns() && !msgLimitReached && (
           <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#22c55e'}>
@@ -382,8 +391,8 @@ export default function CampaignsPage() {
                             <Pause size={10} /> {t('campaigns.pause')}
                           </button>
                         ) : canEdit('/dashboard/campaigns') && ['draft', 'paused'].includes(camp.status) ? (
-                          <button onClick={() => startMutation.mutate(camp.id)} style={{ padding: '5px 10px', background: '#22c55e', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Play size={10} fill="#fff" /> {t('campaigns.send')}
+                          <button onClick={() => { if (msgLimitReached) { toast.error('Limite de mensagens do mês atingido. Faça upgrade.'); return }; startMutation.mutate(camp.id) }} style={{ padding: '5px 10px', background: msgLimitReached ? 'var(--border)' : '#22c55e', border: 'none', color: msgLimitReached ? 'var(--text-faint)' : '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: msgLimitReached ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Play size={10} fill={msgLimitReached ? 'var(--text-faint)' : '#fff'} /> {t('campaigns.send')}
                           </button>
                         ) : null}
                       </div>
