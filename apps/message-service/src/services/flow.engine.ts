@@ -641,6 +641,14 @@ export class FlowEngine {
           } else if (data?.subtype === 'list' && data?.listRows?.length) {
             const listRows = data.listRows.map((r: any, i: number) => ({ id: `row_${i}`, title: this.interpolate(r.title || r, ctx, variables), description: r.description ? this.interpolate(r.description, ctx, variables) : undefined }))
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'interactive', body: message, interactiveType: 'list', listRows, listButtonText: data.listButtonText || 'Ver opções', footer: data.footer ? this.interpolate(data.footer, ctx, variables) : undefined })
+          } else if (data?.subtype === 'image' && data?.mediaUrl) {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'image', mediaUrl: data.mediaUrl, body: data.caption ? this.interpolate(data.caption, ctx, variables) : '' })
+          } else if (data?.subtype === 'video' && data?.mediaUrl) {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'video', mediaUrl: data.mediaUrl, body: data.caption ? this.interpolate(data.caption, ctx, variables) : '' })
+          } else if (data?.subtype === 'audio' && data?.mediaUrl) {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'audio', mediaUrl: data.mediaUrl })
+          } else if (data?.subtype === 'document' && data?.mediaUrl) {
+            await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'document', mediaUrl: data.mediaUrl, body: data.caption ? this.interpolate(data.caption, ctx, variables) : '' })
           } else {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ch, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: message })
           }
