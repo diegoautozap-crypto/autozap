@@ -1,4 +1,4 @@
-import { db, generateId } from '@autozap/utils'
+import { db, generateId, logger, decryptCredentials } from '@autozap/utils'
 
 interface EnsureContactOpts {
   tenantId: string
@@ -62,7 +62,46 @@ export async function ensureContact(opts: EnsureContactOpts): Promise<{ contactI
     await db.from('contacts').update(update).eq('id', upserted.id)
   }
 
+  // Busca foto de perfil do WhatsApp (async, não bloqueia)
+  fetchProfilePhoto(upserted.id, tenantId, phone).catch(() => {})
+
   return { contactId: upserted.id, isNew: true }
+}
+
+async function fetchProfilePhoto(contactId: string, tenantId: string, phone: string): Promise<void> {
+  try {
+    // Verifica se já tem foto
+    const { data: contact } = await db.from('contacts').select('avatar_url').eq('id', contactId).single()
+    if (contact?.avatar_url) return
+
+    // Busca canal Evolution ativo do tenant
+    const { data: channel } = await db.from('channels').select('credentials, type')
+      .eq('tenant_id', tenantId).eq('type', 'evolution').eq('status', 'active').limit(1).maybeSingle()
+    if (!channel) return
+
+    const creds = decryptCredentials(channel.credentials)
+    const baseUrl = creds.baseUrl?.replace(/\/+$/, '')
+    const instanceName = creds.instanceName
+    const apiKey = creds.apiKey
+    if (!baseUrl || !instanceName || !apiKey) return
+
+    const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: apiKey },
+      body: JSON.stringify({ number: phone }),
+      signal: AbortSignal.timeout(5000),
+    })
+
+    if (!res.ok) return
+    const data = await res.json() as any
+    const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture
+    if (!pictureUrl) return
+
+    await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
+    logger.info('Profile photo fetched', { contactId, phone })
+  } catch {
+    // Silencioso — foto é opcional
+  }
 }
 
 export async function ensureConversation(opts: EnsureConversationOpts): Promise<{ conversationId: string; isNew: boolean }> {
