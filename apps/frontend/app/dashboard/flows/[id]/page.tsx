@@ -246,10 +246,12 @@ export default function FlowEditorPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') { copySelected() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') { pasteNodes() }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo])
+  }, [undo, redo, copySelected, pasteNodes])
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
   const [doneNodes, setDoneNodes] = useState<Record<string, 'success' | 'error'>>({})
@@ -608,6 +610,7 @@ export default function FlowEditorPage() {
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
             selectionOnDrag
+            panOnDrag={[1, 2]}
             defaultEdgeOptions={{ type: 'custom', markerEnd: { type: MarkerType.ArrowClosed, color: '#d1d5db' }, style: { stroke: '#d1d5db', strokeWidth: 2 } }}>
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
             <Controls />
