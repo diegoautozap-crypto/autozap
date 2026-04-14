@@ -22,7 +22,7 @@ app.use(express.json({ limit: '100kb' }))
 app.use(rateLimit({ windowMs: 60_000, max: 120 }))
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'tenant-service' })
+  res.json({ status: 'ok' })
 })
 
 app.use('/tenant', asaasWebhookRouter)

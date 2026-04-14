@@ -24,8 +24,8 @@ app.get('/health', async (_req, res) => {
   try {
     const { db: dbCheck } = await import('@autozap/utils')
     const { error } = await dbCheck.from('conversations').select('id').limit(1)
-    res.json({ status: error ? 'degraded' : 'ok', service: 'conversation-service', db: error ? 'down' : 'ok' })
-  } catch { res.json({ status: 'degraded', service: 'conversation-service', db: 'down' }) }
+    res.json({ status: error ? 'degraded' : 'ok' })
+  } catch { res.json({ status: 'degraded' }) }
 })
 app.use('/', conversationRoutes)
 app.use('/', pipelineRoutes)

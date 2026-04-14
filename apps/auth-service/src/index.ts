@@ -55,7 +55,7 @@ app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'auth-service', timestamp: new Date().toISOString() })
+  res.json({ status: 'ok' })
 })
 
 // ─── Internal Endpoints (service-to-service, no rate limit) ─────────────────
@@ -104,6 +104,8 @@ app.post('/internal/notify-agent', async (req, res) => {
 app.use('/auth/register', registerLimiter)
 app.use('/auth/forgot-password', passwordLimiter)
 app.use('/auth/reset-password', passwordLimiter)
+app.use('/auth/verify-email', rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: { error: 'Too many attempts' } }))
+app.use('/auth/resend-verification', rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { error: 'Too many attempts' } }))
 app.use('/auth', authLimiter, authRoutes)
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────

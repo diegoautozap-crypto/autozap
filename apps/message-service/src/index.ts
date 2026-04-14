@@ -69,8 +69,8 @@ app.get('/health', async (_req, res) => {
   try {
     const { db: dbCheck } = await import('@autozap/utils')
     const { error } = await dbCheck.from('flows').select('id').limit(1)
-    res.json({ status: error ? 'degraded' : 'ok', service: 'message-service', db: error ? 'down' : 'ok' })
-  } catch { res.json({ status: 'degraded', service: 'message-service', db: 'down' }) }
+    res.json({ status: error ? 'degraded' : 'ok' })
+  } catch { res.json({ status: 'degraded' }) }
 })
 
 // Rate limiting para webhooks (100 req/min por IP)

@@ -25,8 +25,8 @@ app.get('/health', async (_req, res) => {
   try {
     const { db } = await import('@autozap/utils')
     const { error } = await db.from('campaigns').select('id').limit(1)
-    res.json({ status: error ? 'degraded' : 'ok', service: 'campaign-service', db: error ? 'down' : 'ok' })
-  } catch { res.json({ status: 'degraded', service: 'campaign-service', db: 'down' }) }
+    res.json({ status: error ? 'degraded' : 'ok' })
+  } catch { res.json({ status: 'degraded' }) }
 })
 app.use('/', campaignRoutes)
 app.use(errorHandler)

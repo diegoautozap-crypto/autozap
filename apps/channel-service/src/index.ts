@@ -21,7 +21,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use(rateLimit({ windowMs: 60_000, max: 200 }))
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'channel-service' })
+  res.json({ status: 'ok' })
 })
 
 app.use('/', channelRoutes)

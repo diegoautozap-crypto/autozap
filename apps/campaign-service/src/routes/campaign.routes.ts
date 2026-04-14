@@ -180,11 +180,12 @@ router.post('/campaigns', validate(createCampaignSchema), async (req, res, next)
       curlTemplate = `curl -X POST "https://api.gupshup.io/wa/api/v1/template/msg" -H "apikey: ${apiKey}" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "channel=whatsapp" --data-urlencode "source=${source}" --data-urlencode "destination={{phone}}" --data-urlencode "src.name=${srcName || source}" --data-urlencode "template=${templateParam}"`
     }
 
+    const sanitizeShell = (s: string) => s.replace(/[;"'`$\\|&<>(){}]/g, '')
     const replacePlaceholders = (tpl: string) => tpl
       .replace(/\\\s*\n/g, ' ').replace(/\n/g, ' ')
-      .replace(/\{\{\s*api[_\s]?key\s*\}\}/gi, apiKey)
-      .replace(/\{\{\s*source\s*\}\}/gi, source)
-      .replace(/\{\{\s*src[_\s.]?name\s*\}\}/gi, srcName || source)
+      .replace(/\{\{\s*api[_\s]?key\s*\}\}/gi, sanitizeShell(apiKey))
+      .replace(/\{\{\s*source\s*\}\}/gi, sanitizeShell(source))
+      .replace(/\{\{\s*src[_\s.]?name\s*\}\}/gi, sanitizeShell(srcName || source))
 
     if (curlTemplate) curlTemplate = replacePlaceholders(curlTemplate)
     if (rest.copies && Array.isArray(rest.copies)) {

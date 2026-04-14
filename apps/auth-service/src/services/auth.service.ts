@@ -145,7 +145,7 @@ export class AuthService {
     const valid = await comparePassword(password, user.password_hash)
     if (!valid) {
       await this.recordFailedLogin(email)
-      logger.warn('Failed login attempt', { email: email.toLowerCase(), ip: ipAddress })
+      logger.warn('Failed login attempt', { userId: user.id, ip: ipAddress })
       throw new UnauthorizedError('Invalid email or password')
     }
 
