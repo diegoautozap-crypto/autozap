@@ -139,12 +139,21 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
     })
 
     // Contabiliza uso de IA
-    await db.from('flow_logs').insert({
-      id: require('crypto').randomUUID(),
-      tenant_id: req.auth.tid,
-      status: 'ai_response',
-      detail: `AI suggestion (inbox): ${(completion.choices[0]?.message?.content || '').slice(0, 100)}`,
-    }).then(() => {}).catch(() => {})
+    try {
+      await db.from('flow_logs').insert({
+        id: require('crypto').randomUUID(),
+        tenant_id: req.auth.tid,
+        flow_id: null,
+        node_id: 'inbox_ai_suggestion',
+        contact_id: null,
+        conversation_id: null,
+        status: 'ai_response',
+        detail: `AI suggestion (inbox): ${(completion.choices[0]?.message?.content || '').slice(0, 100)}`,
+        created_at: new Date(),
+      })
+    } catch (logErr) {
+      logger.warn('Failed to log AI usage', { err: (logErr as Error).message })
+    }
 
     res.json(ok({ reply: completion.choices[0]?.message?.content || '' }))
   } catch (err) { next(err) }
