@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { contactApi } from '@/lib/api'
+import { contactApi, tenantApi } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
@@ -41,6 +41,11 @@ function fmt(v: number) {
 export default function ProductsPage() {
   const t = useT()
   const queryClient = useQueryClient()
+  const { data: planLimits } = useQuery({
+    queryKey: ['plan-limits-products'],
+    queryFn: async () => { const { data } = await tenantApi.get('/tenant/limits'); return data.data },
+  })
+  const canCreateProducts = planLimits?.limits?.products === null || (planLimits?.limits?.products ?? 0) > 0
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -150,10 +155,10 @@ export default function ProductsPage() {
           <ShoppingBag size={22} color="#22c55e" />
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Produtos</h1>
         </div>
-        <button onClick={openCreateModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+        {canCreateProducts && <button onClick={openCreateModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
           onMouseEnter={e => (e.currentTarget.style.background = '#16a34a')} onMouseLeave={e => (e.currentTarget.style.background = '#22c55e')}>
           <Plus size={15} /> Novo produto
-        </button>
+        </button>}
       </div>
 
       {/* Summary Cards */}

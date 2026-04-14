@@ -187,6 +187,7 @@ export default function FlowEditorPage() {
   // Filtra nós baseado no plano
   const ACTION_NODES = allActionNodes.filter(n => {
     if (n.type === 'transcribe_audio' && planLimits?.limits?.transcription === false) return false
+    if (n.type === 'ai' && planLimits?.limits?.aiResponses === 0) return false
     return true
   })
 
