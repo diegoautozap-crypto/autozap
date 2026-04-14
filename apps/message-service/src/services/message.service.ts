@@ -643,11 +643,51 @@ Regras:
   private async findOrCreateContact(tenantId: string, phone: string) {
     phone = phone.replace(/^\+/, '')
     if (phone.startsWith('55') && phone.length === 12) phone = phone.slice(0,4) + '9' + phone.slice(4)
-    const { data: existing } = await db.from('contacts').select('id, name').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
-    if (existing) return existing
+    const { data: existing } = await db.from('contacts').select('id, name, avatar_url').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
+    if (existing) {
+      // Busca foto se não tem
+      if (!existing.avatar_url) this.fetchProfilePhoto(existing.id, tenantId, phone).catch(() => {})
+      return existing
+    }
     const { data: created, error } = await db.from('contacts').insert({ id: generateId(), tenant_id: tenantId, phone, name: phone, origin: 'inbound', status: 'active', last_interaction_at: new Date() }).select('id, name').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
+    // Busca foto do novo contato
+    this.fetchProfilePhoto(created.id, tenantId, phone).catch(() => {})
     return created
+  }
+
+  private async fetchProfilePhoto(contactId: string, tenantId: string, phone: string): Promise<void> {
+    try {
+      const { data: channel } = await db.from('channels').select('credentials, type')
+        .eq('tenant_id', tenantId).eq('type', 'evolution').eq('status', 'active').limit(1).maybeSingle()
+      if (!channel) return
+
+      const creds = decryptCredentials(channel.credentials)
+      const baseUrl = creds.baseUrl?.replace(/\/+$/, '')
+      const instanceName = creds.instanceName
+      const apiKey = creds.apiKey
+      if (!baseUrl || !instanceName || !apiKey) return
+
+      const cleanPhone = phone.replace(/\D/g, '')
+      const remoteJid = `${cleanPhone}@s.whatsapp.net`
+
+      const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: apiKey },
+        body: JSON.stringify({ number: remoteJid }),
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (!res.ok) { logger.debug('ProfilePic fetch failed', { contactId, status: res.status }); return }
+      const data = await res.json() as any
+      const pictureUrl = data?.profilePictureUrl
+      if (!pictureUrl) { logger.debug('ProfilePic no URL in response', { contactId, data }); return }
+
+      await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
+      logger.info('ProfilePic saved', { contactId, phone: cleanPhone })
+    } catch (err) {
+      logger.debug('ProfilePic error', { contactId, err: (err as Error).message })
+    }
   }
 
   private async findOrCreateConversation(tenantId: string, channelId: string, contactId: string, channelType: string) {
