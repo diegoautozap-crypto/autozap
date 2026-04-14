@@ -658,7 +658,10 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <div><label style={labelStyle}>{t('nodes.image')}</label><MediaUpload accept="image/*" label={t('nodes.imageUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
             <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
           </>)}
-          {d.subtype === 'video' && (<div><label style={labelStyle}>{t('nodes.video')}</label><MediaUpload accept="video/*" label={t('nodes.videoUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
+          {d.subtype === 'video' && (<>
+            <div><label style={labelStyle}>{t('nodes.video')}</label><MediaUpload accept="video/*" label={t('nodes.videoUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
+            <div><label style={labelStyle}>{t('nodes.captionOptional')}</label><input style={inputStyle} placeholder={t('nodes.captionPlaceholder')} value={d.caption || ''} onChange={e => onUpdate(node.id, { caption: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
+          </>)}
           {d.subtype === 'audio' && (<div><label style={labelStyle}>{t('nodes.audio')}</label><MediaUpload accept="audio/*" label={t('nodes.audioUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>)}
           {d.subtype === 'document' && (<>
             <div><label style={labelStyle}>{t('nodes.document')}</label><MediaUpload accept=".pdf,.doc,.docx,.xls,.xlsx" label={t('nodes.documentUpload')} currentUrl={d.mediaUrl} onUploaded={url => onUpdate(node.id, { mediaUrl: url })} /></div>
