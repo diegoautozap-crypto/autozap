@@ -684,12 +684,13 @@ Regras:
         signal: AbortSignal.timeout(10000),
       })
 
-      logger.info('ProfilePic: response', { status: res.status })
-      if (!res.ok) { const txt = await res.text(); logger.info('ProfilePic: error response', { status: res.status, body: txt.slice(0, 200) }); return }
-      const data = await res.json() as any
-      logger.info('ProfilePic: response data', { keys: Object.keys(data || {}), raw: JSON.stringify(data).slice(0, 500) })
-      const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.imgUrl || data?.wuid?.profilePictureUrl
-      if (!pictureUrl) { logger.info('ProfilePic: no URL found in any field'); return }
+      const responseText = await res.text()
+      logger.info(`ProfilePic: status=${res.status} body=${responseText.slice(0, 300)}`)
+      if (!res.ok) return
+      let data: any
+      try { data = JSON.parse(responseText) } catch { logger.info('ProfilePic: invalid JSON'); return }
+      const pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.imgUrl || data?.url
+      if (!pictureUrl) { logger.info('ProfilePic: no URL field found'); return }
 
       await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
       logger.info('ProfilePic: SAVED', { contactId, phone: cleanPhone, pictureUrl: pictureUrl.slice(0, 80) })
