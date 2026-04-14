@@ -366,6 +366,14 @@ export class FlowEngine {
     const { data: state } = await db.from('flow_states').select('*').eq('conversation_id', ctx.conversationId).eq('tenant_id', ctx.tenantId).eq('status', 'waiting').order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (!state) return false
 
+    // Ignora se o state acabou de ser criado (< 2 segundos) — evita que a mesma mensagem
+    // que criou o waiting state seja usada como resposta
+    const stateAge = Date.now() - new Date(state.updated_at).getTime()
+    if (stateAge < 2000) {
+      logger.info('Waiting state too fresh, ignoring this message', { flowId: state.flow_id, stateAge })
+      return true // retorna true pra não disparar novo flow
+    }
+
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
     const variables = state.variables || {}
     const loopCounters = state.loop_counters || {}
