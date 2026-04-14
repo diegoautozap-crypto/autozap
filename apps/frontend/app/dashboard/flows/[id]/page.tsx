@@ -198,48 +198,45 @@ export default function FlowEditorPage() {
   const [initialized, setInitialized] = useState(false)
 
   // ── Undo/Redo ──
-  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([])
+  const historyRef = useRef<{ nodes: string; edges: string }[]>([])
   const historyIndexRef = useRef(-1)
-  const isUndoRedoRef = useRef(false)
-  const MAX_HISTORY = 50
+  const skipHistoryRef = useRef(false)
 
-  const pushHistory = useCallback(() => {
-    if (isUndoRedoRef.current) return
-    const snapshot = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }
-    const idx = historyIndexRef.current
-    historyRef.current = historyRef.current.slice(0, idx + 1)
-    historyRef.current.push(snapshot)
-    if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift()
+  const saveSnapshot = useCallback(() => {
+    if (skipHistoryRef.current) return
+    const snap = { nodes: JSON.stringify(nodes), edges: JSON.stringify(edges) }
+    // Não salva se igual ao último
+    const last = historyRef.current[historyIndexRef.current]
+    if (last && last.nodes === snap.nodes && last.edges === snap.edges) return
+    // Corta histórico futuro (se deu undo e editou)
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1)
+    historyRef.current.push(snap)
+    if (historyRef.current.length > 50) historyRef.current.shift()
     historyIndexRef.current = historyRef.current.length - 1
   }, [nodes, edges])
 
-  // Salva snapshot quando isDirty muda (operação de edição)
-  useEffect(() => {
-    if (isDirty && initialized) pushHistory()
-  }, [isDirty]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const undo = useCallback(() => {
+    // Salva estado atual antes do primeiro undo (pra poder redo de volta)
+    if (historyIndexRef.current === historyRef.current.length - 1) saveSnapshot()
     if (historyIndexRef.current <= 0) return
     historyIndexRef.current--
-    const snapshot = historyRef.current[historyIndexRef.current]
-    if (!snapshot) return
-    isUndoRedoRef.current = true
-    setNodes(snapshot.nodes)
-    setEdges(snapshot.edges)
-    setTimeout(() => { isUndoRedoRef.current = false }, 100)
-    toast.success('Desfeito')
-  }, [setNodes, setEdges])
+    const snap = historyRef.current[historyIndexRef.current]
+    if (!snap) return
+    skipHistoryRef.current = true
+    setNodes(JSON.parse(snap.nodes))
+    setEdges(JSON.parse(snap.edges))
+    setTimeout(() => { skipHistoryRef.current = false }, 200)
+  }, [setNodes, setEdges, saveSnapshot])
 
   const redo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return
     historyIndexRef.current++
-    const snapshot = historyRef.current[historyIndexRef.current]
-    if (!snapshot) return
-    isUndoRedoRef.current = true
-    setNodes(snapshot.nodes)
-    setEdges(snapshot.edges)
-    setTimeout(() => { isUndoRedoRef.current = false }, 100)
-    toast.success('Refeito')
+    const snap = historyRef.current[historyIndexRef.current]
+    if (!snap) return
+    skipHistoryRef.current = true
+    setNodes(JSON.parse(snap.nodes))
+    setEdges(JSON.parse(snap.edges))
+    setTimeout(() => { skipHistoryRef.current = false }, 200)
   }, [setNodes, setEdges])
 
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
@@ -344,6 +341,11 @@ export default function FlowEditorPage() {
       }
     }))
     setInitialized(true)
+    // Salva snapshot inicial pra undo
+    setTimeout(() => {
+      historyRef.current = []
+      historyIndexRef.current = -1
+    }, 100)
   }, [flowData, initialized, setNodes, setEdges])
 
   const saveMutation = useMutation({
@@ -381,6 +383,7 @@ export default function FlowEditorPage() {
   }, [analytics?.nodeStats, showAnalytics])
 
   const onConnect = useCallback((params: Connection) => {
+    saveSnapshot()
     let edgeColor = '#d1d5db'
     if (params.sourceHandle === 'fallback') edgeColor = '#9ca3af'
     else if (params.sourceHandle?.startsWith('branch_')) {
@@ -392,9 +395,10 @@ export default function FlowEditorPage() {
     else if (params.sourceHandle === 'false') edgeColor = '#ef4444'
     setEdges(eds => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor }, style: { stroke: edgeColor, strokeWidth: 2 } }, eds))
     setIsDirty(true)
-  }, [setEdges, nodes])
+  }, [setEdges, nodes, saveSnapshot])
 
   const addNode = (type: string) => {
+    saveSnapshot()
     if (type === 'sticky_note') {
       const nodeId = `note_${Date.now()}`
       setNodes((nds: Node[]) => [...nds, {
@@ -420,12 +424,14 @@ export default function FlowEditorPage() {
   }
 
   const updateNodeData = (nodeId: string, newData: any) => {
+    saveSnapshot()
     setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...newData, _rev: Date.now() } } : n))
     if (selectedNode?.id === nodeId) setSelectedNode(prev => prev ? { ...prev, data: { ...prev.data, ...newData } } : prev)
     setIsDirty(true)
   }
 
   const deleteNode = (nodeId: string) => {
+    saveSnapshot()
     setNodes((nds: Node[]) => nds.filter(n => n.id !== nodeId))
     setEdges((eds: Edge[]) => eds.filter(e => e.source !== nodeId && e.target !== nodeId))
     setSelectedNode(null)
@@ -443,6 +449,7 @@ export default function FlowEditorPage() {
   }
 
   const pasteNodes = () => {
+    saveSnapshot()
     if (!copiedNodes?.nodes.length) return
     const idMap = new Map<string, string>()
     const offset = 60 + Math.random() * 40
