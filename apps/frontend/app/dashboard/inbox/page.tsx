@@ -1242,7 +1242,7 @@ export default function InboxPage() {
                         setLoadingSuggestions(true); setAiSuggestions([])
                         try {
                           const { data } = await tenantApi.post('/tenant/ai-test', {
-                            message: `Baseado no histórico desta conversa, sugira 3 respostas curtas e naturais que eu posso enviar. Retorne APENAS as 3 sugestões separadas por |||. Sem numeração, sem aspas, sem prefixos como "Agente:" ou "1.".\n\nÚltimas mensagens:\n${(messages || []).slice(-6).map((m: any) => `${m.direction === 'inbound' ? '>' : '<'} ${m.body || '[mídia]'}`).join('\n')}`,
+                            message: `Baseado no histórico desta conversa, sugira 3 respostas curtas e naturais que eu posso enviar. Retorne APENAS as 3 sugestões separadas por |||. Sem numeração, sem aspas, sem prefixos como "Agente:" ou "1.".\n\nÚltimas mensagens:\n${(messages || []).slice(-30).map((m: any) => `${m.direction === 'inbound' ? '>' : '<'} ${m.body || '[mídia]'}`).join('\n')}`,
                             prompt: 'Você sugere respostas curtas e naturais para atendentes de CRM. Retorne APENAS o texto da resposta, sem prefixos, sem numeração, sem aspas. Cada sugestão separada por |||.',
                             model: 'gpt-4o-mini',
                           })
