@@ -250,6 +250,13 @@ export default function FlowEditorPage() {
     } catch { }
   }, [])
 
+  // Salva snapshot inicial quando o flow carrega
+  useEffect(() => {
+    if (initialized && nodes.length > 0 && historyRef.current.length === 0) {
+      saveSnapshot()
+    }
+  }, [initialized, nodes.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Pusher — execution animation
   useEffect(() => {
     if (!tenantId) return
@@ -341,11 +348,6 @@ export default function FlowEditorPage() {
       }
     }))
     setInitialized(true)
-    // Salva snapshot inicial pra undo
-    setTimeout(() => {
-      historyRef.current = []
-      historyIndexRef.current = -1
-    }, 100)
   }, [flowData, initialized, setNodes, setEdges])
 
   const saveMutation = useMutation({
