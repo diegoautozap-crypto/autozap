@@ -646,7 +646,10 @@ Regras:
     const { data: existing } = await db.from('contacts').select('id, name, avatar_url').eq('tenant_id', tenantId).eq('phone', phone).maybeSingle()
     if (existing) {
       // Busca foto se não tem
-      if (!existing.avatar_url) this.fetchProfilePhoto(existing.id, tenantId, phone).catch(() => {})
+      if (!existing.avatar_url) {
+        logger.info('Fetching profile photo for existing contact', { contactId: existing.id, phone })
+        this.fetchProfilePhoto(existing.id, tenantId, phone).catch(err => logger.error('fetchProfilePhoto crashed', { err: (err as Error).message }))
+      }
       return existing
     }
     const { data: created, error } = await db.from('contacts').insert({ id: generateId(), tenant_id: tenantId, phone, name: phone, origin: 'inbound', status: 'active', last_interaction_at: new Date() }).select('id, name').single()
