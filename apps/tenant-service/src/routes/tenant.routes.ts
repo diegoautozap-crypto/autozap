@@ -123,7 +123,10 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
       const { count } = await db.from('flow_logs').select('id', { count: 'exact', head: true })
         .eq('tenant_id', req.auth.tid).eq('status', 'ai_response').gte('created_at', monthStart.toISOString())
-      if ((count ?? 0) >= limits.aiResponses) {
+      const mKey = `ai_usage_${new Date().getFullYear()}_${new Date().getMonth() + 1}`
+      const inboxAi = Number(tenantData?.metadata?.[mKey] || 0)
+      const totalAi = (count ?? 0) + inboxAi
+      if (totalAi >= limits.aiResponses) {
         res.status(403).json({ success: false, error: { message: `Limite de ${limits.aiResponses} respostas IA/mês atingido` } }); return
       }
     }
@@ -138,19 +141,14 @@ router.post('/ai-test', requireRole('admin', 'owner'), async (req, res, next) =>
       max_tokens: 500,
     })
 
-    // Contabiliza uso de IA
+    // Contabiliza uso de IA — incrementa contador no tenant metadata
     try {
-      const { error: logError } = await db.from('flow_logs').insert({
-        id: require('crypto').randomUUID(),
-        tenant_id: req.auth.tid,
-        flow_id: '00000000-0000-0000-0000-000000000000',
-        node_id: 'inbox_ai',
-        contact_id: '00000000-0000-0000-0000-000000000000',
-        conversation_id: '00000000-0000-0000-0000-000000000000',
-        status: 'ai_response',
-        detail: `AI suggestion (inbox)`,
-      })
-      if (logError) logger.warn('Failed to log AI usage', { error: logError.message })
+      const currentMeta = tenantData?.metadata || {}
+      const monthKey = `ai_usage_${new Date().getFullYear()}_${new Date().getMonth() + 1}`
+      const currentCount = Number(currentMeta[monthKey] || 0)
+      await db.from('tenants').update({
+        metadata: { ...currentMeta, [monthKey]: currentCount + 1 },
+      }).eq('id', req.auth.tid)
     } catch (logErr) {
       logger.warn('Failed to log AI usage', { err: (logErr as Error).message })
     }
@@ -236,13 +234,16 @@ router.get('/limits', async (req, res, next) => {
       .gte('created_at', monthStart)
       .lt('created_at', monthEnd)
 
-    // AI responses this month (count flow_logs with ai node executions)
-    const { count: aiCount } = await db
+    // AI responses this month (flow_logs from flow nodes + metadata from inbox)
+    const { count: aiFlowCount } = await db
       .from('flow_logs').select('id', { count: 'exact', head: true })
       .eq('tenant_id', req.auth.tid)
       .eq('status', 'ai_response')
       .gte('created_at', monthStart)
       .lt('created_at', monthEnd)
+    const monthKey = `ai_usage_${new Date().getFullYear()}_${new Date().getMonth() + 1}`
+    const aiInboxCount = Number(tenant?.metadata?.[monthKey] || 0)
+    const aiCount = (aiFlowCount ?? 0) + aiInboxCount
 
     res.json(ok({
       plan: tenant.planSlug,
