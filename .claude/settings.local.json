@@ -65,7 +65,15 @@
       "Bash(git:*)",
       "Bash(railway variables:*)",
       "Bash(npm run:*)",
-      "Bash(cp /tmp/google_clean.ts apps/tenant-service/src/routes/google.routes.ts)"
+      "Bash(cp /tmp/google_clean.ts apps/tenant-service/src/routes/google.routes.ts)",
+      "Bash(wc:*)",
+      "Bash(npm ls:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl apps:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl secrets:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl deploy:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl logs:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl status:*)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl certs:*)"
     ]
   }
 }

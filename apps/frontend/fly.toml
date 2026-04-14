@@ -1,0 +1,34 @@
+app = 'autozap-frontend'
+primary_region = 'gru'
+
+[build]
+  dockerfile = 'Dockerfile'
+  [build.args]
+    NEXT_PUBLIC_API_URL = 'https://autozap-auth.fly.dev'
+    NEXT_PUBLIC_TENANT_SERVICE_URL = 'https://autozap-tenant.fly.dev'
+    NEXT_PUBLIC_CHANNEL_SERVICE_URL = 'https://autozap-channel.fly.dev'
+    NEXT_PUBLIC_MESSAGE_SERVICE_URL = 'https://autozap-message.fly.dev'
+    NEXT_PUBLIC_CONTACT_SERVICE_URL = 'https://autozap-contact.fly.dev'
+    NEXT_PUBLIC_CONVERSATION_SERVICE_URL = 'https://autozap-conversation.fly.dev'
+    NEXT_PUBLIC_CAMPAIGN_SERVICE_URL = 'https://autozap-campaign.fly.dev'
+    NEXT_PUBLIC_SUPABASE_URL = 'https://ylriruvrietwddxnamev.supabase.co'
+    NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscmlydXZyaWV0d2RkeG5hbWV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NTk4NzEsImV4cCI6MjA4OTIzNTg3MX0.AUlWL72qVkMHO0SHED7RICR7zPmlGoLdZKfrZ8pzCs8'
+    NEXT_PUBLIC_TENANT_ID = '0ed679c0-f1e4-43b6-9f12-ed270d7c7646'
+    NEXT_PUBLIC_PUSHER_KEY = 'e1568861ba2b50840e60'
+    NEXT_PUBLIC_PUSHER_CLUSTER = 'sa1'
+
+[env]
+  PORT = '3000'
+  NODE_ENV = 'production'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 2
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

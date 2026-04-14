@@ -114,7 +114,7 @@ autozap/
 │   └── database/                 # SQL migrations
 │       └── src/migrations/       # 001 through 006
 │
-└── CLAUDE.md                     # This file
+└── ARCHITECTURE.md               # This file
 ```
 
 ---
@@ -326,9 +326,9 @@ services/flow/
 
 **Bot pause/resume:**
 - **From CRM:** "Assumir" button pauses bot, "Liberar bot" reactivates
-- **From phone:** Replying from WhatsApp auto-pauses bot. Send `#bot` to reactivate (message is hidden from client)
+- **From phone:** Replying from WhatsApp does NOT pause bot (cooldown controls it). Send `#pausar` to pause manually, `#bot` to reactivate
 - **From flow:** `assign_agent` and `end` nodes can pause the bot
-- Controlled by `conversations.bot_active` column
+- Controlled by `conversations.bot_active` column + flow cooldown (24h/once/always)
 
 **Webhook endpoints (public, token-based):**
 
@@ -629,16 +629,48 @@ router.post('/my-endpoint', validate(mySchema), async (req, res, next) => {
 
 ## Deploy
 
-| Service | Platform | Trigger |
-|---------|----------|---------|
-| All backend services | **Railway** (Docker) | Push to `main` → auto-deploy |
-| Frontend | **Railway** or **Vercel** | Push to `main` → auto-deploy |
-| Database | **Supabase** | Managed PostgreSQL |
-| Cache/Queues | **Railway Redis** | Managed Redis |
-| Real-time | **Pusher** | Managed WebSocket |
-| Error tracking | **Sentry** | All services send errors |
-| Emails | **Resend** | Transactional emails |
-| Billing | **Asaas** | Brazilian payment gateway |
+| Service | Platform | Region | URL |
+|---------|----------|--------|-----|
+| auth-service | **Fly.io** | GRU (Sao Paulo) | autozap-auth.fly.dev |
+| tenant-service | **Fly.io** | GRU (Sao Paulo) | autozap-tenant.fly.dev |
+| channel-service | **Fly.io** | GRU (Sao Paulo) | autozap-channel.fly.dev |
+| message-service | **Fly.io** | GRU (Sao Paulo) | autozap-message.fly.dev |
+| contact-service | **Fly.io** | GRU (Sao Paulo) | autozap-contact.fly.dev |
+| conversation-service | **Fly.io** | GRU (Sao Paulo) | autozap-conversation.fly.dev |
+| campaign-service | **Fly.io** | GRU (Sao Paulo) | autozap-campaign.fly.dev |
+| frontend | **Fly.io** | GRU (Sao Paulo) | autozap-frontend.fly.dev → useautozap.app |
+| Database | **Supabase** | sa-east-1 (Sao Paulo) | Managed PostgreSQL |
+| Cache/Queues | **Redis** (Railway) | US East | BullMQ job queues |
+| Real-time | **Pusher** | sa1 | Managed WebSocket |
+| Error tracking | **Sentry** | Cloud | All services send errors |
+| Emails | **Resend** | Cloud | Transactional emails |
+| Billing | **Asaas** | Brazil | Brazilian payment gateway |
+
+**Deploy manual:**
+```bash
+# Deploy um servico
+flyctl deploy . --config apps/auth-service/fly.toml --dockerfile apps/auth-service/Dockerfile --app autozap-auth
+
+# Deploy todos
+for svc in auth tenant channel message contact conversation campaign; do
+  flyctl deploy . --config apps/$svc-service/fly.toml --dockerfile apps/$svc-service/Dockerfile --app autozap-$svc --detach
+done
+
+# Frontend
+flyctl deploy . --config apps/frontend/fly.toml --dockerfile apps/frontend/Dockerfile --app autozap-frontend
+```
+
+**Escalar replicas:**
+```toml
+# No fly.toml do servico
+min_machines_running = 4  # aumentar replicas
+```
+
+**Infraestrutura atual:**
+- 16 maquinas (2 replicas x 8 servicos) em Sao Paulo
+- ~50 msg/segundo de capacidade
+- ~2-3 milhoes de mensagens/dia
+- Suporta ate ~200 clientes simultaneos
 
 ---
 
@@ -654,4 +686,4 @@ router.post('/my-endpoint', validate(mySchema), async (req, res, next) => {
 | Flow node types | 20+ |
 | Languages | 3 (pt-BR, en, es) |
 | Channel adapters | 4 (Gupshup, Evolution, Instagram, Messenger) |
-| Security fixes applied | 15 (CRITICAL to LOW) |
+| Security audits | 15 fixes applied (OWASP Top 10) |
