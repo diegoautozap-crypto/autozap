@@ -1119,7 +1119,17 @@ export class FlowEngine {
             if (f.field === 'name') updateData.name = val
             else if (f.field === 'phone') updateData.phone = val
             else if (f.field === 'email') updateData.email = val
-            else if (f.field === 'custom' && f.customField) { metadata[f.customField] = val; metadataChanged = true }
+            else if (f.field === 'custom' && f.customField) {
+              metadata[f.customField] = val; metadataChanged = true
+              // Auto-criar custom_field no CRM se não existir
+              const fieldName = f.customField.replace(/\s+/g, '_').toLowerCase()
+              const { data: existing } = await db.from('custom_fields').select('id').eq('tenant_id', ctx.tenantId).eq('name', fieldName).maybeSingle()
+              if (!existing) {
+                await db.from('custom_fields').insert({ tenant_id: ctx.tenantId, name: fieldName, label: f.customField, type: 'text', sort_order: 99 }).then(() => {})
+              }
+              // Usa o nome normalizado no metadata
+              if (fieldName !== f.customField) { metadata[fieldName] = val; delete metadata[f.customField] }
+            }
           }
           if (metadataChanged) updateData.metadata = metadata
           if (Object.keys(updateData).length > 0) await db.from('contacts').update(updateData).eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId)
