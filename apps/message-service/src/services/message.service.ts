@@ -661,35 +661,40 @@ Regras:
 
   private async fetchProfilePhoto(contactId: string, tenantId: string, phone: string): Promise<void> {
     try {
+      logger.info('ProfilePic: querying channel', { contactId })
       const { data: channel } = await db.from('channels').select('credentials, type')
         .eq('tenant_id', tenantId).eq('type', 'evolution').eq('status', 'active').limit(1).maybeSingle()
-      if (!channel) return
+      if (!channel) { logger.info('ProfilePic: no evolution channel found'); return }
 
       const creds = decryptCredentials(channel.credentials)
       const baseUrl = creds.baseUrl?.replace(/\/+$/, '')
       const instanceName = creds.instanceName
       const apiKey = creds.apiKey
-      if (!baseUrl || !instanceName || !apiKey) return
+      if (!baseUrl || !instanceName || !apiKey) { logger.info('ProfilePic: missing creds', { hasBaseUrl: !!baseUrl, hasInstance: !!instanceName, hasKey: !!apiKey }); return }
 
       const cleanPhone = phone.replace(/\D/g, '')
       const remoteJid = `${cleanPhone}@s.whatsapp.net`
+      const url = `${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`
 
-      const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
+      logger.info('ProfilePic: calling Evolution API', { url, remoteJid })
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: apiKey },
         body: JSON.stringify({ number: remoteJid }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10000),
       })
 
-      if (!res.ok) { logger.debug('ProfilePic fetch failed', { contactId, status: res.status }); return }
+      logger.info('ProfilePic: response', { status: res.status })
+      if (!res.ok) { const txt = await res.text(); logger.info('ProfilePic: error response', { status: res.status, body: txt.slice(0, 200) }); return }
       const data = await res.json() as any
+      logger.info('ProfilePic: response data', { data })
       const pictureUrl = data?.profilePictureUrl
-      if (!pictureUrl) { logger.debug('ProfilePic no URL in response', { contactId, data }); return }
+      if (!pictureUrl) { logger.info('ProfilePic: no URL in response'); return }
 
       await db.from('contacts').update({ avatar_url: pictureUrl }).eq('id', contactId)
-      logger.info('ProfilePic saved', { contactId, phone: cleanPhone })
+      logger.info('ProfilePic: SAVED', { contactId, phone: cleanPhone, pictureUrl: pictureUrl.slice(0, 80) })
     } catch (err) {
-      logger.debug('ProfilePic error', { contactId, err: (err as Error).message })
+      logger.info('ProfilePic: EXCEPTION', { contactId, err: (err as Error).message })
     }
   }
 
