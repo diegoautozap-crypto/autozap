@@ -42,6 +42,8 @@ export async function ensureContact(opts: EnsureContactOpts): Promise<{ contactI
     const { data: existing } = await db
       .from('contacts').select('id').eq('tenant_id', tenantId).eq('phone', phone).single()
     if (!existing) throw new Error('Erro ao criar contato')
+    // Busca foto pra contatos existentes sem avatar
+    fetchProfilePhoto(existing.id, tenantId, phone).catch(() => {})
     return { contactId: existing.id, isNew: false }
   }
 
@@ -86,26 +88,26 @@ async function fetchProfilePhoto(contactId: string, tenantId: string, phone: str
     if (!baseUrl || !instanceName || !apiKey) return
 
     const cleanPhone = phone.replace(/\D/g, '')
+    const remoteJid = `${cleanPhone}@s.whatsapp.net`
 
-    // Tenta endpoint v2 da Evolution
     let pictureUrl: string | null = null
 
-    for (const endpoint of [
-      `${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`,
-      `${baseUrl}/chat/profilePicture/${instanceName}`,
-    ]) {
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: apiKey },
-          body: JSON.stringify({ number: cleanPhone }),
-          signal: AbortSignal.timeout(5000),
-        })
-        if (!res.ok) continue
+    try {
+      const res = await fetch(`${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: apiKey },
+        body: JSON.stringify({ number: remoteJid }),
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
         const data = await res.json() as any
-        pictureUrl = data?.profilePictureUrl || data?.profilePicUrl || data?.picture || data?.wpiUrl || data?.imgUrl || null
-        if (pictureUrl) break
-      } catch { continue }
+        pictureUrl = data?.profilePictureUrl || null
+        logger.debug('Evolution profilePic response', { contactId, status: res.status, hasPic: !!pictureUrl })
+      } else {
+        logger.debug('Evolution profilePic failed', { contactId, status: res.status })
+      }
+    } catch (err) {
+      logger.debug('Evolution profilePic error', { contactId, err: (err as Error).message })
     }
 
     if (!pictureUrl) return
