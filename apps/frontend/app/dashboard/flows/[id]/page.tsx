@@ -242,16 +242,6 @@ export default function FlowEditorPage() {
     toast.success('Refeito')
   }, [setNodes, setEdges])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') { copySelected() }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') { pasteNodes() }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, copySelected, pasteNodes])
   const [copiedNodes, setCopiedNodes] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
   const [doneNodes, setDoneNodes] = useState<Record<string, 'success' | 'error'>>({})
@@ -472,6 +462,18 @@ export default function FlowEditorPage() {
     setIsDirty(true)
     toast.success(`${newNodes.length} ${t('nodes.nodesPasted')}!`)
   }
+
+  // Keyboard shortcuts (after all functions are defined)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') { copySelected() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') { pasteNodes() }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undo, redo, copySelected, pasteNodes])
 
   const resizeStickyNote = (nodeId: string, width: number, height: number) => {
     setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, width, height } } : n))
