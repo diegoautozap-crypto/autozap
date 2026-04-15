@@ -503,6 +503,7 @@ export default function PipelinePage() {
   const [campaignFilter, setCampaignFilter] = useState('all')
   const [valueMin, setValueMin] = useState('')
   const [valueMax, setValueMax] = useState('')
+  const [onlyMine, setOnlyMine] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
   const [draggingColKey, setDraggingColKey] = useState<string | null>(null)
@@ -690,15 +691,17 @@ export default function PipelinePage() {
 
   const rawDisplayBoard = localBoardRef.current ?? board
 
-  // Frontend-only value filter
+  // Frontend-only value filter + filter "só meus"
   const displayBoard = (() => {
     if (!rawDisplayBoard) return rawDisplayBoard
     const minVal = valueMin !== '' ? Number(valueMin) : null
     const maxVal = valueMax !== '' ? Number(valueMax) : null
-    if (minVal === null && maxVal === null) return rawDisplayBoard
+    const currentUserId = (user as any)?.id
+    if (minVal === null && maxVal === null && !onlyMine) return rawDisplayBoard
     const filtered: Record<string, any[]> = {}
     for (const [stage, cards] of Object.entries(rawDisplayBoard)) {
       filtered[stage] = cards.filter((conv: any) => {
+        if (onlyMine && currentUserId && conv.assigned_to !== currentUserId) return false
         const cId = conv.contacts?.id || conv.contact_id
         const total = cId ? getContactPurchaseTotal(cId) : 0
         if (minVal !== null && total < minVal) return false
@@ -877,6 +880,11 @@ export default function PipelinePage() {
             </div>
           </div>
           <div className="mobile-header-actions mobile-wrap" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button onClick={() => setOnlyMine(m => !m)}
+              title={onlyMine ? 'Mostrando só seus cards' : 'Clique pra ver só seus cards'}
+              style={{ padding: '7px 12px', background: onlyMine ? '#f0fdf4' : 'var(--bg-input)', border: `1px solid ${onlyMine ? '#22c55e' : 'var(--border)'}`, borderRadius: '8px', fontSize: '13px', color: onlyMine ? '#16a34a' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              👤 {onlyMine ? 'Só meus' : 'Todos'}
+            </button>
             {(channels as any[]).length > 1 && (
               <select value={channelFilter} onChange={e => { setChannelFilter(e.target.value); localBoardRef.current = null }} style={{ padding: '7px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
                 <option value="all">{t('pipeline.allChannels')}</option>
