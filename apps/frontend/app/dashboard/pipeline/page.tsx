@@ -517,6 +517,8 @@ export default function PipelinePage() {
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null)
   const [editingPipelineName, setEditingPipelineName] = useState('')
   const [historyCard, setHistoryCard] = useState<{ cardId?: string; conversationId?: string; name?: string } | null>(null)
+  const [editingValueId, setEditingValueId] = useState<string | null>(null)
+  const [valueDraft, setValueDraft] = useState('')
   const [purchaseConvId, setPurchaseConvId] = useState<string | null>(null)
   const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
   const [purchaseProductId, setPurchaseProductId] = useState('')
@@ -1130,9 +1132,71 @@ export default function PipelinePage() {
                             })()}
                           </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                            {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}
-                            {conv.unread_count > 0 && <span style={{ background: '#22c55e', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px', marginLeft: 'auto' }}>{conv.unread_count}</span>}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', gap: '6px' }}>
+                            {(() => {
+                              const isEditing = editingValueId === (conv._cardId || conv.id)
+                              const hasValue = Number(conv.deal_value || 0) > 0
+                              const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+                              const save = async () => {
+                                const raw = valueDraft.replace(/\D/g, '')
+                                const num = raw === '' ? null : Number(raw)
+                                try {
+                                  if (conv._cardId) {
+                                    await conversationApi.patch(`/pipeline-cards/${conv._cardId}`, { dealValue: num })
+                                  } else {
+                                    await conversationApi.patch(`/conversations/${conv.id}/deal-value`, { dealValue: num })
+                                  }
+                                  setEditingValueId(null)
+                                  setValueDraft('')
+                                  refetch()
+                                  toast.success('Valor atualizado')
+                                } catch { toast.error('Erro ao salvar valor') }
+                              }
+                              if (isEditing) {
+                                return (
+                                  <input type="text" inputMode="numeric" autoFocus
+                                    value={valueDraft}
+                                    onChange={e => setValueDraft(e.target.value.replace(/\D/g, ''))}
+                                    onClick={e => e.stopPropagation()}
+                                    onKeyDown={e => {
+                                      e.stopPropagation()
+                                      if (e.key === 'Enter') save()
+                                      if (e.key === 'Escape') { setEditingValueId(null); setValueDraft('') }
+                                    }}
+                                    onBlur={save}
+                                    placeholder="R$"
+                                    style={{ fontSize: '12px', padding: '3px 8px', border: '1px solid #14b8a6', borderRadius: '6px', outline: 'none', width: '100px', fontWeight: 700, color: '#0f766e', background: '#fff', fontVariantNumeric: 'tabular-nums' }} />
+                                )
+                              }
+                              if (hasValue) {
+                                return (
+                                  <button onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canEdit('/dashboard/pipeline')) return
+                                    setEditingValueId(conv._cardId || conv.id)
+                                    setValueDraft(String(Math.round(Number(conv.deal_value))))
+                                  }}
+                                    style={{ fontSize: '12px', fontWeight: 700, color: '#0f766e', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.25)', padding: '2px 8px', borderRadius: '6px', cursor: canEdit('/dashboard/pipeline') ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums' }}>
+                                    {formatBRL(Number(conv.deal_value))}
+                                  </button>
+                                )
+                              }
+                              if (!canEdit('/dashboard/pipeline')) return <span />
+                              return (
+                                <button onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingValueId(conv._cardId || conv.id)
+                                  setValueDraft('')
+                                }}
+                                  style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: '1px dashed var(--border)', padding: '2px 8px', borderRadius: '6px', cursor: 'pointer' }}>
+                                  + R$
+                                </button>
+                              )
+                            })()}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                              {conv.channels?.name && <span style={{ fontSize: '10px', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '99px' }}>{conv.channels.name}</span>}
+                              {conv.unread_count > 0 && <span style={{ background: '#22c55e', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px' }}>{conv.unread_count}</span>}
+                            </div>
                           </div>
                         </div>
                       )
