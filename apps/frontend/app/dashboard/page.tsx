@@ -340,6 +340,72 @@ function HBarChartPBI({ data, color = '#14b8a6', maxBars = 8 }: {
   )
 }
 
+function BigNumberTile({ title, subtitle, value, color = '#14b8a6', icon: Icon, onClick }: {
+  title: string
+  subtitle?: string
+  value: string | number
+  color?: string
+  icon?: any
+  onClick?: () => void
+}) {
+  return (
+    <div onClick={onClick}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '140px', transition: 'all 0.2s' }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.borderColor = hexToRgba(color, 0.4) } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)' }}>
+      <div>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600, marginTop: '4px' }}>{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ fontSize: '48px', fontWeight: 300, color: 'var(--text)', letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          {typeof value === 'number' ? value.toLocaleString('pt-BR') : value}
+        </div>
+        {Icon && (
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: hexToRgba(color, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon size={18} color={color} strokeWidth={2.2} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FunnelChart({ stages, color = '#14b8a6' }: { stages: { label: string; value: number }[]; color?: string }) {
+  if (stages.length === 0 || stages[0].value === 0) {
+    return <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem cards no pipeline</div>
+  }
+  const max = stages[0].value
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {stages.map((s, i) => {
+        const pct = (s.value / max) * 100
+        const dropPct = i === 0 ? null : Math.round(((stages[i - 1].value - s.value) / stages[i - 1].value) * 100)
+        const width = Math.max(pct, 8)
+        return (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+            <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={s.label}>{s.label}</span>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                width: `${width}%`, minWidth: '30px', height: '26px',
+                background: `linear-gradient(90deg, ${hexToRgba(color, 0.85)}, ${hexToRgba(color, 0.6)})`,
+                borderRadius: '3px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: 700, fontSize: '12px',
+                fontVariantNumeric: 'tabular-nums',
+                transition: 'width 0.5s cubic-bezier(.4,0,.2,1)',
+              }}>{s.value}</div>
+            </div>
+            <span style={{ textAlign: 'right', fontSize: '11px', color: dropPct && dropPct > 0 ? '#dc2626' : 'var(--text-faint)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {dropPct === null ? '—' : dropPct > 0 ? `-${dropPct}%` : '0%'}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const t = useT()
@@ -477,14 +543,20 @@ export default function DashboardPage() {
     { label: t('dashboard.messagesThisMonth'), value: usage?.sent ?? 0,          sub: `${t('dashboard.of')} ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} ${t('dashboard.available')}`, icon: Send,        color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
   ]
 
+  const funnelStages = (pipelineColumns || []).map((col: any) => ({
+    label: col.label,
+    value: pipelineBoard?.[col.key]?.length || 0,
+  }))
+  const pipelineCardCount = funnelStages.reduce((s: number, st: { value: number }) => s + st.value, 0)
+
   return (
-    <div className="mobile-page" style={{ padding: '32px', maxWidth: '1200px' }}>
+    <div className="mobile-page" style={{ padding: '24px 28px', maxWidth: '1400px' }}>
 
       {/* Saudação + filtros compactos no header */}
       <div className="mobile-header" style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting(t)}! 👋</h1>
-          <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em' }}>Dashboard AutoZap</h1>
+          <p style={{ color: 'var(--text-faint)', fontSize: '13px', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{getGreeting(t)} · Visão geral do seu CRM</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {(role === 'owner' || role === 'admin') && (teamMembers || []).length > 1 && (
@@ -541,37 +613,21 @@ export default function DashboardPage() {
       })()}
 
 
-      {/* Cards principais */}
-      {(loadingCampaigns && loadingContacts) ? (
-        <div style={{ marginBottom: '20px' }}><GridSkeleton cols={4} /></div>
-      ) : (
-        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
-          {metricCards.map(({ label, value, sub, icon, color, bg, href }) => (
-            <MetricCard key={label} label={label} value={value} sub={sub} icon={icon} color={color} bg={bg} href={href} onClick={() => router.push(href)} />
-          ))}
-        </div>
-      )}
-
-      {/* VOLUME section */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Volume</div>
+      {/* Seletor de período */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Período de análise</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {[7, 14, 30, 90].map(d => (
             <button key={d} onClick={() => setAnalyticsDays(d)}
-              style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? '#f0fdf4' : 'transparent', color: analyticsDays === d ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#14b8a6' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? 'rgba(20,184,166,0.08)' : 'transparent', color: analyticsDays === d ? '#0f766e' : 'var(--text-muted)', transition: 'all 0.1s' }}>
               {d}d
             </button>
           ))}
         </div>
       </div>
-      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '18px' }}>
-        <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString()} icon={Send} color="#2563eb" bg="#eff6ff" delta={deltaFn(totalSent, prev.totalSent)} />
-        <StatCard label={t('dashboard.deliveryRate')} value={totalSent > 0 ? `${deliveryRate}%` : '—'} icon={CheckCheck} color="#22c55e" bg="#f0fdf4" delta={totalSent > 0 && prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
-        <StatCard label={t('dashboard.readRate')} value={totalSent > 0 ? `${readRate}%` : '—'} icon={Eye} color="#7c3aed" bg="#f5f3ff" delta={totalSent > 0 && prev.readRate != null ? readRate - prev.readRate : null} />
-      </div>
 
       {selectedAgent && (
-        <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <UserCheck size={12} />
           Filtrando desempenho por agente selecionado
           <button onClick={() => setSelectedAgent('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}>
@@ -580,263 +636,257 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Métricas do atendente selecionado */}
-      {selectedAgent && (
-        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-          <StatCard label={t('dashboard.assignedOpenConvs')}  value={agentConversations ?? '—'}              icon={MessageSquare} color="#22c55e" bg="#f0fdf4" />
-          <StatCard label={t('dashboard.closedConvs7d')}   value={agentClosedLast7d ?? '—'}               icon={CheckCheck}    color="#2563eb" bg="#eff6ff" />
-          <StatCard label={t('dashboard.avgResponseTime7d')}  value={formatResponseTime(avgResponseMinutes)} icon={Clock}         color="#ea580c" bg="#fff7ed" />
-        </div>
-      )}
+      {/* GRID PBI 12 col */}
+      {loadingCampaigns && loadingContacts ? (
+        <GridSkeleton cols={4} />
+      ) : (
+      <div className="pbi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: '12px', gridAutoRows: 'minmax(10px, auto)' }}>
 
-      {/* DISTRIBUIÇÃO section */}
-      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Distribuição</div>
-      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '18px' }}>
-        <PieCard
-          title="Conversas por status"
-          subtitle="Distribuição atual"
-          centerValue={(conversations?.length || 0) + (conversationsWaiting?.total || 0)}
-          centerLabel="abertas"
-          segments={[
-            { label: 'Em aberto', value: conversations?.length || 0, color: '#22c55e' },
-            { label: 'Aguardando', value: conversationsWaiting?.total || 0, color: '#d97706' },
-            { label: 'Fechadas', value: conversationsClosed?.total || 0, color: '#94a3b8' },
-          ]}
-        />
-        {(() => {
-          const cardCount = pipelineBoard ? Object.values(pipelineBoard).reduce((a: number, arr: any) => a + arr.length, 0) : 0
-          const hasColumns = (pipelineColumns || []).length > 0
-          if (!hasColumns || cardCount === 0) {
-            return (
-              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column' }}>
-                <CardHeader title="Pipeline por etapa" subtitle="CARDS EM CADA COLUNA" />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 10px', textAlign: 'center' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                    <Workflow size={22} color="#7c3aed" />
-                  </div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 12px', maxWidth: '260px' }}>
-                    {hasColumns ? 'Nenhum card em seu pipeline ainda' : 'Configure seu primeiro pipeline pra acompanhar seus negócios'}
-                  </p>
-                  <button onClick={() => router.push('/dashboard/pipeline')}
-                    style={{ padding: '7px 14px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    {hasColumns ? 'Abrir pipeline' : 'Configurar pipeline'} <ChevronRight size={13} />
-                  </button>
+        {/* Row 1: Combo chart principal (span 8) + 2 tiles grandes (span 4) */}
+        <div style={{ gridColumn: 'span 8', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+          <CardHeader
+            title="Mensagens enviadas"
+            subtitle={`POR DIA · ÚLTIMOS ${analyticsDays} DIAS`}
+            right={
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '11px', color: 'var(--text-faint)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#14b8a6' }} /> Enviadas
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '12px', height: '2px', background: '#0f172a' }} /> Média 7d
+                </span>
+              </div>
+            }
+          />
+          {totalSent === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Nenhuma mensagem enviada nos últimos {analyticsDays} dias.</div>
+          ) : (
+            <ComboBarLine data={days.map(day => ({ label: day, value: byDay[day]?.sent || 0 }))} />
+          )}
+        </div>
+
+        <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
+          <BigNumberTile title="Contatos" subtitle="NA SUA BASE" value={contactsMeta?.total ?? 0} color="#7c3aed" icon={Users} onClick={() => router.push('/dashboard/contacts')} />
+          <BigNumberTile title="Mensagens este mês" subtitle={`DE ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString('pt-BR')} DISPONÍVEL`} value={usage?.sent ?? 0} color="#ea580c" icon={Send} onClick={() => router.push('/dashboard/campaigns')} />
+        </div>
+
+        {/* Row 2: Funil Pipeline (span 5) + HBar atendentes (span 4) + Pie status (span 3) */}
+        <div style={{ gridColumn: 'span 5', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+          <CardHeader title="Funil do pipeline" subtitle={pipelineCardCount > 0 ? `${pipelineCardCount} CARDS · ETAPAS DE CONVERSÃO` : 'SEM CARDS AINDA'} right={
+            <button onClick={() => router.push('/dashboard/pipeline')} style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Abrir</button>
+          } />
+          <FunnelChart stages={funnelStages} color="#14b8a6" />
+        </div>
+
+        <div style={{ gridColumn: 'span 4', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+          <CardHeader title="Conversas por atendente" subtitle="TOP ATENDENTES" />
+          {byAgent.length > 0 ? (
+            <HBarChartPBI data={byAgent.map(a => ({ label: a.name, value: a.count }))} color="#14b8a6" maxBars={6} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem atendentes ativos</div>
+          )}
+        </div>
+
+        <div style={{ gridColumn: 'span 3' }}>
+          <PieCard
+            title="Conversas"
+            subtitle="POR STATUS"
+            centerValue={(conversations?.length || 0) + (conversationsWaiting?.total || 0)}
+            centerLabel="abertas"
+            segments={[
+              { label: 'Em aberto', value: conversations?.length || 0, color: '#14b8a6' },
+              { label: 'Aguardando', value: conversationsWaiting?.total || 0, color: '#f59e0b' },
+              { label: 'Fechadas', value: conversationsClosed?.total || 0, color: '#334155' },
+            ]}
+          />
+        </div>
+
+        {/* Row 3: SLA (span 8) + Campanhas tile (span 4) */}
+        {analytics?.sla && (
+          <div style={{ gridColumn: 'span 8', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+            <CardHeader
+              title="SLA — Tempo de resposta"
+              subtitle={`META ${analytics.sla.targetMinutes} MIN · ÚLTIMOS ${analyticsDays} DIAS`}
+              right={<button onClick={() => router.push('/dashboard/settings')} style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Configurar</button>}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              <DonutChart size={140} thickness={22}
+                segments={[
+                  { label: 'Dentro', value: analytics.sla.withinCount || 0, color: '#14b8a6' },
+                  { label: 'Fora', value: analytics.sla.breachedCount || 0, color: '#dc2626' },
+                ]}
+                centerValue={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
+                centerLabel="no SLA"
+              />
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                <div style={{ padding: '14px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.25)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f766e', letterSpacing: '-0.02em' }}>{analytics.sla.withinCount || 0}</div>
+                  <div style={{ fontSize: '10px', color: '#0f766e', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>No prazo</div>
+                </div>
+                <div style={{ padding: '14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563eb', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyWaiting || 0}</div>
+                  <div style={{ fontSize: '10px', color: '#1d4ed8', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Aguardando</div>
+                </div>
+                <div style={{ padding: '14px', background: (analytics.sla.currentlyBreached || 0) > 0 ? '#fef2f2' : 'var(--bg)', border: `1px solid ${(analytics.sla.currentlyBreached || 0) > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: (analytics.sla.currentlyBreached || 0) > 0 ? '#dc2626' : 'var(--text-faint)', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyBreached || 0}</div>
+                  <div style={{ fontSize: '10px', color: (analytics.sla.currentlyBreached || 0) > 0 ? '#991b1b' : 'var(--text-faint)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Estouradas</div>
                 </div>
               </div>
-            )
-          }
-          return (
+            </div>
+          </div>
+        )}
+
+        <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
+          <BigNumberTile title="Campanhas" subtitle={`${campaigns?.filter((c: any) => c.status === 'running').length || 0} EM ANDAMENTO`} value={campaigns?.length ?? 0} color="#2563eb" icon={Megaphone} onClick={() => router.push('/dashboard/campaigns')} />
+          <BigNumberTile title="Conversas abertas" subtitle={`${conversations?.filter((c: any) => c.unread_count > 0).length || 0} NÃO LIDAS`} value={conversations?.length ?? 0} color="#14b8a6" icon={MessageSquare} onClick={() => router.push('/dashboard/inbox')} />
+        </div>
+
+        {/* Row 4: KPI volume (4 + 4 + 4) */}
+        <div style={{ gridColumn: 'span 4' }}>
+          <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString('pt-BR')} icon={Send} color="#14b8a6" delta={deltaFn(totalSent, prev.totalSent)} />
+        </div>
+        <div style={{ gridColumn: 'span 4' }}>
+          <StatCard label={t('dashboard.deliveryRate')} value={totalSent > 0 ? `${deliveryRate}%` : '—'} icon={CheckCheck} color="#22c55e" delta={totalSent > 0 && prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
+        </div>
+        <div style={{ gridColumn: 'span 4' }}>
+          <StatCard label={t('dashboard.readRate')} value={totalSent > 0 ? `${readRate}%` : '—'} icon={Eye} color="#7c3aed" delta={totalSent > 0 && prev.readRate != null ? readRate - prev.readRate : null} />
+        </div>
+
+        {/* Row agente selecionado (opcional) */}
+        {selectedAgent && (
+          <>
+            <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.assignedOpenConvs')} value={agentConversations ?? '—'} icon={MessageSquare} color="#14b8a6" /></div>
+            <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.closedConvs7d')} value={agentClosedLast7d ?? '—'} icon={CheckCheck} color="#2563eb" /></div>
+            <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.avgResponseTime7d')} value={formatResponseTime(avgResponseMinutes)} icon={Clock} color="#ea580c" /></div>
+          </>
+        )}
+
+        {/* Row 5: Atividade (span 7) + Pipeline por etapa pie (span 5) */}
+        {activity.length > 0 && (
+          <div style={{ gridColumn: 'span 7', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+            <CardHeader title="Atividade recente" subtitle="ÚLTIMOS EVENTOS NO PIPELINE" />
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {activity.slice(0, 7).map((ev: any) => {
+                const contact = ev.card?.contacts || ev.conversation?.contacts
+                const contactName = contact?.name || contact?.phone || 'Contato'
+                const actor = ev.actor?.name || 'Sistema'
+                const when = (() => {
+                  const diff = Date.now() - new Date(ev.created_at).getTime()
+                  const mins = Math.floor(diff / 60000)
+                  if (mins < 1) return 'agora'
+                  if (mins < 60) return `há ${mins}min`
+                  const hrs = Math.floor(mins / 60)
+                  if (hrs < 24) return `há ${hrs}h`
+                  return `há ${Math.floor(hrs / 24)}d`
+                })()
+                let text = ''
+                let color = '#64748b'
+                switch (ev.event_type) {
+                  case 'created': text = `${contactName} entrou em ${ev.to_column || '—'}`; color = '#7c3aed'; break
+                  case 'moved': text = `${contactName} · ${ev.from_column || '—'} → ${ev.to_column || '—'}`; color = '#f59e0b'; break
+                  case 'value_changed': text = `${contactName} · valor R$ ${Number(ev.from_value || 0).toFixed(0)} → R$ ${Number(ev.to_value || 0).toFixed(0)}`; color = '#14b8a6'; break
+                  case 'assigned': text = `${contactName} · responsável alterado`; color = '#0891b2'; break
+                  default: text = `${contactName} · ${ev.event_type}`
+                }
+                return (
+                  <li key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: '6px', background: 'var(--bg)', borderLeft: `3px solid ${color}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{actor} · {when}</div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div style={{ gridColumn: activity.length > 0 ? 'span 5' : 'span 12' }}>
+          {pipelineCardCount > 0 ? (
             <PieCard
               title="Pipeline por etapa"
-              subtitle="Cards em cada coluna"
-              centerValue={cardCount}
+              subtitle="CARDS EM CADA COLUNA"
+              centerValue={pipelineCardCount}
               centerLabel="cards"
               segments={(pipelineColumns || []).map((col: any, i: number) => ({
                 label: col.label,
                 value: pipelineBoard?.[col.key]?.length || 0,
-                color: col.color || ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#dc2626'][i % 6],
+                color: col.color || ['#14b8a6', '#2563eb', '#7c3aed', '#db2777', '#f59e0b', '#dc2626'][i % 6],
               }))}
             />
-          )
-        })()}
-      </div>
-
-      {/* SLA bloco com pizza + métricas */}
-      {analytics?.sla && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '18px' }}>
-          <CardHeader
-            title="SLA — Tempo de resposta"
-            subtitle={`META: ${analytics.sla.targetMinutes} MIN · ÚLTIMOS ${analyticsDays} DIAS`}
-            right={
-              <button onClick={() => router.push('/dashboard/settings')}
-                style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                Configurar
-              </button>
-            }
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <DonutChart
-              size={140} thickness={22}
-              segments={[
-                { label: 'Dentro', value: analytics.sla.withinCount || 0, color: '#16a34a' },
-                { label: 'Fora', value: analytics.sla.breachedCount || 0, color: '#dc2626' },
-              ]}
-              centerValue={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
-              centerLabel="no SLA"
-            />
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px' }}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a', letterSpacing: '-0.02em' }}>{analytics.sla.withinCount || 0}</div>
-                <div style={{ fontSize: '11px', color: '#15803d', marginTop: '2px' }}>Respondidas no prazo</div>
-              </div>
-              <div style={{ padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#2563eb', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyWaiting || 0}</div>
-                <div style={{ fontSize: '11px', color: '#1d4ed8', marginTop: '2px' }}>Aguardando agora</div>
-              </div>
-              <div style={{ padding: '12px 14px', background: (analytics.sla.currentlyBreached || 0) > 0 ? '#fef2f2' : '#f4f4f5', border: `1px solid ${(analytics.sla.currentlyBreached || 0) > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: (analytics.sla.currentlyBreached || 0) > 0 ? '#dc2626' : 'var(--text-faint)', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyBreached || 0}</div>
-                <div style={{ fontSize: '11px', color: (analytics.sla.currentlyBreached || 0) > 0 ? '#991b1b' : 'var(--text-faint)', marginTop: '2px' }}>Estouradas agora</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Gráfico mensagens — combo bars + linha */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
-        <CardHeader
-          title="Mensagens enviadas"
-          subtitle={`POR DIA · ÚLTIMOS ${analyticsDays} DIAS`}
-          right={
-            <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '11px', color: 'var(--text-faint)' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#14b8a6' }} /> Enviadas
-              </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '12px', height: '2px', background: '#0f172a' }} /> Média 7d
-              </span>
-            </div>
-          }
-        />
-        {totalSent === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: '13px' }}>
-            Nenhuma mensagem enviada nos últimos {analyticsDays} dias.
-          </div>
-        ) : (
-          <ComboBarLine data={days.map(day => ({ label: day, value: byDay[day]?.sent || 0 }))} />
-        )}
-      </div>
-
-      {/* Conversas por atendente */}
-      {byAgent.length > 0 && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
-          <CardHeader title="Conversas por atendente" subtitle="DISTRIBUIÇÃO DE CONVERSAS ABERTAS" />
-          <HBarChartPBI data={byAgent.map(a => ({ label: a.name, value: a.count }))} color="#14b8a6" />
-        </div>
-      )}
-
-      {/* EQUIPE section */}
-      {(role === 'owner' || role === 'admin') && (agentRanking.length > 0 || activity.length > 0) && (
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Atividade</div>
-      )}
-
-      {/* Atividade recente */}
-      {activity.length > 0 && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '14px', boxShadow: 'var(--shadow)' }}>
-          <CardHeader title="Atividade recente" subtitle="ÚLTIMOS EVENTOS NO PIPELINE" />
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activity.slice(0, 8).map((ev: any) => {
-              const contact = ev.card?.contacts || ev.conversation?.contacts
-              const contactName = contact?.name || contact?.phone || 'Contato'
-              const actor = ev.actor?.name || 'Sistema'
-              const when = (() => {
-                const diff = Date.now() - new Date(ev.created_at).getTime()
-                const mins = Math.floor(diff / 60000)
-                if (mins < 1) return 'agora'
-                if (mins < 60) return `há ${mins}min`
-                const hrs = Math.floor(mins / 60)
-                if (hrs < 24) return `há ${hrs}h`
-                return `há ${Math.floor(hrs / 24)}d`
-              })()
-              let text = ''
-              let color = '#64748b'
-              let bg = '#f1f5f9'
-              switch (ev.event_type) {
-                case 'created':
-                  text = `${contactName} entrou no pipeline em ${ev.to_column || '—'}`
-                  color = '#7c3aed'; bg = '#f5f3ff'
-                  break
-                case 'moved':
-                  text = `${contactName} movido de ${ev.from_column || '—'} → ${ev.to_column || '—'}`
-                  color = '#d97706'; bg = '#fffbeb'
-                  break
-                case 'value_changed':
-                  text = `${contactName} · valor alterado: R$ ${Number(ev.from_value || 0).toFixed(0)} → R$ ${Number(ev.to_value || 0).toFixed(0)}`
-                  color = '#059669'; bg = '#ecfdf5'
-                  break
-                case 'assigned':
-                  text = `${contactName} · responsável alterado`
-                  color = '#0891b2'; bg = '#ecfeff'
-                  break
-                default:
-                  text = `${contactName} · ${ev.event_type}`
-              }
-              return (
-                <li key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: bg, border: `1px solid ${color}20` }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, marginTop: '7px', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{text}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{actor} · {when}</div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* Ranking de atendentes */}
-      {(role === 'owner' || role === 'admin') && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '18px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <Trophy size={15} color="#d97706" />
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.agentRanking')}</h3>
-          </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '0 0 16px' }}>{t('dashboard.agentRankingDesc')}</p>
-
-          {agentRanking.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noAgentRanking')}</div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.byAgent')}</th>
-                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.messagesResponded')}</th>
-                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.avgTime')}</th>
-                    <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '12px' }}>{t('dashboard.closed')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agentRanking.map((agent, i) => {
-                    const medalColors = ['#d97706', '#9ca3af', '#b45309']
-                    const avatarColors = [
-                      { bg: '#dbeafe', fg: '#1d4ed8' }, { bg: '#dcfce7', fg: '#15803d' },
-                      { bg: '#fce7f3', fg: '#be185d' }, { bg: '#ede9fe', fg: '#6d28d9' },
-                      { bg: '#ffedd5', fg: '#c2410c' }, { bg: '#e0f2fe', fg: '#0369a1' },
-                      { bg: '#fef3c7', fg: '#b45309' }, { bg: '#ccfbf1', fg: '#0f766e' },
-                    ]
-                    const hash = (agent.name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-                    const av = avatarColors[hash % avatarColors.length]
-                    const initials = (agent.name || '??').trim().slice(0, 2).toUpperCase()
-                    return (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--divider)', transition: 'background 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: i < 3 ? medalColors[i] : 'var(--text-faint)', width: '36px', fontVariantNumeric: 'tabular-nums' }}>
-                          {i < 3 ? '🏆' : i + 1}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: av.bg, color: av.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-                              {initials}
-                            </div>
-                            <span>{agent.name}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#22c55e', fontVariantNumeric: 'tabular-nums' }}>{agent.messagesResponded}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{agent.conversationsClosed}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div style={{ height: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column' }}>
+              <CardHeader title="Pipeline por etapa" subtitle="CARDS EM CADA COLUNA" />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(20,184,166,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                  <Workflow size={20} color="#14b8a6" />
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px' }}>Configure seu pipeline</p>
+                <button onClick={() => router.push('/dashboard/pipeline')} style={{ padding: '6px 12px', background: '#14b8a6', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  Configurar <ChevronRight size={12} />
+                </button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Row 6: Ranking full width (admin) */}
+        {(role === 'owner' || role === 'admin') && (
+          <div style={{ gridColumn: 'span 12', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+            <CardHeader title={t('dashboard.agentRanking')} subtitle="DESEMPENHO DA EQUIPE" right={<Trophy size={15} color="#f59e0b" />} />
+            {agentRanking.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noAgentRanking')}</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>#</th>
+                      <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('dashboard.byAgent')}</th>
+                      <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('dashboard.messagesResponded')}</th>
+                      <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('dashboard.avgTime')}</th>
+                      <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-faint)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('dashboard.closed')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agentRanking.map((agent, i) => {
+                      const medalColors = ['#f59e0b', '#9ca3af', '#b45309']
+                      const avatarColors = [
+                        { bg: '#dbeafe', fg: '#1d4ed8' }, { bg: '#ccfbf1', fg: '#0f766e' },
+                        { bg: '#fce7f3', fg: '#be185d' }, { bg: '#ede9fe', fg: '#6d28d9' },
+                        { bg: '#ffedd5', fg: '#c2410c' }, { bg: '#e0f2fe', fg: '#0369a1' },
+                      ]
+                      const hash = (agent.name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+                      const av = avatarColors[hash % avatarColors.length]
+                      const initials = (agent.name || '??').trim().slice(0, 2).toUpperCase()
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--divider)', transition: 'background 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: i < 3 ? medalColors[i] : 'var(--text-faint)', width: '36px', fontVariantNumeric: 'tabular-nums' }}>{i < 3 ? '🏆' : i + 1}</td>
+                          <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: av.bg, color: av.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>{initials}</div>
+                              <span>{agent.name}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#14b8a6', fontVariantNumeric: 'tabular-nums' }}>{agent.messagesResponded}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{agent.conversationsClosed}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
       )}
+
+      <div style={{ height: '16px' }} />
 
       {/* Acesso rápido */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
