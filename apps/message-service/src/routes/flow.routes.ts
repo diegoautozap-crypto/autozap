@@ -370,6 +370,26 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       ? Math.round(runs.reduce((s, r) => s + (new Date(r.endedAt).getTime() - new Date(r.startedAt).getTime()), 0) / runs.length)
       : 0
 
+    // Calcula drop-off: quantos runs pararam neste node (último visitado e não concluídos)
+    const dropOffByNode: Record<string, number> = {}
+    for (const run of runs) {
+      if (!run.completed && !run.hadError && run.lastNodeId) {
+        dropOffByNode[run.lastNodeId] = (dropOffByNode[run.lastNodeId] || 0) + 1
+      }
+    }
+    // Adiciona drop-off aos nodeStats
+    for (const nodeId in nodeStats) {
+      const ns = nodeStats[nodeId] as any
+      ns.dropOff = dropOffByNode[nodeId] || 0
+      ns.dropOffPct = runs.length > 0 ? Math.round(((dropOffByNode[nodeId] || 0) / runs.length) * 100) : 0
+    }
+
+    // Top 3 gargalos (mais drop-off)
+    const topBottlenecks = Object.entries(dropOffByNode)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([nodeId, count]) => ({ nodeId, count, pct: runs.length > 0 ? Math.round((count / runs.length) * 100) : 0 }))
+
     // Busca nomes dos contatos pra mostrar na lista (últimas 50 execuções)
     const recentRuns = runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 50)
     const contactIds = [...new Set(recentRuns.map(r => r.contactId).filter(Boolean))] as string[]
@@ -402,6 +422,7 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       uniqueContacts: contactSet.size,
       nodeStats,
       executions,
+      topBottlenecks,
       days,
     }))
   } catch (err) { next(err) }

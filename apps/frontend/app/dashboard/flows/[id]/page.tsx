@@ -378,15 +378,21 @@ export default function FlowEditorPage() {
     if (!analytics?.nodeStats) {
       // Limpa contadores quando analytics desativa
       if (!showAnalytics) {
-        setNodes(nds => nds.map(n => { const { _execCount, _errorCount, ...cleanData } = (n.data as any); return { ...n, data: cleanData } }))
+        setNodes(nds => nds.map(n => { const { _execCount, _errorCount, _dropOff, _dropOffPct, ...cleanData } = (n.data as any); return { ...n, data: cleanData } }))
         setEdges(eds => eds.map(e => { const { _count, ...cleanData } = (e.data || {} as any); return { ...e, data: cleanData } }))
       }
       return
     }
-    const stats = analytics.nodeStats as Record<string, { success: number; error: number; total: number }>
+    const stats = analytics.nodeStats as Record<string, { success: number; error: number; total: number; dropOff?: number; dropOffPct?: number }>
     setNodes(nds => nds.map(n => ({
       ...n,
-      data: { ...(n.data as any), _execCount: stats[n.id]?.success || 0, _errorCount: stats[n.id]?.error || 0 },
+      data: {
+        ...(n.data as any),
+        _execCount: stats[n.id]?.success || 0,
+        _errorCount: stats[n.id]?.error || 0,
+        _dropOff: stats[n.id]?.dropOff || 0,
+        _dropOffPct: stats[n.id]?.dropOffPct || 0,
+      },
     })))
     // Contagem nas edges = total do nó de origem (quantos passaram)
     setEdges(eds => eds.map(e => ({
@@ -591,6 +597,23 @@ export default function FlowEditorPage() {
             style={{ marginLeft: 'auto', padding: '4px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
             Ver {analytics.executions?.length || 0} execuções →
           </button>
+
+          {/* Top 3 gargalos */}
+          {(analytics.topBottlenecks || []).length > 0 && (
+            <div style={{ width: '100%', marginTop: '6px', padding: '8px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚠ Gargalos</span>
+              {(analytics.topBottlenecks as any[]).map((b, i) => {
+                const node = nodes.find(n => n.id === b.nodeId)
+                const label = (node?.data as any)?.type || 'Node'
+                return (
+                  <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
+                    style={{ padding: '3px 10px', background: '#fff', border: '1px solid #fb923c', borderRadius: '99px', fontSize: '11px', fontWeight: 600, color: '#9a3412', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} {label} — {b.count} abandonos ({b.pct}%)
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <select value={analyticsDays} onChange={e => setAnalyticsDays(Number(e.target.value))}
             style={{ padding: '3px 8px', background: '#fff', border: '1px solid #ddd6fe', borderRadius: '6px', fontSize: '11px', color: '#6d28d9', cursor: 'pointer' }}>
             <option value={1}>24h</option>
@@ -626,6 +649,7 @@ export default function FlowEditorPage() {
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Quando</th>
                       <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Duração</th>
                       <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Nodes</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Parou em</th>
                       <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
                     </tr>
                   </thead>
@@ -643,6 +667,18 @@ export default function FlowEditorPage() {
                           {e.durationMs > 60000 ? `${Math.round(e.durationMs / 60000)}min` : `${Math.round(e.durationMs / 1000)}s`}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{e.nodeCount}</td>
+                        <td style={{ padding: '10px 12px', color: '#4b5563', fontSize: '11px' }}>
+                          {(() => {
+                            const node = nodes.find(n => n.id === e.lastNodeId)
+                            const nodeType = (node?.data as any)?.type || '—'
+                            return (
+                              <button onClick={() => { setNodeDrilldownId(e.lastNodeId); setShowExecutionsModal(false) }}
+                                style={{ background: 'transparent', border: 'none', color: '#7c3aed', cursor: 'pointer', textDecoration: 'underline', fontSize: '11px', padding: 0 }}>
+                                {nodeType}
+                              </button>
+                            )
+                          })()}
+                        </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           {e.completed ? (
                             <span style={{ padding: '2px 8px', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>✓ Concluído</span>

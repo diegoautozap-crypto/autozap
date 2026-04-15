@@ -287,7 +287,17 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
               ✗ {data._errorCount}
             </span>
           )}
+          {data._dropOff > 0 && (
+            <span title={`${data._dropOff} cliente(s) abandonaram aqui (${data._dropOffPct}% do total)`}
+              style={{ fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '99px', background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+              ⏸ {data._dropOff} ({data._dropOffPct}%)
+            </span>
+          )}
         </div>
+      )}
+      {/* Borda laranja se drop-off crítico (>30%) */}
+      {data._dropOffPct > 30 && (
+        <div style={{ position: 'absolute', inset: '-2px', borderRadius: '10px', border: '2px solid #f97316', pointerEvents: 'none' }} />
       )}
     </div>
   )
