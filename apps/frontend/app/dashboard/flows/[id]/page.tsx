@@ -299,8 +299,22 @@ export default function FlowEditorPage() {
   })
   const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
   const [showAnalytics, setShowAnalytics] = useState(false)
-  const [analyticsDays, setAnalyticsDays] = useState(7)
-  const [abandonMinutes, setAbandonMinutes] = useState(30)
+  const [analyticsDays, setAnalyticsDaysRaw] = useState(() => {
+    if (typeof window === 'undefined') return 7
+    return Number(localStorage.getItem('autozap-analytics-days')) || 7
+  })
+  const setAnalyticsDays = (v: number) => {
+    setAnalyticsDaysRaw(v)
+    try { localStorage.setItem('autozap-analytics-days', String(v)) } catch {}
+  }
+  const [abandonMinutes, setAbandonMinutesRaw] = useState(() => {
+    if (typeof window === 'undefined') return 30
+    return Number(localStorage.getItem('autozap-abandon-minutes')) || 30
+  })
+  const setAbandonMinutes = (v: number) => {
+    setAbandonMinutesRaw(v)
+    try { localStorage.setItem('autozap-abandon-minutes', String(v)) } catch {}
+  }
   const [showExecutionsModal, setShowExecutionsModal] = useState(false)
   const [nodeDrilldownId, setNodeDrilldownId] = useState<string | null>(null)
   const { data: analytics } = useQuery({
