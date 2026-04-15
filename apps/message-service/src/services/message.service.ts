@@ -238,7 +238,7 @@ export class MessageService {
           db.from('conversations').update({ last_message: messageBody }).eq('id', conversation.id).then(() => {})
           emitPusher(tenantId, 'conversation.updated', { conversationId: conversation.id })
         }
-      }).catch(() => {})
+      }).catch(err => logger.warn('Outbound status update failed', { err: (err as Error).message }))
     }
 
     // SLA tracking
@@ -687,7 +687,7 @@ Regras:
     const { data: created, error } = await db.from('contacts').insert({ id: generateId(), tenant_id: tenantId, phone, name: phone, origin: 'inbound', status: 'active', last_interaction_at: new Date() }).select('id, name').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     // Busca foto do novo contato
-    this.fetchProfilePhoto(created.id, tenantId, phone).catch(() => {})
+    this.fetchProfilePhoto(created.id, tenantId, phone).catch(err => logger.debug('fetchProfilePhoto failed', { err: (err as Error).message }))
     return created
   }
 

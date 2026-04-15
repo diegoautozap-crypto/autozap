@@ -300,7 +300,8 @@ async function processContact(
 
     await campaignService.markContactSent(contact.id, messageUuid)
     await campaignService.incrementCounter(campaignId, 'sent_count')
-    try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) } catch {}
+    try { await db.rpc('increment_message_count', { p_tenant_id: tenantId }) }
+    catch (err) { logger.warn('increment_message_count failed', { err: (err as Error).message, tenantId }) }
 
     return 'sent'
   } catch (err: any) {
@@ -344,7 +345,8 @@ async function processCampaignJob(job: any) {
     const { data: ch } = await db.from('channels').select('type, credentials').eq('id', chId).single()
     if (ch) {
       let creds = ch.credentials
-      try { if (creds && typeof creds === 'object') creds = decryptCredentials(creds) } catch {}
+      try { if (creds && typeof creds === 'object') creds = decryptCredentials(creds) }
+      catch (err) { logger.error('decryptCredentials failed', { err: (err as Error).message, channelId: chId }) }
       channelInfoMap[chId] = { type: ch.type, credentials: creds }
     }
   }

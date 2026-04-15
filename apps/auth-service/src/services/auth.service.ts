@@ -243,7 +243,8 @@ export class AuthService {
     }).eq('id', user.id)
 
     const { data: tenant } = await db.from('tenants').select('name').eq('id', user.tenant_id).single()
-    sendWelcomeEmail({ to: user.email, name: user.name, tenantName: tenant?.name || 'sua empresa' }).catch(() => {})
+    sendWelcomeEmail({ to: user.email, name: user.name, tenantName: tenant?.name || 'sua empresa' })
+      .catch(err => logger.warn('Welcome email failed', { err: (err as Error).message, userId: user.id }))
 
     logger.info('Email verified', { userId: user.id })
   }

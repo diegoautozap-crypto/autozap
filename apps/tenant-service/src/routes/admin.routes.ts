@@ -23,6 +23,7 @@ router.get('/tenants', async (req, res, next) => {
       .from('tenants')
       .select('id, name, slug, plan_slug, is_active, is_blocked, blocked_reason, messages_sent_this_period, created_at')
       .order('created_at', { ascending: false })
+      .limit(500)
 
     const tenantIds = (tenants || []).map((t: any) => t.id)
 

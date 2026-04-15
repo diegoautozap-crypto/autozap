@@ -53,7 +53,7 @@ export async function runStatusReconciliation(): Promise<void> {
                 p_field:       field,
                 p_status:      event.status,
               })
-            } catch {}
+            } catch (err) { logger.warn('increment_campaign_counter_safe failed', { err: (err as Error).message, externalId: event.external_id }) }
           }
           resolved++
         } else {
