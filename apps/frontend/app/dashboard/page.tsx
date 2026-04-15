@@ -402,7 +402,7 @@ function AlertBanner({ alerts }: { alerts: { severity: 'critical' | 'warning'; i
   )
 }
 
-function RevenueTile({ value, dealsCount, onClick }: { value: number; dealsCount: number; onClick?: () => void }) {
+function RevenueTile({ value, dealsCount, directValue, productsValue, onClick }: { value: number; dealsCount: number; directValue?: number; productsValue?: number; onClick?: () => void }) {
   const formatBRL = (v: number) => {
     if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M`
     if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}k`
@@ -424,6 +424,9 @@ function RevenueTile({ value, dealsCount, onClick }: { value: number; dealsCount
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '6px', fontWeight: 500 }}>
             {dealsCount} {dealsCount === 1 ? 'negócio ganho' : 'negócios ganhos'}
+            {(productsValue || 0) > 0 && (directValue || 0) > 0 && (
+              <span title={`Valor direto: ${formatBRL(directValue!)} · Produtos: ${formatBRL(productsValue!)}`}> · inclui produtos</span>
+            )}
           </div>
         </div>
         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(20,184,166,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -548,6 +551,11 @@ export default function DashboardPage() {
   const { data: conversationsWaiting } = useQuery({ queryKey: ['conversations', 'waiting'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=waiting&limit=1'); return data.meta }, refetchInterval: 30000 })
   const { data: conversationsClosed } = useQuery({ queryKey: ['conversations', 'closed'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=closed&limit=1'); return data.meta }, refetchInterval: 60000 })
   const { data: contactsMeta, isLoading: loadingContacts } = useQuery({ queryKey: ['contacts-count'], queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta }, refetchInterval: 15000 })
+  const { data: purchasesByContact = {} } = useQuery<Record<string, any[]>>({
+    queryKey: ['purchases-by-contact'],
+    queryFn: async () => { const { data } = await contactApi.get('/purchases/by-contact'); return data.data || {} },
+    staleTime: 10000, refetchInterval: 30000,
+  })
   const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data }, refetchInterval: 15000 })
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
@@ -686,11 +694,22 @@ export default function DashboardPage() {
   const pipelineTotalRevenue = funnelStages.reduce((s: number, st: { revenue: number }) => s + st.revenue, 0)
 
   // Receita fechada: cards em coluna com probabilidade 100% (ou label "fechad"/"ganho"/"won")
+  // Soma deal_value direto + valor total de produtos comprados pelo contato do card
+  const getContactPurchaseTotal = (contactId: string): number => {
+    const purchases = (purchasesByContact as any)[contactId]
+    if (!purchases || !Array.isArray(purchases)) return 0
+    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
+  }
   const wonColumns = (pipelineColumns || []).filter((c: any) =>
     c.probability === 100 || /fechad|ganho|won|conclu|vendid|success/i.test(c.label || '')
   )
   const wonCards: any[] = wonColumns.flatMap((col: any) => pipelineBoard?.[col.key] || [])
-  const revenueValue = wonCards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
+  const revenueDirectValue = wonCards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
+  const revenueProductsValue = wonCards.reduce((s: number, c: any) => {
+    const cid = c.contacts?.id || c.contact_id
+    return s + (cid ? getContactPurchaseTotal(cid) : 0)
+  }, 0)
+  const revenueValue = revenueDirectValue + revenueProductsValue
   const revenueCount = wonCards.length
 
   const alerts: { severity: 'critical' | 'warning'; icon: any; title: string; detail: string; href: string; cta: string }[] = []
@@ -867,7 +886,7 @@ export default function DashboardPage() {
 
         <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
           <BigNumberTile title="Contatos" subtitle="NA SUA BASE" value={contactsMeta?.total ?? 0} color="#7c3aed" icon={Users} onClick={() => router.push('/dashboard/contacts')} />
-          <RevenueTile value={revenueValue} dealsCount={revenueCount} onClick={() => router.push('/dashboard/pipeline')} />
+          <RevenueTile value={revenueValue} dealsCount={revenueCount} directValue={revenueDirectValue} productsValue={revenueProductsValue} onClick={() => router.push('/dashboard/pipeline')} />
         </div>
 
         {/* Row 2: Funil Pipeline (span 5) + HBar atendentes (span 4) + Pie status (span 3) */}
