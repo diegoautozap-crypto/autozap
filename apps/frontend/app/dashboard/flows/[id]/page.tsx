@@ -16,7 +16,7 @@ import { Save, ArrowLeft, Loader2, Workflow, BarChart2, Undo2, Redo2 } from 'luc
 import { subscribeTenant } from '@/lib/pusher'
 import { FlowNode } from './components/FlowNode'
 import { NodeConfigPanel } from './components/NodeConfigPanel'
-import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch } from './components/constants'
+import { NODE_COLORS, NODE_ICONS, LEGACY_TYPE_MAP, defaultBranch, getNodeLabels } from './components/constants'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
@@ -569,6 +569,25 @@ export default function FlowEditorPage() {
 
       {showAnalytics && analytics && (() => {
         const fmtDur = (ms: number) => ms > 60000 ? `${Math.round(ms / 60000)}min` : ms > 0 ? `${Math.round(ms / 1000)}s` : '—'
+        const nodeLabels = getNodeLabels(t)
+        const getNodeDescription = (nodeId: string): { label: string; context: string } => {
+          const node = nodes.find(n => n.id === nodeId)
+          if (!node) return { label: 'Node removido', context: '' }
+          const d = node.data as any
+          const label = nodeLabels[d.type] || (d.type || '').replace(/^trigger_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Node'
+          let context = ''
+          if (d.type === 'trigger_keyword') context = (d.keywords || []).slice(0, 3).join(', ')
+          else if (d.type === 'send_message') context = (d.message || d.body || '').slice(0, 40)
+          else if (d.type === 'input') context = (d.question || '').slice(0, 40)
+          else if (d.type === 'condition') context = `${(d.branches || []).length} caminho(s)`
+          else if (d.type === 'wait') context = d.mode === 'until' ? `até ${d.untilTime}` : `${d.hours || 0}h ${d.minutes || 0}min`
+          else if (d.type === 'ai') context = d.mode || 'respond'
+          else if (d.type === 'move_pipeline') context = d.stage || ''
+          else if (d.type === 'webhook') context = (d.url || '').slice(0, 40)
+          else if (d.type === 'tag_contact') context = d.subtype === 'remove' ? 'remover' : 'adicionar'
+          else if (d.type === 'create_task') context = (d.taskTitle || '').slice(0, 40)
+          return { label, context }
+        }
         const StatCard = ({ icon, color, bg, value, label, sub }: { icon: string; color: string; bg: string; value: string | number; label: string; sub?: string }) => (
           <div style={{ flex: 1, minWidth: '130px', padding: '12px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -615,17 +634,17 @@ export default function FlowEditorPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {(analytics.topBottlenecks as any[]).map((b, i) => {
-                    const node = nodes.find(n => n.id === b.nodeId)
-                    const label = (node?.data as any)?.type || 'Node'
+                    const { label, context } = getNodeDescription(b.nodeId)
                     const medals = ['🥇', '🥈', '🥉']
                     return (
                       <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
-                        style={{ flex: 1, minWidth: '200px', padding: '10px 14px', background: '#fff', border: '1px solid #fb923c', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.15s' }}
+                        style={{ flex: 1, minWidth: '240px', padding: '10px 14px', background: '#fff', border: '1px solid #fb923c', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.15s' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(251,146,60,0.2)' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none' }}>
                         <span style={{ fontSize: '24px' }}>{medals[i]}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#9a3412', marginBottom: '2px' }}>{label}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#9a3412', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                          {context && <div style={{ fontSize: '10px', color: '#b45309', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>&ldquo;{context}&rdquo;</div>}
                           <div style={{ fontSize: '11px', color: '#c2410c' }}><strong>{b.count}</strong> abandonos · <strong>{b.pct}%</strong> do total</div>
                         </div>
                         <span style={{ fontSize: '10px', color: '#9a3412', fontWeight: 600 }}>Ver →</span>
@@ -740,12 +759,14 @@ export default function FlowEditorPage() {
                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{e.nodeCount}</td>
                         <td style={{ padding: '10px 12px', color: '#4b5563', fontSize: '11px' }}>
                           {(() => {
+                            const nodeLabelsMap = getNodeLabels(t)
                             const node = nodes.find(n => n.id === e.lastNodeId)
-                            const nodeType = (node?.data as any)?.type || '—'
+                            const d = (node?.data as any) || {}
+                            const niceLabel = nodeLabelsMap[d.type] || (d.type || '').replace(/^trigger_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || '—'
                             return (
                               <button onClick={() => { setNodeDrilldownId(e.lastNodeId); setShowExecutionsModal(false) }}
                                 style={{ background: 'transparent', border: 'none', color: '#7c3aed', cursor: 'pointer', textDecoration: 'underline', fontSize: '11px', padding: 0 }}>
-                                {nodeType}
+                                {niceLabel}
                               </button>
                             )
                           })()}
@@ -778,7 +799,9 @@ export default function FlowEditorPage() {
             {(() => {
               const stats = analytics.nodeStats[nodeDrilldownId]
               const node = nodes.find(n => n.id === nodeDrilldownId)
-              const nodeName = (node?.data as any)?.type || 'Node'
+              const d = (node?.data as any) || {}
+              const labelsMap = getNodeLabels(t)
+              const nodeName = labelsMap[d.type] || (d.type || '').replace(/^trigger_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Node'
               return (
                 <>
                   <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
