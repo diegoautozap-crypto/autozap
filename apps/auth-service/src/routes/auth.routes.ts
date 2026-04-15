@@ -194,7 +194,7 @@ router.post('/team/invite', requireAuth, requireRole('admin', 'owner'), validate
     })
 
     const { data: tenant } = await db.from('tenants').select('name').eq('id', req.auth.tid).single()
-    sendTeamInviteEmail({ to: email, name, tenantName: tenant?.name || 'sua empresa', tempPassword: '(definida pelo administrador)' })
+    sendTeamInviteEmail({ to: email, name, tenantName: tenant?.name || 'sua empresa', tempPassword: password })
       .catch(err => logger.error('Failed to send team invite email', { err }))
 
     res.status(201).json(ok({ id: userId, name, email, role }))

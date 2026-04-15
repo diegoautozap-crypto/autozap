@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import { logger } from '@autozap/utils'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM = process.env.SMTP_FROM || 'AutoZap <onboarding@resend.dev>'
+const FROM = process.env.RESEND_FROM || process.env.SMTP_FROM || 'AutoZap <onboarding@resend.dev>'
 const APP_URL = process.env.APP_URL || 'https://useautozap.app'
 
 // ─── Templates ────────────────────────────────────────────────────────────────
