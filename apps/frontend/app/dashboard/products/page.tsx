@@ -203,9 +203,34 @@ export default function ProductsPage() {
           <Loader2 size={28} color="var(--text-faint)" style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-faint)' }}>
-          <ShoppingBag size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
-          <p style={{ fontSize: '15px', fontWeight: 500 }}>{categoryFilter !== 'all' ? 'Nenhum produto nesta categoria' : 'Nenhum produto cadastrado'}</p>
+        <div style={{ padding: '56px 24px', textAlign: 'center', maxWidth: '520px', margin: '0 auto' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <ShoppingBag size={26} color="#ea580c" />
+          </div>
+          <p style={{ color: 'var(--text)', fontSize: '16px', fontWeight: 600, margin: '0 0 6px' }}>
+            {categoryFilter !== 'all' ? 'Nenhum produto nesta categoria' : 'Nenhum produto ainda'}
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 24px', lineHeight: 1.5 }}>
+            {categoryFilter !== 'all'
+              ? 'Tente outra categoria ou cadastre um produto novo.'
+              : 'Cadastre seus produtos pra usar em vendas via WhatsApp, pipeline e relatórios de receita.'}
+          </p>
+          {categoryFilter === 'all' && (
+            <>
+              <button onClick={() => { setEditingProduct(null); setShowModal(true) }}
+                style={{ padding: '9px 18px', background: '#ea580c', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                + Cadastrar primeiro produto
+              </button>
+              <div style={{ marginTop: '28px', padding: '14px', background: 'var(--bg)', border: '1px solid var(--divider)', borderRadius: '10px', textAlign: 'left' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Por que cadastrar produtos?</p>
+                <ul style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, paddingLeft: '18px', lineHeight: 1.7 }}>
+                  <li>Associar vendas aos cards do pipeline (aparece receita fechada no dashboard)</li>
+                  <li>Rastrear o que cada cliente já comprou (histórico de compras no perfil)</li>
+                  <li>Usar em catálogos e mensagens automáticas via flow</li>
+                </ul>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

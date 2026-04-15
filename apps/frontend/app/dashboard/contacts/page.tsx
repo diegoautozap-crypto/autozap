@@ -796,11 +796,33 @@ export default function ContactsPage() {
         {isLoading ? (
           <div style={{ padding: '20px' }}><ListSkeleton rows={8} /></div>
         ) : contacts.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-              <User size={22} color="var(--text-faintest)" />
+          <div style={{ padding: '56px 24px', textAlign: 'center', maxWidth: '520px', margin: '0 auto' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <User size={26} color="#16a34a" />
             </div>
-            <p style={{ color: 'var(--text-faint)', fontSize: '14px' }}>{t('contacts.noContacts')}</p>
+            <p style={{ color: 'var(--text)', fontSize: '16px', fontWeight: 600, margin: '0 0 6px' }}>Nenhum contato ainda</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 24px', lineHeight: 1.5 }}>
+              Seus contatos vão aparecer aqui automaticamente quando você receber a primeira mensagem.
+              Você também pode importar uma lista ou adicionar manualmente.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => setShowImport(true)}
+                style={{ padding: '9px 18px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                📥 Importar lista (CSV)
+              </button>
+              <button onClick={() => router.push('/dashboard/channels')}
+                style={{ padding: '9px 18px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Conectar canal
+              </button>
+            </div>
+            <div style={{ marginTop: '28px', padding: '14px', background: 'var(--bg)', border: '1px solid var(--divider)', borderRadius: '10px', textAlign: 'left' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>3 formas de trazer contatos:</p>
+              <ol style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, paddingLeft: '18px', lineHeight: 1.7 }}>
+                <li><b>Automático:</b> conecte um canal — qualquer cliente que mandar mensagem vira contato</li>
+                <li><b>Importar:</b> suba um CSV com nome, telefone, email e campos customizados</li>
+                <li><b>Webhook:</b> formulários/sistemas externos podem criar contato via API</li>
+              </ol>
+            </div>
           </div>
         ) : (
           <>
