@@ -851,6 +851,17 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 <option value="America/Noronha">Fernando de Noronha (UTC-2)</option>
               </select>
             </div>
+            <div>
+              <label style={labelStyle}>Espalhar em até X minutos <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(proteção contra rate limit)</span></label>
+              <input type="number" min="0" max="60" style={inputStyle}
+                placeholder="0"
+                value={(d as any).spreadMinutes ?? 0}
+                onChange={e => onUpdate(node.id, { spreadMinutes: Number(e.target.value) || 0 } as any)}
+                onFocus={focusInput} onBlur={blurInput} />
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px', lineHeight: 1.4 }}>
+                0 = dispara todos no horário exato. Ex: 5 = espalha aleatoriamente entre {(d as any).untilTime || 'HH:MM'} e +5min (evita bloqueio do WhatsApp quando muitos clientes).
+              </p>
+            </div>
           </>)}
         </>)}
 

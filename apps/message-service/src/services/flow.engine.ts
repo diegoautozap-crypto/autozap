@@ -813,8 +813,14 @@ export class FlowEngine {
             target.setHours(hh, mm, 0, 0)
             // Se o horário já passou hoje, vai pra amanhã (comportamento padrão)
             if (target.getTime() <= nowInTz.getTime()) target.setDate(target.getDate() + 1)
-            totalMs = target.getTime() - nowInTz.getTime()
-            logger.info('Wait until specific time', { tz, untilTime: untilTimeStr, delayMinutes: Math.round(totalMs / 60000) })
+            // Jitter pra evitar disparar tudo no mesmo segundo (evita rate limit WhatsApp)
+            const spreadMinutes = Number((data as any)?.spreadMinutes ?? 0)
+            let jitterMs = 0
+            if (spreadMinutes > 0) {
+              jitterMs = Math.floor(Math.random() * spreadMinutes * 60_000)
+            }
+            totalMs = target.getTime() - nowInTz.getTime() + jitterMs
+            logger.info('Wait until specific time', { tz, untilTime: untilTimeStr, delayMinutes: Math.round(totalMs / 60000), jitterSec: Math.round(jitterMs / 1000) })
           } else {
             totalMs = ((data?.seconds || 0) + (data?.minutes || 0) * 60 + (data?.hours || 0) * 3600 + (Number(data?.days) || 0) * 86400) * 1000
           }
