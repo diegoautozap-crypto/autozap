@@ -686,10 +686,10 @@ export default function DashboardPage() {
   const pipelineTotalRevenue = funnelStages.reduce((s: number, st: { revenue: number }) => s + st.revenue, 0)
 
   // Receita fechada: cards em coluna com probabilidade 100% (ou label "fechad"/"ganho"/"won")
-  const wonColumn = (pipelineColumns || []).find((c: any) =>
-    c.probability === 100 || /fechad|ganho|won/i.test(c.label || '')
+  const wonColumns = (pipelineColumns || []).filter((c: any) =>
+    c.probability === 100 || /fechad|ganho|won|conclu|vendid|success/i.test(c.label || '')
   )
-  const wonCards: any[] = wonColumn ? (pipelineBoard?.[wonColumn.key] || []) : []
+  const wonCards: any[] = wonColumns.flatMap((col: any) => pipelineBoard?.[col.key] || [])
   const revenueValue = wonCards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
   const revenueCount = wonCards.length
 
