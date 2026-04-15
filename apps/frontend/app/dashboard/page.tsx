@@ -105,6 +105,90 @@ function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }:
   )
 }
 
+function DonutChart({ segments, size = 160, thickness = 28, centerLabel, centerValue }: {
+  segments: { label: string; value: number; color: string }[]
+  size?: number
+  thickness?: number
+  centerLabel?: string
+  centerValue?: string | number
+}) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0)
+  const radius = (size - thickness) / 2
+  const circumference = 2 * Math.PI * radius
+  let offset = 0
+
+  if (total === 0) {
+    return (
+      <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: `${thickness}px solid var(--bg-input)`, boxSizing: 'border-box', color: 'var(--text-faintest)', fontSize: '12px' }}>
+        Sem dados
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--bg-input)" strokeWidth={thickness} />
+        {segments.map((seg, i) => {
+          if (seg.value === 0) return null
+          const length = (seg.value / total) * circumference
+          const el = (
+            <circle key={i}
+              cx={size / 2} cy={size / 2} r={radius}
+              fill="none" stroke={seg.color} strokeWidth={thickness}
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={-offset}
+              style={{ transition: 'stroke-dasharray 0.4s ease' }}
+            />
+          )
+          offset += length
+          return el
+        })}
+      </svg>
+      {(centerValue !== undefined || centerLabel) && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          {centerValue !== undefined && <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{centerValue}</div>}
+          {centerLabel && <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{centerLabel}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PieCard({ title, subtitle, segments, centerValue, centerLabel }: {
+  title: string
+  subtitle?: string
+  segments: { label: string; value: number; color: string }[]
+  centerValue?: string | number
+  centerLabel?: string
+}) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0)
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+      <div style={{ marginBottom: '14px' }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{title}</h3>
+        {subtitle && <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{subtitle}</p>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <DonutChart segments={segments} centerValue={centerValue} centerLabel={centerLabel} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+          {segments.map(seg => {
+            const pct = total > 0 ? Math.round((seg.value / total) * 100) : 0
+            return (
+              <div key={seg.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: seg.color, flexShrink: 0 }} />
+                <span style={{ flex: 1, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{seg.label}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{seg.value}</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-faint)', width: '32px', textAlign: 'right' }}>{pct}%</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatCard({ label, value, icon: Icon, color, bg, onClick, delta }: any) {
   return (
     <div onClick={onClick} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s' }}
@@ -134,6 +218,8 @@ export default function DashboardPage() {
   const { data: channels } = useQuery({ queryKey: ['channels'], queryFn: async () => { const { data } = await channelApi.get('/channels'); return data.data }, refetchInterval: 30000 })
   const { data: templates } = useQuery({ queryKey: ['templates'], queryFn: async () => { const { data } = await campaignApi.get('/templates'); return data.data }, refetchInterval: 30000 })
   const { data: conversations } = useQuery({ queryKey: ['conversations', 'open'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=open'); return data.data }, refetchInterval: 15000 })
+  const { data: conversationsWaiting } = useQuery({ queryKey: ['conversations', 'waiting'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=waiting&limit=1'); return data.meta }, refetchInterval: 30000 })
+  const { data: conversationsClosed } = useQuery({ queryKey: ['conversations', 'closed'], queryFn: async () => { const { data } = await conversationApi.get('/conversations?status=closed&limit=1'); return data.meta }, refetchInterval: 60000 })
   const { data: contactsMeta, isLoading: loadingContacts } = useQuery({ queryKey: ['contacts-count'], queryFn: async () => { const { data } = await contactApi.get('/contacts?limit=1'); return data.meta }, refetchInterval: 15000 })
   const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: async () => { const { data } = await tenantApi.get('/tenant/usage'); return data.data }, refetchInterval: 15000 })
   const { data: teamMembers } = useQuery({
@@ -329,108 +415,138 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Métricas operacionais */}
-      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        <StatCard label={t('dashboard.avgResponseTime7d')}       value={formatResponseTime(avgResponseMinutes)} icon={Clock}      color="#ea580c" bg="#fff7ed" />
-        <StatCard label={t('dashboard.flowsFiredToday')}               value={activeFlowsToday}                       icon={Workflow}   color="#22c55e" bg="#f0fdf4" onClick={() => router.push('/dashboard/flows')} />
-        <StatCard label={t('dashboard.agentsWithOpen')}   value={byAgent.length}                          icon={UserCheck}  color="#2563eb" bg="#eff6ff" />
+      {/* Pizzas — Status das conversas + Pipeline por etapa */}
+      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}>
+        <PieCard
+          title="Conversas por status"
+          subtitle="Distribuição atual"
+          centerValue={(conversations?.length || 0) + (conversationsWaiting?.total || 0)}
+          centerLabel="abertas"
+          segments={[
+            { label: 'Em aberto', value: conversations?.length || 0, color: '#22c55e' },
+            { label: 'Aguardando', value: conversationsWaiting?.total || 0, color: '#d97706' },
+            { label: 'Fechadas', value: conversationsClosed?.total || 0, color: '#94a3b8' },
+          ]}
+        />
+        <PieCard
+          title="Pipeline por etapa"
+          subtitle="Cards em cada coluna"
+          centerValue={pipelineBoard ? Object.values(pipelineBoard).reduce((a: number, arr: any) => a + arr.length, 0) : 0}
+          centerLabel="cards"
+          segments={(pipelineColumns || []).map((col: any, i: number) => ({
+            label: col.label,
+            value: pipelineBoard?.[col.key]?.length || 0,
+            color: col.color || ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#dc2626'][i % 6],
+          }))}
+        />
       </div>
 
-      {/* SLA */}
+      {/* SLA bloco com pizza + métricas */}
       {analytics?.sla && (
-        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-          <StatCard
-            label={`Dentro do SLA (${analytics.sla.targetMinutes}min)`}
-            value={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
-            icon={Clock}
-            color={analytics.sla.withinPct !== null && analytics.sla.withinPct >= 80 ? '#16a34a' : '#d97706'}
-            bg={analytics.sla.withinPct !== null && analytics.sla.withinPct >= 80 ? '#f0fdf4' : '#fffbeb'}
-          />
-          <StatCard
-            label="Aguardando resposta agora"
-            value={analytics.sla.currentlyWaiting || 0}
-            icon={MessageSquare}
-            color="#2563eb"
-            bg="#eff6ff"
-            onClick={() => router.push('/dashboard/inbox')}
-          />
-          <StatCard
-            label="Estouradas agora"
-            value={analytics.sla.currentlyBreached || 0}
-            icon={Clock}
-            color={(analytics.sla.currentlyBreached || 0) > 0 ? '#dc2626' : '#71717a'}
-            bg={(analytics.sla.currentlyBreached || 0) > 0 ? '#fef2f2' : '#f4f4f5'}
-            onClick={() => router.push('/dashboard/inbox')}
-          />
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>SLA — Tempo de resposta</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Meta: {analytics.sla.targetMinutes} minutos · últimos {analyticsDays} dias</p>
+            </div>
+            <button onClick={() => router.push('/dashboard/settings')}
+              style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Configurar
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <DonutChart
+              size={140} thickness={22}
+              segments={[
+                { label: 'Dentro', value: analytics.sla.withinCount || 0, color: '#16a34a' },
+                { label: 'Fora', value: analytics.sla.breachedCount || 0, color: '#dc2626' },
+              ]}
+              centerValue={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
+              centerLabel="no SLA"
+            />
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px' }}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a', letterSpacing: '-0.02em' }}>{analytics.sla.withinCount || 0}</div>
+                <div style={{ fontSize: '11px', color: '#15803d', marginTop: '2px' }}>Respondidas no prazo</div>
+              </div>
+              <div style={{ padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#2563eb', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyWaiting || 0}</div>
+                <div style={{ fontSize: '11px', color: '#1d4ed8', marginTop: '2px' }}>Aguardando agora</div>
+              </div>
+              <div style={{ padding: '12px 14px', background: (analytics.sla.currentlyBreached || 0) > 0 ? '#fef2f2' : '#f4f4f5', border: `1px solid ${(analytics.sla.currentlyBreached || 0) > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: (analytics.sla.currentlyBreached || 0) > 0 ? '#dc2626' : 'var(--text-faint)', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyBreached || 0}</div>
+                <div style={{ fontSize: '11px', color: (analytics.sla.currentlyBreached || 0) > 0 ? '#991b1b' : 'var(--text-faint)', marginTop: '2px' }}>Estouradas agora</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Gráfico + Conversas por atendente */}
-      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '14px', marginBottom: '20px' }}>
-        {/* Gráfico de barras */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.messagesSent')}</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{t('dashboard.last30days')}</p>
-            </div>
-            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: 'var(--text-faint)' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> {t('dashboard.sent')}
-            </div>
+      {/* Gráfico mensagens — largura total */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Mensagens enviadas</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos {analyticsDays} dias</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '140px', paddingBottom: '24px', position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: 'var(--text-faint)' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> Enviadas
+          </div>
+        </div>
+        {totalSent === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: '13px' }}>
+            Nenhuma mensagem enviada nos últimos {analyticsDays} dias.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '180px', paddingBottom: '24px', position: 'relative' }}>
             {[0.25, 0.5, 0.75, 1].map(p => (
-              <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 116}px`, borderTop: '1px dashed var(--divider)', zIndex: 0 }} />
+              <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 156}px`, borderTop: '1px dashed var(--divider)', zIndex: 0 }} />
             ))}
             {days.map((day, i) => {
               const sent = byDay[day]?.sent || 0
+              const showLabel = days.length <= 14 ? true : (i % Math.ceil(days.length / 10) === 0)
               return (
                 <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                  <div title={`${day}: ${sent} ${t('dashboard.sent').toLowerCase()}`}
-                    style={{ width: '100%', maxWidth: '18px', height: `${Math.max(sent / maxVal * 116, sent > 0 ? 3 : 0)}px`, background: '#22c55e', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
+                  <div title={`${day}: ${sent} enviadas`}
+                    style={{ width: '100%', maxWidth: '22px', height: `${Math.max(sent / maxVal * 156, sent > 0 ? 3 : 0)}px`, background: '#22c55e', borderRadius: '3px 3px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#16a34a'}
                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#22c55e'} />
-                  {i % 5 === 0 && <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: 'var(--text-faintest)', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>}
+                  {showLabel && <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: 'var(--text-faintest)', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>}
                 </div>
               )
             })}
           </div>
-          {totalSent === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noMessagesSent30d')}</div>}
-        </div>
-
-        {/* Conversas por atendente */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.byAgent')}</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{t('dashboard.assignedOpenConvs')}</p>
-          </div>
-          {byAgent.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>{t('dashboard.noAssignedConvs')}</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {byAgent.map((agent, i) => {
-                const maxCount = byAgent[0].count
-                const pct = Math.round((agent.count / maxCount) * 100)
-                const colors = ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706']
-                const color = colors[i % colors.length]
-                return (
-                  <div key={agent.name}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>{agent.name}</span>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color }}>{agent.count}</span>
-                    </div>
-                    <div style={{ height: '5px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Funil de conversão — removido do dashboard */}
+      {/* Conversas por atendente */}
+      {byAgent.length > 0 && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Conversas por atendente</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Distribuição de conversas abertas</p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {byAgent.map((agent, i) => {
+              const maxCount = byAgent[0].count
+              const pct = Math.round((agent.count / maxCount) * 100)
+              const colors = ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706']
+              const color = colors[i % colors.length]
+              return (
+                <div key={agent.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>{agent.name}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color }}>{agent.count}</span>
+                  </div>
+                  <div style={{ height: '5px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Ranking de atendentes */}
       {(role === 'owner' || role === 'admin') && (
