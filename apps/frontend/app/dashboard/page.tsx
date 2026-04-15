@@ -402,6 +402,38 @@ function AlertBanner({ alerts }: { alerts: { severity: 'critical' | 'warning'; i
   )
 }
 
+function RevenueTile({ value, dealsCount, onClick }: { value: number; dealsCount: number; onClick?: () => void }) {
+  const formatBRL = (v: number) => {
+    if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M`
+    if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}k`
+    return `R$ ${v.toFixed(0)}`
+  }
+  return (
+    <div onClick={onClick}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '140px', transition: 'all 0.2s' }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(20,184,166,0.4)' } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)' }}>
+      <div>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Receita fechada</div>
+        <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600, marginTop: '3px' }}>NEGÓCIOS GANHOS</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px' }}>
+        <div>
+          <div style={{ fontSize: value >= 1_000_000 ? '36px' : '44px', fontWeight: 400, color: 'var(--text)', letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {formatBRL(value)}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '6px', fontWeight: 500 }}>
+            {dealsCount} {dealsCount === 1 ? 'negócio ganho' : 'negócios ganhos'}
+          </div>
+        </div>
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(20,184,166,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <DollarSign size={18} color="#0f766e" strokeWidth={2.2} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PlanUsageTile({ used, limit }: { used: number; limit: number | null }) {
   const now = new Date()
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
@@ -653,6 +685,14 @@ export default function DashboardPage() {
   const pipelineCardCount = funnelStages.reduce((s: number, st: { value: number }) => s + st.value, 0)
   const pipelineTotalRevenue = funnelStages.reduce((s: number, st: { revenue: number }) => s + st.revenue, 0)
 
+  // Receita fechada: cards em coluna com probabilidade 100% (ou label "fechad"/"ganho"/"won")
+  const wonColumn = (pipelineColumns || []).find((c: any) =>
+    c.probability === 100 || /fechad|ganho|won/i.test(c.label || '')
+  )
+  const wonCards: any[] = wonColumn ? (pipelineBoard?.[wonColumn.key] || []) : []
+  const revenueValue = wonCards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
+  const revenueCount = wonCards.length
+
   const alerts: { severity: 'critical' | 'warning'; icon: any; title: string; detail: string; href: string; cta: string }[] = []
   const sla = analytics?.sla
   if (sla?.currentlyBreached > 0) {
@@ -674,6 +714,36 @@ export default function DashboardPage() {
       href: '/dashboard/inbox?status=waiting',
       cta: 'Ver inbox',
     })
+  }
+  // Alerta de uso do plano — só quando tá perto de estourar
+  if (usage?.limit && usage.limit > 0) {
+    const usedNow = usage.sent || 0
+    const now = new Date()
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const dayOfMonth = now.getDate()
+    const dailyAvg = usedNow / Math.max(dayOfMonth, 1)
+    const projected = Math.round(dailyAvg * daysInMonth)
+    const usedPct = (usedNow / usage.limit) * 100
+    if (projected > usage.limit && usedPct > 50) {
+      const daysUntilLimit = dailyAvg > 0 ? Math.max(0, Math.ceil((usage.limit - usedNow) / dailyAvg)) : 0
+      alerts.push({
+        severity: 'critical',
+        icon: AlertTriangle,
+        title: `Plano vai estourar em ${daysUntilLimit}d`,
+        detail: `Usou ${Math.round(usedPct)}% de ${usage.limit.toLocaleString('pt-BR')} · projeção: ${projected.toLocaleString('pt-BR')} msgs no mês.`,
+        href: '/dashboard/settings',
+        cta: 'Fazer upgrade',
+      })
+    } else if (usedPct > 85) {
+      alerts.push({
+        severity: 'warning',
+        icon: AlertTriangle,
+        title: `Plano em ${Math.round(usedPct)}% do limite`,
+        detail: `${usedNow.toLocaleString('pt-BR')} de ${usage.limit.toLocaleString('pt-BR')} msgs · avalie upgrade.`,
+        href: '/dashboard/settings',
+        cta: 'Ver planos',
+      })
+    }
   }
 
   return (
@@ -797,7 +867,7 @@ export default function DashboardPage() {
 
         <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
           <BigNumberTile title="Contatos" subtitle="NA SUA BASE" value={contactsMeta?.total ?? 0} color="#7c3aed" icon={Users} onClick={() => router.push('/dashboard/contacts')} />
-          <PlanUsageTile used={usage?.sent ?? 0} limit={usage?.limit ?? null} />
+          <RevenueTile value={revenueValue} dealsCount={revenueCount} onClick={() => router.push('/dashboard/pipeline')} />
         </div>
 
         {/* Row 2: Funil Pipeline (span 5) + HBar atendentes (span 4) + Pie status (span 3) */}
