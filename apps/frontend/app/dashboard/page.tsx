@@ -98,7 +98,7 @@ function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }:
         </div>
         <ArrowUpRight size={13} color="var(--text-faintest)" />
       </div>
-      <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '4px' }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
+      <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '4px', fontVariantNumeric: 'tabular-nums' }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
       <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '2px' }}>{label}</div>
       <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{sub}</div>
     </div>
@@ -199,7 +199,7 @@ function StatCard({ label, value, icon: Icon, color, bg, onClick, delta }: any) 
       </div>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</span>
+          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
           {delta != null && delta !== 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: delta > 0 ? '#16a34a' : '#dc2626', background: delta > 0 ? '#f0fdf4' : '#fef2f2', padding: '1px 6px', borderRadius: '99px' }}>{delta > 0 ? '+' : ''}{delta}%</span>}
         </div>
         <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '1px' }}>{label}</div>
@@ -257,6 +257,15 @@ export default function DashboardPage() {
 
   const [selectedAgent, setSelectedAgent] = useState<string>('')
   const [analyticsDays, setAnalyticsDays] = useState(30)
+
+  const { data: activity = [] } = useQuery({
+    queryKey: ['pipeline-activity'],
+    queryFn: async () => {
+      const { data } = await conversationApi.get('/pipeline/activity?limit=12')
+      return data.data || []
+    },
+    refetchInterval: 30000,
+  })
 
   const { data: analytics } = useQuery({
     queryKey: ['analytics', selectedAgent, analyticsDays],
@@ -339,22 +348,65 @@ export default function DashboardPage() {
   return (
     <div className="mobile-page" style={{ padding: '32px', maxWidth: '1200px' }}>
 
-      {/* Saudação */}
-      <div className="mobile-header" style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/* Saudação + filtros compactos no header */}
+      <div className="mobile-header" style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{getGreeting(t)}! 👋</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: '14px', marginTop: '4px' }}>{t('dashboard.summaryToday')}</p>
         </div>
-        {(role === 'owner' || role === 'admin') && (
-          <button onClick={generateReport}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--shadow)', whiteSpace: 'nowrap' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#22c55e' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}>
-            <Printer size={14} />
-            Gerar relatório
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {(role === 'owner' || role === 'admin') && (teamMembers || []).length > 1 && (
+            <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
+              style={{ padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-muted)', outline: 'none', cursor: 'pointer', boxShadow: 'var(--shadow)' }}>
+              <option value="">Toda a equipe</option>
+              {(teamMembers || []).map((m: any) => (
+                <option key={m.id} value={m.id}>{m.name || m.email}</option>
+              ))}
+            </select>
+          )}
+          {(role === 'owner' || role === 'admin') && (
+            <button onClick={generateReport}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--shadow)', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#22c55e' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}>
+              <Printer size={14} />
+              Gerar relatório
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Barra "Hoje" */}
+      {(() => {
+        const todayKey = new Date().toISOString().split('T')[0]
+        const msgsToday = byDay[todayKey]?.sent || 0
+        const waiting = analytics?.sla?.currentlyWaiting || 0
+        const breached = analytics?.sla?.currentlyBreached || 0
+        const items = [
+          { icon: Send, color: '#22c55e', bg: '#f0fdf4', value: msgsToday, label: 'mensagens enviadas' },
+          { icon: MessageSquare, color: '#2563eb', bg: '#eff6ff', value: waiting, label: 'aguardando resposta' },
+          { icon: Clock, color: breached > 0 ? '#dc2626' : '#94a3b8', bg: breached > 0 ? '#fef2f2' : '#f4f4f5', value: breached, label: 'estouradas agora' },
+        ]
+        return (
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', boxShadow: 'var(--shadow)', display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>Hoje</div>
+            {items.map((it, i) => {
+              const I = it.icon
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: it.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <I size={14} color={it.color} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{it.value}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: '6px' }}>{it.label}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
 
 
       {/* Cards principais */}
@@ -368,41 +420,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Período + Taxa cards */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-        {[7, 14, 30, 90].map(d => (
-          <button key={d} onClick={() => setAnalyticsDays(d)}
-            style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? '#f0fdf4' : 'transparent', color: analyticsDays === d ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
-            {d}d
-          </button>
-        ))}
+      {/* VOLUME section */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Volume</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {[7, 14, 30, 90].map(d => (
+            <button key={d} onClick={() => setAnalyticsDays(d)}
+              style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? '#f0fdf4' : 'transparent', color: analyticsDays === d ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              {d}d
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '18px' }}>
         <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString()} icon={Send} color="#2563eb" bg="#eff6ff" delta={deltaFn(totalSent, prev.totalSent)} />
-        <StatCard label={t('dashboard.deliveryRate')} value={`${deliveryRate}%`} icon={CheckCheck} color="#22c55e" bg="#f0fdf4" delta={prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
-        <StatCard label={t('dashboard.readRate')} value={`${readRate}%`} icon={Eye} color="#7c3aed" bg="#f5f3ff" delta={prev.readRate != null ? readRate - prev.readRate : null} />
+        <StatCard label={t('dashboard.deliveryRate')} value={totalSent > 0 ? `${deliveryRate}%` : '—'} icon={CheckCheck} color="#22c55e" bg="#f0fdf4" delta={totalSent > 0 && prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
+        <StatCard label={t('dashboard.readRate')} value={totalSent > 0 ? `${readRate}%` : '—'} icon={Eye} color="#7c3aed" bg="#f5f3ff" delta={totalSent > 0 && prev.readRate != null ? readRate - prev.readRate : null} />
       </div>
 
-      {/* Seletor de atendente (só owner/admin) */}
-      {(role === 'owner' || role === 'admin') && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: 'var(--shadow)' }}>
-          <UserCheck size={15} color="var(--text-faint)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>{t('dashboard.viewPerformanceOf')}</span>
-          <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
-            style={{ padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text)', outline: 'none', cursor: 'pointer', minWidth: '200px' }}>
-            <option value="">{t('dashboard.wholeTeam')}</option>
-            {(teamMembers || []).map((m: any) => (
-              <option key={m.id} value={m.id}>{m.name || m.email}</option>
-            ))}
-          </select>
-          {selectedAgent && (
-            <button onClick={() => setSelectedAgent('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faint)'}>
-              <X size={13} /> {t('dashboard.clear')}
-            </button>
-          )}
+      {selectedAgent && (
+        <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <UserCheck size={12} />
+          Filtrando desempenho por agente selecionado
+          <button onClick={() => setSelectedAgent('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}>
+            <X size={11} /> limpar
+          </button>
         </div>
       )}
 
@@ -415,8 +457,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pizzas — Status das conversas + Pipeline por etapa */}
-      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}>
+      {/* DISTRIBUIÇÃO section */}
+      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Distribuição</div>
+      <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '18px' }}>
         <PieCard
           title="Conversas por status"
           subtitle="Distribuição atual"
@@ -428,22 +471,50 @@ export default function DashboardPage() {
             { label: 'Fechadas', value: conversationsClosed?.total || 0, color: '#94a3b8' },
           ]}
         />
-        <PieCard
-          title="Pipeline por etapa"
-          subtitle="Cards em cada coluna"
-          centerValue={pipelineBoard ? Object.values(pipelineBoard).reduce((a: number, arr: any) => a + arr.length, 0) : 0}
-          centerLabel="cards"
-          segments={(pipelineColumns || []).map((col: any, i: number) => ({
-            label: col.label,
-            value: pipelineBoard?.[col.key]?.length || 0,
-            color: col.color || ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#dc2626'][i % 6],
-          }))}
-        />
+        {(() => {
+          const cardCount = pipelineBoard ? Object.values(pipelineBoard).reduce((a: number, arr: any) => a + arr.length, 0) : 0
+          const hasColumns = (pipelineColumns || []).length > 0
+          if (!hasColumns || cardCount === 0) {
+            return (
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Pipeline por etapa</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Cards em cada coluna</p>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 10px', textAlign: 'center' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                    <Workflow size={22} color="#7c3aed" />
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 12px', maxWidth: '260px' }}>
+                    {hasColumns ? 'Nenhum card em seu pipeline ainda' : 'Configure seu primeiro pipeline pra acompanhar seus negócios'}
+                  </p>
+                  <button onClick={() => router.push('/dashboard/pipeline')}
+                    style={{ padding: '7px 14px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {hasColumns ? 'Abrir pipeline' : 'Configurar pipeline'} <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )
+          }
+          return (
+            <PieCard
+              title="Pipeline por etapa"
+              subtitle="Cards em cada coluna"
+              centerValue={cardCount}
+              centerLabel="cards"
+              segments={(pipelineColumns || []).map((col: any, i: number) => ({
+                label: col.label,
+                value: pipelineBoard?.[col.key]?.length || 0,
+                color: col.color || ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#dc2626'][i % 6],
+              }))}
+            />
+          )
+        })()}
       </div>
 
       {/* SLA bloco com pizza + métricas */}
       {analytics?.sla && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '18px' }}>
           <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>SLA — Tempo de resposta</h3>
@@ -548,9 +619,72 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* EQUIPE section */}
+      {(role === 'owner' || role === 'admin') && (agentRanking.length > 0 || activity.length > 0) && (
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Atividade</div>
+      )}
+
+      {/* Atividade recente */}
+      {activity.length > 0 && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '14px', boxShadow: 'var(--shadow)' }}>
+          <div style={{ marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Atividade recente</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos eventos no pipeline</p>
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {activity.slice(0, 8).map((ev: any) => {
+              const contact = ev.card?.contacts || ev.conversation?.contacts
+              const contactName = contact?.name || contact?.phone || 'Contato'
+              const actor = ev.actor?.name || 'Sistema'
+              const when = (() => {
+                const diff = Date.now() - new Date(ev.created_at).getTime()
+                const mins = Math.floor(diff / 60000)
+                if (mins < 1) return 'agora'
+                if (mins < 60) return `há ${mins}min`
+                const hrs = Math.floor(mins / 60)
+                if (hrs < 24) return `há ${hrs}h`
+                return `há ${Math.floor(hrs / 24)}d`
+              })()
+              let text = ''
+              let color = '#64748b'
+              let bg = '#f1f5f9'
+              switch (ev.event_type) {
+                case 'created':
+                  text = `${contactName} entrou no pipeline em ${ev.to_column || '—'}`
+                  color = '#7c3aed'; bg = '#f5f3ff'
+                  break
+                case 'moved':
+                  text = `${contactName} movido de ${ev.from_column || '—'} → ${ev.to_column || '—'}`
+                  color = '#d97706'; bg = '#fffbeb'
+                  break
+                case 'value_changed':
+                  text = `${contactName} · valor alterado: R$ ${Number(ev.from_value || 0).toFixed(0)} → R$ ${Number(ev.to_value || 0).toFixed(0)}`
+                  color = '#059669'; bg = '#ecfdf5'
+                  break
+                case 'assigned':
+                  text = `${contactName} · responsável alterado`
+                  color = '#0891b2'; bg = '#ecfeff'
+                  break
+                default:
+                  text = `${contactName} · ${ev.event_type}`
+              }
+              return (
+                <li key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: bg, border: `1px solid ${color}20` }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, marginTop: '7px', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{text}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{actor} · {when}</div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Ranking de atendentes */}
       {(role === 'owner' || role === 'admin') && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '20px', boxShadow: 'var(--shadow)' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '18px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <Trophy size={15} color="#d97706" />
             <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{t('dashboard.agentRanking')}</h3>

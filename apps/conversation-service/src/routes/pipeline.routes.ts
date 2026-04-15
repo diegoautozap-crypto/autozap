@@ -336,6 +336,27 @@ router.get('/pipeline-cards/:id/events', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Feed de atividade recente do tenant (usado no dashboard)
+router.get('/pipeline/activity', async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 15, 50)
+    const { data, error } = await db
+      .from('pipeline_card_events')
+      .select(`
+        id, event_type, from_column, to_column, from_value, to_value, created_at,
+        card_id, conversation_id,
+        actor:actor_user_id(id, name),
+        card:card_id(contacts(id, name, phone)),
+        conversation:conversation_id(contacts(id, name, phone))
+      `)
+      .eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
 // Histórico via conversation_id (para cards que ainda são conversas legacy)
 router.get('/conversations/:id/pipeline-events', async (req, res, next) => {
   try {
