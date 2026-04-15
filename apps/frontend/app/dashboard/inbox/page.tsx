@@ -503,6 +503,16 @@ export default function InboxPage() {
     // ✅ sem refetchInterval — Pusher cuida das atualizações
   })
 
+  const { data: tenantSlaData } = useQuery({
+    queryKey: ['tenant-sla-inbox'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant')
+      return data.data
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+  const slaTargetMinutes: number = Number(tenantSlaData?.settings?.slaTargetMinutes) || 30
+
   useEffect(() => {
     if (!convData) return
     if (convPage === 1) { setAllConvs(convData) } else {
@@ -985,6 +995,24 @@ export default function InboxPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || '??'}</span>
+                      {conv.waiting_since && (() => {
+                        const waitMin = Math.floor((Date.now() - new Date(conv.waiting_since).getTime()) / 60000)
+                        const breached = waitMin > slaTargetMinutes
+                        const warn = !breached && waitMin > slaTargetMinutes * 0.7
+                        if (!breached && !warn) return null
+                        return (
+                          <span title={`Aguardando resposta há ${waitMin}min · SLA: ${slaTargetMinutes}min`}
+                            style={{
+                              fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '99px',
+                              background: breached ? '#fef2f2' : '#fffbeb',
+                              color: breached ? '#dc2626' : '#d97706',
+                              border: `1px solid ${breached ? '#fecaca' : '#fde68a'}`,
+                              display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0, marginLeft: '4px',
+                            }}>
+                            <Clock size={9} /> {waitMin}m
+                          </span>
+                        )
+                      })()}
                       {conv.last_message_at && <span style={{ color: 'var(--text-faint)', fontSize: '11px', flexShrink: 0, marginLeft: '4px' }}>{new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginBottom: '1px' }}>

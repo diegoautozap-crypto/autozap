@@ -174,12 +174,31 @@ export class MessageService {
     }).select('id').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
     const lastMsg = input.body || `[${input.contentType}]`
-    await db.from('conversations').update({
+
+    // SLA: busca estado atual pra calcular first_response e limpar waiting_since
+    const { data: convState } = await db.from('conversations')
+      .select('waiting_since, first_response_at, created_at')
+      .eq('id', input.conversationId).single()
+
+    const now = new Date()
+    const slaUpdate: any = {
       last_message: lastMsg,
-      last_message_at: new Date(),
+      last_message_at: now,
       status: 'open',
-    }).eq('id', input.conversationId)
-    emitPusher(input.tenantId, 'conversation.updated', { conversationId: input.conversationId, lastMessage: lastMsg, lastMessageAt: new Date() })
+    }
+
+    if (convState?.waiting_since) {
+      slaUpdate.waiting_since = null
+      if (!convState.first_response_at) {
+        // Primeira resposta da conversa — grava tempo baseado no waiting_since atual
+        const waitMs = now.getTime() - new Date(convState.waiting_since).getTime()
+        slaUpdate.first_response_at = now
+        slaUpdate.first_response_minutes = Math.max(0, Math.round(waitMs / 60000))
+      }
+    }
+
+    await db.from('conversations').update(slaUpdate).eq('id', input.conversationId)
+    emitPusher(input.tenantId, 'conversation.updated', { conversationId: input.conversationId, lastMessage: lastMsg, lastMessageAt: now })
     return messageUuid
   }
 
@@ -223,10 +242,30 @@ export class MessageService {
       }).catch(() => {})
     }
 
+    // SLA tracking
+    const slaExtra: any = {}
+    const { data: cur } = await db.from('conversations')
+      .select('waiting_since, first_response_at').eq('id', conversation.id).single()
+    if (!msg.fromMe) {
+      // Cliente falou: inicia cronômetro se ainda não estava esperando
+      if (!cur?.waiting_since) slaExtra.waiting_since = msg.timestamp
+    } else {
+      // Mensagem do tenant via celular (coexistência) — conta como resposta
+      if (cur?.waiting_since) {
+        slaExtra.waiting_since = null
+        if (!cur.first_response_at) {
+          const waitMs = new Date(msg.timestamp).getTime() - new Date(cur.waiting_since).getTime()
+          slaExtra.first_response_at = msg.timestamp
+          slaExtra.first_response_minutes = Math.max(0, Math.round(waitMs / 60000))
+        }
+      }
+    }
+
     await db.from('conversations').update({
       last_message: messageBody || `[${msg.contentType}]`,
       last_message_at: msg.timestamp,
       ...(!msg.fromMe ? { status: 'waiting' } : {}),
+      ...slaExtra,
     }).eq('id', conversation.id)
     if (!msg.fromMe) {
       try { await db.rpc('increment_unread', { p_conversation_id: conversation.id }) } catch {

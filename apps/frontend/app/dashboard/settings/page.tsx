@@ -241,6 +241,64 @@ function NotifyWebhookSection() {
 }
 
 
+// ── SLA (meta de tempo de resposta) ────────────────────────────────────────────
+function SLASection() {
+  const queryClient = useQueryClient()
+  const [target, setTarget] = useState<number>(30)
+  const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-sla'],
+    queryFn: async () => {
+      const { data } = await tenantApi.get('/tenant')
+      return data.data
+    },
+  })
+
+  useEffect(() => {
+    if (tenantData && !loaded) {
+      const cur = tenantData.settings?.slaTargetMinutes
+      if (cur) setTarget(Number(cur))
+      setLoaded(true)
+    }
+  }, [tenantData, loaded])
+
+  const save = async () => {
+    if (!target || target < 1) { toast.error('Meta precisa ser maior que 0'); return }
+    setSaving(true)
+    try {
+      await tenantApi.patch('/tenant/settings', { slaTargetMinutes: target })
+      queryClient.invalidateQueries({ queryKey: ['tenant'] })
+      queryClient.invalidateQueries({ queryKey: ['tenant-sla'] })
+      toast.success('Meta de SLA salva')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || 'Erro ao salvar SLA')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>SLA — Tempo de resposta</span>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          Meta máxima (em minutos) para responder o cliente a partir da primeira mensagem dele.
+          Conversas acima dessa meta aparecem marcadas em vermelho no inbox.
+        </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <input type="number" min={1} max={10080} value={target} onChange={e => setTarget(Math.max(1, parseInt(e.target.value) || 0))}
+          style={{ width: '110px', padding: '9px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13.5px', outline: 'none', color: 'var(--text)' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>minutos</span>
+        <button onClick={save} disabled={saving}
+          style={{ marginLeft: 'auto', padding: '9px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Salvando…' : 'Salvar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Seção de Webhooks ──────────────────────────────────────────────────────────
 function WebhooksSection() {
   const t = useT()
@@ -1462,6 +1520,9 @@ export default function SettingsPage() {
 
         {/* ── Webhook de Notificação ── */}
         {canEdit('/dashboard/settings') && <NotifyWebhookSection />}
+
+        {/* ── SLA ── */}
+        {canEdit('/dashboard/settings') && <SLASection />}
 
         {/* ── Formulário de Captura ── */}
         {canEdit('/dashboard/settings') && <FormBuilderSection />}

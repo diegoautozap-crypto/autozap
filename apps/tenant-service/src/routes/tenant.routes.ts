@@ -27,6 +27,7 @@ const updateSettingsSchema = z.object({
   defaultLanguage: z.string().optional(),
   webhookUrl: z.string().url().optional().nullable(),
   webhookSecret: z.string().min(8).optional().nullable(),
+  slaTargetMinutes: z.number().int().min(1).max(10080).optional(),
   settings: z.record(z.any()).optional(),
 })
 
@@ -667,6 +668,35 @@ router.get('/analytics', async (req, res, next) => {
     const prevDeliveryRate = prevTotalSent > 0 ? Math.round((prevTotalDelivered / prevTotalSent) * 100) : 0
     const prevReadRate = prevTotalSent > 0 ? Math.round((prevTotalRead / prevTotalSent) * 100) : 0
 
+    // ─── SLA ─────────────────────────────────────────────────────────────────
+    const { data: tenantRow } = await db.from('tenants').select('settings').eq('id', tenantId).single()
+    const slaTargetMinutes = Number((tenantRow?.settings as any)?.slaTargetMinutes) || 30
+
+    const { data: respondedConvs } = await db
+      .from('conversations')
+      .select('first_response_minutes')
+      .eq('tenant_id', tenantId)
+      .gte('first_response_at', since.toISOString())
+      .not('first_response_minutes', 'is', null)
+
+    const slaSampleSize = (respondedConvs || []).length
+    const slaWithinCount = (respondedConvs || []).filter((c: any) => (c.first_response_minutes || 0) <= slaTargetMinutes).length
+    const slaBreachedCount = slaSampleSize - slaWithinCount
+    const slaWithinPct = slaSampleSize > 0 ? Math.round((slaWithinCount / slaSampleSize) * 100) : null
+
+    const { data: currentlyWaiting } = await db
+      .from('conversations')
+      .select('id, waiting_since')
+      .eq('tenant_id', tenantId)
+      .not('waiting_since', 'is', null)
+
+    const nowMs = Date.now()
+    const slaCurrentlyBreached = (currentlyWaiting || []).filter((c: any) => {
+      const mins = (nowMs - new Date(c.waiting_since).getTime()) / 60000
+      return mins > slaTargetMinutes
+    }).length
+    const slaCurrentlyWaiting = (currentlyWaiting || []).length
+
     res.json(ok({
       totalSent, totalDelivered, totalRead,
       deliveryRate, readRate,
@@ -677,6 +707,15 @@ router.get('/analytics', async (req, res, next) => {
       agentClosedLast7d: filterUserId ? agentClosedLast7d : null,
       days,
       previous: { totalSent: prevTotalSent, deliveryRate: prevDeliveryRate, readRate: prevReadRate },
+      sla: {
+        targetMinutes: slaTargetMinutes,
+        sampleSize: slaSampleSize,
+        withinCount: slaWithinCount,
+        breachedCount: slaBreachedCount,
+        withinPct: slaWithinPct,
+        currentlyWaiting: slaCurrentlyWaiting,
+        currentlyBreached: slaCurrentlyBreached,
+      },
     }))
   } catch (err) { next(err) }
 })

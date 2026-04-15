@@ -336,6 +336,35 @@ export default function DashboardPage() {
         <StatCard label={t('dashboard.agentsWithOpen')}   value={byAgent.length}                          icon={UserCheck}  color="#2563eb" bg="#eff6ff" />
       </div>
 
+      {/* SLA */}
+      {analytics?.sla && (
+        <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+          <StatCard
+            label={`Dentro do SLA (${analytics.sla.targetMinutes}min)`}
+            value={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
+            icon={Clock}
+            color={analytics.sla.withinPct !== null && analytics.sla.withinPct >= 80 ? '#16a34a' : '#d97706'}
+            bg={analytics.sla.withinPct !== null && analytics.sla.withinPct >= 80 ? '#f0fdf4' : '#fffbeb'}
+          />
+          <StatCard
+            label="Aguardando resposta agora"
+            value={analytics.sla.currentlyWaiting || 0}
+            icon={MessageSquare}
+            color="#2563eb"
+            bg="#eff6ff"
+            onClick={() => router.push('/dashboard/inbox')}
+          />
+          <StatCard
+            label="Estouradas agora"
+            value={analytics.sla.currentlyBreached || 0}
+            icon={Clock}
+            color={(analytics.sla.currentlyBreached || 0) > 0 ? '#dc2626' : '#71717a'}
+            bg={(analytics.sla.currentlyBreached || 0) > 0 ? '#fef2f2' : '#f4f4f5'}
+            onClick={() => router.push('/dashboard/inbox')}
+          />
+        </div>
+      )}
+
       {/* Gráfico + Conversas por atendente */}
       <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '14px', marginBottom: '20px' }}>
         {/* Gráfico de barras */}
