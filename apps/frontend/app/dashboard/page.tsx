@@ -8,6 +8,7 @@ import {
   Megaphone, Users, MessageSquare, Send, ArrowUpRight, TrendingUp,
   CheckCheck, Eye, Radio, FileText, Zap, ChevronRight, Check,
   Clock, UserCheck, Workflow, X, Trophy, Printer,
+  AlertTriangle, Target, DollarSign,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
@@ -371,37 +372,128 @@ function BigNumberTile({ title, subtitle, value, color = '#14b8a6', icon: Icon, 
   )
 }
 
-function FunnelChart({ stages, color = '#14b8a6' }: { stages: { label: string; value: number }[]; color?: string }) {
+function AlertBanner({ alerts }: { alerts: { severity: 'critical' | 'warning'; icon: any; title: string; detail: string; href: string; cta: string }[] }) {
+  if (alerts.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      {alerts.map((a, i) => {
+        const crit = a.severity === 'critical'
+        const bg = crit ? '#fef2f2' : '#fffbeb'
+        const border = crit ? '#fecaca' : '#fde68a'
+        const fg = crit ? '#991b1b' : '#92400e'
+        const accent = crit ? '#dc2626' : '#f59e0b'
+        const Icon = a.icon
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', background: bg, border: `1px solid ${border}`, borderLeft: `4px solid ${accent}`, borderRadius: '10px' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon size={17} color={accent} strokeWidth={2.2} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: fg, letterSpacing: '-0.01em' }}>{a.title}</div>
+              <div style={{ fontSize: '12px', color: fg, opacity: 0.85, marginTop: '1px' }}>{a.detail}</div>
+            </div>
+            <a href={a.href} style={{ padding: '7px 14px', background: accent, color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              {a.cta} <ChevronRight size={12} />
+            </a>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function GoalTile({ title, current, target, unit = '' }: { title: string; current: number; target: number | null; unit?: string }) {
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dayOfMonth = now.getDate()
+  const monthProgress = dayOfMonth / daysInMonth
+  const pct = target && target > 0 ? Math.min(100, Math.round((current / target) * 100)) : null
+  const projected = monthProgress > 0 ? Math.round(current / monthProgress) : current
+  const onPace = target && projected >= target
+  const accent = target === null ? '#14b8a6' : onPace ? '#14b8a6' : pct && pct >= 70 ? '#f59e0b' : '#dc2626'
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '140px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{title}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600, marginTop: '3px' }}>META DO MÊS</div>
+        </div>
+        <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: hexToRgba(accent, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Target size={15} color={accent} strokeWidth={2.2} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{current.toLocaleString('pt-BR')}</span>
+        {target !== null && <span style={{ fontSize: '13px', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>/ {target.toLocaleString('pt-BR')} {unit}</span>}
+        {target === null && <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>sem meta · ilimitado</span>}
+      </div>
+      {target !== null && target > 0 && (
+        <>
+          <div style={{ height: '6px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ position: 'absolute', left: `${monthProgress * 100}%`, top: 0, bottom: 0, width: '1px', background: 'var(--text-faint)', opacity: 0.4 }} />
+            <div style={{ width: `${pct}%`, height: '100%', background: accent, borderRadius: '99px', transition: 'width 0.5s' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>{pct}% · dia {dayOfMonth}/{daysInMonth}</span>
+            <span style={{ color: accent, fontWeight: 600 }}>
+              ritmo: {projected.toLocaleString('pt-BR')} {onPace ? '✓' : '⚠'}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function FunnelChart({ stages, color = '#14b8a6' }: { stages: { label: string; value: number; revenue?: number; probability?: number | null }[]; color?: string }) {
   if (stages.length === 0 || stages[0].value === 0) {
     return <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem cards no pipeline</div>
   }
   const max = stages[0].value
+  const hasRevenue = stages.some(s => (s.revenue || 0) > 0)
+  const weightedTotal = stages.reduce((s, st) => s + (st.revenue || 0) * ((st.probability ?? 100) / 100), 0)
+  const formatBRL = (v: number) => v >= 1000 ? `R$ ${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `R$ ${v.toFixed(0)}`
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      {stages.map((s, i) => {
-        const pct = (s.value / max) * 100
-        const dropPct = i === 0 ? null : Math.round(((stages[i - 1].value - s.value) / stages[i - 1].value) * 100)
-        const width = Math.max(pct, 8)
-        return (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-            <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={s.label}>{s.label}</span>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <div style={{
-                width: `${width}%`, minWidth: '30px', height: '26px',
-                background: `linear-gradient(90deg, ${hexToRgba(color, 0.85)}, ${hexToRgba(color, 0.6)})`,
-                borderRadius: '3px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: 700, fontSize: '12px',
-                fontVariantNumeric: 'tabular-nums',
-                transition: 'width 0.5s cubic-bezier(.4,0,.2,1)',
-              }}>{s.value}</div>
+    <div>
+      {hasRevenue && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '8px 12px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', borderRadius: '8px' }}>
+          <DollarSign size={14} color="#0f766e" />
+          <span style={{ fontSize: '11px', color: '#0f766e', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Projeção ponderada</span>
+          <span style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 700, color: '#0f766e', letterSpacing: '-0.02em' }}>{formatBRL(weightedTotal)}</span>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        {stages.map((s, i) => {
+          const pct = (s.value / max) * 100
+          const dropPct = i === 0 ? null : Math.round(((stages[i - 1].value - s.value) / stages[i - 1].value) * 100)
+          const width = Math.max(pct, 10)
+          return (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 70px', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, fontSize: '12px' }} title={s.label}>{s.label}</div>
+                {s.probability != null && <div style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: 500 }}>{s.probability}% conv.</div>}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{
+                  width: `${width}%`, minWidth: '80px', height: '30px',
+                  background: `linear-gradient(90deg, ${hexToRgba(color, 0.9)}, ${hexToRgba(color, 0.65)})`,
+                  borderRadius: '4px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px',
+                  color: '#fff', fontWeight: 700, fontSize: '12px',
+                  fontVariantNumeric: 'tabular-nums',
+                  transition: 'width 0.5s cubic-bezier(.4,0,.2,1)',
+                }}>
+                  <span>{s.value}</span>
+                  {hasRevenue && <span style={{ fontSize: '11px', opacity: 0.95 }}>{formatBRL(s.revenue || 0)}</span>}
+                </div>
+              </div>
+              <span style={{ textAlign: 'right', fontSize: '11px', color: dropPct && dropPct > 0 ? '#dc2626' : 'var(--text-faint)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {dropPct === null ? '—' : dropPct > 0 ? `-${dropPct}%` : '0%'}
+              </span>
             </div>
-            <span style={{ textAlign: 'right', fontSize: '11px', color: dropPct && dropPct > 0 ? '#dc2626' : 'var(--text-faint)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {dropPct === null ? '—' : dropPct > 0 ? `-${dropPct}%` : '0%'}
-            </span>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -543,11 +635,41 @@ export default function DashboardPage() {
     { label: t('dashboard.messagesThisMonth'), value: usage?.sent ?? 0,          sub: `${t('dashboard.of')} ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} ${t('dashboard.available')}`, icon: Send,        color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
   ]
 
-  const funnelStages = (pipelineColumns || []).map((col: any) => ({
-    label: col.label,
-    value: pipelineBoard?.[col.key]?.length || 0,
-  }))
+  const funnelStages = (pipelineColumns || []).map((col: any) => {
+    const cards = pipelineBoard?.[col.key] || []
+    const revenue = cards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
+    return {
+      label: col.label,
+      value: cards.length,
+      revenue,
+      probability: col.probability ?? null,
+    }
+  })
   const pipelineCardCount = funnelStages.reduce((s: number, st: { value: number }) => s + st.value, 0)
+  const pipelineTotalRevenue = funnelStages.reduce((s: number, st: { revenue: number }) => s + st.revenue, 0)
+
+  const alerts: { severity: 'critical' | 'warning'; icon: any; title: string; detail: string; href: string; cta: string }[] = []
+  const sla = analytics?.sla
+  if (sla?.currentlyBreached > 0) {
+    alerts.push({
+      severity: 'critical',
+      icon: AlertTriangle,
+      title: `${sla.currentlyBreached} conversa${sla.currentlyBreached > 1 ? 's' : ''} com SLA estourado`,
+      detail: `Meta de ${sla.targetMinutes} min excedida — responda agora pra não perder o lead.`,
+      href: '/dashboard/inbox?sla=breached',
+      cta: 'Responder',
+    })
+  }
+  if (sla?.currentlyWaiting > 5 && (sla?.currentlyBreached || 0) === 0) {
+    alerts.push({
+      severity: 'warning',
+      icon: Clock,
+      title: `${sla.currentlyWaiting} conversa${sla.currentlyWaiting > 1 ? 's' : ''} aguardando resposta`,
+      detail: 'Atenda antes que estourem o SLA.',
+      href: '/dashboard/inbox?status=waiting',
+      cta: 'Ver inbox',
+    })
+  }
 
   return (
     <div className="mobile-page" style={{ padding: '24px 28px', maxWidth: '1400px' }}>
@@ -613,6 +735,9 @@ export default function DashboardPage() {
       })()}
 
 
+      {/* Alertas acionáveis */}
+      <AlertBanner alerts={alerts} />
+
       {/* Seletor de período */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Período de análise</div>
@@ -667,14 +792,18 @@ export default function DashboardPage() {
 
         <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
           <BigNumberTile title="Contatos" subtitle="NA SUA BASE" value={contactsMeta?.total ?? 0} color="#7c3aed" icon={Users} onClick={() => router.push('/dashboard/contacts')} />
-          <BigNumberTile title="Mensagens este mês" subtitle={`DE ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString('pt-BR')} DISPONÍVEL`} value={usage?.sent ?? 0} color="#ea580c" icon={Send} onClick={() => router.push('/dashboard/campaigns')} />
+          <GoalTile title="Mensagens este mês" current={usage?.sent ?? 0} target={usage?.limit ?? null} unit="" />
         </div>
 
         {/* Row 2: Funil Pipeline (span 5) + HBar atendentes (span 4) + Pie status (span 3) */}
         <div style={{ gridColumn: 'span 5', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
-          <CardHeader title="Funil do pipeline" subtitle={pipelineCardCount > 0 ? `${pipelineCardCount} CARDS · ETAPAS DE CONVERSÃO` : 'SEM CARDS AINDA'} right={
-            <button onClick={() => router.push('/dashboard/pipeline')} style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Abrir</button>
-          } />
+          <CardHeader
+            title="Funil do pipeline"
+            subtitle={pipelineCardCount > 0
+              ? `${pipelineCardCount} CARDS${pipelineTotalRevenue > 0 ? ` · R$ ${pipelineTotalRevenue >= 1000 ? (pipelineTotalRevenue / 1000).toFixed(pipelineTotalRevenue >= 10000 ? 0 : 1) + 'K' : pipelineTotalRevenue.toFixed(0)} EM NEGOCIAÇÃO` : ''}`
+              : 'SEM CARDS AINDA'}
+            right={<button onClick={() => router.push('/dashboard/pipeline')} style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Abrir</button>}
+          />
           <FunnelChart stages={funnelStages} color="#14b8a6" />
         </div>
 
