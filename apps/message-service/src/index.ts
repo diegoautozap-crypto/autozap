@@ -8,7 +8,6 @@ import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import zlib from 'zlib'
 import messageRoutes from './routes/message.routes'
-import automationRoutes from './routes/automation.routes'
 import flowRoutes from './routes/flow.routes'
 import { startMessageWorker, startRetryWorker, startAutoReplyWorker, startAgentNotifyWorker, startReconciliationJob } from './workers/message.worker'
 import { startFlowResumeWorker, startManualFlowWorker } from './workers/flow.worker'
@@ -76,7 +75,6 @@ app.get('/health', async (_req, res) => {
 // Rate limiting para webhooks (100 req/min por IP)
 app.use('/webhook', rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }))
 app.use('/', messageRoutes)
-app.use('/', automationRoutes)
 app.use('/', flowRoutes)
 app.use(errorHandler)
 

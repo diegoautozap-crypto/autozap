@@ -2,7 +2,6 @@ import { v4 as uuidv4 } from 'uuid'
 import { db, logger, AppError, generateId, decryptCredentials, logPipelineCardEvent } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
-import { automationService } from './automation.service'
 import { flowEngine } from './flow.engine'
 
 // In-memory cache for tenant data
@@ -345,7 +344,7 @@ export class MessageService {
 
     const isFirstMessage = (msgCount || 0) <= 1
 
-    const automationCtx = {
+    const flowCtx = {
       tenantId, channelId,
       contactId: contact.id,
       conversationId: conversation.id,
@@ -355,12 +354,9 @@ export class MessageService {
       hour: new Date().getHours(),
     }
 
-    automationService.processAutomations(automationCtx)
-      .catch(err => logger.error('Automation error', { err }))
-
     let flowMatched = false
     try {
-      flowMatched = await flowEngine.processFlows(automationCtx)
+      flowMatched = await flowEngine.processFlows(flowCtx)
     } catch (err) {
       logger.error('Flow engine error', { err })
     }
