@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { channelApi, tenantApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil, QrCode, Wifi, WifiOff, Bot } from 'lucide-react'
+import { Plus, Radio, Trash2, X, Check, Loader2, Copy, ExternalLink, Eye, EyeOff, Pencil, QrCode, Wifi, WifiOff, Bot, HelpCircle, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 import { usePermissions } from '@/store/permissions.store'
 
@@ -28,6 +28,125 @@ const CHANNEL_LIMITS: Record<string, number> = {
 
 type ChannelFormType = 'gupshup' | 'evolution' | 'instagram' | 'messenger'
 const emptyForm = { name: '', apiKey: '', source: '', srcName: '', metaToken: '', phoneNumberId: '', channelType: 'gupshup' as ChannelFormType, baseUrl: '', instanceName: '', aiChatbotEnabled: false, accessToken: '', pageId: '', appSecret: '' }
+
+// Descrições de cada campo técnico por canal (onde achar no provider)
+const FIELD_HELP: Record<string, string> = {
+  // Gupshup
+  'gupshup.source': 'Número da sua linha WhatsApp Business registrada no Gupshup (sem +, ex: 5511999998888). Encontre em Gupshup Dashboard → App Settings.',
+  'gupshup.apiKey': 'Chave secreta da sua conta Gupshup. Pegue em Gupshup Dashboard → Profile → API Key. Começa com "sk_" ou é um código longo.',
+  'gupshup.srcName': 'Nome cadastrado da sua linha no Gupshup (aparece pra quem recebe). Normalmente é o nome do seu negócio.',
+  'gupshup.metaToken': 'Token de acesso do Meta (WhatsApp Business Platform). Necessário APENAS se você quiser mandar botões e listas interativas. Começa com "EAA". Pegue em developers.facebook.com → seu App → WhatsApp → API Setup.',
+  'gupshup.phoneNumberId': 'ID numérico do seu WhatsApp no Meta Business (ex: 1104144786108073). Encontre em business.facebook.com → WhatsApp Manager → Configurações → Números.',
+  // Evolution
+  'evolution.baseUrl': 'URL da sua Evolution API rodando (ex: https://api.seudominio.com). É a URL onde você acessa o painel admin da Evolution.',
+  'evolution.apiKey': 'Chave de API global da sua Evolution. Configurada no arquivo .env da Evolution como AUTHENTICATION_API_KEY.',
+  'evolution.instanceName': 'Nome único da instância dentro da Evolution. Use letras, números e hífens (ex: "minha-loja"). Não pode ter espaços.',
+  // Meta (Instagram/Messenger)
+  'meta.pageId': 'ID numérico da sua página do Facebook/Instagram Business. Acesse a página no Facebook → Sobre → "ID da página".',
+  'meta.accessToken': 'Token de acesso de longa duração da página. Gere em developers.facebook.com → seu App → Graph API Explorer → selecione a página → Generate Access Token (mude pra Long-Lived).',
+  'meta.appSecret': 'Segredo do App (App Secret) usado pra validar webhooks do Meta. Encontre em developers.facebook.com → seu App → Settings → Basic → App Secret.',
+}
+
+function FieldLabel({ children, help }: { children: React.ReactNode; help?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.01em', margin: 0 }}>
+        {children}
+      </label>
+      {help && (
+        <>
+          <button type="button"
+            onClick={() => setOpen(o => !o)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0891b2', padding: 0, display: 'flex', alignItems: 'center' }}
+            title="O que é isso?">
+            <HelpCircle size={13} />
+          </button>
+          {open && (
+            <div style={{ position: 'absolute', marginTop: '24px', maxWidth: '380px', padding: '10px 12px', background: '#0f172a', color: '#f1f5f9', borderRadius: '8px', fontSize: '11.5px', lineHeight: 1.5, zIndex: 100, boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
+              {help}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function ChannelGuide({ channelType }: { channelType: ChannelFormType }) {
+  const [open, setOpen] = useState(false)
+  const guides: Record<ChannelFormType, { title: string; steps: string[]; link?: { label: string; url: string } }> = {
+    gupshup: {
+      title: '🤝 Como conectar Gupshup',
+      steps: [
+        'Crie conta em gupshup.io e aprove sua linha WhatsApp Business',
+        'Acesse Dashboard → App → copie a API Key e o Source (número)',
+        'Se quiser botões/listas: crie App no Meta developers e copie Token + Phone Number ID',
+        'Depois de criar o canal aqui, vai aparecer uma URL de Webhook — cole ela em Gupshup → App Settings → Callback URL',
+      ],
+      link: { label: 'Painel Gupshup', url: 'https://www.gupshup.io/developer/home' },
+    },
+    evolution: {
+      title: '🟢 Como conectar Evolution API (WhatsApp QR Code)',
+      steps: [
+        'Tenha uma Evolution API rodando (sua VPS ou serviço hospedado)',
+        'Anote a Base URL (ex: https://api.meudominio.com)',
+        'Pegue a Global API Key do arquivo .env da Evolution',
+        'Escolha um nome único pra instância (ex: "loja-principal")',
+        'Depois de criar, aparece QR Code — escaneie com o WhatsApp do seu celular',
+      ],
+      link: { label: 'Docs Evolution API', url: 'https://doc.evolution-api.com/' },
+    },
+    instagram: {
+      title: '📷 Como conectar Instagram Business',
+      steps: [
+        'Sua conta Instagram precisa ser do tipo Business (não pessoal)',
+        'Conecte-a a uma Página do Facebook',
+        'Crie um App em developers.facebook.com e adicione produto "Instagram Graph API"',
+        'Gere Long-Lived Access Token pra página (não o User Token)',
+        'Configure o webhook do Meta apontando pra URL mostrada após criar o canal aqui',
+      ],
+      link: { label: 'Meta for Developers', url: 'https://developers.facebook.com/' },
+    },
+    messenger: {
+      title: '💬 Como conectar Messenger (Facebook)',
+      steps: [
+        'Você precisa administrar uma Página do Facebook',
+        'Crie um App em developers.facebook.com e adicione produto "Messenger"',
+        'Pegue o Page ID na página → Sobre',
+        'Gere Long-Lived Access Token pra página',
+        'Configure o webhook apontando pra URL mostrada após criar o canal',
+      ],
+      link: { label: 'Meta for Developers', url: 'https://developers.facebook.com/' },
+    },
+  }
+  const g = guides[channelType]
+  return (
+    <div style={{ marginBottom: '18px', border: '1px solid #e0f2fe', borderRadius: '10px', background: '#f0f9ff', overflow: 'hidden' }}>
+      <button type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, color: '#0369a1' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <BookOpen size={14} /> {g.title}
+        </span>
+        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+      {open && (
+        <div style={{ padding: '0 14px 14px', borderTop: '1px solid #e0f2fe' }}>
+          <ol style={{ margin: '10px 0 0', paddingLeft: '20px', fontSize: '12.5px', color: '#0c4a6e', lineHeight: 1.7 }}>
+            {g.steps.map((step, i) => <li key={i}>{step}</li>)}
+          </ol>
+          {g.link && (
+            <a href={g.link.url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '10px', fontSize: '12px', fontWeight: 600, color: '#0891b2', textDecoration: 'none' }}>
+              {g.link.label} <ExternalLink size={11} />
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ChannelsPage() {
   const t = useT()
@@ -216,17 +335,18 @@ export default function ChannelsPage() {
 
           {(form.channelType === 'instagram' || form.channelType === 'messenger') ? (
             <>
+              <ChannelGuide channelType={form.channelType} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div>
-                  <label style={lbl}>Page ID</label>
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['meta.pageId']}>ID da Página</FieldLabel>
                   <input style={inp} placeholder="123456789012345" value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
-                <div>
-                  <label style={lbl}>Access Token</label>
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['meta.accessToken']}>Token de Acesso</FieldLabel>
                   <input style={inp} type="password" placeholder="EAAxxxxxxx..." value={form.accessToken} onChange={e => setForm({ ...form, accessToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
-                <div>
-                  <label style={lbl}>App Secret</label>
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['meta.appSecret']}>Segredo do App</FieldLabel>
                   <input style={inp} type="password" placeholder="abc123def456..." value={form.appSecret} onChange={e => setForm({ ...form, appSecret: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
               </div>
@@ -240,43 +360,43 @@ export default function ChannelsPage() {
             </>
           ) : form.channelType === 'gupshup' ? (
             <>
+              <ChannelGuide channelType="gupshup" />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 {[
-                  { label: t('channels.formSource'),  key: 'source',  placeholder: '15558406981' },
-                  { label: t('channels.formApiKey'),   key: 'apiKey',  placeholder: 'sk_xxxxxxxxxxxxxxxxxx' },
-                  { label: t('channels.formSrcName'), key: 'srcName', placeholder: t('channels.formSrcNamePlaceholder') },
+                  { label: 'Número (Source)',  key: 'source',  placeholder: '5511999998888', helpKey: 'gupshup.source' },
+                  { label: 'API Key',           key: 'apiKey',  placeholder: 'sk_xxxxxxxxxxxxxxxxxx', helpKey: 'gupshup.apiKey' },
+                  { label: 'Nome da Linha (Source Name)', key: 'srcName', placeholder: t('channels.formSrcNamePlaceholder'), helpKey: 'gupshup.srcName' },
                 ].map(field => (
-                  <div key={field.key}>
-                    <label style={lbl}>{field.label}</label>
+                  <div key={field.key} style={{ position: 'relative' }}>
+                    <FieldLabel help={FIELD_HELP[field.helpKey]}>{field.label}</FieldLabel>
                     <input style={inp} placeholder={field.placeholder} value={(form as any)[field.key]} onChange={e => setForm({ ...form, [field.key]: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                   </div>
                 ))}
               </div>
 
-              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
-                <label style={lbl}>{t('channels.formMetaToken')} <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>({t('channels.formOptional')})</span></label>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>{t('channels.formMetaTokenHint')}</p>
+              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)', position: 'relative' }}>
+                <FieldLabel help={FIELD_HELP['gupshup.metaToken']}>Token Meta <span style={{ color: 'var(--text-faint)', fontWeight: 400, fontSize: '11px' }}>({t('channels.formOptional')} — necessário pra botões interativos)</span></FieldLabel>
                 <input style={inp} type="password" placeholder={editingId ? t('channels.formMetaTokenKeep') : 'EAAxxxxxxx...'} value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
               </div>
-              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)' }}>
-                <label style={lbl}>Phone Number ID <span style={{ color: 'var(--text-faint)', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>(opcional — necessário pra botões interativos)</span></label>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>ID do número no Meta Business. Encontre em business.facebook.com → WhatsApp Manager</p>
+              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '9px', border: '1px solid var(--divider)', position: 'relative' }}>
+                <FieldLabel help={FIELD_HELP['gupshup.phoneNumberId']}>ID do Número (Phone Number ID) <span style={{ color: 'var(--text-faint)', fontWeight: 400, fontSize: '11px' }}>(opcional)</span></FieldLabel>
                 <input style={inp} placeholder="Ex: 1104144786108073" value={form.phoneNumberId} onChange={e => setForm({ ...form, phoneNumberId: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
               </div>
             </>
           ) : (
             <>
+              <ChannelGuide channelType="evolution" />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div>
-                  <label style={lbl}>Base URL</label>
-                  <input style={inp} placeholder="https://api.evolution.com" value={form.baseUrl} onChange={e => setForm({ ...form, baseUrl: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['evolution.baseUrl']}>URL Base da Evolution</FieldLabel>
+                  <input style={inp} placeholder="https://api.seudominio.com" value={form.baseUrl} onChange={e => setForm({ ...form, baseUrl: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
-                <div>
-                  <label style={lbl}>Global API Key</label>
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['evolution.apiKey']}>API Key Global</FieldLabel>
                   <input style={inp} placeholder="sua-api-key-global" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
-                <div>
-                  <label style={lbl}>Instance Name</label>
+                <div style={{ position: 'relative' }}>
+                  <FieldLabel help={FIELD_HELP['evolution.instanceName']}>Nome da Instância</FieldLabel>
                   <input style={inp} placeholder="minha-instancia" value={form.instanceName} onChange={e => setForm({ ...form, instanceName: e.target.value })} onFocus={focusInp} onBlur={blurInp} />
                 </div>
               </div>
