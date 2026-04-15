@@ -183,10 +183,7 @@ function PieCard({ title, subtitle, segments, centerValue, centerLabel }: {
   const total = segments.reduce((s, seg) => s + seg.value, 0)
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
-      <div style={{ marginBottom: '14px' }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>{title}</h3>
-        {subtitle && <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>{subtitle}</p>}
-      </div>
+      <CardHeader title={title} subtitle={subtitle?.toUpperCase()} />
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
         <DonutChart segments={segments} centerValue={centerValue} centerLabel={centerLabel} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
@@ -229,6 +226,116 @@ function StatCard({ label, value, icon: Icon, color, bg, onClick, delta }: any) 
         </div>
         <div style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '1px' }}>{label}</div>
       </div>
+    </div>
+  )
+}
+
+function CardHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', gap: '12px' }}>
+      <div style={{ minWidth: 0 }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{title}</h3>
+        {subtitle && <p style={{ fontSize: '10px', color: 'var(--text-faint)', margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600 }}>{subtitle}</p>}
+      </div>
+      {right}
+    </div>
+  )
+}
+
+function ComboBarLine({ data, barColor = '#14b8a6', lineColor = '#0f172a' }: {
+  data: { label: string; value: number }[]
+  barColor?: string
+  lineColor?: string
+}) {
+  if (data.length === 0) {
+    return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem dados no período</div>
+  }
+  const W = 1000, H = 220, PL = 36, PR = 16, PT = 12, PB = 28
+  const innerW = W - PL - PR
+  const innerH = H - PT - PB
+  const maxVal = Math.max(...data.map(d => d.value), 1)
+  const niceMax = (() => {
+    const exp = Math.pow(10, Math.floor(Math.log10(maxVal)))
+    return Math.ceil(maxVal / exp) * exp
+  })()
+  const barW = data.length > 0 ? (innerW / data.length) * 0.62 : 0
+  const step = data.length > 0 ? innerW / data.length : 0
+  const window = Math.min(7, data.length)
+  const ma = data.map((_, i) => {
+    const start = Math.max(0, i - window + 1)
+    const slice = data.slice(start, i + 1)
+    return slice.reduce((s, d) => s + d.value, 0) / slice.length
+  })
+  const xOf = (i: number) => PL + step * i + step / 2
+  const yOf = (v: number) => PT + innerH - (v / niceMax) * innerH
+  const linePath = ma.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xOf(i)},${yOf(v)}`).join(' ')
+  const gridLines = [0, 0.25, 0.5, 0.75, 1]
+  const maxLabels = 12
+  const labelStep = Math.max(1, Math.ceil(data.length / maxLabels))
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '240px', display: 'block' }}>
+        {gridLines.map(p => {
+          const y = PT + innerH * p
+          const val = Math.round(niceMax * (1 - p))
+          return (
+            <g key={p}>
+              <line x1={PL} x2={W - PR} y1={y} y2={y} stroke="var(--divider)" strokeDasharray="3 4" />
+              <text x={PL - 6} y={y + 3} fontSize="10" textAnchor="end" fill="var(--text-faint)" fontFamily="inherit">{val.toLocaleString()}</text>
+            </g>
+          )
+        })}
+        {data.map((d, i) => {
+          const h = (d.value / niceMax) * innerH
+          const x = xOf(i) - barW / 2
+          const y = PT + innerH - h
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barW} height={h} fill={barColor} rx={2}>
+                <title>{`${d.label}: ${d.value.toLocaleString()}`}</title>
+              </rect>
+            </g>
+          )
+        })}
+        <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {ma.map((v, i) => (
+          <circle key={i} cx={xOf(i)} cy={yOf(v)} r={2.5} fill="#fff" stroke={lineColor} strokeWidth="1.5">
+            <title>{`Média 7d: ${v.toFixed(0)}`}</title>
+          </circle>
+        ))}
+        {data.map((d, i) => {
+          if (i % labelStep !== 0 && i !== data.length - 1) return null
+          return <text key={i} x={xOf(i)} y={H - 10} fontSize="10" textAnchor="middle" fill="var(--text-faint)" fontFamily="inherit">{d.label.slice(5)}</text>
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function HBarChartPBI({ data, color = '#14b8a6', maxBars = 8 }: {
+  data: { label: string; value: number }[]
+  color?: string
+  maxBars?: number
+}) {
+  if (data.length === 0) {
+    return <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem dados</div>
+  }
+  const sorted = [...data].sort((a, b) => b.value - a.value).slice(0, maxBars)
+  const max = Math.max(...sorted.map(d => d.value), 1)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {sorted.map(d => {
+        const pct = (d.value / max) * 100
+        return (
+          <div key={d.label} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 44px', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+            <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={d.label}>{d.label}</span>
+            <div style={{ position: 'relative', height: '18px', background: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px', transition: 'width 0.5s cubic-bezier(.4,0,.2,1)' }} />
+            </div>
+            <span style={{ fontWeight: 700, color: 'var(--text)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{d.value.toLocaleString()}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -502,10 +609,7 @@ export default function DashboardPage() {
           if (!hasColumns || cardCount === 0) {
             return (
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ marginBottom: '14px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Pipeline por etapa</h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Cards em cada coluna</p>
-                </div>
+                <CardHeader title="Pipeline por etapa" subtitle="CARDS EM CADA COLUNA" />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 10px', textAlign: 'center' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
                     <Workflow size={22} color="#7c3aed" />
@@ -540,16 +644,16 @@ export default function DashboardPage() {
       {/* SLA bloco com pizza + métricas */}
       {analytics?.sla && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '18px' }}>
-          <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>SLA — Tempo de resposta</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Meta: {analytics.sla.targetMinutes} minutos · últimos {analyticsDays} dias</p>
-            </div>
-            <button onClick={() => router.push('/dashboard/settings')}
-              style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-              Configurar
-            </button>
-          </div>
+          <CardHeader
+            title="SLA — Tempo de resposta"
+            subtitle={`META: ${analytics.sla.targetMinutes} MIN · ÚLTIMOS ${analyticsDays} DIAS`}
+            right={
+              <button onClick={() => router.push('/dashboard/settings')}
+                style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Configurar
+              </button>
+            }
+          />
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <DonutChart
               size={140} thickness={22}
@@ -578,107 +682,36 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Gráfico mensagens — largura total */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Mensagens enviadas</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos {analyticsDays} dias</p>
-          </div>
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '12px', color: 'var(--text-faint)' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#22c55e' }} /> Enviadas
-          </div>
-        </div>
+      {/* Gráfico mensagens — combo bars + linha */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
+        <CardHeader
+          title="Mensagens enviadas"
+          subtitle={`POR DIA · ÚLTIMOS ${analyticsDays} DIAS`}
+          right={
+            <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '11px', color: 'var(--text-faint)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#14b8a6' }} /> Enviadas
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '12px', height: '2px', background: '#0f172a' }} /> Média 7d
+              </span>
+            </div>
+          }
+        />
         {totalSent === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: '13px' }}>
             Nenhuma mensagem enviada nos últimos {analyticsDays} dias.
           </div>
-        ) : (() => {
-          const W = 1000, H = 180, P = 16
-          const n = days.length
-          const stepX = n > 1 ? (W - P * 2) / (n - 1) : 0
-          const scaleY = (v: number) => H - P - (v / maxVal) * (H - P * 2)
-          const points = days.map((day, i) => ({
-            x: P + i * stepX,
-            y: scaleY(byDay[day]?.sent || 0),
-            v: byDay[day]?.sent || 0,
-            label: day,
-          }))
-          // Smooth path using bezier cubics
-          const buildSmoothPath = () => {
-            if (points.length === 0) return ''
-            let d = `M ${points[0].x},${points[0].y}`
-            for (let i = 0; i < points.length - 1; i++) {
-              const p0 = points[i], p1 = points[i + 1]
-              const cpX = (p0.x + p1.x) / 2
-              d += ` C ${cpX},${p0.y} ${cpX},${p1.y} ${p1.x},${p1.y}`
-            }
-            return d
-          }
-          const linePath = buildSmoothPath()
-          const areaPath = `${linePath} L ${points[points.length - 1].x},${H - P} L ${points[0].x},${H - P} Z`
-          return (
-            <div style={{ position: 'relative' }}>
-              <svg viewBox={`0 0 ${W} ${H + 20}`} preserveAspectRatio="none" style={{ width: '100%', height: '200px', display: 'block' }}>
-                <defs>
-                  <linearGradient id="msgAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {/* grid lines */}
-                {[0.25, 0.5, 0.75].map(p => (
-                  <line key={p} x1={P} x2={W - P} y1={P + p * (H - P * 2)} y2={P + p * (H - P * 2)} stroke="var(--divider)" strokeDasharray="4 4" />
-                ))}
-                <path d={areaPath} fill="url(#msgAreaGradient)" />
-                <path d={linePath} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                {points.map((p, i) => (
-                  <g key={i}>
-                    <circle cx={p.x} cy={p.y} r={3} fill="#fff" stroke="#22c55e" strokeWidth="2" />
-                    <title>{`${p.label}: ${p.v} enviadas`}</title>
-                  </g>
-                ))}
-              </svg>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `0 ${P}px`, fontSize: '10px', color: 'var(--text-faintest)', marginTop: '-8px' }}>
-                {(() => {
-                  const labels: { idx: number; text: string }[] = []
-                  const maxLabels = 8
-                  const step = Math.max(1, Math.ceil(n / maxLabels))
-                  for (let i = 0; i < n; i += step) labels.push({ idx: i, text: days[i].slice(5) })
-                  return labels.map(l => <span key={l.idx}>{l.text}</span>)
-                })()}
-              </div>
-            </div>
-          )
-        })()}
+        ) : (
+          <ComboBarLine data={days.map(day => ({ label: day, value: byDay[day]?.sent || 0 }))} />
+        )}
       </div>
 
       {/* Conversas por atendente */}
       {byAgent.length > 0 && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', marginBottom: '20px' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Conversas por atendente</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Distribuição de conversas abertas</p>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {byAgent.map((agent, i) => {
-              const maxCount = byAgent[0].count
-              const pct = Math.round((agent.count / maxCount) * 100)
-              const colors = ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#d97706']
-              const color = colors[i % colors.length]
-              return (
-                <div key={agent.name}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>{agent.name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color }}>{agent.count}</span>
-                  </div>
-                  <div style={{ height: '5px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <CardHeader title="Conversas por atendente" subtitle="DISTRIBUIÇÃO DE CONVERSAS ABERTAS" />
+          <HBarChartPBI data={byAgent.map(a => ({ label: a.name, value: a.count }))} color="#14b8a6" />
         </div>
       )}
 
@@ -690,10 +723,7 @@ export default function DashboardPage() {
       {/* Atividade recente */}
       {activity.length > 0 && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '14px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>Atividade recente</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-faint)', margin: '2px 0 0' }}>Últimos eventos no pipeline</p>
-          </div>
+          <CardHeader title="Atividade recente" subtitle="ÚLTIMOS EVENTOS NO PIPELINE" />
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {activity.slice(0, 8).map((ev: any) => {
               const contact = ev.card?.contacts || ev.conversation?.contacts
