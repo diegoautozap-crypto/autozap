@@ -9,8 +9,60 @@ import { toast } from 'sonner'
 import {
   Users, Plus, Pencil, Trash2, X, Check, Loader2,
   UserCheck, Eye, RotateCcw, ToggleLeft, ToggleRight, Settings,
-  ChevronLeft,
+  ChevronLeft, Shield, BarChart3, Headphones, Sparkles,
 } from 'lucide-react'
+
+// Presets de permissões — clique 1x pra aplicar tudo
+const PERMISSION_PRESETS = [
+  {
+    id: 'admin_like',
+    icon: Shield,
+    color: '#7c3aed',
+    bg: '#f5f3ff',
+    border: '#ddd6fe',
+    label: 'Administrador',
+    desc: 'Acesso total ao sistema — exceto plano/cobrança',
+    permissions: {
+      allowed_pages: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline', '/dashboard/flows', '/dashboard/channels'],
+      editable_pages: ['/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline', '/dashboard/flows', '/dashboard/channels'],
+      allowed_channels: [] as string[],
+      conversation_access: 'all',
+      campaign_access: 'manage',
+    },
+  },
+  {
+    id: 'supervisor',
+    icon: BarChart3,
+    color: '#0891b2',
+    bg: '#ecfeff',
+    border: '#a5f3fc',
+    label: 'Supervisor',
+    desc: 'Lidera o time — vê todas as conversas, cria campanhas',
+    permissions: {
+      allowed_pages: ['/dashboard', '/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
+      editable_pages: ['/dashboard/campaigns', '/dashboard/templates', '/dashboard/contacts', '/dashboard/inbox', '/dashboard/pipeline'],
+      allowed_channels: [] as string[],
+      conversation_access: 'all',
+      campaign_access: 'manage',
+    },
+  },
+  {
+    id: 'agent',
+    icon: Headphones,
+    color: '#16a34a',
+    bg: '#f0fdf4',
+    border: '#bbf7d0',
+    label: 'Atendente',
+    desc: 'Responde só suas conversas e move seu pipeline',
+    permissions: {
+      allowed_pages: ['/dashboard/inbox', '/dashboard/contacts', '/dashboard/pipeline', '/dashboard/templates'],
+      editable_pages: ['/dashboard/inbox', '/dashboard/pipeline'],
+      allowed_channels: [] as string[],
+      conversation_access: 'assigned',
+      campaign_access: 'view',
+    },
+  },
+]
 import { useT } from '@/lib/i18n'
 
 const inputStyle: React.CSSProperties = {
@@ -164,6 +216,60 @@ function PermissionsPanel({ member, onClose }: { member: any; onClose: () => voi
         <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faintest)' }} /></div>
       ) : (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+          {/* PRESETS — clique 1x pra aplicar perfil */}
+          {(() => {
+            // Detecta se o perfil atual bate com algum preset
+            const currentPreset = PERMISSION_PRESETS.find(p => {
+              const curPages = [...(effectivePerms.allowed_pages || [])].sort().join(',')
+              const prePages = [...p.permissions.allowed_pages].sort().join(',')
+              const curEdit = [...(effectivePerms.editable_pages || [])].sort().join(',')
+              const preEdit = [...p.permissions.editable_pages].sort().join(',')
+              return curPages === prePages && curEdit === preEdit &&
+                effectivePerms.conversation_access === p.permissions.conversation_access &&
+                effectivePerms.campaign_access === p.permissions.campaign_access
+            })
+            const applyPreset = (preset: typeof PERMISSION_PRESETS[0]) => {
+              setPerms({ ...effectivePerms, ...preset.permissions, allowed_channels: effectivePerms.allowed_channels || [] })
+            }
+            return (
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>⚡ Perfil rápido</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginBottom: '10px' }}>Clique num perfil pra aplicar tudo de uma vez. Você pode ajustar depois abaixo.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {PERMISSION_PRESETS.map(preset => {
+                    const Icon = preset.icon
+                    const isActive = currentPreset?.id === preset.id
+                    return (
+                      <div key={preset.id} onClick={() => applyPreset(preset)}
+                        style={{ padding: '14px', border: `1.5px solid ${isActive ? preset.color : 'var(--border)'}`, background: isActive ? preset.bg : 'var(--bg-input)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: preset.bg, border: `1px solid ${preset.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={14} color={preset.color} />
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: isActive ? preset.color : 'var(--text)' }}>{preset.label}</span>
+                          {isActive && <Check size={13} color={preset.color} style={{ marginLeft: 'auto' }} />}
+                        </div>
+                        <p style={{ fontSize: '11px', color: 'var(--text-faint)', lineHeight: 1.4, margin: 0 }}>{preset.desc}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+                {!currentPreset && hasChanges && (
+                  <div style={{ marginTop: '10px', padding: '8px 12px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sparkles size={13} color="#a16207" />
+                    <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 600 }}>Perfil personalizado — você ajustou permissões manualmente</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px dashed var(--divider)', paddingTop: '4px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🔧 Ajuste fino (opcional)</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>Edite qualquer permissão abaixo pra criar um perfil totalmente customizado.</p>
+          </div>
 
           {/* Páginas */}
           <div>
