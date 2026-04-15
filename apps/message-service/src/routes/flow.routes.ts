@@ -407,8 +407,10 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       ns.dropOffPct = runs.length > 0 ? Math.round(((dropOffByNode[nodeId] || 0) / runs.length) * 100) : 0
     }
 
-    // Top 3 gargalos (mais drop-off)
+    // Top 3 gargalos — só de nodes que AINDA existem no flow (filtra deletados)
+    const activeNodeIds = new Set((flowNodes || []).map((n: { id: string }) => n.id))
     const topBottlenecks = Object.entries(dropOffByNode)
+      .filter(([nodeId]) => activeNodeIds.has(nodeId))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([nodeId, count]) => ({ nodeId, count, pct: runs.length > 0 ? Math.round((count / runs.length) * 100) : 0 }))
