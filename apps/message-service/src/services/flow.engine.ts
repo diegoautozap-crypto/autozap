@@ -83,7 +83,7 @@ interface FlowNodeData {
   conditionValue?: string
   conditionFieldName?: string
   apiKey?: string
-  mode?: 'respond' | 'classify' | 'extract' | 'summarize'
+  mode?: 'respond' | 'classify' | 'extract' | 'summarize' | 'duration' | 'until'
   userMessage?: string
   historyMessages?: number
   systemPrompt?: string
@@ -146,6 +146,31 @@ interface FlowNodeData {
   fields?: { label: string; variable: string; contactField: string }[]
   mappings?: { from: string; to: string }[]
   updateFields?: { field: string; customField?: string; value: string }[]
+  // wait absoluto
+  untilTime?: string
+  spreadMinutes?: number
+  // lookup_contact
+  includeTags?: boolean
+  includePurchases?: boolean
+  // csat
+  invalidMessage?: string
+  thankYouMessage?: string
+  // validation no input
+  validationType?: 'text' | 'email' | 'cpf' | 'cnpj' | 'phone' | 'date' | 'number'
+  validationErrorMessage?: string
+  validationMaxAttempts?: number
+  // webhook trigger
+  autoMapFields?: boolean
+  ignoredPhones?: string
+  // send_message extras
+  footer?: string
+  buttons?: any[]
+  listRows?: any[]
+  listButtonText?: string
+  // send_message interactive type
+  interactiveType?: string
+  // input timeout
+  timeoutMinutes?: number
 }
 
 interface FlowNodeRow {
@@ -800,10 +825,10 @@ export class FlowEngine {
 
         case 'wait': {
           let totalMs: number
-          if ((data as any)?.mode === 'until' && (data as any)?.untilTime) {
+          if (data?.mode === 'until' && data?.untilTime) {
             // Espera até HH:MM (no timezone especificado ou América/SP)
-            const tz = (data as any)?.timezone || 'America/Sao_Paulo'
-            const untilTimeStr = String((data as any).untilTime)
+            const tz = data?.timezone || 'America/Sao_Paulo'
+            const untilTimeStr = String(data.untilTime)
             const [hh, mm] = untilTimeStr.split(':').map((n: string) => parseInt(n))
             if (isNaN(hh) || isNaN(mm)) { logger.warn('wait until: horário inválido', { untilTime: untilTimeStr }); break }
             // Calcula próxima ocorrência desse horário no tz
@@ -814,7 +839,7 @@ export class FlowEngine {
             // Se o horário já passou hoje, vai pra amanhã (comportamento padrão)
             if (target.getTime() <= nowInTz.getTime()) target.setDate(target.getDate() + 1)
             // Jitter pra evitar disparar tudo no mesmo segundo (evita rate limit WhatsApp)
-            const spreadMinutes = Number((data as any)?.spreadMinutes ?? 0)
+            const spreadMinutes = Number(data?.spreadMinutes ?? 0)
             let jitterMs = 0
             if (spreadMinutes > 0) {
               jitterMs = Math.floor(Math.random() * spreadMinutes * 60_000)

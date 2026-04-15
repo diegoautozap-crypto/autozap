@@ -464,7 +464,7 @@ router.post('/conversations/bulk/read', validate(bulkIdsSchema), async (req, res
     const { ids } = req.body
     const results = await Promise.all(
       ids.map((id: string) =>
-        db.from('conversations').update({ unread_count: 0 }).eq('tenant_id', req.auth.tid).eq('id', id).then(() => true).catch(() => false)
+        Promise.resolve(db.from('conversations').update({ unread_count: 0 }).eq('tenant_id', req.auth.tid).eq('id', id)).then(() => true).catch(() => false)
       )
     )
     const updated = results.filter(Boolean).length

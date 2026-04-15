@@ -41,4 +41,6 @@ export interface SendMessageJob {
   listRows?: { id: string; title: string; description?: string }[]
   listButtonText?: string
   footer?: string
+  filename?: string
+  caption?: string
 }
