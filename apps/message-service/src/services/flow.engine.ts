@@ -1146,7 +1146,20 @@ export class FlowEngine {
             if (f.contactField === 'phone') phone = val.replace(/\D/g, '')
             else if (f.contactField === 'name') name = val
             else if (f.contactField === 'email') email = val
-            else if (f.label) extraFields[f.label] = val
+            else if (f.label) {
+              // Normaliza o nome do campo (ex: "Cidade" → "cidade")
+              const fieldName = f.label.replace(/\s+/g, '_').toLowerCase()
+              extraFields[fieldName] = val
+              // Auto-registra no CRM se ainda não existir (aparece em filtros e perfil do contato)
+              const { data: existing } = await db.from('custom_fields')
+                .select('id').eq('tenant_id', ctx.tenantId).eq('name', fieldName).maybeSingle()
+              if (!existing) {
+                await db.from('custom_fields').insert({
+                  tenant_id: ctx.tenantId, name: fieldName, label: f.label,
+                  type: 'text', sort_order: 99,
+                }).then(() => {})
+              }
+            }
           }
 
           if (!phone && !name) break
