@@ -899,6 +899,8 @@ export const es: Record<string, string> = {
     'nodes.splitAb': 'Prueba A/B',
     'nodes.randomPath': 'Camino aleatorio',
     'nodes.scheduleAppointment': 'Agendar cita',
+    'nodes.lookupContact': 'Buscar datos del contacto',
+    'nodes.csat': 'Encuesta de satisfacción',
     'nodes.scheduleAppointmentInfo': 'Agenda una cita automáticamente para el contacto.',
     'nodes.schedulingConfig': 'Configuración de agenda',
     'nodes.schedulingConfigSelect': 'Seleccione una agenda',

@@ -884,6 +884,8 @@ export const en: Record<string, string> = {
     'nodes.splitAb': 'A/B Test',
     'nodes.randomPath': 'Random path',
     'nodes.scheduleAppointment': 'Schedule appointment',
+    'nodes.lookupContact': 'Fetch contact data',
+    'nodes.csat': 'Satisfaction survey',
     'nodes.scheduleAppointmentInfo': 'Automatically schedules an appointment for the contact.',
     'nodes.schedulingConfig': 'Scheduling config',
     'nodes.schedulingConfigSelect': 'Select a schedule',

@@ -148,7 +148,7 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             {isTrigger ? t('nodes.sectionTrigger') : data.type === 'end' ? t('nodes.sectionEnd') : t('nodes.sectionAction')}
           </div>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
-            {nodeLabels[data.type] || data.type}
+            {nodeLabels[data.type] || (data.type || '').replace(/^trigger_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Node'}
           </div>
         </div>
       </div>
