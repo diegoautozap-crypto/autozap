@@ -567,7 +567,78 @@ export default function FlowEditorPage() {
         </button>
       </div>
 
-      {showAnalytics && analytics && (
+      {showAnalytics && analytics && (() => {
+        const fmtDur = (ms: number) => ms > 60000 ? `${Math.round(ms / 60000)}min` : ms > 0 ? `${Math.round(ms / 1000)}s` : '—'
+        const StatCard = ({ icon, color, bg, value, label, sub }: { icon: string; color: string; bg: string; value: string | number; label: string; sub?: string }) => (
+          <div style={{ flex: 1, minWidth: '130px', padding: '12px 14px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>{icon}</div>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+            </div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+            {sub && <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>{sub}</div>}
+          </div>
+        )
+        return (
+          <div style={{ background: '#fafafa', borderBottom: '1px solid #e5e7eb', padding: '14px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#18181b' }}>📊 Métricas do flow</span>
+                <select value={analyticsDays} onChange={e => setAnalyticsDays(Number(e.target.value))}
+                  style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}>
+                  <option value={1}>últimas 24h</option>
+                  <option value={7}>últimos 7 dias</option>
+                  <option value={14}>últimos 14 dias</option>
+                  <option value={30}>últimos 30 dias</option>
+                  <option value={90}>últimos 90 dias</option>
+                </select>
+              </div>
+              <button onClick={() => setShowExecutionsModal(true)}
+                style={{ padding: '6px 14px', background: '#18181b', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                Ver {analytics.executions?.length || 0} execuções →
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+              <StatCard icon="🚀" color="#7c3aed" bg="#f5f3ff" value={analytics.totalFlowRuns} label="Execuções" sub={`${analytics.uniqueContacts} contatos`} />
+              <StatCard icon="✓" color="#16a34a" bg="#f0fdf4" value={`${analytics.completionRate ?? 0}%`} label="Taxa conclusão" sub={`${analytics.totalCompletions || 0} chegaram ao fim`} />
+              <StatCard icon="⏱" color="#0891b2" bg="#ecfeff" value={fmtDur(analytics.avgDurationMs)} label="Duração média" />
+              <StatCard icon="🎯" color="#ea580c" bg="#fff7ed" value={analytics.totalExecutions || 0} label="Nodes processados" sub="somando todos os passos" />
+              {(analytics.totalErrors || 0) > 0 && (
+                <StatCard icon="⚠" color="#dc2626" bg="#fef2f2" value={analytics.totalErrors} label="Erros" sub="nodes que falharam" />
+              )}
+            </div>
+            {(analytics.topBottlenecks || []).length > 0 && (
+              <div style={{ marginTop: '10px', padding: '12px 14px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fed7aa', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '14px' }}>🚧</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Principais gargalos</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(analytics.topBottlenecks as any[]).map((b, i) => {
+                    const node = nodes.find(n => n.id === b.nodeId)
+                    const label = (node?.data as any)?.type || 'Node'
+                    const medals = ['🥇', '🥈', '🥉']
+                    return (
+                      <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
+                        style={{ flex: 1, minWidth: '200px', padding: '10px 14px', background: '#fff', border: '1px solid #fb923c', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(251,146,60,0.2)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none' }}>
+                        <span style={{ fontSize: '24px' }}>{medals[i]}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#9a3412', marginBottom: '2px' }}>{label}</div>
+                          <div style={{ fontSize: '11px', color: '#c2410c' }}><strong>{b.count}</strong> abandonos · <strong>{b.pct}%</strong> do total</div>
+                        </div>
+                        <span style={{ fontSize: '10px', color: '#9a3412', fontWeight: 600 }}>Ver →</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+      {false && (
         <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '16px', alignItems: 'center', fontSize: '13px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
