@@ -58,6 +58,7 @@ const updateCardSchema = z.object({
   title: z.string().max(255).nullable().optional(),
   sortOrder: z.number().int().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
+  probabilityOverride: z.number().int().min(0).max(100).nullable().optional(),
 })
 
 const pipelineColumnSchema = z.object({
@@ -67,6 +68,7 @@ const pipelineColumnSchema = z.object({
     label: z.string().min(1).max(100),
     color: z.string().optional().default('#6b7280'),
     sort_order: z.number().int().min(0),
+    probability: z.number().int().min(0).max(100).nullable().optional(),
     _isNew: z.boolean().optional(),
   })),
   pipelineId: z.string().uuid().nullable().optional(),
@@ -173,6 +175,7 @@ router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res,
         label: c.label,
         color: c.color || '#6b7280',
         sort_order: c.sort_order ?? i,
+        probability: c.probability ?? null,
       }))
 
     if (toInsert.length > 0) {
@@ -184,7 +187,7 @@ router.put('/pipeline-columns', validate(pipelineColumnSchema), async (req, res,
     for (const col of toUpdate) {
       const { error } = await db
         .from('pipeline_columns')
-        .update({ label: col.label, color: col.color, sort_order: col.sort_order })
+        .update({ label: col.label, color: col.color, sort_order: col.sort_order, probability: col.probability ?? null })
         .eq('id', col.id)
         .eq('tenant_id', tenantId)
       if (error) throw error
@@ -266,6 +269,7 @@ router.patch('/pipeline-cards/:id', validate(updateCardSchema), async (req, res,
     if (req.body.title !== undefined) update.title = req.body.title
     if (req.body.sortOrder !== undefined) update.sort_order = req.body.sortOrder
     if (req.body.assignedTo !== undefined) update.assigned_to = req.body.assignedTo
+    if (req.body.probabilityOverride !== undefined) update.probability_override = req.body.probabilityOverride
 
     const { data, error } = await db.from('pipeline_cards').update(update)
       .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
@@ -344,6 +348,116 @@ router.get('/conversations/:id/pipeline-events', async (req, res, next) => {
       .limit(100)
     if (error) throw error
     res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// ─── Forecast ─────────────────────────────────────────────────────────────────
+// Retorna previsão de receita ponderada do pipeline.
+// `pipelineId` na query filtra por pipeline específico; sem ele, usa o default (null).
+// `from`/`to` opcionais filtram cards fechados ("Ganho") nesse período pra compor
+// "receita realizada".
+router.get('/pipelines/forecast', async (req, res, next) => {
+  try {
+    const tenantId = req.auth.tid
+    const pipelineIdRaw = (req.query.pipelineId as string) || null
+    const pipelineId = pipelineIdRaw === 'null' || !pipelineIdRaw ? null : pipelineIdRaw
+
+    // Colunas do pipeline (pra mapear key → probability + label)
+    let colQuery = db.from('pipeline_columns').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true })
+    colQuery = pipelineId ? colQuery.eq('pipeline_id', pipelineId) : colQuery.is('pipeline_id', null)
+    const { data: columns } = await colQuery
+
+    const colByKey: Record<string, any> = {}
+    for (const c of (columns || [])) colByKey[c.key] = c
+
+    // Cards do pipeline (apenas abertos — não inclui colunas com probability=0 tipo "Perdido")
+    let cardQuery = db.from('pipeline_cards')
+      .select('id, column_key, deal_value, probability_override, assigned_to, users:assigned_to(name)')
+      .eq('tenant_id', tenantId)
+    cardQuery = pipelineId ? cardQuery.eq('pipeline_id', pipelineId) : cardQuery.is('pipeline_id', null)
+    const { data: cards } = await cardQuery
+
+    // Conversations com pipeline_stage (legacy — alguns cards ainda são conversas)
+    let convQuery = db.from('conversations')
+      .select('id, pipeline_stage, deal_value, assigned_to, users:assigned_to(name)')
+      .eq('tenant_id', tenantId)
+      .in('status', ['open', 'waiting'])
+    convQuery = pipelineId ? convQuery.eq('pipeline_id', pipelineId) : convQuery.is('pipeline_id', null)
+    const { data: convs } = await convQuery
+
+    const probFor = (key: string | null, override: number | null) => {
+      if (override !== null && override !== undefined) return override
+      const col = key ? colByKey[key] : null
+      if (col && col.probability !== null && col.probability !== undefined) return col.probability
+      return null // sem previsão se não configurou
+    }
+
+    type Row = { id: string; columnKey: string; dealValue: number; weighted: number; prob: number | null; agentId: string | null; agentName: string | null }
+    const rows: Row[] = []
+
+    for (const c of (cards || [])) {
+      const val = Number(c.deal_value || 0)
+      const prob = probFor(c.column_key, (c as any).probability_override)
+      rows.push({
+        id: c.id, columnKey: c.column_key, dealValue: val,
+        weighted: prob !== null ? val * prob / 100 : 0,
+        prob,
+        agentId: c.assigned_to, agentName: (c as any).users?.name || null,
+      })
+    }
+    for (const c of (convs || [])) {
+      const val = Number(c.deal_value || 0)
+      if (val <= 0) continue // conversas sem valor não entram no forecast
+      const prob = probFor(c.pipeline_stage, null)
+      rows.push({
+        id: c.id, columnKey: c.pipeline_stage || 'lead', dealValue: val,
+        weighted: prob !== null ? val * prob / 100 : 0,
+        prob,
+        agentId: c.assigned_to, agentName: (c as any).users?.name || null,
+      })
+    }
+
+    // Totais
+    const totalBruto = rows.reduce((s, r) => s + r.dealValue, 0)
+    const totalPonderado = rows.reduce((s, r) => s + r.weighted, 0)
+
+    // Por coluna
+    const byColumnMap: Record<string, { key: string; label: string; color: string; probability: number | null; count: number; totalBruto: number; totalPonderado: number }> = {}
+    for (const col of (columns || [])) {
+      byColumnMap[col.key] = {
+        key: col.key, label: col.label, color: col.color,
+        probability: col.probability ?? null,
+        count: 0, totalBruto: 0, totalPonderado: 0,
+      }
+    }
+    for (const r of rows) {
+      if (!byColumnMap[r.columnKey]) {
+        byColumnMap[r.columnKey] = { key: r.columnKey, label: r.columnKey, color: '#6b7280', probability: r.prob, count: 0, totalBruto: 0, totalPonderado: 0 }
+      }
+      byColumnMap[r.columnKey].count++
+      byColumnMap[r.columnKey].totalBruto += r.dealValue
+      byColumnMap[r.columnKey].totalPonderado += r.weighted
+    }
+    const byColumn = Object.values(byColumnMap)
+
+    // Por agente
+    const byAgentMap: Record<string, { agentId: string; name: string; count: number; totalBruto: number; totalPonderado: number }> = {}
+    for (const r of rows) {
+      if (!r.agentId) continue
+      if (!byAgentMap[r.agentId]) byAgentMap[r.agentId] = { agentId: r.agentId, name: r.agentName || 'Atendente', count: 0, totalBruto: 0, totalPonderado: 0 }
+      byAgentMap[r.agentId].count++
+      byAgentMap[r.agentId].totalBruto += r.dealValue
+      byAgentMap[r.agentId].totalPonderado += r.weighted
+    }
+    const byAgent = Object.values(byAgentMap).sort((a, b) => b.totalPonderado - a.totalPonderado)
+
+    res.json(ok({
+      totalBruto,
+      totalPonderado,
+      cardCount: rows.length,
+      byColumn,
+      byAgent,
+    }))
   } catch (err) { next(err) }
 })
 

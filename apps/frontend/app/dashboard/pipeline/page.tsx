@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Loader2, MessageSquare, RefreshCw, Settings2, Plus, Trash2,
-  GripVertical, X, Check, Pencil, DollarSign, AlertTriangle, Clock, History,
+  GripVertical, X, Check, Pencil, DollarSign, AlertTriangle, Clock, History, TrendingUp,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n'
@@ -89,6 +89,127 @@ function formatRelativeTime(dateStr: string) {
   if (days < 30) return `há ${days}d`
   const months = Math.floor(days / 30)
   return `há ${months}mes${months > 1 ? 'es' : ''}`
+}
+
+function formatBRL(n: number) {
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function ForecastModal({ pipelineId, onClose }: { pipelineId: string | null; onClose: () => void }) {
+  const { data: forecast, isLoading } = useQuery({
+    queryKey: ['pipeline-forecast', pipelineId],
+    queryFn: async () => {
+      const pipelineParam = pipelineId ? pipelineId : 'null'
+      const { data } = await conversationApi.get(`/pipelines/forecast?pipelineId=${pipelineParam}`)
+      return data.data
+    },
+  })
+
+  const byColumn = forecast?.byColumn || []
+  const byAgent = forecast?.byAgent || []
+  const totalBruto = forecast?.totalBruto || 0
+  const totalPonderado = forecast?.totalPonderado || 0
+  const maxCol = Math.max(...byColumn.map((c: any) => c.totalBruto || 0), 1)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '640px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Previsão de vendas</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>Receita projetada com base na probabilidade de cada etapa</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text)' }}>✕</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 22px' }}>
+          {isLoading && <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)' }} /></div>}
+
+          {!isLoading && (
+            <>
+              {/* Totais */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+                <div style={{ padding: '14px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Previsão ponderada</div>
+                  <div style={{ fontSize: '22px', fontWeight: 700, color: '#166534', letterSpacing: '-0.02em' }}>R$ {formatBRL(totalPonderado)}</div>
+                  <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '2px' }}>Receita esperada · {forecast?.cardCount || 0} cards</div>
+                </div>
+                <div style={{ padding: '14px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Total bruto</div>
+                  <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>R$ {formatBRL(totalBruto)}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>Soma dos valores no pipeline</div>
+                </div>
+              </div>
+
+              {/* Por coluna */}
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Por etapa</h4>
+                {byColumn.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Sem dados.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {byColumn.map((c: any) => (
+                      <div key={c.key}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{c.label}</span>
+                            {c.probability !== null && <span style={{ fontSize: '10px', color: 'var(--text-faint)', background: 'var(--bg-input)', padding: '1px 6px', borderRadius: '99px' }}>{c.probability}%</span>}
+                            <span style={{ fontSize: '10px', color: 'var(--text-faintest)' }}>({c.count})</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                            <b style={{ color: '#16a34a' }}>R$ {formatBRL(c.totalPonderado)}</b>
+                            <span style={{ marginLeft: '8px', color: 'var(--text-faintest)' }}>/ R$ {formatBRL(c.totalBruto)}</span>
+                          </div>
+                        </div>
+                        <div style={{ position: 'relative', height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(c.totalBruto / maxCol) * 100}%`, background: 'var(--border)' }} />
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(c.totalPonderado / maxCol) * 100}%`, background: c.color, opacity: 0.8 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Por agente */}
+              <div>
+                <h4 style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Por responsável</h4>
+                {byAgent.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Nenhum card atribuído a um responsável.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '6px 4px', fontWeight: 600, color: 'var(--text-faint)', fontSize: '11px' }}>Agente</th>
+                        <th style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600, color: 'var(--text-faint)', fontSize: '11px' }}>Cards</th>
+                        <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600, color: 'var(--text-faint)', fontSize: '11px' }}>Bruto</th>
+                        <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600, color: '#16a34a', fontSize: '11px' }}>Previsto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byAgent.map((a: any) => (
+                        <tr key={a.agentId} style={{ borderBottom: '1px solid var(--divider)' }}>
+                          <td style={{ padding: '8px 4px', color: 'var(--text)' }}>{a.name}</td>
+                          <td style={{ padding: '8px 4px', textAlign: 'center', color: 'var(--text-muted)' }}>{a.count}</td>
+                          <td style={{ padding: '8px 4px', textAlign: 'right', color: 'var(--text-muted)' }}>R$ {formatBRL(a.totalBruto)}</td>
+                          <td style={{ padding: '8px 4px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>R$ {formatBRL(a.totalPonderado)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <p style={{ fontSize: '11px', color: 'var(--text-faintest)', marginTop: '16px', textAlign: 'center' }}>
+                Configure a probabilidade de cada etapa em "Colunas" pra melhorar a previsão.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function CardHistoryModal({ cardId, conversationId, name, onClose, stages, t }: {
@@ -265,6 +386,19 @@ function ManageColumnsModal({ columns, pipelineId, onClose, onSaved, board }: {
                   ) : (
                     <span onClick={() => !isPendingDelete && startEdit(col)} style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: isPendingDelete ? '#ef4444' : 'var(--text)', cursor: 'text' }}>{col.label}</span>
                   )}
+                  {!isPendingDelete && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }} title="Probabilidade de fechar (%) — usada no forecast">
+                      <input type="number" min={0} max={100} placeholder="—"
+                        value={col.probability ?? ''}
+                        onChange={e => {
+                          const v = e.target.value === '' ? null : Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
+                          setLocalCols(c => c.map(x => x.id === col.id ? { ...x, probability: v } : x))
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: '44px', padding: '3px 6px', fontSize: '11px', border: '1px solid var(--border)', borderRadius: '5px', background: 'var(--bg-card)', color: 'var(--text)', textAlign: 'right', outline: 'none' }} />
+                      <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>%</span>
+                    </div>
+                  )}
                   {cardCount > 0 && !isPendingDelete && <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginRight: '2px' }}>{cardCount} {t('pipeline.convAbbrev')}</span>}
                   <button onClick={() => tryRemoveColumn(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPendingDelete ? '#ef4444' : 'var(--text-faintest)', padding: '2px', borderRadius: '4px', display: 'flex' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'}
@@ -375,6 +509,7 @@ export default function PipelinePage() {
   const [overColKey, setOverColKey] = useState<string | null>(null)
   const [localStages, setLocalStages] = useState<any[] | null>(null)
   const [showManage, setShowManage] = useState(false)
+  const [showForecast, setShowForecast] = useState(false)
   const [showNewPipeline, setShowNewPipeline] = useState(false)
   const [addToStage, setAddToStage] = useState<string | null>(null)
   const [addSearch, setAddSearch] = useState('')
@@ -766,6 +901,11 @@ export default function PipelinePage() {
                 </button>
               )}
             </div>
+            <button onClick={() => setShowForecast(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = '#52525b' }}>
+              <TrendingUp size={13} /> Previsão
+            </button>
             {canEdit('/dashboard/pipeline') && (
             <button onClick={() => setShowManage(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg)'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#22c55e'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
@@ -1023,6 +1163,13 @@ export default function PipelinePage() {
           onClose={() => setHistoryCard(null)}
           stages={stages}
           t={t}
+        />
+      )}
+
+      {showForecast && (
+        <ForecastModal
+          pipelineId={selectedPipelineId}
+          onClose={() => setShowForecast(false)}
         />
       )}
 
