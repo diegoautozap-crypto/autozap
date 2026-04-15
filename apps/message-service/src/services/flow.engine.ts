@@ -1,4 +1,4 @@
-import { db, logger, decryptCredentials, generateId, normalizeBRPhone } from '@autozap/utils'
+import { db, logger, decryptCredentials, generateId, normalizeBRPhone, logPipelineCardEvent } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { ensureContact, ensureConversation } from './contact.helper'
 
@@ -1162,8 +1162,19 @@ export class FlowEngine {
           const stage = data?.stage
           if (!stage) break
           const pipelineId = data?.pipelineId || null
+          const { data: before } = await db.from('conversations')
+            .select('pipeline_stage, pipeline_id').eq('id', ctx.conversationId).single()
           await db.from('conversations').update({ pipeline_stage: stage, pipeline_id: pipelineId }).eq('id', ctx.conversationId)
           emitPusher(ctx.tenantId, 'conversation.updated', { conversationId: ctx.conversationId, pipelineStage: stage, pipelineId })
+          await logPipelineCardEvent({
+            tenantId: ctx.tenantId,
+            conversationId: ctx.conversationId,
+            pipelineId: pipelineId || before?.pipeline_id || null,
+            eventType: before?.pipeline_stage ? 'moved' : 'created',
+            fromColumn: before?.pipeline_stage || null,
+            toColumn: stage,
+            metadata: { source: 'flow' },
+          })
           break
         }
 

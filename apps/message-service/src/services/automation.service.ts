@@ -1,4 +1,4 @@
-import { db, logger, generateId } from '@autozap/utils'
+import { db, logger, generateId, logPipelineCardEvent } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
@@ -201,8 +201,19 @@ export class AutomationService {
       case 'move_pipeline': {
         const stage = action.value?.stage
         if (!stage) return
+        const { data: before } = await db.from('conversations')
+          .select('pipeline_stage, pipeline_id').eq('id', ctx.conversationId).single()
         await db.from('conversations').update({ pipeline_stage: stage }).eq('id', ctx.conversationId)
         await this.logAutomation(automationId, ctx, 'success', `Movido para ${stage}${stepLabel}`)
+        await logPipelineCardEvent({
+          tenantId: ctx.tenantId,
+          conversationId: ctx.conversationId,
+          pipelineId: before?.pipeline_id || null,
+          eventType: before?.pipeline_stage ? 'moved' : 'created',
+          fromColumn: before?.pipeline_stage || null,
+          toColumn: stage,
+          metadata: { source: 'automation', automationId },
+        })
         break
       }
 

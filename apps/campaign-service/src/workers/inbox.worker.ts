@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq'
-import { logger, generateId, db } from '@autozap/utils'
+import { logger, generateId, db, logPipelineCardEvent } from '@autozap/utils'
 import type { InboxJob } from './campaign.worker'
 
 function getRedisConnection() {
@@ -68,6 +68,14 @@ export function startInboxWorker(): Worker<InboxJob> {
       resolvedContactId = contactResult.id
     }
 
+    // Checa estado anterior da conversa pra decidir se é entrada nova ou movimento
+    const { data: prevConv } = await db.from('conversations')
+      .select('id, pipeline_stage, pipeline_id')
+      .eq('tenant_id', tenantId).eq('contact_id', resolvedContactId).eq('channel_id', channelId)
+      .maybeSingle()
+    const prevStage = prevConv?.pipeline_stage || null
+    const prevPipelineId = prevConv?.pipeline_id || null
+
     // Upsert conversa com campaign_id
     const { data: convResult, error: convError } = await db.from('conversations')
       .upsert({
@@ -96,6 +104,19 @@ export function startInboxWorker(): Worker<InboxJob> {
       }
     } else {
       resolvedConversationId = convResult.id
+    }
+
+    // Loga entrada/movimento na pipeline via campanha
+    if (prevStage !== 'lead') {
+      await logPipelineCardEvent({
+        tenantId,
+        conversationId: resolvedConversationId,
+        pipelineId: prevPipelineId,
+        eventType: prevStage ? 'moved' : 'created',
+        fromColumn: prevStage,
+        toColumn: 'lead',
+        metadata: { source: 'campaign_reply', campaignId: campaignId || null },
+      })
     }
 
     // Atualiza mensagem

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { db, logger, AppError, generateId, decryptCredentials } from '@autozap/utils'
+import { db, logger, AppError, generateId, decryptCredentials, logPipelineCardEvent } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import type { NormalizedMessage, MessageStatusUpdate } from './types'
 import { automationService } from './automation.service'
@@ -734,6 +734,13 @@ Regras:
     if (existing) return existing
     const { data: created, error } = await db.from('conversations').insert({ id: generateId(), tenant_id: tenantId, contact_id: contactId, channel_id: channelId, channel_type: channelType, status: 'waiting', pipeline_stage: 'novo', bot_active: true, unread_count: 1, last_message_at: new Date() }).select('id, unread_count').single()
     if (error) throw new AppError('DB_ERROR', error.message, 500)
+    await logPipelineCardEvent({
+      tenantId,
+      conversationId: created.id,
+      eventType: 'created',
+      toColumn: 'novo',
+      metadata: { source: 'inbound_message', channelId, channelType },
+    })
     return created
   }
 }
