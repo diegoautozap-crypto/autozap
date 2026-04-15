@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge,
   useNodesState, useEdgesState, Connection, Edge, Node,
-  Panel, BackgroundVariant, MarkerType, getSmoothStepPath, BaseEdge,
+  Panel, BackgroundVariant, MarkerType, getSmoothStepPath, BaseEdge, ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { messageApi, contactApi, channelApi, tenantApi } from '@/lib/api'
@@ -318,6 +318,12 @@ export default function FlowEditorPage() {
   const [showExecutionsModal, setShowExecutionsModal] = useState(false)
   const [nodeDrilldownId, setNodeDrilldownId] = useState<string | null>(null)
   const [showAllBottlenecks, setShowAllBottlenecks] = useState(false)
+  const rfInstanceRef = useRef<any>(null)
+  const focusNodeOnCanvas = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node || !rfInstanceRef.current) return
+    rfInstanceRef.current.setCenter(node.position.x + 125, node.position.y + 50, { zoom: 1.2, duration: 600 })
+  }
   const { data: analytics } = useQuery({
     queryKey: ['flow-analytics', id, analyticsDays, abandonMinutes],
     queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=${analyticsDays}&abandonMinutes=${abandonMinutes}`); return data.data },
@@ -690,7 +696,7 @@ export default function FlowEditorPage() {
                     const iconColor = NODE_COLORS[nodeType] || '#6b7280'
                     const isLast = i === listToShow.length - 1
                     return (
-                      <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
+                      <button key={b.nodeId} onClick={() => { focusNodeOnCanvas(b.nodeId); setNodeDrilldownId(b.nodeId) }}
                         style={{ width: '100%', padding: '12px 16px', background: '#fff', border: 'none', borderBottom: isLast ? 'none' : '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', transition: 'background 0.1s' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
@@ -983,6 +989,7 @@ export default function FlowEditorPage() {
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNode(node)}
             onPaneClick={() => setSelectedNode(null)}
+            onInit={(instance) => { rfInstanceRef.current = instance }}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView fitViewOptions={{ padding: 0.3 }}

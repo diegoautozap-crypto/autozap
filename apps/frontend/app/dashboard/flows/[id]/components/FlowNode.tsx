@@ -287,17 +287,44 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
               ✗ {data._errorCount}
             </span>
           )}
-          {data._dropOff > 0 && (
-            <span title={`${data._dropOff} cliente(s) abandonaram aqui (${data._dropOffPct}% do total)`}
-              style={{ fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '99px', background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
-              ⏸ {data._dropOff} ({data._dropOffPct}%)
-            </span>
-          )}
         </div>
       )}
-      {/* Borda laranja se drop-off crítico (>30%) */}
+      {/* Badge de abandono GIGANTE no topo direito */}
+      {data._dropOff > 0 && (() => {
+        const isCritical = data._dropOffPct > 30
+        const isHigh = data._dropOffPct > 15
+        const bg = isCritical ? '#dc2626' : isHigh ? '#ea580c' : '#f59e0b'
+        return (
+          <>
+            <div
+              title={`${data._dropOff} cliente(s) abandonaram aqui (${data._dropOffPct}% do total)`}
+              style={{
+                position: 'absolute', top: -12, right: -12, zIndex: 5,
+                minWidth: '38px', padding: '4px 8px', borderRadius: '999px',
+                background: bg, color: '#fff',
+                fontSize: '11px', fontWeight: 800,
+                display: 'flex', alignItems: 'center', gap: '3px',
+                boxShadow: `0 4px 12px ${bg}80, 0 0 0 3px #fff`,
+                animation: isCritical ? 'pulse-danger 1.5s ease-in-out infinite' : undefined,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+              ⏸ {data._dropOffPct}%
+            </div>
+            <style>{`
+              @keyframes pulse-danger {
+                0%, 100% { transform: scale(1); box-shadow: 0 4px 12px ${bg}80, 0 0 0 3px #fff; }
+                50% { transform: scale(1.08); box-shadow: 0 6px 20px ${bg}cc, 0 0 0 3px #fff, 0 0 0 8px ${bg}30; }
+              }
+            `}</style>
+          </>
+        )
+      })()}
+      {/* Borda vibrante quando drop-off crítico */}
       {data._dropOffPct > 30 && (
-        <div style={{ position: 'absolute', inset: '-2px', borderRadius: '10px', border: '2px solid #f97316', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: '-3px', borderRadius: '12px', border: '3px solid #dc2626', pointerEvents: 'none', boxShadow: '0 0 20px rgba(220,38,38,0.4)' }} />
+      )}
+      {data._dropOffPct > 15 && data._dropOffPct <= 30 && (
+        <div style={{ position: 'absolute', inset: '-2px', borderRadius: '11px', border: '2px solid #ea580c', pointerEvents: 'none' }} />
       )}
     </div>
   )
