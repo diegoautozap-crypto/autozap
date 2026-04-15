@@ -258,6 +258,20 @@ export function FlowNode({ data, selected }: { data: any; selected: boolean }) {
             ))}
           </div>
         </>
+      ) : data.type === 'csat' ? (
+        <>
+          <Handle type="source" position={Position.Right} id="promoter"
+            style={{ background: '#16a34a', width: 12, height: 12, border: '2px solid #fff', top: '25%' }} />
+          <Handle type="source" position={Position.Right} id="passive"
+            style={{ background: '#f59e0b', width: 12, height: 12, border: '2px solid #fff', top: '50%' }} />
+          <Handle type="source" position={Position.Right} id="detractor"
+            style={{ background: '#dc2626', width: 12, height: 12, border: '2px solid #fff', top: '75%' }} />
+          <div style={{ position: 'absolute', right: -70, top: '18%', display: 'flex', flexDirection: 'column', gap: '9px', fontSize: '9px', fontWeight: 700 }}>
+            <span style={{ color: '#16a34a' }}>9-10 Promoter</span>
+            <span style={{ color: '#f59e0b' }}>7-8 Passive</span>
+            <span style={{ color: '#dc2626' }}>0-6 Detractor</span>
+          </div>
+        </>
       ) : !isCondition && !isLoop && data.type !== 'end' ? (
         <Handle type="source" position={Position.Right} id="success"
           style={{ background: color, width: 10, height: 10, border: '2px solid #fff' }} />

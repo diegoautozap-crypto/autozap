@@ -155,6 +155,8 @@ export { requireAuth, requireRole, errorHandler, validate } from './middleware'
 export { logPipelineCardEvent } from './pipeline-events'
 export type { PipelineEventType, LogPipelineEventParams } from './pipeline-events'
 export { isPhoneIgnored, phonesMatch, parseIgnoredPhones } from './phone-filter'
+export { validateInput } from './input-validators'
+export type { ValidationType, ValidationResult } from './input-validators'
 
 export function normalizeBRPhone(phone: string): string {
   // Remove tudo que não é dígito, adiciona 9° dígito em celulares BR se necessário

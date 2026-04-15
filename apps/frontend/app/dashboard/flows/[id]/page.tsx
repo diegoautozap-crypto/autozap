@@ -163,6 +163,8 @@ function getActionNodes(t: (key: string) => string) {
     { type: 'go_to',             label: t('nodes.goTo') },
     { type: 'loop',              label: t('nodes.loop') },
     { type: 'schedule_appointment', label: t('nodes.scheduleAppointment') },
+    { type: 'lookup_contact',    label: 'Buscar dados do contato' },
+    { type: 'csat',              label: 'Pesquisa de satisfação (CSAT/NPS)' },
     { type: 'end',               label: t('nodes.end') },
   ]
 }

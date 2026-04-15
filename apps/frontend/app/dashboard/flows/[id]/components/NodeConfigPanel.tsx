@@ -681,6 +681,40 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>{t('nodes.useVariableHint')}: {'{{' }{d.saveAs || 'variavel'}{'}}' }</p>
           </div>
           <div>
+            <label style={labelStyle}>Validar como</label>
+            <select style={{ ...inputStyle, background: '#fafafa' }}
+              value={d.validationType || 'text'}
+              onChange={e => onUpdate(node.id, { validationType: e.target.value })}
+              onFocus={focusInput} onBlur={blurInput}>
+              <option value="text">Texto livre (sem validação)</option>
+              <option value="email">E-mail</option>
+              <option value="cpf">CPF</option>
+              <option value="cnpj">CNPJ</option>
+              <option value="phone">Telefone</option>
+              <option value="date">Data (DD/MM/AAAA)</option>
+              <option value="number">Número</option>
+            </select>
+            {d.validationType && d.validationType !== 'text' && (
+              <>
+                <div style={{ marginTop: '8px' }}>
+                  <label style={{ ...labelStyle, fontSize: '11px' }}>Mensagem de erro <span style={{ fontWeight: 400, color: '#9ca3af' }}>(opcional, use {'{{error}}'} pro motivo)</span></label>
+                  <input style={inputStyle} placeholder="Valor inválido, tenta de novo 🙂"
+                    value={d.validationErrorMessage || ''}
+                    onChange={e => onUpdate(node.id, { validationErrorMessage: e.target.value })}
+                    onFocus={focusInput} onBlur={blurInput} />
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  <label style={{ ...labelStyle, fontSize: '11px' }}>Máx. tentativas antes de desistir</label>
+                  <input type="number" min="1" max="10" style={inputStyle}
+                    value={d.validationMaxAttempts ?? 3}
+                    onChange={e => onUpdate(node.id, { validationMaxAttempts: Number(e.target.value) || 3 })}
+                    onFocus={focusInput} onBlur={blurInput} />
+                  <p style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>Após esgotar, segue o fluxo salvando o valor cru e marcando <code>{'{{'}{d.saveAs || 'variavel'}_invalid{'}}'}</code> como true.</p>
+                </div>
+              </>
+            )}
+          </div>
+          <div>
             <label style={labelStyle}>Timeout</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
@@ -713,11 +747,19 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           {d.mode === 'extract' && <div><label style={labelStyle}>{t('nodes.aiExtractLabel')}</label><input style={inputStyle} placeholder={t('nodes.aiExtractPlaceholder')} value={d.extractField || ''} onChange={e => onUpdate(node.id, { extractField: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>}
           <div><label style={labelStyle}>{t('nodes.saveResponseAs')}</label><input style={inputStyle} placeholder="intencao" value={d.saveAs || ''} onChange={e => onUpdate(node.id, { saveAs: e.target.value.replace(/\s/g, '_').toLowerCase() })} onFocus={focusInput} onBlur={blurInput} /></div>
           <div>
-            <label style={labelStyle}>{t('nodes.aiHistoryLabel')}</label>
+            <label style={labelStyle}>Histórico da conversa</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input type="range" min="0" max="200" step="5" value={d.historyMessages ?? 20} onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })} style={{ flex: 1, accentColor: color }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color, minWidth: '42px', textAlign: 'right' }}>{d.historyMessages === 0 ? t('nodes.aiHistoryNone') : d.historyMessages === 200 ? t('nodes.aiHistoryAll') : `${d.historyMessages ?? 20}`}</span>
+              <input type="range" min="0" max="500" step="10"
+                value={d.historyMessages ?? 0}
+                onChange={e => onUpdate(node.id, { historyMessages: Number(e.target.value) })}
+                style={{ flex: 1, accentColor: color }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color, minWidth: '80px', textAlign: 'right' }}>
+                {(d.historyMessages ?? 0) === 0 ? 'Conversa toda' : `Últimas ${d.historyMessages}`}
+              </span>
             </div>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', lineHeight: 1.4 }}>
+              Ler 0 = toda a conversa (cap 500 msgs). N &gt; 0 = últimas N mensagens. Quanto maior, mais contexto — mas mais caro.
+            </p>
           </div>
         </>)}
 
@@ -1252,6 +1294,72 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   style={{ width: '28px', height: '28px', borderRadius: '50%', background: c.bg, border: `2.5px solid ${(d.color || 'yellow') === c.k ? c.border : 'transparent'}`, cursor: 'pointer' }} />
               ))}
             </div>
+          </div>
+        </>)}
+
+        {d.type === 'lookup_contact' && (<>
+          <p style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.5, padding: '8px 10px', background: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+            Este node carrega os dados do contato em variáveis pra usar em mensagens depois.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={d.includeTags !== false}
+                onChange={e => onUpdate(node.id, { includeTags: e.target.checked })} />
+              Incluir tags do contato
+            </label>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={d.includePurchases !== false}
+                onChange={e => onUpdate(node.id, { includePurchases: e.target.checked })} />
+              Incluir histórico de compras
+            </label>
+          </div>
+          <div style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>Variáveis disponíveis depois deste node:</p>
+            <pre style={{ fontSize: '10px', color: '#166534', fontFamily: 'monospace', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+{`{{contact_name}}
+{{contact_phone}}
+{{contact_email}}
+{{contact_tags}}
+{{contact_purchase_total}}
+{{contact_purchase_count}}
+{{contact_last_products}}`}
+            </pre>
+          </div>
+        </>)}
+
+        {d.type === 'csat' && (<>
+          <div>
+            <label style={labelStyle}>Pergunta da pesquisa</label>
+            <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' as const }}
+              placeholder="De 0 a 10, como você avalia nosso atendimento?"
+              value={d.question || ''}
+              onChange={e => onUpdate(node.id, { question: e.target.value })}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div>
+            <label style={labelStyle}>Mensagem se resposta inválida</label>
+            <input style={inputStyle}
+              placeholder="Por favor, responda com uma nota de 0 a 10 🙂"
+              value={d.invalidMessage || ''}
+              onChange={e => onUpdate(node.id, { invalidMessage: e.target.value })}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div>
+            <label style={labelStyle}>Mensagem de agradecimento <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(opcional · usa padrão por categoria)</span></label>
+            <input style={inputStyle}
+              placeholder="Obrigado pelo feedback!"
+              value={d.thankYouMessage || ''}
+              onChange={e => onUpdate(node.id, { thankYouMessage: e.target.value })}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div style={{ padding: '10px', background: '#fefce8', border: '1px solid #fde047', borderRadius: '6px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#a16207', marginBottom: '6px' }}>Como funciona</p>
+            <p style={{ fontSize: '11px', color: '#854d0e', lineHeight: 1.5, margin: 0 }}>
+              Nota 0–6 → saída <b>detractor</b><br/>
+              Nota 7–8 → saída <b>passive</b><br/>
+              Nota 9–10 → saída <b>promoter</b><br/>
+              Variáveis: <code>{'{{csat_rating}}'}</code> e <code>{'{{csat_category}}'}</code>
+            </p>
           </div>
         </>)}
 

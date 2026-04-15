@@ -1,4 +1,4 @@
-import { db, logger, decryptCredentials, generateId, normalizeBRPhone, logPipelineCardEvent } from '@autozap/utils'
+import { db, logger, decryptCredentials, generateId, normalizeBRPhone, logPipelineCardEvent, validateInput, type ValidationType } from '@autozap/utils'
 import { PLAN_LIMITS, type PlanSlug } from '@autozap/types'
 import { ensureContact, ensureConversation } from './contact.helper'
 
@@ -384,6 +384,7 @@ export class FlowEngine {
     logger.info('Resuming waiting flow', { flowId: state.flow_id, nodeId: state.current_node_id })
     const variables = state.variables || {}
     const loopCounters = state.loop_counters || {}
+    let csatHandle: 'detractor' | 'passive' | 'promoter' | null = null
     // Se a resposta é áudio, busca a última mensagem e tenta transcrever
     if (state.waiting_variable) {
       let responseText = ctx.messageBody
@@ -458,8 +459,84 @@ export class FlowEngine {
         } catch (mapErr) { logger.warn('Number mapping failed', { err: (mapErr as Error).message }) }
       }
 
-      variables[state.waiting_variable] = responseText
-      ctx.messageBody = responseText || ctx.messageBody
+      // Busca config do node atual (usado por validação de input E por CSAT)
+      const { data: currentNodeRow } = await db.from('flow_nodes').select('data, type').eq('id', state.current_node_id).single()
+      const nodeData = (currentNodeRow as { data?: any; type?: string } | null)?.data || {}
+      const currentNodeType = (currentNodeRow as { type?: string } | null)?.type || ''
+
+      // Tratamento especial: CSAT
+      if (state.waiting_variable === '_csat_rating_' && currentNodeType === 'csat') {
+        const numMatch = String(responseText || '').match(/\d+/)
+        const rating = numMatch ? Math.min(10, Math.max(0, parseInt(numMatch[0]))) : null
+        if (rating === null) {
+          // Não entendeu a nota — pede de novo (uma vez só, sem reenviar pergunta)
+          const retryMsg = nodeData.invalidMessage || 'Por favor, me responda com uma nota de 0 a 10 🙂'
+          await this.sendMessage({
+            tenantId: ctx.tenantId, channelId: ctx.channelId,
+            contactId: ctx.contactId, conversationId: ctx.conversationId,
+            to: ctx.phone, contentType: 'text', body: retryMsg,
+          })
+          return true
+        }
+        variables.csat_rating = String(rating)
+        csatHandle = rating <= 6 ? 'detractor' : rating <= 8 ? 'passive' : 'promoter'
+        variables.csat_category = csatHandle
+        // Salva na conversa pra agregação
+        await db.from('conversations').update({
+          metadata: { csat_rating: rating, csat_category: csatHandle, csat_at: new Date().toISOString() },
+        }).eq('id', ctx.conversationId).eq('tenant_id', ctx.tenantId)
+        // Thank-you message (opcional)
+        const thankMsg = nodeData.thankYouMessage ||
+          (csatHandle === 'promoter' ? 'Obrigado! 🙏 Fico feliz que gostou!' :
+           csatHandle === 'passive'  ? 'Obrigado pelo feedback!' :
+                                       'Obrigado pela sinceridade, vamos melhorar 🙏')
+        if (thankMsg) {
+          await this.sendMessage({
+            tenantId: ctx.tenantId, channelId: ctx.channelId,
+            contactId: ctx.contactId, conversationId: ctx.conversationId,
+            to: ctx.phone, contentType: 'text', body: thankMsg,
+          })
+        }
+      }
+
+      const validationType = nodeData.validationType as ValidationType | undefined
+      const maxAttempts = Number(nodeData.validationMaxAttempts ?? 3)
+      if (validationType && validationType !== 'text' && responseText) {
+        const result = validateInput(validationType, responseText)
+        if (!result.valid) {
+          const attempts = Number((variables as any)._input_attempts_ || 0) + 1
+          if (attempts < maxAttempts) {
+            const errorMsg = nodeData.validationErrorMessage
+              ? String(nodeData.validationErrorMessage).replace('{{error}}', result.error || '')
+              : (result.error || 'Valor inválido, tenta de novo.')
+            await this.sendMessage({
+              tenantId: ctx.tenantId, channelId: ctx.channelId,
+              contactId: ctx.contactId, conversationId: ctx.conversationId,
+              to: ctx.phone, contentType: 'text',
+              body: errorMsg,
+            })
+            // Mantém estado waiting e incrementa tentativa
+            ;(variables as any)._input_attempts_ = attempts
+            await db.from('flow_states').update({
+              variables, updated_at: new Date(),
+            }).eq('id', state.id)
+            return true // mantém o flow esperando nova resposta válida
+          } else {
+            // Esgotou tentativas — vai pro handle 'invalid' (ou segue success com valor cru se não houver)
+            ;(variables as any)._input_attempts_ = 0
+            variables[state.waiting_variable] = responseText
+            variables[`${state.waiting_variable}_invalid`] = 'true'
+          }
+        } else {
+          // Válido — salva normalizado e reseta tentativas
+          ;(variables as any)._input_attempts_ = 0
+          variables[state.waiting_variable] = result.normalized ?? responseText
+          ctx.messageBody = result.normalized ?? responseText
+        }
+      } else {
+        variables[state.waiting_variable] = responseText
+        ctx.messageBody = responseText || ctx.messageBody
+      }
     }
     await db.from('flow_states').update({ status: 'running', variables, updated_at: new Date() }).eq('id', state.id)
 
@@ -478,7 +555,7 @@ export class FlowEngine {
 
     let currentNode: FlowNodeRow | null = state.pending_condition_node_id
       ? nodeMap.get(state.pending_condition_node_id) || null
-      : this.getNextNode(state.current_node_id, 'success', edgeMap, nodeMap)
+      : this.getNextNode(state.current_node_id, csatHandle || 'success', edgeMap, nodeMap)
 
     let stepCount = 0
     const visitedNodes = new Map<string, number>()
@@ -914,12 +991,27 @@ export class FlowEngine {
           const openai = new OpenAI({ apiKey: openaiKey, timeout: 30000, maxRetries: 1 })
           const aiMode = data?.mode || 'respond'
           const userMessage = this.interpolate(data?.userMessage || ctx.messageBody, ctx, variables)
-          const maxHistory = data?.historyMessages ?? 20
+          // maxHistory: 0 ou undefined = conversa inteira (cap de segurança 500); N>0 = últimas N msgs
+          const rawHistoryLimit = data?.historyMessages
+          const maxHistory = rawHistoryLimit === 0 || rawHistoryLimit === undefined || rawHistoryLimit === null
+            ? 500
+            : Math.min(Number(rawHistoryLimit), 500)
           let historyMessages: { role: 'user' | 'assistant'; content: string }[] = []
           if (maxHistory > 0) {
-            const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
-            const { data: history } = await db.from('messages').select('direction, body, content_type, created_at').eq('conversation_id', ctx.conversationId).eq('tenant_id', ctx.tenantId).in('content_type', ['text']).not('body', 'is', null).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }).limit(maxHistory)
-            historyMessages = (history || []).reverse().filter((m: { body?: string }) => m.body?.trim()).map((m: { direction: string; body: string }) => ({ role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.body }))
+            const { data: history } = await db.from('messages')
+              .select('direction, body, content_type, created_at')
+              .eq('conversation_id', ctx.conversationId)
+              .eq('tenant_id', ctx.tenantId)
+              .in('content_type', ['text'])
+              .not('body', 'is', null)
+              .order('created_at', { ascending: false })
+              .limit(maxHistory)
+            historyMessages = (history || []).reverse()
+              .filter((m: { body?: string }) => m.body?.trim())
+              .map((m: { direction: string; body: string }) => ({
+                role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
+                content: m.body,
+              }))
           }
           let messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
           if (aiMode === 'respond') {
@@ -1213,6 +1305,63 @@ export class FlowEngine {
           if (!targetFlow || !targetFlow.is_active) break
           await this.executeFlow(targetFlow, ctx, variables)
           return { success: true, ended: true }
+        }
+
+        case 'lookup_contact': {
+          // Carrega dados do contato em variáveis do fluxo
+          const { data: contact } = await db.from('contacts')
+            .select('name, phone, email, metadata, created_at')
+            .eq('id', ctx.contactId).eq('tenant_id', ctx.tenantId).single()
+          if (contact) {
+            variables.contact_name = contact.name || ''
+            variables.contact_phone = contact.phone || ''
+            variables.contact_email = contact.email || ''
+            variables.contact_created_at = contact.created_at || ''
+            // Campos customizados no metadata
+            if (contact.metadata && typeof contact.metadata === 'object') {
+              for (const [k, v] of Object.entries(contact.metadata)) {
+                variables[`contact_${k}`] = String(v ?? '')
+              }
+            }
+          }
+          if (data?.includeTags !== false) {
+            const { data: tags } = await db.from('contact_tags')
+              .select('tags(name)').eq('contact_id', ctx.contactId)
+            variables.contact_tags = (tags || []).map((r: any) => r.tags?.name).filter(Boolean).join(', ')
+          }
+          if (data?.includePurchases !== false) {
+            const { data: purchases } = await db.from('purchases')
+              .select('total_price, shipping, products(name)')
+              .eq('contact_id', ctx.contactId).eq('tenant_id', ctx.tenantId)
+              .order('created_at', { ascending: false }).limit(20)
+            const total = (purchases || []).reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
+            variables.contact_purchase_total = total.toFixed(2)
+            variables.contact_purchase_count = String((purchases || []).length)
+            const lastProducts = (purchases || []).slice(0, 3).map((p: any) => p.products?.name).filter(Boolean)
+            variables.contact_last_products = lastProducts.join(', ')
+          }
+          logger.info('Lookup contact done', { flowId, contactId: ctx.contactId })
+          break
+        }
+
+        case 'csat': {
+          // Manda pergunta inicial e pausa esperando nota (0-10)
+          const question = this.interpolate(data?.question || 'De 0 a 10, como você avalia nosso atendimento?', ctx, variables)
+          await this.sendMessage({
+            tenantId: ctx.tenantId, channelId: ctx.channelId,
+            contactId: ctx.contactId, conversationId: ctx.conversationId,
+            to: ctx.phone, contentType: 'text', body: question,
+          })
+          const csatStateId = stateId || generateId()
+          await db.from('flow_states').upsert({
+            id: csatStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
+            conversation_id: ctx.conversationId, current_node_id: node.id,
+            pending_condition_node_id: null,
+            variables, loop_counters: loopCounters,
+            waiting_variable: '_csat_rating_', status: 'waiting',
+            updated_at: new Date(),
+          }, { onConflict: 'flow_id,conversation_id' })
+          return { success: true, paused: true }
         }
 
         case 'create_task': {
