@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { tenantApi } from '@/lib/api'
 import { Sidebar } from '@/components/layout/sidebar'
 import { TrialBanner } from '@/components/layout/TrialBanner'
+import { CommandPalette } from '@/components/layout/CommandPalette'
 import { useNotifications } from '@/hooks/useNotifications'
 import { usePermissionsStore } from '@/store/permissions.store'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -71,6 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Só monta aqui — depois que hydrated=true e isAuthenticated=true */}
       <NotificationsProvider />
       <PermissionsLoader />
+      <CommandPalette />
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <TrialBanner />

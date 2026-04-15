@@ -396,7 +396,14 @@ export default function InboxPage() {
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [newTaskPriority, setNewTaskPriority] = useState('medium')
   const [showChatSearch, setShowChatSearch] = useState(false)
-  const [messageText, setMessageText] = useState('')
+  const [messageText, setMessageTextRaw] = useState('')
+  // Rascunho: salva texto digitado por conversa. Restaura ao trocar.
+  const setMessageText = (v: string | ((prev: string) => string)) => {
+    setMessageTextRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      return next
+    })
+  }
   const [sendChannelId, setSendChannelId] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
   const [inputMode, setInputMode] = useState<'message' | 'note'>('message')
@@ -445,6 +452,21 @@ export default function InboxPage() {
   const allowedChannels: string[] = userPerms?.allowed_channels || []
   useEffect(() => { if (allowedChannels.length === 1 && channelFilter === 'all') setChannelFilter(allowedChannels[0]) }, [allowedChannels.join(',')])
   useEffect(() => { localStorage.setItem('autozap-pinned', JSON.stringify([...pinnedIds])) }, [pinnedIds])
+
+  // ── Rascunho por conversa: restaura ao abrir, salva ao digitar ──
+  useEffect(() => {
+    if (!selectedConvId) return
+    const saved = localStorage.getItem(`autozap-draft-${selectedConvId}`) || ''
+    setMessageTextRaw(saved)
+  }, [selectedConvId])
+  useEffect(() => {
+    if (!selectedConvId) return
+    if (messageText) {
+      localStorage.setItem(`autozap-draft-${selectedConvId}`, messageText)
+    } else {
+      localStorage.removeItem(`autozap-draft-${selectedConvId}`)
+    }
+  }, [messageText, selectedConvId])
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
