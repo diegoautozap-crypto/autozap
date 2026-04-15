@@ -317,6 +317,7 @@ export default function FlowEditorPage() {
   }
   const [showExecutionsModal, setShowExecutionsModal] = useState(false)
   const [nodeDrilldownId, setNodeDrilldownId] = useState<string | null>(null)
+  const [showAllBottlenecks, setShowAllBottlenecks] = useState(false)
   const { data: analytics } = useQuery({
     queryKey: ['flow-analytics', id, analyticsDays, abandonMinutes],
     queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=${analyticsDays}&abandonMinutes=${abandonMinutes}`); return data.data },
@@ -657,7 +658,10 @@ export default function FlowEditorPage() {
                 <StatCard icon="⚠" color="#dc2626" bg="#fef2f2" value={analytics.totalErrors} label="Erros" sub="nodes que falharam" />
               )}
             </div>
-            {(analytics.topBottlenecks || []).length > 0 && (
+            {(analytics.allBottlenecks || analytics.topBottlenecks || []).length > 0 && (() => {
+              const all = (analytics.allBottlenecks || analytics.topBottlenecks || []) as any[]
+              const listToShow = showAllBottlenecks ? all : all.slice(0, 3)
+              return (
               <div style={{ marginTop: '12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -666,18 +670,25 @@ export default function FlowEditorPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#18181b' }}>Onde o cliente para</div>
-                      <div style={{ fontSize: '11px', color: '#71717a' }}>Os nodes que mais causam abandono</div>
+                      <div style={{ fontSize: '11px', color: '#71717a' }}>
+                        {all.length} {all.length === 1 ? 'node' : 'nodes'} com abandono · clique pra ver detalhes
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#a1a1aa' }}>Clique pra ver detalhes</span>
+                  {all.length > 3 && (
+                    <button onClick={() => setShowAllBottlenecks(s => !s)}
+                      style={{ padding: '5px 12px', background: showAllBottlenecks ? '#18181b' : '#f4f4f5', color: showAllBottlenecks ? '#fff' : '#52525b', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                      {showAllBottlenecks ? 'Ver só top 3' : `Ver todos (${all.length})`}
+                    </button>
+                  )}
                 </div>
-                <div>
-                  {(analytics.topBottlenecks as any[]).map((b, i) => {
+                <div style={{ maxHeight: showAllBottlenecks ? '400px' : 'auto', overflowY: showAllBottlenecks ? 'auto' : 'visible' }}>
+                  {listToShow.map((b, i) => {
                     const { label, context } = getNodeDescription(b.nodeId)
                     const nodeType = (nodes.find(n => n.id === b.nodeId)?.data as any)?.type || ''
                     const Icon = NODE_ICONS[nodeType] || NODE_ICONS.trigger_keyword
                     const iconColor = NODE_COLORS[nodeType] || '#6b7280'
-                    const isLast = i === (analytics.topBottlenecks as any[]).length - 1
+                    const isLast = i === listToShow.length - 1
                     return (
                       <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
                         style={{ width: '100%', padding: '12px 16px', background: '#fff', border: 'none', borderBottom: isLast ? 'none' : '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', transition: 'background 0.1s' }}
@@ -717,7 +728,8 @@ export default function FlowEditorPage() {
                   })}
                 </div>
               </div>
-            )}
+              )
+            })()}
           </div>
         )
       })()}

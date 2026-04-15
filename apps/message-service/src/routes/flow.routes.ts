@@ -407,13 +407,13 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       ns.dropOffPct = runs.length > 0 ? Math.round(((dropOffByNode[nodeId] || 0) / runs.length) * 100) : 0
     }
 
-    // Top 3 gargalos — só de nodes que AINDA existem no flow (filtra deletados)
+    // Gargalos — só de nodes que AINDA existem no flow (filtra deletados)
     const activeNodeIds = new Set((flowNodes || []).map((n: { id: string }) => n.id))
-    const topBottlenecks = Object.entries(dropOffByNode)
+    const allBottlenecks = Object.entries(dropOffByNode)
       .filter(([nodeId]) => activeNodeIds.has(nodeId))
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
       .map(([nodeId, count]) => ({ nodeId, count, pct: runs.length > 0 ? Math.round((count / runs.length) * 100) : 0 }))
+    const topBottlenecks = allBottlenecks.slice(0, 3)
 
     // Busca nomes dos contatos pra mostrar na lista (últimas 50 execuções)
     const recentRuns = runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 50)
@@ -452,6 +452,7 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       nodeStats,
       executions,
       topBottlenecks,
+      allBottlenecks,
       days,
       abandonThresholdMinutes: Math.round(abandonThresholdMs / 60000),
     }))
