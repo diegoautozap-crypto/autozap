@@ -86,15 +86,28 @@ function OnboardingBanner({ channels, templates, campaigns }: { channels: any[];
   )
 }
 
+function hexToRgba(hex: string, alpha: number) {
+  const m = hex.replace('#', '')
+  const r = parseInt(m.slice(0, 2), 16), g = parseInt(m.slice(2, 4), 16), b = parseInt(m.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }: any) {
+  const softShadow = `0 1px 3px ${hexToRgba(color, 0.06)}, 0 1px 2px rgba(0,0,0,.03)`
+  const hoverShadow = `0 10px 24px ${hexToRgba(color, 0.12)}, 0 2px 4px ${hexToRgba(color, 0.06)}`
   return (
     <div onClick={onClick}
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--shadow)' }}
-      onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = '0 4px 16px rgba(0,0,0,.08)'; el.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'var(--shadow)'; el.style.transform = 'translateY(0)' }}>
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(.4,0,.2,1)', boxShadow: softShadow, position: 'relative', overflow: 'hidden' }}
+      onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = hoverShadow; el.style.transform = 'translateY(-2px)'; el.style.borderColor = hexToRgba(color, 0.3) }}
+      onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = softShadow; el.style.transform = 'translateY(0)'; el.style.borderColor = 'var(--border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={17} color={color} strokeWidth={2} />
+        <div style={{
+          width: '38px', height: '38px', borderRadius: '10px',
+          background: `linear-gradient(135deg, ${hexToRgba(color, 0.12)}, ${hexToRgba(color, 0.22)})`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `inset 0 0 0 1px ${hexToRgba(color, 0.15)}`,
+        }}>
+          <Icon size={18} color={color} strokeWidth={2.2} />
         </div>
         <ArrowUpRight size={13} color="var(--text-faintest)" />
       </div>
@@ -105,16 +118,21 @@ function MetricCard({ label, value, sub, icon: Icon, color, bg, href, onClick }:
   )
 }
 
-function DonutChart({ segments, size = 160, thickness = 28, centerLabel, centerValue }: {
+function DonutChart({ segments, size = 160, thickness = 22, centerLabel, centerValue }: {
   segments: { label: string; value: number; color: string }[]
   size?: number
   thickness?: number
   centerLabel?: string
   centerValue?: string | number
 }) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0)
+  const nonZero = segments.filter(s => s.value > 0)
+  const total = nonZero.reduce((s, seg) => s + seg.value, 0)
   const radius = (size - thickness) / 2
   const circumference = 2 * Math.PI * radius
+  // Gap pequeno entre fatias (só se tiver mais de 1 segmento)
+  const gap = nonZero.length > 1 ? 3 : 0
+  const totalGap = gap * nonZero.length
+  const usable = circumference - totalGap
   let offset = 0
 
   if (total === 0) {
@@ -129,26 +147,26 @@ function DonutChart({ segments, size = 160, thickness = 28, centerLabel, centerV
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--bg-input)" strokeWidth={thickness} />
-        {segments.map((seg, i) => {
-          if (seg.value === 0) return null
-          const length = (seg.value / total) * circumference
+        {nonZero.map((seg, i) => {
+          const length = (seg.value / total) * usable
           const el = (
             <circle key={i}
               cx={size / 2} cy={size / 2} r={radius}
               fill="none" stroke={seg.color} strokeWidth={thickness}
+              strokeLinecap="round"
               strokeDasharray={`${length} ${circumference - length}`}
               strokeDashoffset={-offset}
-              style={{ transition: 'stroke-dasharray 0.4s ease' }}
+              style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(.4,0,.2,1)' }}
             />
           )
-          offset += length
+          offset += length + gap
           return el
         })}
       </svg>
       {(centerValue !== undefined || centerLabel) && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          {centerValue !== undefined && <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{centerValue}</div>}
-          {centerLabel && <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{centerLabel}</div>}
+          {centerValue !== undefined && <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{centerValue}</div>}
+          {centerLabel && <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '5px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{centerLabel}</div>}
         </div>
       )}
     </div>
@@ -190,12 +208,19 @@ function PieCard({ title, subtitle, segments, centerValue, centerLabel }: {
 }
 
 function StatCard({ label, value, icon: Icon, color, bg, onClick, delta }: any) {
+  const softShadow = `0 1px 3px ${hexToRgba(color, 0.05)}, 0 1px 2px rgba(0,0,0,.03)`
+  const hoverShadow = `0 8px 20px ${hexToRgba(color, 0.1)}, 0 2px 4px ${hexToRgba(color, 0.05)}`
   return (
-    <div onClick={onClick} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s' }}
-      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
-      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon size={18} color={color} />
+    <div onClick={onClick} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: softShadow, cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s cubic-bezier(.4,0,.2,1)' }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.boxShadow = hoverShadow; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)' } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = softShadow; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}>
+      <div style={{
+        width: '42px', height: '42px', borderRadius: '11px',
+        background: `linear-gradient(135deg, ${hexToRgba(color, 0.12)}, ${hexToRgba(color, 0.22)})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        boxShadow: `inset 0 0 0 1px ${hexToRgba(color, 0.15)}`,
+      }}>
+        <Icon size={19} color={color} strokeWidth={2.2} />
       </div>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -568,26 +593,64 @@ export default function DashboardPage() {
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: '13px' }}>
             Nenhuma mensagem enviada nos últimos {analyticsDays} dias.
           </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '180px', paddingBottom: '24px', position: 'relative' }}>
-            {[0.25, 0.5, 0.75, 1].map(p => (
-              <div key={p} style={{ position: 'absolute', left: 0, right: 0, bottom: `${24 + p * 156}px`, borderTop: '1px dashed var(--divider)', zIndex: 0 }} />
-            ))}
-            {days.map((day, i) => {
-              const sent = byDay[day]?.sent || 0
-              const showLabel = days.length <= 14 ? true : (i % Math.ceil(days.length / 10) === 0)
-              return (
-                <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                  <div title={`${day}: ${sent} enviadas`}
-                    style={{ width: '100%', maxWidth: '22px', height: `${Math.max(sent / maxVal * 156, sent > 0 ? 3 : 0)}px`, background: '#22c55e', borderRadius: '3px 3px 0 0', transition: 'height 0.3s ease', cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#16a34a'}
-                    onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#22c55e'} />
-                  {showLabel && <span style={{ position: 'absolute', bottom: '0', fontSize: '9px', color: 'var(--text-faintest)', whiteSpace: 'nowrap' }}>{day.slice(5)}</span>}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        ) : (() => {
+          const W = 1000, H = 180, P = 16
+          const n = days.length
+          const stepX = n > 1 ? (W - P * 2) / (n - 1) : 0
+          const scaleY = (v: number) => H - P - (v / maxVal) * (H - P * 2)
+          const points = days.map((day, i) => ({
+            x: P + i * stepX,
+            y: scaleY(byDay[day]?.sent || 0),
+            v: byDay[day]?.sent || 0,
+            label: day,
+          }))
+          // Smooth path using bezier cubics
+          const buildSmoothPath = () => {
+            if (points.length === 0) return ''
+            let d = `M ${points[0].x},${points[0].y}`
+            for (let i = 0; i < points.length - 1; i++) {
+              const p0 = points[i], p1 = points[i + 1]
+              const cpX = (p0.x + p1.x) / 2
+              d += ` C ${cpX},${p0.y} ${cpX},${p1.y} ${p1.x},${p1.y}`
+            }
+            return d
+          }
+          const linePath = buildSmoothPath()
+          const areaPath = `${linePath} L ${points[points.length - 1].x},${H - P} L ${points[0].x},${H - P} Z`
+          return (
+            <div style={{ position: 'relative' }}>
+              <svg viewBox={`0 0 ${W} ${H + 20}`} preserveAspectRatio="none" style={{ width: '100%', height: '200px', display: 'block' }}>
+                <defs>
+                  <linearGradient id="msgAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {/* grid lines */}
+                {[0.25, 0.5, 0.75].map(p => (
+                  <line key={p} x1={P} x2={W - P} y1={P + p * (H - P * 2)} y2={P + p * (H - P * 2)} stroke="var(--divider)" strokeDasharray="4 4" />
+                ))}
+                <path d={areaPath} fill="url(#msgAreaGradient)" />
+                <path d={linePath} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                {points.map((p, i) => (
+                  <g key={i}>
+                    <circle cx={p.x} cy={p.y} r={3} fill="#fff" stroke="#22c55e" strokeWidth="2" />
+                    <title>{`${p.label}: ${p.v} enviadas`}</title>
+                  </g>
+                ))}
+              </svg>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `0 ${P}px`, fontSize: '10px', color: 'var(--text-faintest)', marginTop: '-8px' }}>
+                {(() => {
+                  const labels: { idx: number; text: string }[] = []
+                  const maxLabels = 8
+                  const step = Math.max(1, Math.ceil(n / maxLabels))
+                  for (let i = 0; i < n; i += step) labels.push({ idx: i, text: days[i].slice(5) })
+                  return labels.map(l => <span key={l.idx}>{l.text}</span>)
+                })()}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Conversas por atendente */}
@@ -708,17 +771,33 @@ export default function DashboardPage() {
                 <tbody>
                   {agentRanking.map((agent, i) => {
                     const medalColors = ['#d97706', '#9ca3af', '#b45309']
+                    const avatarColors = [
+                      { bg: '#dbeafe', fg: '#1d4ed8' }, { bg: '#dcfce7', fg: '#15803d' },
+                      { bg: '#fce7f3', fg: '#be185d' }, { bg: '#ede9fe', fg: '#6d28d9' },
+                      { bg: '#ffedd5', fg: '#c2410c' }, { bg: '#e0f2fe', fg: '#0369a1' },
+                      { bg: '#fef3c7', fg: '#b45309' }, { bg: '#ccfbf1', fg: '#0f766e' },
+                    ]
+                    const hash = (agent.name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+                    const av = avatarColors[hash % avatarColors.length]
+                    const initials = (agent.name || '??').trim().slice(0, 2).toUpperCase()
                     return (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--divider)' }}
+                      <tr key={i} style={{ borderBottom: '1px solid var(--divider)', transition: 'background 0.15s' }}
                         onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg)'}
                         onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: i < 3 ? medalColors[i] : 'var(--text-faint)' }}>
-                          {i + 1}
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: i < 3 ? medalColors[i] : 'var(--text-faint)', width: '36px', fontVariantNumeric: 'tabular-nums' }}>
+                          {i < 3 ? '🏆' : i + 1}
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>{agent.name}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#22c55e' }}>{agent.messagesResponded}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>{agent.conversationsClosed}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: av.bg, color: av.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                              {initials}
+                            </div>
+                            <span>{agent.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#22c55e', fontVariantNumeric: 'tabular-nums' }}>{agent.messagesResponded}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{agent.conversationsClosed}</td>
                       </tr>
                     )
                   })}
