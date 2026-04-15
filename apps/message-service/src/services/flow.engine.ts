@@ -798,6 +798,8 @@ export class FlowEngine {
           if (data?.question) {
             await this.sendMessage({ tenantId: ctx.tenantId, channelId: ctx.channelId, contactId: ctx.contactId, conversationId: ctx.conversationId, to: ctx.phone, contentType: 'text', body: this.interpolate(data.question, ctx, variables) })
           }
+          // Loga o input antes de pausar — senão analytics não sabe que cliente parou aqui
+          await this.logNode(flowId, node.id, ctx, 'waiting', `Aguardando resposta: ${(data?.question || '').slice(0, 60)}`)
           const saveVar = data?.saveAs || 'resposta'
           const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
           const pendingConditionNodeId = (nextNode?.type === 'condition') ? nextNode.id : null
@@ -1419,6 +1421,7 @@ export class FlowEngine {
             contactId: ctx.contactId, conversationId: ctx.conversationId,
             to: ctx.phone, contentType: 'text', body: question,
           })
+          await this.logNode(flowId, node.id, ctx, 'waiting', `Aguardando nota CSAT`)
           const csatStateId = stateId || generateId()
           await db.from('flow_states').upsert({
             id: csatStateId, flow_id: flowId, tenant_id: ctx.tenantId, contact_id: ctx.contactId,
