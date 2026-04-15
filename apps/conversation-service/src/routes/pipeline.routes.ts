@@ -358,18 +358,36 @@ router.get('/pipelines/forecast', async (req, res, next) => {
 
     // Cards do pipeline (apenas abertos — não inclui colunas com probability=0 tipo "Perdido")
     let cardQuery = db.from('pipeline_cards')
-      .select('id, column_key, deal_value, probability_override, assigned_to, users:assigned_to(name)')
+      .select('id, column_key, deal_value, probability_override, assigned_to, contact_id, users:assigned_to(name)')
       .eq('tenant_id', tenantId)
     cardQuery = pipelineId ? cardQuery.eq('pipeline_id', pipelineId) : cardQuery.is('pipeline_id', null)
     const { data: cards } = await cardQuery
 
     // Conversations com pipeline_stage (legacy — alguns cards ainda são conversas)
     let convQuery = db.from('conversations')
-      .select('id, pipeline_stage, deal_value, assigned_to, users:assigned_to(name)')
+      .select('id, pipeline_stage, deal_value, assigned_to, contact_id, users:assigned_to(name)')
       .eq('tenant_id', tenantId)
       .in('status', ['open', 'waiting'])
     convQuery = pipelineId ? convQuery.eq('pipeline_id', pipelineId) : convQuery.is('pipeline_id', null)
     const { data: convs } = await convQuery
+
+    // Compras por contact_id — soma total_price + shipping
+    const contactIds = new Set<string>()
+    for (const c of (cards || [])) if ((c as any).contact_id) contactIds.add((c as any).contact_id)
+    for (const c of (convs || [])) if ((c as any).contact_id) contactIds.add((c as any).contact_id)
+    const purchasesByContact: Record<string, number> = {}
+    if (contactIds.size > 0) {
+      const { data: purchases } = await db.from('purchases')
+        .select('contact_id, total_price, shipping')
+        .eq('tenant_id', tenantId)
+        .in('contact_id', Array.from(contactIds))
+      for (const p of (purchases || [])) {
+        const cid = (p as any).contact_id
+        if (!cid) continue
+        purchasesByContact[cid] = (purchasesByContact[cid] || 0) + Number(p.total_price || 0) + Number((p as any).shipping || 0)
+      }
+    }
+    const purchasesFor = (contactId: string | null | undefined) => contactId ? (purchasesByContact[contactId] || 0) : 0
 
     const probFor = (key: string | null, override: number | null) => {
       if (override !== null && override !== undefined) return override
@@ -382,7 +400,7 @@ router.get('/pipelines/forecast', async (req, res, next) => {
     const rows: Row[] = []
 
     for (const c of (cards || [])) {
-      const val = Number(c.deal_value || 0)
+      const val = Number(c.deal_value || 0) + purchasesFor((c as any).contact_id)
       const prob = probFor(c.column_key, (c as any).probability_override)
       rows.push({
         id: c.id, columnKey: c.column_key, dealValue: val,
@@ -392,8 +410,8 @@ router.get('/pipelines/forecast', async (req, res, next) => {
       })
     }
     for (const c of (convs || [])) {
-      const val = Number(c.deal_value || 0)
-      if (val <= 0) continue // conversas sem valor não entram no forecast
+      const val = Number(c.deal_value || 0) + purchasesFor((c as any).contact_id)
+      if (val <= 0) continue // conversas sem valor nenhum (nem produtos) não entram
       const prob = probFor(c.pipeline_stage, null)
       rows.push({
         id: c.id, columnKey: c.pipeline_stage || 'lead', dealValue: val,

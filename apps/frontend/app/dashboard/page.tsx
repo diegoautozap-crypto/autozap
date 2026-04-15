@@ -680,9 +680,19 @@ export default function DashboardPage() {
     { label: t('dashboard.messagesThisMonth'), value: usage?.sent ?? 0,          sub: `${t('dashboard.of')} ${usage?.limit === null ? '∞' : (usage?.limit ?? 0).toLocaleString()} ${t('dashboard.available')}`, icon: Send,        color: '#ea580c', bg: '#fff7ed', href: '/dashboard/campaigns' },
   ]
 
+  const getContactPurchaseTotal = (contactId: string): number => {
+    const purchases = (purchasesByContact as any)[contactId]
+    if (!purchases || !Array.isArray(purchases)) return 0
+    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
+  }
   const funnelStages = (pipelineColumns || []).map((col: any) => {
     const cards = pipelineBoard?.[col.key] || []
-    const revenue = cards.reduce((s: number, c: any) => s + Number(c.deal_value || 0), 0)
+    const revenue = cards.reduce((s: number, c: any) => {
+      const direct = Number(c.deal_value || 0)
+      const cid = c.contacts?.id || c.contact_id
+      const products = cid ? getContactPurchaseTotal(cid) : 0
+      return s + direct + products
+    }, 0)
     return {
       label: col.label,
       value: cards.length,
@@ -695,11 +705,6 @@ export default function DashboardPage() {
 
   // Receita fechada: cards em coluna com probabilidade 100% (ou label "fechad"/"ganho"/"won")
   // Soma deal_value direto + valor total de produtos comprados pelo contato do card
-  const getContactPurchaseTotal = (contactId: string): number => {
-    const purchases = (purchasesByContact as any)[contactId]
-    if (!purchases || !Array.isArray(purchases)) return 0
-    return purchases.reduce((s: number, p: any) => s + Number(p.total_price || 0) + Number(p.shipping || 0), 0)
-  }
   const wonColumns = (pipelineColumns || []).filter((c: any) =>
     c.probability === 100 || /fechad|ganho|won|conclu|vendid|success/i.test(c.label || '')
   )
