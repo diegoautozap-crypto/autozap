@@ -7,7 +7,7 @@ router.use(requireAuth)
 
 // Schema de uma ação individual
 const actionSchema = z.object({
-  type: z.enum(['send_message', 'assign_agent', 'add_tag', 'move_pipeline']),
+  type: z.enum(['send_message', 'assign_agent', 'add_tag', 'move_pipeline', 'webhook', 'create_task']),
   value: z.record(z.any()).optional().default({}),
   delay: z.number().min(0).max(86400).optional().default(0), // delay em segundos antes desta ação
 })
@@ -20,7 +20,7 @@ const automationSchema = z.object({
   // Suporte a múltiplas ações (novo) — se não vier, monta a partir dos campos legados
   actions: z.array(actionSchema).min(1).optional(),
   // Campos legados mantidos para compatibilidade
-  action_type: z.enum(['send_message', 'assign_agent', 'add_tag', 'move_pipeline']).optional(),
+  action_type: z.enum(['send_message', 'assign_agent', 'add_tag', 'move_pipeline', 'webhook', 'create_task']).optional(),
   action_value: z.record(z.any()).optional().default({}),
   is_active: z.boolean().optional().default(true),
   cooldown_minutes: z.number().nullable().optional(),

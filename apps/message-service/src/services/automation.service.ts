@@ -15,7 +15,7 @@ interface AutomationContext {
 }
 
 interface AutomationAction {
-  type: 'send_message' | 'assign_agent' | 'add_tag' | 'move_pipeline'
+  type: 'send_message' | 'assign_agent' | 'add_tag' | 'move_pipeline' | 'webhook' | 'create_task'
   value: Record<string, any>
   delay?: number // segundos antes de executar esta ação
 }
@@ -221,6 +221,81 @@ export class AutomationService {
           toColumn: stage,
           metadata: { source: 'automation', automationId },
         })
+        break
+      }
+
+      case 'webhook': {
+        const url = this.interpolate(action.value?.url || '', ctx)
+        if (!url) { await this.logAutomation(automationId, ctx, 'error', `Webhook sem URL${stepLabel}`); return }
+        const method = (action.value?.method || 'POST').toUpperCase()
+        const headersRaw = action.value?.headers || {}
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        for (const [k, v] of Object.entries(headersRaw)) headers[k] = this.interpolate(String(v), ctx)
+        // Payload default inclui contexto. Se vier body custom, faz merge.
+        const defaultPayload = {
+          tenantId: ctx.tenantId,
+          contactId: ctx.contactId,
+          conversationId: ctx.conversationId,
+          phone: ctx.phone,
+          message: ctx.messageBody,
+          automationId,
+        }
+        let body: string | undefined
+        if (method !== 'GET' && method !== 'HEAD') {
+          let customBody = action.value?.body
+          if (typeof customBody === 'string') {
+            customBody = this.interpolate(customBody, ctx)
+            body = customBody
+          } else if (customBody && typeof customBody === 'object') {
+            const interpolated: any = {}
+            for (const [k, v] of Object.entries(customBody)) interpolated[k] = typeof v === 'string' ? this.interpolate(v, ctx) : v
+            body = JSON.stringify({ ...defaultPayload, ...interpolated })
+          } else {
+            body = JSON.stringify(defaultPayload)
+          }
+        }
+        try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 10000)
+          const res = await fetch(url, { method, headers, body, signal: controller.signal })
+          clearTimeout(timeout)
+          await this.logAutomation(automationId, ctx, res.ok ? 'success' : 'error', `Webhook ${method} ${res.status}${stepLabel}`)
+        } catch (err: any) {
+          await this.logAutomation(automationId, ctx, 'error', `Webhook falhou${stepLabel}: ${err.message || 'erro'}`)
+        }
+        break
+      }
+
+      case 'create_task': {
+        const title = this.interpolate(action.value?.title || '', ctx)
+        if (!title) { await this.logAutomation(automationId, ctx, 'error', `Task sem título${stepLabel}`); return }
+        const description = this.interpolate(action.value?.description || '', ctx) || null
+        const assignedTo = action.value?.assignedTo || null
+        const priority = action.value?.priority || 'medium'
+        // dueInHours: prazo relativo (ex: 2 = 2h a partir de agora). Preferido ao dueDate absoluto.
+        let dueDate: string | null = null
+        if (action.value?.dueInHours) {
+          dueDate = new Date(Date.now() + Number(action.value.dueInHours) * 3600 * 1000).toISOString()
+        } else if (action.value?.dueDate) {
+          dueDate = new Date(action.value.dueDate).toISOString()
+        }
+        const { error } = await db.from('tasks').insert({
+          tenant_id: ctx.tenantId,
+          conversation_id: ctx.conversationId,
+          contact_id: ctx.contactId,
+          assigned_to: assignedTo,
+          created_by: null,
+          title,
+          description,
+          due_date: dueDate,
+          priority,
+          status: 'pending',
+        })
+        if (error) {
+          await this.logAutomation(automationId, ctx, 'error', `Tarefa falhou${stepLabel}: ${error.message}`)
+        } else {
+          await this.logAutomation(automationId, ctx, 'success', `Tarefa criada${stepLabel}: ${title.slice(0, 40)}`)
+        }
         break
       }
 

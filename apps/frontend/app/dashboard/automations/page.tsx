@@ -26,10 +26,12 @@ const TRIGGER_TYPES = [
 ]
 
 const ACTION_TYPES = [
-  { value: 'send_message', labelKey: 'automations.actionSendMessage' },
-  { value: 'assign_agent', labelKey: 'automations.actionAssignAgent' },
-  { value: 'move_pipeline', labelKey: 'automations.actionMovePipeline' },
-  { value: 'add_tag', labelKey: 'automations.actionAddTag' },
+  { value: 'send_message', labelKey: 'automations.actionSendMessage', label: 'Enviar mensagem' },
+  { value: 'assign_agent', labelKey: 'automations.actionAssignAgent', label: 'Atribuir agente' },
+  { value: 'move_pipeline', labelKey: 'automations.actionMovePipeline', label: 'Mover pipeline' },
+  { value: 'add_tag', labelKey: 'automations.actionAddTag', label: 'Adicionar tag' },
+  { value: 'webhook', labelKey: 'automations.actionWebhook', label: 'Chamar webhook' },
+  { value: 'create_task', labelKey: 'automations.actionCreateTask', label: 'Criar tarefa' },
 ]
 
 const PIPELINE_STAGES = [
@@ -188,6 +190,68 @@ function ActionEditor({ action, index, total, tags, onChange, onRemove, onMoveUp
           )}
         </div>
       )}
+
+      {action.type === 'webhook' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div>
+            <label style={labelStyle}>URL</label>
+            <input style={inputStyle} placeholder="https://api.seudominio.com/webhook"
+              value={action.value?.url || ''}
+              onChange={e => onChange({ ...action, value: { ...action.value, url: e.target.value } })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+            <div>
+              <label style={labelStyle}>Método</label>
+              <select style={{ ...inputStyle, background: '#fff' }}
+                value={action.value?.method || 'POST'}
+                onChange={e => onChange({ ...action, value: { ...action.value, method: e.target.value } })}>
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+              </select>
+            </div>
+          </div>
+          <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.5 }}>
+            Payload enviado automático: <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: '3px' }}>tenantId, contactId, conversationId, phone, message</code>. Timeout: 10s.
+          </p>
+        </div>
+      )}
+
+      {action.type === 'create_task' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div>
+            <label style={labelStyle}>Título da tarefa</label>
+            <input style={inputStyle} placeholder="Ex: Entrar em contato com {{name}}"
+              value={action.value?.title || ''}
+              onChange={e => onChange({ ...action, value: { ...action.value, title: e.target.value } })} />
+          </div>
+          <div>
+            <label style={labelStyle}>Descrição <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(opcional)</span></label>
+            <textarea style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' as any }}
+              value={action.value?.description || ''}
+              onChange={e => onChange({ ...action, value: { ...action.value, description: e.target.value } })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={labelStyle}>Prioridade</label>
+              <select style={{ ...inputStyle, background: '#fff' }}
+                value={action.value?.priority || 'medium'}
+                onChange={e => onChange({ ...action, value: { ...action.value, priority: e.target.value } })}>
+                <option value="low">Baixa</option>
+                <option value="medium">Média</option>
+                <option value="high">Alta</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Prazo (horas)</label>
+              <input type="number" min="0" style={inputStyle} placeholder="2"
+                value={action.value?.dueInHours || ''}
+                onChange={e => onChange({ ...action, value: { ...action.value, dueInHours: e.target.value === '' ? '' : Number(e.target.value) } })} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -233,6 +297,8 @@ function SortableAutomationCard({ automation, index, onToggle, onEdit, onDelete,
       const tag = tags.find((tg: any) => tg.id === value.tagId)
       return tag ? `${t('automations.addTagPrefix')} ${tag.name}` : t('automations.actionAddTag')
     }
+    if (type === 'webhook') return `Webhook: ${(value.method || 'POST')} ${(value.url || '').slice(0, 40)}${(value.url || '').length > 40 ? '…' : ''}`
+    if (type === 'create_task') return `Criar tarefa: ${(value.title || '').slice(0, 40)}${(value.title || '').length > 40 ? '…' : ''}`
     return type
   }
 
