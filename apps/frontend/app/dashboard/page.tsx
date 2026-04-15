@@ -243,7 +243,7 @@ function CardHeader({ title, subtitle, right }: { title: string; subtitle?: stri
   )
 }
 
-function ComboBarLine({ data, barColor = '#14b8a6', lineColor = '#0f172a' }: {
+function ComboBarLine({ data, barColor = '#22c55e', lineColor = '#0f172a' }: {
   data: { label: string; value: number }[]
   barColor?: string
   lineColor?: string
@@ -313,7 +313,7 @@ function ComboBarLine({ data, barColor = '#14b8a6', lineColor = '#0f172a' }: {
   )
 }
 
-function HBarChartPBI({ data, color = '#14b8a6', maxBars = 8 }: {
+function HBarChartPBI({ data, color = '#22c55e', maxBars = 8 }: {
   data: { label: string; value: number }[]
   color?: string
   maxBars?: number
@@ -341,7 +341,7 @@ function HBarChartPBI({ data, color = '#14b8a6', maxBars = 8 }: {
   )
 }
 
-function BigNumberTile({ title, subtitle, value, color = '#14b8a6', icon: Icon, onClick }: {
+function BigNumberTile({ title, subtitle, value, color = '#22c55e', icon: Icon, onClick }: {
   title: string
   subtitle?: string
   value: string | number
@@ -411,7 +411,7 @@ function RevenueTile({ value, dealsCount, directValue, productsValue, onClick }:
   return (
     <div onClick={onClick}
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--shadow)', cursor: onClick ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '140px', transition: 'all 0.2s' }}
-      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(20,184,166,0.4)' } }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(34,197,94,0.4)' } }}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)' }}>
       <div>
         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Receita fechada</div>
@@ -429,8 +429,8 @@ function RevenueTile({ value, dealsCount, directValue, productsValue, onClick }:
             )}
           </div>
         </div>
-        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(20,184,166,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <DollarSign size={18} color="#0f766e" strokeWidth={2.2} />
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <DollarSign size={18} color="#16a34a" strokeWidth={2.2} />
         </div>
       </div>
     </div>
@@ -448,7 +448,7 @@ function PlanUsageTile({ used, limit }: { used: number; limit: number | null }) 
   const pct = limit && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : null
   const willExceed = limit !== null && limit > 0 && projected > limit
   const daysUntilLimit = limit && dailyAvg > 0 && willExceed ? Math.max(0, Math.ceil((limit - used) / dailyAvg)) : null
-  const accent = limit === null ? '#14b8a6' : willExceed ? '#dc2626' : pct !== null && pct > 85 ? '#f59e0b' : '#14b8a6'
+  const accent = limit === null ? '#22c55e' : willExceed ? '#dc2626' : pct !== null && pct > 85 ? '#f59e0b' : '#22c55e'
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '140px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -485,7 +485,7 @@ function PlanUsageTile({ used, limit }: { used: number; limit: number | null }) 
   )
 }
 
-function FunnelChart({ stages, color = '#14b8a6' }: { stages: { label: string; value: number; revenue?: number; probability?: number | null }[]; color?: string }) {
+function FunnelChart({ stages, color = '#22c55e' }: { stages: { label: string; value: number; revenue?: number; probability?: number | null }[]; color?: string }) {
   if (stages.length === 0 || stages[0].value === 0) {
     return <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem cards no pipeline</div>
   }
@@ -496,10 +496,10 @@ function FunnelChart({ stages, color = '#14b8a6' }: { stages: { label: string; v
   return (
     <div>
       {hasRevenue && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '8px 12px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', borderRadius: '8px' }}>
-          <DollarSign size={14} color="#0f766e" />
-          <span style={{ fontSize: '11px', color: '#0f766e', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Projeção ponderada</span>
-          <span style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 700, color: '#0f766e', letterSpacing: '-0.02em' }}>{formatBRL(weightedTotal)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '8px 12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '8px' }}>
+          <DollarSign size={14} color="#16a34a" />
+          <span style={{ fontSize: '11px', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Projeção ponderada</span>
+          <span style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 700, color: '#16a34a', letterSpacing: '-0.02em' }}>{formatBRL(weightedTotal)}</span>
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -843,7 +843,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {[7, 14, 30, 90].map(d => (
             <button key={d} onClick={() => setAnalyticsDays(d)}
-              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#14b8a6' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? 'rgba(20,184,166,0.08)' : 'transparent', color: analyticsDays === d ? '#0f766e' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: `1px solid ${analyticsDays === d ? '#22c55e' : 'var(--border)'}`, cursor: 'pointer', background: analyticsDays === d ? 'rgba(34,197,94,0.08)' : 'transparent', color: analyticsDays === d ? '#16a34a' : 'var(--text-muted)', transition: 'all 0.1s' }}>
               {d}d
             </button>
           ))}
@@ -874,7 +874,7 @@ export default function DashboardPage() {
             right={
               <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '11px', color: 'var(--text-faint)' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#14b8a6' }} /> Enviadas
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#22c55e' }} /> Enviadas
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                   <span style={{ width: '12px', height: '2px', background: '#0f172a' }} /> Média 7d
@@ -903,13 +903,13 @@ export default function DashboardPage() {
               : 'SEM CARDS AINDA'}
             right={<button onClick={() => router.push('/dashboard/pipeline')} style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Abrir</button>}
           />
-          <FunnelChart stages={funnelStages} color="#14b8a6" />
+          <FunnelChart stages={funnelStages} color="#22c55e" />
         </div>
 
         <div style={{ gridColumn: 'span 4', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
           <CardHeader title="Conversas por atendente" subtitle="TOP ATENDENTES" />
           {byAgent.length > 0 ? (
-            <HBarChartPBI data={byAgent.map(a => ({ label: a.name, value: a.count }))} color="#14b8a6" maxBars={6} />
+            <HBarChartPBI data={byAgent.map(a => ({ label: a.name, value: a.count }))} color="#22c55e" maxBars={6} />
           ) : (
             <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-faint)', fontSize: '13px' }}>Sem atendentes ativos</div>
           )}
@@ -922,7 +922,7 @@ export default function DashboardPage() {
             centerValue={(conversations?.length || 0) + (conversationsWaiting?.total || 0)}
             centerLabel="abertas"
             segments={[
-              { label: 'Em aberto', value: conversations?.length || 0, color: '#14b8a6' },
+              { label: 'Em aberto', value: conversations?.length || 0, color: '#22c55e' },
               { label: 'Aguardando', value: conversationsWaiting?.total || 0, color: '#f59e0b' },
               { label: 'Fechadas', value: conversationsClosed?.total || 0, color: '#334155' },
             ]}
@@ -940,16 +940,16 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <DonutChart size={140} thickness={22}
                 segments={[
-                  { label: 'Dentro', value: analytics.sla.withinCount || 0, color: '#14b8a6' },
+                  { label: 'Dentro', value: analytics.sla.withinCount || 0, color: '#22c55e' },
                   { label: 'Fora', value: analytics.sla.breachedCount || 0, color: '#dc2626' },
                 ]}
                 centerValue={analytics.sla.withinPct !== null ? `${analytics.sla.withinPct}%` : '—'}
                 centerLabel="no SLA"
               />
               <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                <div style={{ padding: '14px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.25)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f766e', letterSpacing: '-0.02em' }}>{analytics.sla.withinCount || 0}</div>
-                  <div style={{ fontSize: '10px', color: '#0f766e', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>No prazo</div>
+                <div style={{ padding: '14px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a', letterSpacing: '-0.02em' }}>{analytics.sla.withinCount || 0}</div>
+                  <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>No prazo</div>
                 </div>
                 <div style={{ padding: '14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer' }} onClick={() => router.push('/dashboard/inbox')}>
                   <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563eb', letterSpacing: '-0.02em' }}>{analytics.sla.currentlyWaiting || 0}</div>
@@ -966,12 +966,12 @@ export default function DashboardPage() {
 
         <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
           <BigNumberTile title="Campanhas" subtitle={`${campaigns?.filter((c: any) => c.status === 'running').length || 0} EM ANDAMENTO`} value={campaigns?.length ?? 0} color="#2563eb" icon={Megaphone} onClick={() => router.push('/dashboard/campaigns')} />
-          <BigNumberTile title="Conversas abertas" subtitle={`${conversations?.filter((c: any) => c.unread_count > 0).length || 0} NÃO LIDAS`} value={conversations?.length ?? 0} color="#14b8a6" icon={MessageSquare} onClick={() => router.push('/dashboard/inbox')} />
+          <BigNumberTile title="Conversas abertas" subtitle={`${conversations?.filter((c: any) => c.unread_count > 0).length || 0} NÃO LIDAS`} value={conversations?.length ?? 0} color="#22c55e" icon={MessageSquare} onClick={() => router.push('/dashboard/inbox')} />
         </div>
 
         {/* Row 4: KPI volume (4 + 4 + 4) */}
         <div style={{ gridColumn: 'span 4' }}>
-          <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString('pt-BR')} icon={Send} color="#14b8a6" delta={deltaFn(totalSent, prev.totalSent)} />
+          <StatCard label={`Mensagens (${analyticsDays}d)`} value={totalSent.toLocaleString('pt-BR')} icon={Send} color="#22c55e" delta={deltaFn(totalSent, prev.totalSent)} />
         </div>
         <div style={{ gridColumn: 'span 4' }}>
           <StatCard label={t('dashboard.deliveryRate')} value={totalSent > 0 ? `${deliveryRate}%` : '—'} icon={CheckCheck} color="#22c55e" delta={totalSent > 0 && prev.deliveryRate != null ? deliveryRate - prev.deliveryRate : null} />
@@ -983,7 +983,7 @@ export default function DashboardPage() {
         {/* Row agente selecionado (opcional) */}
         {selectedAgent && (
           <>
-            <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.assignedOpenConvs')} value={agentConversations ?? '—'} icon={MessageSquare} color="#14b8a6" /></div>
+            <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.assignedOpenConvs')} value={agentConversations ?? '—'} icon={MessageSquare} color="#22c55e" /></div>
             <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.closedConvs7d')} value={agentClosedLast7d ?? '—'} icon={CheckCheck} color="#2563eb" /></div>
             <div style={{ gridColumn: 'span 4' }}><StatCard label={t('dashboard.avgResponseTime7d')} value={formatResponseTime(avgResponseMinutes)} icon={Clock} color="#ea580c" /></div>
           </>
@@ -1012,7 +1012,7 @@ export default function DashboardPage() {
                 switch (ev.event_type) {
                   case 'created': text = `${contactName} entrou em ${ev.to_column || '—'}`; color = '#7c3aed'; break
                   case 'moved': text = `${contactName} · ${ev.from_column || '—'} → ${ev.to_column || '—'}`; color = '#f59e0b'; break
-                  case 'value_changed': text = `${contactName} · valor R$ ${Number(ev.from_value || 0).toFixed(0)} → R$ ${Number(ev.to_value || 0).toFixed(0)}`; color = '#14b8a6'; break
+                  case 'value_changed': text = `${contactName} · valor R$ ${Number(ev.from_value || 0).toFixed(0)} → R$ ${Number(ev.to_value || 0).toFixed(0)}`; color = '#22c55e'; break
                   case 'assigned': text = `${contactName} · responsável alterado`; color = '#0891b2'; break
                   default: text = `${contactName} · ${ev.event_type}`
                 }
@@ -1039,18 +1039,18 @@ export default function DashboardPage() {
               segments={(pipelineColumns || []).map((col: any, i: number) => ({
                 label: col.label,
                 value: pipelineBoard?.[col.key]?.length || 0,
-                color: col.color || ['#14b8a6', '#2563eb', '#7c3aed', '#db2777', '#f59e0b', '#dc2626'][i % 6],
+                color: col.color || ['#22c55e', '#2563eb', '#7c3aed', '#db2777', '#f59e0b', '#dc2626'][i % 6],
               }))}
             />
           ) : (
             <div style={{ height: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column' }}>
               <CardHeader title="Pipeline por etapa" subtitle="CARDS EM CADA COLUNA" />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(20,184,166,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                  <Workflow size={20} color="#14b8a6" />
+                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                  <Workflow size={20} color="#22c55e" />
                 </div>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px' }}>Configure seu pipeline</p>
-                <button onClick={() => router.push('/dashboard/pipeline')} style={{ padding: '6px 12px', background: '#14b8a6', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => router.push('/dashboard/pipeline')} style={{ padding: '6px 12px', background: '#22c55e', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   Configurar <ChevronRight size={12} />
                 </button>
               </div>
@@ -1080,7 +1080,7 @@ export default function DashboardPage() {
                     {agentRanking.map((agent, i) => {
                       const medalColors = ['#f59e0b', '#9ca3af', '#b45309']
                       const avatarColors = [
-                        { bg: '#dbeafe', fg: '#1d4ed8' }, { bg: '#ccfbf1', fg: '#0f766e' },
+                        { bg: '#dbeafe', fg: '#1d4ed8' }, { bg: '#ccfbf1', fg: '#16a34a' },
                         { bg: '#fce7f3', fg: '#be185d' }, { bg: '#ede9fe', fg: '#6d28d9' },
                         { bg: '#ffedd5', fg: '#c2410c' }, { bg: '#e0f2fe', fg: '#0369a1' },
                       ]
@@ -1098,7 +1098,7 @@ export default function DashboardPage() {
                               <span>{agent.name}</span>
                             </div>
                           </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#14b8a6', fontVariantNumeric: 'tabular-nums' }}>{agent.messagesResponded}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#22c55e', fontVariantNumeric: 'tabular-nums' }}>{agent.messagesResponded}</td>
                           <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatResponseTime(agent.avgResponseMinutes)}</td>
                           <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{agent.conversationsClosed}</td>
                         </tr>

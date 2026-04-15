@@ -1165,7 +1165,7 @@ export default function PipelinePage() {
                                     }}
                                     onBlur={save}
                                     placeholder="R$"
-                                    style={{ fontSize: '12px', padding: '3px 8px', border: '1px solid #14b8a6', borderRadius: '6px', outline: 'none', width: '100px', fontWeight: 700, color: '#0f766e', background: '#fff', fontVariantNumeric: 'tabular-nums' }} />
+                                    style={{ fontSize: '12px', padding: '3px 8px', border: '1px solid #22c55e', borderRadius: '6px', outline: 'none', width: '100px', fontWeight: 700, color: '#16a34a', background: '#fff', fontVariantNumeric: 'tabular-nums' }} />
                                 )
                               }
                               if (hasValue) {
@@ -1176,7 +1176,7 @@ export default function PipelinePage() {
                                     setEditingValueId(conv._cardId || conv.id)
                                     setValueDraft(String(Math.round(Number(conv.deal_value))))
                                   }}
-                                    style={{ fontSize: '12px', fontWeight: 700, color: '#0f766e', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.25)', padding: '2px 8px', borderRadius: '6px', cursor: canEdit('/dashboard/pipeline') ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums' }}>
+                                    style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '6px', cursor: canEdit('/dashboard/pipeline') ? 'pointer' : 'default', fontVariantNumeric: 'tabular-nums' }}>
                                     {formatBRL(Number(conv.deal_value))}
                                   </button>
                                 )
