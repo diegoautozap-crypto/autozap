@@ -402,41 +402,46 @@ function AlertBanner({ alerts }: { alerts: { severity: 'critical' | 'warning'; i
   )
 }
 
-function GoalTile({ title, current, target, unit = '' }: { title: string; current: number; target: number | null; unit?: string }) {
+function PlanUsageTile({ used, limit }: { used: number; limit: number | null }) {
   const now = new Date()
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const dayOfMonth = now.getDate()
-  const monthProgress = dayOfMonth / daysInMonth
-  const pct = target && target > 0 ? Math.min(100, Math.round((current / target) * 100)) : null
-  const projected = monthProgress > 0 ? Math.round(current / monthProgress) : current
-  const onPace = target && projected >= target
-  const accent = target === null ? '#14b8a6' : onPace ? '#14b8a6' : pct && pct >= 70 ? '#f59e0b' : '#dc2626'
+  const daysElapsed = dayOfMonth
+  const daysRemaining = daysInMonth - daysElapsed
+  const dailyAvg = used / Math.max(daysElapsed, 1)
+  const projected = Math.round(dailyAvg * daysInMonth)
+  const pct = limit && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : null
+  const willExceed = limit !== null && limit > 0 && projected > limit
+  const daysUntilLimit = limit && dailyAvg > 0 && willExceed ? Math.max(0, Math.ceil((limit - used) / dailyAvg)) : null
+  const accent = limit === null ? '#14b8a6' : willExceed ? '#dc2626' : pct !== null && pct > 85 ? '#f59e0b' : '#14b8a6'
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '140px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{title}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600, marginTop: '3px' }}>META DO MÊS</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Mensagens este mês</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600, marginTop: '3px' }}>USO DO PLANO</div>
         </div>
         <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: hexToRgba(accent, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Target size={15} color={accent} strokeWidth={2.2} />
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-        <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{current.toLocaleString('pt-BR')}</span>
-        {target !== null && <span style={{ fontSize: '13px', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>/ {target.toLocaleString('pt-BR')} {unit}</span>}
-        {target === null && <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>sem meta · ilimitado</span>}
+        <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{used.toLocaleString('pt-BR')}</span>
+        {limit !== null
+          ? <span style={{ fontSize: '13px', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>/ {limit.toLocaleString('pt-BR')}</span>
+          : <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>· plano ilimitado</span>}
       </div>
-      {target !== null && target > 0 && (
+      {limit !== null && limit > 0 && (
         <>
-          <div style={{ height: '6px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
-            <div style={{ position: 'absolute', left: `${monthProgress * 100}%`, top: 0, bottom: 0, width: '1px', background: 'var(--text-faint)', opacity: 0.4 }} />
+          <div style={{ height: '6px', background: 'var(--bg)', borderRadius: '99px', overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: accent, borderRadius: '99px', transition: 'width 0.5s' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>{pct}% · dia {dayOfMonth}/{daysInMonth}</span>
-            <span style={{ color: accent, fontWeight: 600 }}>
-              ritmo: {projected.toLocaleString('pt-BR')} {onPace ? '✓' : '⚠'}
+            <span style={{ color: 'var(--text-muted)' }}>{pct}% usado · dia {dayOfMonth}/{daysInMonth}</span>
+            <span style={{ color: accent, fontWeight: 600 }} title={`Projeção fim do mês: ${projected.toLocaleString('pt-BR')}`}>
+              {willExceed
+                ? `estoura em ${daysUntilLimit}d ⚠`
+                : `sobra pra ${daysRemaining}d ✓`}
             </span>
           </div>
         </>
@@ -792,7 +797,7 @@ export default function DashboardPage() {
 
         <div style={{ gridColumn: 'span 4', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
           <BigNumberTile title="Contatos" subtitle="NA SUA BASE" value={contactsMeta?.total ?? 0} color="#7c3aed" icon={Users} onClick={() => router.push('/dashboard/contacts')} />
-          <GoalTile title="Mensagens este mês" current={usage?.sent ?? 0} target={usage?.limit ?? null} unit="" />
+          <PlanUsageTile used={usage?.sent ?? 0} limit={usage?.limit ?? null} />
         </div>
 
         {/* Row 2: Funil Pipeline (span 5) + HBar atendentes (span 4) + Pie status (span 3) */}
