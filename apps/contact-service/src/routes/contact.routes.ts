@@ -157,6 +157,144 @@ router.get('/contacts/:id/deal-adjustments', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /contacts/:id/timeline — feed unificado de eventos do contato
+router.get('/contacts/:id/timeline', async (req, res, next) => {
+  try {
+    const contactId = req.params.id
+    const tenantId = req.auth.tid
+    const limit = Math.min(Number(req.query.limit) || 100, 300)
+
+    // Valida que o contato pertence ao tenant
+    const { data: contact } = await db.from('contacts')
+      .select('id').eq('id', contactId).eq('tenant_id', tenantId).single()
+    if (!contact) { res.status(404).json({ error: 'Contato não encontrado' }); return }
+
+    // Busca IDs auxiliares (conversations e pipeline_cards desse contato)
+    // Necessários pra filtrar pipeline_card_events corretamente
+    const [convRes, cardRes] = await Promise.all([
+      db.from('conversations').select('id').eq('tenant_id', tenantId).eq('contact_id', contactId),
+      db.from('pipeline_cards').select('id').eq('tenant_id', tenantId).eq('contact_id', contactId),
+    ])
+    const convIds: string[] = (convRes.data || []).map((c: any) => c.id)
+    const cardIds: string[] = (cardRes.data || []).map((c: any) => c.id)
+
+    // Queries paralelas pros eventos
+    const [msgs, cardEvents, tasks, campaigns, tags] = await Promise.all([
+      db.from('messages')
+        .select('id, direction, content_type, body, created_at, campaign_id')
+        .eq('tenant_id', tenantId).eq('contact_id', contactId)
+        .order('created_at', { ascending: false }).limit(limit),
+
+      (convIds.length || cardIds.length)
+        ? db.from('pipeline_card_events')
+            .select('id, event_type, from_column, to_column, from_value, to_value, created_at, card_id, conversation_id, actor:actor_user_id(name), to_user:to_user_id(name)')
+            .eq('tenant_id', tenantId)
+            .or([
+              cardIds.length ? `card_id.in.(${cardIds.join(',')})` : '',
+              convIds.length ? `conversation_id.in.(${convIds.join(',')})` : '',
+            ].filter(Boolean).join(','))
+            .order('created_at', { ascending: false }).limit(limit)
+        : Promise.resolve({ data: [] }),
+
+      db.from('tasks')
+        .select('id, title, status, priority, due_date, completed_at, created_at, assignee:assigned_to(name)')
+        .eq('tenant_id', tenantId).eq('contact_id', contactId)
+        .order('created_at', { ascending: false }).limit(limit),
+
+      db.from('campaign_contacts')
+        .select('id, status, sent_at, created_at, campaigns(id, name)')
+        .eq('tenant_id', tenantId).eq('contact_id', contactId)
+        .order('created_at', { ascending: false }).limit(limit),
+
+      db.from('contact_tags')
+        .select('tag_id, created_at, tags(id, name, color)')
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: false }).limit(limit),
+    ])
+
+    const events: any[] = []
+
+    for (const m of (msgs.data || [])) {
+      const preview = m.body ? (m.body.length > 140 ? m.body.slice(0, 140) + '…' : m.body) : `[${m.content_type}]`
+      events.push({
+        id: `msg_${m.id}`,
+        type: m.direction === 'in' ? 'message_in' : 'message_out',
+        at: m.created_at,
+        title: m.direction === 'in' ? 'Mensagem recebida' : 'Mensagem enviada',
+        body: preview,
+        metadata: { campaignId: m.campaign_id || null, contentType: m.content_type },
+      })
+    }
+
+    for (const e of ((cardEvents as any).data || [])) {
+      events.push({
+        id: `card_${e.id}`,
+        type: `pipeline_${e.event_type}`,
+        at: e.created_at,
+        title: {
+          created: 'Card criado no pipeline',
+          moved: 'Card movido',
+          value_changed: 'Valor do card alterado',
+          assigned: 'Responsável do card alterado',
+          deleted: 'Card removido',
+        }[e.event_type as string] || 'Evento no pipeline',
+        metadata: {
+          fromColumn: e.from_column, toColumn: e.to_column,
+          fromValue: e.from_value, toValue: e.to_value,
+          actor: (e as any).actor?.name || null,
+          toUser: (e as any).to_user?.name || null,
+        },
+      })
+    }
+
+    for (const t of (tasks.data || [])) {
+      events.push({
+        id: `task_${t.id}_created`,
+        type: 'task_created',
+        at: t.created_at,
+        title: `Tarefa criada: ${t.title}`,
+        metadata: { status: t.status, priority: t.priority, dueDate: t.due_date, assignee: (t as any).assignee?.name || null },
+      })
+      if (t.completed_at) {
+        events.push({
+          id: `task_${t.id}_completed`,
+          type: 'task_completed',
+          at: t.completed_at,
+          title: `Tarefa concluída: ${t.title}`,
+          metadata: { assignee: (t as any).assignee?.name || null },
+        })
+      }
+    }
+
+    for (const c of (campaigns.data || [])) {
+      const when = c.sent_at || c.created_at
+      if (!when) continue
+      events.push({
+        id: `camp_${c.id}`,
+        type: 'campaign_sent',
+        at: when,
+        title: `Campanha: ${(c as any).campaigns?.name || '—'}`,
+        metadata: { status: c.status },
+      })
+    }
+
+    for (const ct of (tags.data || [])) {
+      if (!ct.created_at) continue
+      events.push({
+        id: `tag_${ct.tag_id}`,
+        type: 'tag_added',
+        at: ct.created_at,
+        title: `Tag aplicada: ${(ct as any).tags?.name || '—'}`,
+        metadata: { color: (ct as any).tags?.color || null },
+      })
+    }
+
+    events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+
+    res.json(ok(events.slice(0, limit)))
+  } catch (err) { next(err) }
+})
+
 // DELETE /contacts/:id
 router.delete('/contacts/:id', requireRole('admin', 'owner'), async (req, res, next) => {
   try {

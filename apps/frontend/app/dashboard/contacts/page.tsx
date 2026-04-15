@@ -846,8 +846,15 @@ export default function ContactsPage() {
                       </>
                     ) : (
                       <>
+                        <button onClick={() => router.push(`/dashboard/contacts/${c.id}`)}
+                          title="Ver timeline"
+                          style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; (e.currentTarget as HTMLButtonElement).style.color = '#2563eb' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
+                          <User size={13} />
+                        </button>
                         <button onClick={() => router.push(`/dashboard/inbox?contactId=${c.id}&phone=${encodeURIComponent(c.phone || '')}`)}
-                          title="Ver perfil / Conversa"
+                          title="Abrir conversa"
                           style={{ background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-faintest)', padding: '5px', display: 'flex' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f0fdf4'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)' }}>
