@@ -1,4 +1,4 @@
-import { db, logger } from '@autozap/utils'
+import { db, logger, isPhoneIgnored } from '@autozap/utils'
 import type { FlowContext, FlowRow, FlowNodeRow } from './types'
 
 export async function isOnCooldown(flow: FlowRow, ctx: FlowContext): Promise<boolean> {
@@ -18,15 +18,10 @@ export async function checkFlowTrigger(flow: FlowRow, ctx: FlowContext): Promise
   const triggerNode = (nodes as FlowNodeRow[]).find(n => n.type.startsWith('trigger_'))
   if (!triggerNode) return false
 
-  // Check ignored phones list
-  const ignoredPhones = triggerNode.data?.ignoredPhones
-  if (ignoredPhones) {
-    const list = ignoredPhones.split('\n').map((p: string) => p.trim().replace(/\D/g, '')).filter(Boolean)
-    const phone = ctx.phone.replace(/\D/g, '')
-    if (list.some((p: string) => phone.endsWith(p) || p.endsWith(phone.slice(-8)))) {
-      logger.info('Flow skipped — phone in ignored list', { phone: ctx.phone })
-      return false
-    }
+  // Check ignored phones list — vale pra todos os tipos de trigger
+  if (isPhoneIgnored(ctx.phone, triggerNode.data?.ignoredPhones)) {
+    logger.info('Flow skipped — phone in ignored list', { phone: ctx.phone, flowId: flow.id })
+    return false
   }
 
   return evaluateTrigger(triggerNode, ctx)

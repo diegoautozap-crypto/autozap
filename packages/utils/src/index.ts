@@ -154,6 +154,7 @@ export { encrypt, decrypt, encryptCredentials, decryptCredentials } from './cryp
 export { requireAuth, requireRole, errorHandler, validate } from './middleware'
 export { logPipelineCardEvent } from './pipeline-events'
 export type { PipelineEventType, LogPipelineEventParams } from './pipeline-events'
+export { isPhoneIgnored, phonesMatch, parseIgnoredPhones } from './phone-filter'
 
 export function normalizeBRPhone(phone: string): string {
   // Remove tudo que não é dígito, adiciona 9° dígito em celulares BR se necessário

@@ -60,7 +60,7 @@ function emptyForm() {
     name: '',
     channelId: '',
     trigger_type: 'keyword',
-    trigger_value: { keywords: '', start: 9, end: 18, days: [1,2,3,4,5] },
+    trigger_value: { keywords: '', start: 9, end: 18, days: [1,2,3,4,5], ignoredPhones: '' },
     actions: [emptyAction()],
     cooldown_minutes: null as number | null,
   }
@@ -336,11 +336,17 @@ export default function AutomationsPage() {
         name: form.name,
         channelId: form.channelId || null,
         trigger_type: form.trigger_type,
-        trigger_value: form.trigger_type === 'keyword'
-          ? { keywords: form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) }
-          : form.trigger_type === 'first_message'
-          ? { keywords: form.trigger_value.keywords ? form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [] }
-          : { start: form.trigger_value.start, end: form.trigger_value.end, days: form.trigger_value.days },
+        trigger_value: (() => {
+          const base: any = form.trigger_type === 'keyword'
+            ? { keywords: form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) }
+            : form.trigger_type === 'first_message'
+            ? { keywords: form.trigger_value.keywords ? form.trigger_value.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [] }
+            : { start: form.trigger_value.start, end: form.trigger_value.end, days: form.trigger_value.days }
+          if (form.trigger_value.ignoredPhones && form.trigger_value.ignoredPhones.trim()) {
+            base.ignoredPhones = form.trigger_value.ignoredPhones.trim()
+          }
+          return base
+        })(),
         actions: form.actions.map(a => ({
           type: a.type,
           value: a.value,
@@ -409,6 +415,7 @@ export default function AutomationsPage() {
         start: a.trigger_value?.start ?? 9,
         end: a.trigger_value?.end ?? 18,
         days: a.trigger_value?.days ?? [1,2,3,4,5],
+        ignoredPhones: a.trigger_value?.ignoredPhones || '',
       },
       actions,
       cooldown_minutes: a.cooldown_minutes ?? null,
@@ -519,6 +526,20 @@ export default function AutomationsPage() {
                 </div>
               </div>
             )}
+
+            {/* Números ignorados — vale pra todos os tipos de trigger */}
+            <div style={{ marginTop: '14px' }}>
+              <label style={labelStyle}>Números ignorados <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(opcional — 1 por linha)</span></label>
+              <textarea
+                rows={3}
+                style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' }}
+                placeholder={'+5511999998888\n+5511888887777'}
+                value={form.trigger_value.ignoredPhones || ''}
+                onChange={e => setForm({ ...form, trigger_value: { ...form.trigger_value, ignoredPhones: e.target.value } })} />
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', lineHeight: 1.4 }}>
+                Esses números nunca acionam esta automação, mesmo se bater o gatilho. Aceita formato com ou sem "+55".
+              </p>
+            </div>
           </div>
 
           {/* Ações */}

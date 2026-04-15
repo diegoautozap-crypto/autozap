@@ -1,4 +1,4 @@
-import { db, logger, generateId, logPipelineCardEvent } from '@autozap/utils'
+import { db, logger, generateId, logPipelineCardEvent, isPhoneIgnored } from '@autozap/utils'
 
 const MESSAGE_SERVICE_URL = process.env.MESSAGE_SERVICE_URL || 'http://localhost:3004'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET!
@@ -54,6 +54,13 @@ export class AutomationService {
 
   private async checkTrigger(automation: any, ctx: AutomationContext): Promise<boolean> {
     const { trigger_type, trigger_value } = automation
+
+    // Check ignored phones ANTES de avaliar qualquer trigger — vale pra todos os tipos
+    const ignoredPhones = trigger_value?.ignoredPhones ?? automation.ignored_phones ?? null
+    if (isPhoneIgnored(ctx.phone, ignoredPhones)) {
+      logger.info('Automation skipped — phone in ignored list', { phone: ctx.phone, automationId: automation.id })
+      return false
+    }
 
     switch (trigger_type) {
       case 'keyword': {
