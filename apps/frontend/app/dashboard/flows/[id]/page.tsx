@@ -644,27 +644,60 @@ export default function FlowEditorPage() {
               )}
             </div>
             {(analytics.topBottlenecks || []).length > 0 && (
-              <div style={{ marginTop: '10px', padding: '12px 14px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fed7aa', borderRadius: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px' }}>🚧</span>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Principais gargalos</span>
+              <div style={{ marginTop: '12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '14px' }}>🚧</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#18181b' }}>Onde o cliente para</div>
+                      <div style={{ fontSize: '11px', color: '#71717a' }}>Os nodes que mais causam abandono</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#a1a1aa' }}>Clique pra ver detalhes</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div>
                   {(analytics.topBottlenecks as any[]).map((b, i) => {
                     const { label, context } = getNodeDescription(b.nodeId)
-                    const medals = ['🥇', '🥈', '🥉']
+                    const nodeType = (nodes.find(n => n.id === b.nodeId)?.data as any)?.type || ''
+                    const Icon = NODE_ICONS[nodeType] || NODE_ICONS.trigger_keyword
+                    const iconColor = NODE_COLORS[nodeType] || '#6b7280'
+                    const isLast = i === (analytics.topBottlenecks as any[]).length - 1
                     return (
                       <button key={b.nodeId} onClick={() => setNodeDrilldownId(b.nodeId)}
-                        style={{ flex: 1, minWidth: '240px', padding: '10px 14px', background: '#fff', border: '1px solid #fb923c', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(251,146,60,0.2)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none' }}>
-                        <span style={{ fontSize: '24px' }}>{medals[i]}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#9a3412', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-                          {context && <div style={{ fontSize: '10px', color: '#b45309', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>&ldquo;{context}&rdquo;</div>}
-                          <div style={{ fontSize: '11px', color: '#c2410c' }}><strong>{b.count}</strong> abandonos · <strong>{b.pct}%</strong> do total</div>
+                        style={{ width: '100%', padding: '12px 16px', background: '#fff', border: 'none', borderBottom: isLast ? 'none' : '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', transition: 'background 0.1s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fafafa' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}>
+                        {/* Rank */}
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: i === 0 ? '#fef3c7' : '#f4f4f5', color: i === 0 ? '#a16207' : '#71717a', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {i + 1}
                         </div>
-                        <span style={{ fontSize: '10px', color: '#9a3412', fontWeight: 600 }}>Ver →</span>
+                        {/* Node icon */}
+                        <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: `${iconColor}15`, border: `1px solid ${iconColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icon size={16} color={iconColor} />
+                        </div>
+                        {/* Label + contexto */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#18181b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                          {context && (
+                            <div style={{ fontSize: '12px', color: '#71717a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                              &ldquo;{context}&rdquo;
+                            </div>
+                          )}
+                        </div>
+                        {/* Barra visual + números */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', minWidth: '180px' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span style={{ fontSize: '20px', fontWeight: 700, color: '#c2410c', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{b.pct}%</span>
+                            <span style={{ fontSize: '11px', color: '#71717a' }}>· {b.count} pessoa{b.count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div style={{ width: '100%', height: '5px', background: '#f4f4f5', borderRadius: '99px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(b.pct, 100)}%`, height: '100%', background: b.pct > 50 ? '#dc2626' : b.pct > 25 ? '#ea580c' : '#f59e0b', borderRadius: '99px', transition: 'width 0.5s ease' }} />
+                          </div>
+                        </div>
+                        {/* Arrow */}
+                        <div style={{ color: '#a1a1aa', fontSize: '16px', flexShrink: 0, marginLeft: '4px' }}>›</div>
                       </button>
                     )
                   })}
