@@ -348,7 +348,7 @@ router.patch('/conversations/:id/assign', validate(assignSchema), async (req, re
 
 router.patch('/conversations/:id/pipeline', validate(pipelineSchema), async (req, res, next) => {
   try {
-    const conv = await conversationService.updatePipelineStage(req.params.id, req.auth.tid, req.body.stage, req.body.pipelineId)
+    const conv = await conversationService.updatePipelineStage(req.params.id, req.auth.tid, req.body.stage, req.body.pipelineId, req.auth.sub)
     res.json(ok(conv))
   } catch (err) { next(err) }
 })

@@ -96,12 +96,20 @@ export class ConversationService {
     return data
   }
 
-  async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage, pipelineId?: string) {
+  async updatePipelineStage(conversationId: string, tenantId: string, stage: PipelineStage, pipelineId?: string, actorUserId?: string) {
     // Valida que o pipeline pertence ao tenant
     if (pipelineId) {
       const { data: pipe } = await db.from('pipelines').select('id').eq('id', pipelineId).eq('tenant_id', tenantId).single()
       if (!pipe) throw new NotFoundError('Pipeline')
     }
+
+    // Snapshot pré-update pra logar o evento
+    const { data: before } = await db
+      .from('conversations')
+      .select('pipeline_stage, pipeline_id')
+      .eq('id', conversationId)
+      .eq('tenant_id', tenantId)
+      .single()
 
     const update: any = { pipeline_stage: stage }
     if (pipelineId !== undefined) update.pipeline_id = pipelineId || null
@@ -115,6 +123,24 @@ export class ConversationService {
       .single()
 
     if (error || !data) throw new NotFoundError('Conversation')
+
+    // Loga mudança de stage no histórico (best-effort, não quebra o fluxo)
+    if (before && (before.pipeline_stage || null) !== (data.pipeline_stage || null)) {
+      try {
+        await db.from('pipeline_card_events').insert({
+          tenant_id: tenantId,
+          conversation_id: conversationId,
+          pipeline_id: data.pipeline_id || null,
+          event_type: 'moved',
+          from_column: before.pipeline_stage || null,
+          to_column: data.pipeline_stage || null,
+          actor_user_id: actorUserId || null,
+        })
+      } catch (e) {
+        console.error('[pipeline_card_events] falha ao logar (conversation)', e)
+      }
+    }
+
     return data
   }
 

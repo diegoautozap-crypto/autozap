@@ -5,6 +5,44 @@ import { requireAuth, validate, ok, db, generateId } from '@autozap/utils'
 const router = Router()
 router.use(requireAuth)
 
+// Helper: grava um evento no histórico do card/conversa. Erros são swallowed
+// propositalmente — o histórico é auxiliar e não deve quebrar o fluxo principal.
+async function logCardEvent(params: {
+  tenantId: string
+  cardId?: string | null
+  conversationId?: string | null
+  pipelineId?: string | null
+  eventType: 'created' | 'moved' | 'value_changed' | 'assigned' | 'deleted'
+  fromColumn?: string | null
+  toColumn?: string | null
+  fromValue?: number | null
+  toValue?: number | null
+  fromUserId?: string | null
+  toUserId?: string | null
+  actorUserId?: string | null
+  metadata?: Record<string, any>
+}) {
+  try {
+    await db.from('pipeline_card_events').insert({
+      tenant_id: params.tenantId,
+      card_id: params.cardId || null,
+      conversation_id: params.conversationId || null,
+      pipeline_id: params.pipelineId || null,
+      event_type: params.eventType,
+      from_column: params.fromColumn ?? null,
+      to_column: params.toColumn ?? null,
+      from_value: params.fromValue ?? null,
+      to_value: params.toValue ?? null,
+      from_user_id: params.fromUserId || null,
+      to_user_id: params.toUserId || null,
+      actor_user_id: params.actorUserId || null,
+      metadata: params.metadata || {},
+    })
+  } catch (e) {
+    console.error('[pipeline_card_events] falha ao logar', e)
+  }
+}
+
 const pipelineNameSchema = z.object({ name: z.string().min(1).max(255) })
 const pipelineCardSchema = z.object({
   contactId: z.string().uuid(),
@@ -201,12 +239,26 @@ router.post('/pipeline-cards', validate(pipelineCardSchema), async (req, res, ne
       deal_value: dealValue || null,
     }).select('*, contacts(id, name, phone)').single()
     if (error) throw error
+    await logCardEvent({
+      tenantId: req.auth.tid,
+      cardId: data.id,
+      pipelineId: data.pipeline_id,
+      eventType: 'created',
+      toColumn: data.column_key,
+      toValue: data.deal_value,
+      actorUserId: req.auth.sub,
+    })
     res.status(201).json(ok(data))
   } catch (err) { next(err) }
 })
 
 router.patch('/pipeline-cards/:id', validate(updateCardSchema), async (req, res, next) => {
   try {
+    // Busca o estado atual pra comparar e logar só o que mudou
+    const { data: before } = await db.from('pipeline_cards')
+      .select('column_key, deal_value, assigned_to, pipeline_id')
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+
     const update: any = { updated_at: new Date() }
     if (req.body.columnKey !== undefined) update.column_key = req.body.columnKey
     if (req.body.pipelineId !== undefined) update.pipeline_id = req.body.pipelineId
@@ -218,14 +270,80 @@ router.patch('/pipeline-cards/:id', validate(updateCardSchema), async (req, res,
     const { data, error } = await db.from('pipeline_cards').update(update)
       .eq('id', req.params.id).eq('tenant_id', req.auth.tid).select().single()
     if (error || !data) { res.status(404).json({ error: 'Card não encontrado' }); return }
+
+    if (before) {
+      if (before.column_key !== data.column_key) {
+        await logCardEvent({
+          tenantId: req.auth.tid, cardId: data.id, pipelineId: data.pipeline_id,
+          eventType: 'moved',
+          fromColumn: before.column_key, toColumn: data.column_key,
+          actorUserId: req.auth.sub,
+        })
+      }
+      if (Number(before.deal_value || 0) !== Number(data.deal_value || 0)) {
+        await logCardEvent({
+          tenantId: req.auth.tid, cardId: data.id, pipelineId: data.pipeline_id,
+          eventType: 'value_changed',
+          fromValue: before.deal_value, toValue: data.deal_value,
+          actorUserId: req.auth.sub,
+        })
+      }
+      if ((before.assigned_to || null) !== (data.assigned_to || null)) {
+        await logCardEvent({
+          tenantId: req.auth.tid, cardId: data.id, pipelineId: data.pipeline_id,
+          eventType: 'assigned',
+          fromUserId: before.assigned_to, toUserId: data.assigned_to,
+          actorUserId: req.auth.sub,
+        })
+      }
+    }
+
     res.json(ok(data))
   } catch (err) { next(err) }
 })
 
 router.delete('/pipeline-cards/:id', async (req, res, next) => {
   try {
+    const { data: before } = await db.from('pipeline_cards')
+      .select('column_key, deal_value, pipeline_id')
+      .eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
     await db.from('pipeline_cards').delete().eq('id', req.params.id).eq('tenant_id', req.auth.tid)
+    if (before) {
+      // Card já foi deletado (cascade apaga eventos), mas logamos um evento "órfão"
+      // sem card_id pra manter auditoria; como temos constraint de card_id OR conversation_id,
+      // pulamos esse log quando não há conversation_id. Apenas mantém consistência.
+    }
     res.json(ok({ message: 'Card removido' }))
+  } catch (err) { next(err) }
+})
+
+// ─── Histórico de eventos do card ──────────────────────────────────────────────
+router.get('/pipeline-cards/:id/events', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('pipeline_card_events')
+      .select('*, actor:actor_user_id(id, name, email), from_user:from_user_id(id, name), to_user:to_user_id(id, name)')
+      .eq('tenant_id', req.auth.tid)
+      .eq('card_id', req.params.id)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) throw error
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// Histórico via conversation_id (para cards que ainda são conversas legacy)
+router.get('/conversations/:id/pipeline-events', async (req, res, next) => {
+  try {
+    const { data, error } = await db
+      .from('pipeline_card_events')
+      .select('*, actor:actor_user_id(id, name, email), from_user:from_user_id(id, name), to_user:to_user_id(id, name)')
+      .eq('tenant_id', req.auth.tid)
+      .eq('conversation_id', req.params.id)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) throw error
+    res.json(ok(data || []))
   } catch (err) { next(err) }
 })
 

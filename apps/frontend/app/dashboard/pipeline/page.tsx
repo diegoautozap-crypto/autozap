@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from 'sonner'
 import {
   Loader2, MessageSquare, RefreshCw, Settings2, Plus, Trash2,
-  GripVertical, X, Check, Pencil, DollarSign, AlertTriangle,
+  GripVertical, X, Check, Pencil, DollarSign, AlertTriangle, Clock, History,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/i18n'
@@ -74,6 +74,100 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function formatRelativeTime(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'agora'
+  if (mins < 60) return `há ${mins}min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `há ${hrs}h`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `há ${days}d`
+  const months = Math.floor(days / 30)
+  return `há ${months}mes${months > 1 ? 'es' : ''}`
+}
+
+function CardHistoryModal({ cardId, conversationId, name, onClose, stages, t }: {
+  cardId?: string
+  conversationId?: string
+  name?: string
+  onClose: () => void
+  stages: { key: string; label: string; color: string }[]
+  t: (k: string) => string
+}) {
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ['card-events', cardId, conversationId],
+    queryFn: async () => {
+      const url = cardId
+        ? `/pipeline-cards/${cardId}/events`
+        : `/conversations/${conversationId}/pipeline-events`
+      const { data } = await conversationApi.get(url)
+      return data.data || []
+    },
+    enabled: !!(cardId || conversationId),
+  })
+
+  const stageLabel = (key?: string | null) => {
+    if (!key) return '—'
+    return stages.find(s => s.key === key)?.label || key
+  }
+
+  const eventLabel = (ev: any) => {
+    switch (ev.event_type) {
+      case 'created':
+        return <>Criado em <b>{stageLabel(ev.to_column)}</b></>
+      case 'moved':
+        return <>Movido de <b>{stageLabel(ev.from_column)}</b> → <b>{stageLabel(ev.to_column)}</b></>
+      case 'value_changed':
+        return <>Valor alterado: R$ {Number(ev.from_value || 0).toFixed(2)} → R$ {Number(ev.to_value || 0).toFixed(2)}</>
+      case 'assigned':
+        return <>Responsável: {ev.from_user?.name || '—'} → <b>{ev.to_user?.name || '—'}</b></>
+      case 'deleted':
+        return <>Removido</>
+      default:
+        return ev.event_type
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '14px', width: '100%', maxWidth: '480px', maxHeight: '75vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Histórico do card</h3>
+            {name && <p style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '2px' }}>{name}</p>}
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '7px', cursor: 'pointer', padding: '6px', display: 'flex', color: 'var(--text)' }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 20px' }}>
+          {isLoading && <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>}
+          {!isLoading && events.length === 0 && (
+            <p style={{ fontSize: '13px', color: 'var(--text-faint)', textAlign: 'center', padding: '40px 0' }}>
+              Nenhum evento registrado ainda.
+            </p>
+          )}
+          {!isLoading && events.length > 0 && (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {events.map((ev: any) => (
+                <li key={ev.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                  <Clock size={14} style={{ color: 'var(--text-faint)', marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text)' }}>{eventLabel(ev)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <span>{formatRelativeTime(ev.created_at)}</span>
+                      {ev.actor?.name && <><span>·</span><span>por {ev.actor.name}</span></>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -287,6 +381,7 @@ export default function PipelinePage() {
   const [newPipelineName, setNewPipelineName] = useState('')
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null)
   const [editingPipelineName, setEditingPipelineName] = useState('')
+  const [historyCard, setHistoryCard] = useState<{ cardId?: string; conversationId?: string; name?: string } | null>(null)
   const [purchaseConvId, setPurchaseConvId] = useState<string | null>(null)
   const [purchaseContactId, setPurchaseContactId] = useState<string | null>(null)
   const [purchaseProductId, setPurchaseProductId] = useState('')
@@ -834,7 +929,17 @@ export default function PipelinePage() {
                               <X size={12} />
                             </button>}
                             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em', flex: 1 }}>{name}</span>
+                            <button onClick={(e) => {
+                              e.stopPropagation()
+                              setHistoryCard({ cardId: conv._cardId, conversationId: conv._cardId ? undefined : conv.id, name })
+                            }}
+                              title={t('pipeline.history') || 'Histórico'}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-faintest)', display: 'flex', flexShrink: 0, borderRadius: '4px' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#2563eb'; (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-faintest)'; (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                              <History size={12} />
+                            </button>
                           </div>
                           <ContactTagBadges contact={conv.contacts} />
                           {conv.last_message && <p style={{ fontSize: '11px', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '4px' }}>{conv.last_message}</p>}
@@ -908,6 +1013,17 @@ export default function PipelinePage() {
             )}
           </div>
         </div>
+      )}
+
+      {historyCard && (
+        <CardHistoryModal
+          cardId={historyCard.cardId}
+          conversationId={historyCard.conversationId}
+          name={historyCard.name}
+          onClose={() => setHistoryCard(null)}
+          stages={stages}
+          t={t}
+        />
       )}
 
       {showManage && (
