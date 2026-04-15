@@ -370,12 +370,35 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       ? Math.round(runs.reduce((s, r) => s + (new Date(r.endedAt).getTime() - new Date(r.startedAt).getTime()), 0) / runs.length)
       : 0
 
-    // Calcula drop-off: quantos runs pararam neste node (último visitado e não concluídos)
+    // Threshold pra considerar abandono — default 30min (configurável via query)
+    const abandonThresholdMs = Number(req.query.abandonMinutes || 30) * 60_000
+    const now = Date.now()
+
+    // Mapa de nodes pra decidir se é wait (nunca abandono — só esperando timer)
+    const nodeTypeById: Record<string, string> = {}
+    for (const n of (flowNodes || [])) nodeTypeById[(n as { id: string }).id] = (n as { type: string }).type
+
+    // Calcula drop-off e "em andamento":
+    // - completed → concluído
+    // - hadError → erro
+    // - lastNode é wait → em andamento (esperando timer, nunca abandona)
+    // - lastLog < threshold → em andamento (cliente pode responder ainda)
+    // - lastLog > threshold → abandono real
     const dropOffByNode: Record<string, number> = {}
+    let inProgress = 0, abandoned = 0
     for (const run of runs) {
-      if (!run.completed && !run.hadError && run.lastNodeId) {
-        dropOffByNode[run.lastNodeId] = (dropOffByNode[run.lastNodeId] || 0) + 1
+      if (run.completed || run.hadError) continue
+      const lastNodeType = run.lastNodeId ? nodeTypeById[run.lastNodeId] : ''
+      const ageMs = now - new Date(run.endedAt).getTime()
+      const isWaitNode = lastNodeType === 'wait'
+      if (isWaitNode || ageMs < abandonThresholdMs) {
+        inProgress++
+        ;(run as any).inProgress = true
+        continue
       }
+      abandoned++
+      ;(run as any).abandoned = true
+      if (run.lastNodeId) dropOffByNode[run.lastNodeId] = (dropOffByNode[run.lastNodeId] || 0) + 1
     }
     // Adiciona drop-off aos nodeStats
     for (const nodeId in nodeStats) {
@@ -410,6 +433,8 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       nodeCount: r.nodeCount,
       hadError: r.hadError,
       completed: r.completed,
+      inProgress: (r as any).inProgress || false,
+      abandoned: (r as any).abandoned || false,
     }))
 
     res.json(ok({
@@ -417,6 +442,8 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       totalExecutions,
       totalErrors,
       totalCompletions,
+      totalAbandoned: abandoned,
+      totalInProgress: inProgress,
       completionRate,
       avgDurationMs,
       uniqueContacts: contactSet.size,
@@ -424,6 +451,7 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
       executions,
       topBottlenecks,
       days,
+      abandonThresholdMinutes: Math.round(abandonThresholdMs / 60000),
     }))
   } catch (err) { next(err) }
 })

@@ -300,11 +300,12 @@ export default function FlowEditorPage() {
   const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [analyticsDays, setAnalyticsDays] = useState(7)
+  const [abandonMinutes, setAbandonMinutes] = useState(30)
   const [showExecutionsModal, setShowExecutionsModal] = useState(false)
   const [nodeDrilldownId, setNodeDrilldownId] = useState<string | null>(null)
   const { data: analytics } = useQuery({
-    queryKey: ['flow-analytics', id, analyticsDays],
-    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=${analyticsDays}`); return data.data },
+    queryKey: ['flow-analytics', id, analyticsDays, abandonMinutes],
+    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=${analyticsDays}&abandonMinutes=${abandonMinutes}`); return data.data },
     enabled: showAnalytics,
     refetchInterval: showAnalytics ? 15000 : false,
   })
@@ -611,6 +612,17 @@ export default function FlowEditorPage() {
                   <option value={30}>últimos 30 dias</option>
                   <option value={90}>últimos 90 dias</option>
                 </select>
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>·</span>
+                <span style={{ fontSize: '11px', color: '#6b7280' }}>Abandono após</span>
+                <select value={abandonMinutes} onChange={e => setAbandonMinutes(Number(e.target.value))}
+                  title="Quanto tempo sem responder até marcar como abandono"
+                  style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#52525b', cursor: 'pointer', fontWeight: 500 }}>
+                  <option value={15}>15 min</option>
+                  <option value={30}>30 min</option>
+                  <option value={60}>1 hora</option>
+                  <option value={240}>4 horas</option>
+                  <option value={1440}>24 horas</option>
+                </select>
               </div>
               <button onClick={() => setShowExecutionsModal(true)}
                 style={{ padding: '6px 14px', background: '#18181b', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
@@ -620,8 +632,13 @@ export default function FlowEditorPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
               <StatCard icon="🚀" color="#7c3aed" bg="#f5f3ff" value={analytics.totalFlowRuns} label="Execuções" sub={`${analytics.uniqueContacts} contatos`} />
               <StatCard icon="✓" color="#16a34a" bg="#f0fdf4" value={`${analytics.completionRate ?? 0}%`} label="Taxa conclusão" sub={`${analytics.totalCompletions || 0} chegaram ao fim`} />
+              {(analytics.totalInProgress || 0) > 0 && (
+                <StatCard icon="⏳" color="#f59e0b" bg="#fffbeb" value={analytics.totalInProgress} label="Em andamento" sub={`últimos ${abandonMinutes}min`} />
+              )}
+              {(analytics.totalAbandoned || 0) > 0 && (
+                <StatCard icon="⏸" color="#c2410c" bg="#fff7ed" value={analytics.totalAbandoned} label="Abandonados" sub={`> ${abandonMinutes}min sem responder`} />
+              )}
               <StatCard icon="⏱" color="#0891b2" bg="#ecfeff" value={fmtDur(analytics.avgDurationMs)} label="Duração média" />
-              <StatCard icon="🎯" color="#ea580c" bg="#fff7ed" value={analytics.totalExecutions || 0} label="Nodes processados" sub="somando todos os passos" />
               {(analytics.totalErrors || 0) > 0 && (
                 <StatCard icon="⚠" color="#dc2626" bg="#fef2f2" value={analytics.totalErrors} label="Erros" sub="nodes que falharam" />
               )}
@@ -776,8 +793,10 @@ export default function FlowEditorPage() {
                             <span style={{ padding: '2px 8px', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>✓ Concluído</span>
                           ) : e.hadError ? (
                             <span style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⚠ Erro</span>
+                          ) : e.inProgress ? (
+                            <span style={{ padding: '2px 8px', background: '#fffbeb', color: '#d97706', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Em andamento</span>
                           ) : (
-                            <span style={{ padding: '2px 8px', background: '#fef3c7', color: '#a16207', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏸ Parou no meio</span>
+                            <span style={{ padding: '2px 8px', background: '#fff7ed', color: '#c2410c', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏸ Abandonou</span>
                           )}
                         </td>
                       </tr>
