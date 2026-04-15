@@ -290,9 +290,19 @@ router.post('/webhook/flow/:flowId/:token', rateLimit({ max: 120 }), async (req,
     // fieldMap: [{ externalField: 'telefone', contactField: 'phone' }, ...]
     const fieldMap: any[] = flow.webhook_field_map || []
 
+    // Checa se o trigger_webhook tem autoMapFields: false (mapeamento manual via map_fields node)
+    const { data: triggerNode } = await db
+      .from('flow_nodes')
+      .select('data')
+      .eq('flow_id', flow.id)
+      .eq('type', 'trigger_webhook')
+      .limit(1)
+      .maybeSingle()
+    const autoMapFields = (triggerNode?.data as any)?.autoMapFields !== false // default true
+
     const phone = resolveField(body, 'phone', fieldMap).replace(/\D/g, '')
-    const name = resolveField(body, 'name', fieldMap) || phone
-    const email = resolveField(body, 'email', fieldMap)
+    const name = autoMapFields ? (resolveField(body, 'name', fieldMap) || phone) : phone
+    const email = autoMapFields ? resolveField(body, 'email', fieldMap) : ''
     const source = resolveField(body, 'source', fieldMap) || 'webhook'
     const messageBody = resolveField(body, 'message', fieldMap) || `Lead via ${source}`
 

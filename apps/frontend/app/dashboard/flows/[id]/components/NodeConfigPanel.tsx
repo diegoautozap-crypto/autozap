@@ -402,6 +402,23 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 ))}
               </div>
             </div>
+
+            {/* Toggle: mapear campos automaticamente */}
+            <div>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '4px' }}>
+                <input type="checkbox"
+                  checked={(d as any).autoMapFields !== false}
+                  onChange={e => onUpdate(node.id, { autoMapFields: e.target.checked } as any)} />
+                <span>Mapear campos automaticamente</span>
+              </label>
+              <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px', lineHeight: 1.5 }}>
+                {(d as any).autoMapFields !== false ? (
+                  <>✅ <b>Ligado:</b> sistema extrai nome/email do payload e salva automaticamente no contato.</>
+                ) : (
+                  <>⚙ <b>Manual:</b> só o telefone identifica o contato. Use os nodes <b>Mapear campos</b>, <b>Criar contato</b> ou <b>Atualizar contato</b> no flow pra escolher exatamente quais campos salvar.</>
+                )}
+              </p>
+            </div>
           </div>
         )}
 
