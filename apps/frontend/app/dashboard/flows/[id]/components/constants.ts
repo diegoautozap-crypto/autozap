@@ -233,6 +233,8 @@ export const OPERATORS = [
   { value: 'less_equal',    label: 'Menor ou igual' },
   { value: 'is_empty',      label: 'Está vazio' },
   { value: 'is_not_empty',  label: 'Não está vazio' },
+  { value: 'is_business_hours',     label: '🕐 Está em horário comercial' },
+  { value: 'is_not_business_hours', label: '🌙 Está fora do horário comercial' },
 ]
 
 export function getOperators(t: (key: string) => string) {
@@ -249,6 +251,8 @@ export function getOperators(t: (key: string) => string) {
     { value: 'less_equal',    label: t('nodes.opLessEqual') },
     { value: 'is_empty',      label: t('nodes.opIsEmpty') },
     { value: 'is_not_empty',  label: t('nodes.opIsNotEmpty') },
+    { value: 'is_business_hours',     label: '🕐 Está em horário comercial' },
+    { value: 'is_not_business_hours', label: '🌙 Está fora do horário comercial' },
   ]
 }
 

@@ -169,12 +169,26 @@ export function ConditionPanel({ d, nodeId, inputStyle, onUpdate }: {
                       style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }}>
                       {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                     </select>
-                    {!['is_empty', 'is_not_empty'].includes(rule.operator) && (
+                    {!['is_empty', 'is_not_empty', 'is_business_hours', 'is_not_business_hours'].includes(rule.operator) && (
                       <ChipInput
                         value={rule.value || ''}
                         onChange={val => updateRule(branch.id, rule.id, { value: val })}
                         inputStyle={inputStyle}
                       />
+                    )}
+                    {(rule.operator === 'is_business_hours' || rule.operator === 'is_not_business_hours') && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        <input type="number" min="0" max="23"
+                          placeholder="Início (h)"
+                          value={(rule as any).businessHoursStart ?? 9}
+                          onChange={e => updateRule(branch.id, rule.id, { businessHoursStart: Number(e.target.value) || 9 } as any)}
+                          style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} />
+                        <input type="number" min="1" max="24"
+                          placeholder="Fim (h)"
+                          value={(rule as any).businessHoursEnd ?? 18}
+                          onChange={e => updateRule(branch.id, rule.id, { businessHoursEnd: Number(e.target.value) || 18 } as any)}
+                          style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px' }} />
+                      </div>
                     )}
                   </div>
                 </div>

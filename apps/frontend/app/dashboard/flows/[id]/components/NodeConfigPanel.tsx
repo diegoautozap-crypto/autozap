@@ -786,29 +786,72 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
         </>)}
 
         {d.type === 'wait' && (<>
-          <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1' }}>
-            {t('nodes.waitInfo')}
+          <div style={{ display: 'flex', gap: '6px', padding: '4px', background: '#f4f4f5', borderRadius: '8px' }}>
+            <button type="button"
+              onClick={() => onUpdate(node.id, { mode: 'duration' })}
+              style={{ flex: 1, padding: '6px 10px', fontSize: '12px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer',
+                background: (d.mode || 'duration') === 'duration' ? '#fff' : 'transparent',
+                color: (d.mode || 'duration') === 'duration' ? '#111827' : '#6b7280',
+                boxShadow: (d.mode || 'duration') === 'duration' ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+              Por duração
+            </button>
+            <button type="button"
+              onClick={() => onUpdate(node.id, { mode: 'until' })}
+              style={{ flex: 1, padding: '6px 10px', fontSize: '12px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer',
+                background: d.mode === 'until' ? '#fff' : 'transparent',
+                color: d.mode === 'until' ? '#111827' : '#6b7280',
+                boxShadow: d.mode === 'until' ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+              Até horário específico
+            </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div><label style={labelStyle}>{t('nodes.days')}</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>{t('nodes.hours')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>{t('nodes.minutes')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-            <div><label style={labelStyle}>{t('nodes.seconds')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
-          </div>
-          {(() => {
-            const total = (d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)
-            const parts: string[] = []
-            if (d.days) parts.push(`${d.days}d`)
-            if (d.hours) parts.push(`${d.hours}h`)
-            if (d.minutes) parts.push(`${d.minutes}min`)
-            if (d.seconds) parts.push(`${d.seconds}s`)
-            return (
+
+          {(d.mode || 'duration') === 'duration' ? (<>
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#0369a1' }}>
+              {t('nodes.waitInfo')}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div><label style={labelStyle}>{t('nodes.days')}</label><input type="number" min="0" style={inputStyle} value={d.days ?? 0} onChange={e => onUpdate(node.id, { days: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+              <div><label style={labelStyle}>{t('nodes.hours')}</label><input type="number" min="0" max="23" style={inputStyle} value={d.hours ?? 0} onChange={e => onUpdate(node.id, { hours: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+              <div><label style={labelStyle}>{t('nodes.minutes')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.minutes ?? 0} onChange={e => onUpdate(node.id, { minutes: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+              <div><label style={labelStyle}>{t('nodes.seconds')}</label><input type="number" min="0" max="59" style={inputStyle} value={d.seconds ?? 0} onChange={e => onUpdate(node.id, { seconds: Number(e.target.value) })} onFocus={focusInput} onBlur={blurInput} /></div>
+            </div>
+            {(() => {
+              const total = (d.days||0)*86400 + (d.hours||0)*3600 + (d.minutes||0)*60 + (d.seconds||0)
+              const parts: string[] = []
+              if (d.days) parts.push(`${d.days}d`)
+              if (d.hours) parts.push(`${d.hours}h`)
+              if (d.minutes) parts.push(`${d.minutes}min`)
+              if (d.seconds) parts.push(`${d.seconds}s`)
+              return (
+                <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>
+                  {t('nodes.total')} {parts.join(' ') || '0s'}
+                  {total > 300 ? ` — ${t('nodes.scheduledViaQueue')} ✓` : total > 0 ? ` — ${t('nodes.syncWait')}` : ''}
+                </p>
+              )
+            })()}
+          </>) : (<>
+            <div>
+              <label style={labelStyle}>Horário (HH:MM)</label>
+              <input type="time" style={inputStyle} value={d.untilTime || '09:00'}
+                onChange={e => onUpdate(node.id, { untilTime: e.target.value })}
+                onFocus={focusInput} onBlur={blurInput} />
               <p style={{ fontSize: '11px', color: '#a1a1aa', marginTop: '4px' }}>
-                {t('nodes.total')} {parts.join(' ') || '0s'}
-                {total > 300 ? ` — ${t('nodes.scheduledViaQueue')} ✓` : total > 0 ? ` — ${t('nodes.syncWait')}` : ''}
+                Se o horário já passou hoje, espera até amanhã. Fuso: América/São Paulo.
               </p>
-            )
-          })()}
+            </div>
+            <div>
+              <label style={labelStyle}>Fuso horário</label>
+              <select style={{ ...inputStyle, background: '#fafafa' }}
+                value={d.timezone || 'America/Sao_Paulo'}
+                onChange={e => onUpdate(node.id, { timezone: e.target.value })}
+                onFocus={focusInput} onBlur={blurInput}>
+                <option value="America/Sao_Paulo">São Paulo (UTC-3)</option>
+                <option value="America/Manaus">Manaus (UTC-4)</option>
+                <option value="America/Rio_Branco">Rio Branco (UTC-5)</option>
+                <option value="America/Noronha">Fernando de Noronha (UTC-2)</option>
+              </select>
+            </div>
+          </>)}
         </>)}
 
         {d.type === 'tag_contact' && (<>

@@ -175,6 +175,11 @@ interface ConditionRule {
   fieldName?: string
   operator: string
   value: string
+  // Config opcional para operador is_business_hours / is_not_business_hours
+  businessHoursStart?: number
+  businessHoursEnd?: number
+  businessDays?: number[]
+  timezone?: string
 }
 
 interface ConditionBranch {
@@ -794,7 +799,25 @@ export class FlowEngine {
         }
 
         case 'wait': {
-          const totalMs = ((data?.seconds || 0) + (data?.minutes || 0) * 60 + (data?.hours || 0) * 3600 + (Number(data?.days) || 0) * 86400) * 1000
+          let totalMs: number
+          if ((data as any)?.mode === 'until' && (data as any)?.untilTime) {
+            // Espera até HH:MM (no timezone especificado ou América/SP)
+            const tz = (data as any)?.timezone || 'America/Sao_Paulo'
+            const untilTimeStr = String((data as any).untilTime)
+            const [hh, mm] = untilTimeStr.split(':').map((n: string) => parseInt(n))
+            if (isNaN(hh) || isNaN(mm)) { logger.warn('wait until: horário inválido', { untilTime: untilTimeStr }); break }
+            // Calcula próxima ocorrência desse horário no tz
+            const now = new Date()
+            const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: tz }))
+            const target = new Date(nowInTz)
+            target.setHours(hh, mm, 0, 0)
+            // Se o horário já passou hoje, vai pra amanhã (comportamento padrão)
+            if (target.getTime() <= nowInTz.getTime()) target.setDate(target.getDate() + 1)
+            totalMs = target.getTime() - nowInTz.getTime()
+            logger.info('Wait until specific time', { tz, untilTime: untilTimeStr, delayMinutes: Math.round(totalMs / 60000) })
+          } else {
+            totalMs = ((data?.seconds || 0) + (data?.minutes || 0) * 60 + (data?.hours || 0) * 3600 + (Number(data?.days) || 0) * 86400) * 1000
+          }
           if (totalMs <= 0) break
           if (totalMs <= 300_000) { await new Promise(r => setTimeout(r, totalMs)); break }
           const nextNode = this.getNextNode(node.id, 'success', edgeMap, nodeMap)
@@ -1763,6 +1786,16 @@ export class FlowEngine {
   }
 
   private evaluateRule(rule: ConditionRule, ctx: FlowContext, variables: Record<string, string>): boolean {
+    // Operadores de tempo — independem do field
+    if (rule.operator === 'is_business_hours' || rule.operator === 'is_not_business_hours') {
+      const tz = rule.timezone || 'America/Sao_Paulo'
+      const start = Number(rule.businessHoursStart ?? 9)
+      const end = Number(rule.businessHoursEnd ?? 18)
+      const days = Array.isArray(rule.businessDays) && rule.businessDays.length > 0 ? rule.businessDays : [1, 2, 3, 4, 5]
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }))
+      const inHours = days.includes(now.getDay()) && now.getHours() >= start && now.getHours() < end
+      return rule.operator === 'is_business_hours' ? inHours : !inHours
+    }
     let fv = ''
     if (rule.field === 'message') fv = ctx.messageBody || ''
     else if (rule.field === 'variable') fv = variables[rule.fieldName || rule.field] || ''
