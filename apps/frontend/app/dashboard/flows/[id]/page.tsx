@@ -299,11 +299,19 @@ export default function FlowEditorPage() {
   })
   const BRANCH_COLORS_MAP = ['#16a34a', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#0891b2']
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [analyticsDays, setAnalyticsDays] = useState(7)
+  const [showExecutionsModal, setShowExecutionsModal] = useState(false)
+  const [nodeDrilldownId, setNodeDrilldownId] = useState<string | null>(null)
   const { data: analytics } = useQuery({
-    queryKey: ['flow-analytics', id],
-    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=7`); return data.data },
+    queryKey: ['flow-analytics', id, analyticsDays],
+    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/analytics?days=${analyticsDays}`); return data.data },
     enabled: showAnalytics,
     refetchInterval: showAnalytics ? 15000 : false,
+  })
+  const { data: nodeLogs } = useQuery({
+    queryKey: ['flow-node-logs', id, nodeDrilldownId, analyticsDays],
+    queryFn: async () => { const { data } = await messageApi.get(`/flows/${id}/node-logs/${nodeDrilldownId}?days=${analyticsDays}`); return data.data },
+    enabled: !!nodeDrilldownId,
   })
 
   const { data: flowData, isLoading } = useQuery({
@@ -554,26 +562,170 @@ export default function FlowEditorPage() {
       </div>
 
       {showAnalytics && analytics && (
-        <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '20px', alignItems: 'center', fontSize: '13px', flexWrap: 'wrap' }}>
+        <div style={{ background: '#faf5ff', borderBottom: '1px solid #ede9fe', padding: '10px 20px', display: 'flex', gap: '16px', alignItems: 'center', fontSize: '13px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
-            <span style={{ color: '#6d28d9' }}><strong>{analytics.totalFlowRuns}</strong> {t('nodes.executions')}</span>
+            <span style={{ color: '#6d28d9' }}><strong>{analytics.totalFlowRuns}</strong> execuções</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
-            <span style={{ color: '#1d4ed8' }}><strong>{analytics.uniqueContacts}</strong> {t('nodes.contacts')}</span>
+            <span style={{ color: '#1d4ed8' }}><strong>{analytics.uniqueContacts}</strong> contatos</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
-            <span style={{ color: '#15803d' }}><strong>{analytics.totalExecutions}</strong> {t('nodes.nodesProcessed')}</span>
+            <span style={{ color: '#15803d' }}><strong>{analytics.completionRate ?? 0}%</strong> concluídos</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0891b2', display: 'inline-block' }} />
+            <span style={{ color: '#0e7490' }}>
+              <strong>{analytics.avgDurationMs ? (analytics.avgDurationMs > 60000 ? `${Math.round(analytics.avgDurationMs / 60000)}min` : `${Math.round(analytics.avgDurationMs / 1000)}s`) : '—'}</strong> média
+            </span>
           </div>
           {analytics.totalErrors > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-              <span style={{ color: '#dc2626' }}><strong>{analytics.totalErrors}</strong> {t('nodes.errors')}</span>
+              <span style={{ color: '#dc2626' }}><strong>{analytics.totalErrors}</strong> erros</span>
             </div>
           )}
-          <span style={{ fontSize: '11px', color: '#a78bfa', marginLeft: 'auto' }}>{t('nodes.last7days')}</span>
+          <button onClick={() => setShowExecutionsModal(true)}
+            style={{ marginLeft: 'auto', padding: '4px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+            Ver {analytics.executions?.length || 0} execuções →
+          </button>
+          <select value={analyticsDays} onChange={e => setAnalyticsDays(Number(e.target.value))}
+            style={{ padding: '3px 8px', background: '#fff', border: '1px solid #ddd6fe', borderRadius: '6px', fontSize: '11px', color: '#6d28d9', cursor: 'pointer' }}>
+            <option value={1}>24h</option>
+            <option value={7}>7 dias</option>
+            <option value={14}>14 dias</option>
+            <option value={30}>30 dias</option>
+            <option value={90}>90 dias</option>
+          </select>
+        </div>
+      )}
+
+      {/* Modal: Lista de execuções */}
+      {showExecutionsModal && analytics && (
+        <div onClick={() => setShowExecutionsModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '800px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Execuções do flow</h3>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0' }}>Últimas {analytics.executions?.length || 0} — {analyticsDays} dias</p>
+              </div>
+              <button onClick={() => setShowExecutionsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '20px' }}>×</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {(!analytics.executions || analytics.executions.length === 0) ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>Nenhuma execução no período</div>
+              ) : (
+                <table style={{ width: '100%', fontSize: '12px' }}>
+                  <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
+                    <tr>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Contato</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Quando</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Duração</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Nodes</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.executions.map((e: any, i: number) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>{e.contactName}</div>
+                          <div style={{ fontSize: '11px', color: '#9ca3af' }}>{e.contactPhone}</div>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#6b7280' }}>
+                          {new Date(e.startedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                          {e.durationMs > 60000 ? `${Math.round(e.durationMs / 60000)}min` : `${Math.round(e.durationMs / 1000)}s`}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{e.nodeCount}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          {e.completed ? (
+                            <span style={{ padding: '2px 8px', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>✓ Concluído</span>
+                          ) : e.hadError ? (
+                            <span style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⚠ Erro</span>
+                          ) : (
+                            <span style={{ padding: '2px 8px', background: '#fef3c7', color: '#a16207', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏸ Parou no meio</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Drill-down do node */}
+      {nodeDrilldownId && analytics?.nodeStats?.[nodeDrilldownId] && (
+        <div onClick={() => setNodeDrilldownId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '640px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {(() => {
+              const stats = analytics.nodeStats[nodeDrilldownId]
+              const node = nodes.find(n => n.id === nodeDrilldownId)
+              const nodeName = (node?.data as any)?.type || 'Node'
+              return (
+                <>
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>📊 Detalhes do node</h3>
+                      <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0' }}>{nodeName}</p>
+                    </div>
+                    <button onClick={() => setNodeDrilldownId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '20px' }}>×</button>
+                  </div>
+                  <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', color: '#15803d', fontWeight: 700, textTransform: 'uppercase' }}>Sucessos</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a', marginTop: '4px' }}>{stats.success}</div>
+                    </div>
+                    <div style={{ padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', color: '#991b1b', fontWeight: 700, textTransform: 'uppercase' }}>Erros</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#dc2626', marginTop: '4px' }}>{stats.error}</div>
+                    </div>
+                    <div style={{ padding: '12px', background: '#f5f3ff', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', color: '#6d28d9', fontWeight: 700, textTransform: 'uppercase' }}>Total</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#7c3aed', marginTop: '4px' }}>{stats.total}</div>
+                    </div>
+                  </div>
+                  {stats.lastError && (
+                    <div style={{ margin: '0 20px 16px', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#991b1b', marginBottom: '4px' }}>⚠ Último erro</div>
+                      <div style={{ fontSize: '12px', color: '#7f1d1d', lineHeight: 1.5 }}>{stats.lastError}</div>
+                      {stats.lastErrorAt && <div style={{ fontSize: '10px', color: '#dc2626', marginTop: '4px' }}>{new Date(stats.lastErrorAt).toLocaleString('pt-BR')}</div>}
+                    </div>
+                  )}
+                  <div style={{ overflowY: 'auto', flex: 1, borderTop: '1px solid #e5e7eb' }}>
+                    <p style={{ padding: '12px 20px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Últimas execuções deste node</p>
+                    {!nodeLogs ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>Carregando...</div>
+                    ) : nodeLogs.length === 0 ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>Nenhum registro</div>
+                    ) : (
+                      <ul style={{ listStyle: 'none', padding: '0 20px 16px', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {nodeLogs.map((log: any, i: number) => (
+                          <li key={i} style={{ padding: '8px 10px', borderRadius: '6px', background: log.status === 'error' ? '#fef2f2' : '#f9fafb', borderLeft: `3px solid ${log.status === 'error' ? '#dc2626' : '#16a34a'}`, fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 500, color: '#111827' }}>{log.contacts?.name || log.contacts?.phone || 'Contato'}</span>
+                              <span style={{ fontSize: '10px', color: '#9ca3af' }}>{new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            {log.detail && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{log.detail}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
         </div>
       )}
 

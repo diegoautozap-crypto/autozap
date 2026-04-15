@@ -309,23 +309,116 @@ router.get('/flows/:id/analytics', async (req, res, next) => {
     const since = new Date(Date.now() - days * 86400000).toISOString()
 
     const { data: logs } = await db.from('flow_logs')
-      .select('node_id, status, contact_id, created_at')
+      .select('node_id, status, contact_id, conversation_id, detail, created_at')
       .eq('flow_id', flowId).eq('tenant_id', tenantId).gte('created_at', since)
+      .order('created_at', { ascending: true })
 
-    const nodeStats: Record<string, { success: number; error: number; total: number }> = {}
-    let totalExecutions = 0, totalErrors = 0, totalFlowRuns = 0
+    // Identifica nodes do tipo 'end' pra medir taxa de conclusão
+    const { data: flowNodes } = await db.from('flow_nodes').select('id, type').eq('flow_id', flowId)
+    const endNodeIds = new Set((flowNodes || []).filter((n: { type: string }) => n.type === 'end').map((n: { id: string }) => n.id))
+
+    const nodeStats: Record<string, { success: number; error: number; total: number; lastError?: string | null; lastErrorAt?: string | null }> = {}
+    let totalExecutions = 0, totalErrors = 0, totalFlowRuns = 0, totalCompletions = 0
     const contactSet = new Set<string>()
 
+    // Agrupa por conversation_id + dia pra gerar lista de execuções
+    // runs[key] = { conversationId, contactId, startedAt, endedAt, lastNodeId, nodeCount, hadError, completed }
+    type Run = { conversationId: string; contactId: string | null; startedAt: string; endedAt: string; lastNodeId: string | null; nodeCount: number; hadError: boolean; completed: boolean }
+    const runsByConv: Record<string, Run> = {}
+
     for (const log of (logs || [])) {
-      if (!nodeStats[log.node_id]) nodeStats[log.node_id] = { success: 0, error: 0, total: 0 }
+      if (!nodeStats[log.node_id]) nodeStats[log.node_id] = { success: 0, error: 0, total: 0, lastError: null, lastErrorAt: null }
       nodeStats[log.node_id].total++
       if (log.status === 'success') nodeStats[log.node_id].success++
-      else if (log.status === 'error') { nodeStats[log.node_id].error++; totalErrors++ }
+      else if (log.status === 'error') {
+        nodeStats[log.node_id].error++
+        nodeStats[log.node_id].lastError = log.detail || 'Erro'
+        nodeStats[log.node_id].lastErrorAt = log.created_at
+        totalErrors++
+      }
       if (log.status === 'flow_executed') { totalFlowRuns++; if (log.contact_id) contactSet.add(log.contact_id) }
       totalExecutions++
+
+      // Tracking de runs por conversation
+      if (log.conversation_id) {
+        const run = runsByConv[log.conversation_id]
+        if (!run) {
+          runsByConv[log.conversation_id] = {
+            conversationId: log.conversation_id,
+            contactId: log.contact_id || null,
+            startedAt: log.created_at,
+            endedAt: log.created_at,
+            lastNodeId: log.node_id || null,
+            nodeCount: 1,
+            hadError: log.status === 'error',
+            completed: endNodeIds.has(log.node_id || ''),
+          }
+        } else {
+          run.endedAt = log.created_at
+          if (log.node_id) run.lastNodeId = log.node_id
+          run.nodeCount++
+          if (log.status === 'error') run.hadError = true
+          if (endNodeIds.has(log.node_id || '')) run.completed = true
+        }
+      }
     }
 
-    res.json(ok({ totalFlowRuns, totalExecutions, totalErrors, uniqueContacts: contactSet.size, nodeStats }))
+    const runs = Object.values(runsByConv)
+    totalCompletions = runs.filter(r => r.completed).length
+    const completionRate = runs.length > 0 ? Math.round((totalCompletions / runs.length) * 100) : 0
+    const avgDurationMs = runs.length > 0
+      ? Math.round(runs.reduce((s, r) => s + (new Date(r.endedAt).getTime() - new Date(r.startedAt).getTime()), 0) / runs.length)
+      : 0
+
+    // Busca nomes dos contatos pra mostrar na lista (últimas 50 execuções)
+    const recentRuns = runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 50)
+    const contactIds = [...new Set(recentRuns.map(r => r.contactId).filter(Boolean))] as string[]
+    const contactNameById: Record<string, { name: string; phone: string }> = {}
+    if (contactIds.length > 0) {
+      const { data: contacts } = await db.from('contacts').select('id, name, phone').in('id', contactIds)
+      for (const c of (contacts || [])) contactNameById[c.id] = { name: c.name || '—', phone: c.phone || '' }
+    }
+    const executions = recentRuns.map(r => ({
+      conversationId: r.conversationId,
+      contactId: r.contactId,
+      contactName: r.contactId ? contactNameById[r.contactId]?.name || 'Contato' : 'Contato',
+      contactPhone: r.contactId ? contactNameById[r.contactId]?.phone || '' : '',
+      startedAt: r.startedAt,
+      endedAt: r.endedAt,
+      durationMs: new Date(r.endedAt).getTime() - new Date(r.startedAt).getTime(),
+      lastNodeId: r.lastNodeId,
+      nodeCount: r.nodeCount,
+      hadError: r.hadError,
+      completed: r.completed,
+    }))
+
+    res.json(ok({
+      totalFlowRuns,
+      totalExecutions,
+      totalErrors,
+      totalCompletions,
+      completionRate,
+      avgDurationMs,
+      uniqueContacts: contactSet.size,
+      nodeStats,
+      executions,
+      days,
+    }))
+  } catch (err) { next(err) }
+})
+
+// GET /flows/:id/node-logs — logs de um node específico
+router.get('/flows/:id/node-logs/:nodeId', async (req, res, next) => {
+  try {
+    const days = Number(req.query.days) || 7
+    const since = new Date(Date.now() - days * 86400000).toISOString()
+    const { data } = await db.from('flow_logs')
+      .select('status, detail, contact_id, conversation_id, created_at, contacts:contact_id(name, phone)')
+      .eq('flow_id', req.params.id).eq('tenant_id', req.auth.tid)
+      .eq('node_id', req.params.nodeId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(100)
+    res.json(ok(data || []))
   } catch (err) { next(err) }
 })
 
