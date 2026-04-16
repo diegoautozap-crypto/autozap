@@ -1434,6 +1434,59 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
         </>)}
 
+        {d.type === 'lead_search' && (<>
+          <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', color: '#991b1b', lineHeight: 1.5 }}>
+            🔍 Busca empresas no Google Maps e cria contatos automáticos. Custa <b>1 crédito por lead</b> (+1 se validar WhatsApp).
+          </div>
+          <div>
+            <label style={labelStyle}>Segmento</label>
+            <input style={inputStyle} placeholder="dentista, advogado, padaria..."
+              value={(d as any).segment || ''}
+              onChange={e => onUpdate(node.id, { segment: e.target.value } as any)}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div>
+            <label style={labelStyle}>Localização</label>
+            <input style={inputStyle} placeholder="São Paulo, SP"
+              value={(d as any).location || ''}
+              onChange={e => onUpdate(node.id, { location: e.target.value } as any)}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div>
+            <label style={labelStyle}>Quantidade (1 a 200)</label>
+            <input type="number" min="1" max="200" style={inputStyle}
+              value={(d as any).limit ?? 30}
+              onChange={e => onUpdate(node.id, { limit: Number(e.target.value) || 30 } as any)}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <div>
+            <label style={labelStyle}>Tag aplicada nos novos contatos</label>
+            <input style={inputStyle} placeholder="lead-google-maps"
+              value={(d as any).tag ?? 'lead-google-maps'}
+              onChange={e => onUpdate(node.id, { tag: e.target.value } as any)}
+              onFocus={focusInput} onBlur={blurInput} />
+          </div>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={(d as any).validateWhatsapp !== false}
+              onChange={e => onUpdate(node.id, { validateWhatsapp: e.target.checked } as any)} />
+            <span>Validar WhatsApp (custa +1 crédito por número)</span>
+          </label>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={(d as any).skipDuplicates !== false}
+              onChange={e => onUpdate(node.id, { skipDuplicates: e.target.checked } as any)} />
+            <span>Ignorar contatos que já existem</span>
+          </label>
+          <div style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>Variáveis criadas após executar:</p>
+            <pre style={{ fontSize: '10px', color: '#166534', fontFamily: 'monospace', lineHeight: 1.6, margin: 0 }}>
+{`{{leads_encontrados}}  → total retornado pelo Google
+{{leads_validos}}      → com WhatsApp válido
+{{leads_novos}}        → criados como contato (sem duplicatas)
+{{leads_creditos_usados}}`}
+            </pre>
+          </div>
+        </>)}
+
         {d.type === 'end' && (
           <div><label style={labelStyle}>{t('nodes.endMessage')}</label><textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' as const }} placeholder={t('nodes.endPlaceholder')} value={d.message || ''} onChange={e => onUpdate(node.id, { message: e.target.value })} onFocus={focusInput} onBlur={blurInput} /></div>
         )}

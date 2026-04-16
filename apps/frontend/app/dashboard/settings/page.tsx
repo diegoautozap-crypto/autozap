@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { tenantApi, conversationApi } from '@/lib/api'
+import { tenantApi, conversationApi, messageApi } from '@/lib/api'
 import { AlertTriangle, Zap, Check, Loader2, X, Webhook, Plus, Trash2, Eye, EyeOff, Copy, ChevronDown, ChevronUp, Bot, FileText, Palette, Bell, Volume2, VolumeX, Upload, MessageSquare, Calendar, Unlink, Shield } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -612,6 +612,46 @@ function GoogleCalendarSection() {
 }
 
 // ── Preferências de Notificação ──────────────────────────────────────────────
+function LeadCreditsSection() {
+  const queryClient = useQueryClient()
+  const { data: credits } = useQuery({
+    queryKey: ['lead-credits'],
+    queryFn: async () => { const { data } = await messageApi.get('/lead-credits'); return data.data },
+  })
+  const balance = credits?.balance ?? 0
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow, 0 1px 3px rgba(0,0,0,.04))' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          🔍
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', display: 'block', marginBottom: '2px' }}>Créditos de prospecção</span>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>Usados pelo node "🔍 Buscar leads (Google Maps)" nos flows</p>
+        </div>
+      </div>
+      <div style={{ padding: '16px', background: 'var(--bg-input)', borderRadius: '10px', border: '1px solid var(--divider)', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Saldo atual</div>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: balance > 100 ? '#16a34a' : balance > 0 ? '#f59e0b' : '#dc2626', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {balance.toLocaleString('pt-BR')} <span style={{ fontSize: '13px', color: 'var(--text-faint)', fontWeight: 500 }}>créditos</span>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text-faint)' }}>
+            <div>Comprado: <b>{(credits?.total_purchased || 0).toLocaleString('pt-BR')}</b></div>
+            <div>Consumido: <b>{(credits?.total_consumed || 0).toLocaleString('pt-BR')}</b></div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '12px', color: '#92400e', lineHeight: 1.5 }}>
+        💡 Pra comprar mais créditos, fala com a equipe AutoZap. Em breve a compra direta via Pix vai estar disponível.
+        <br /><b>Pacotes:</b> R$ 50 → 500 créditos · R$ 200 → 2.500 · R$ 500 → 8.000.
+      </div>
+    </div>
+  )
+}
+
 function NotificationSection() {
   const queryClient = useQueryClient()
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -1532,6 +1572,9 @@ export default function SettingsPage() {
 
         {/* ── Notificações ── */}
         <NotificationSection />
+
+        {/* ── Créditos de prospecção ── */}
+        {canEdit('/dashboard/settings') && <LeadCreditsSection />}
 
 
         {/* Planos */}

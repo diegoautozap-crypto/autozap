@@ -886,6 +886,7 @@ export const en: Record<string, string> = {
     'nodes.scheduleAppointment': 'Schedule appointment',
     'nodes.lookupContact': 'Fetch contact data',
     'nodes.csat': 'Satisfaction survey',
+    'nodes.leadSearch': 'Find leads (Google Maps)',
     'nodes.scheduleAppointmentInfo': 'Automatically schedules an appointment for the contact.',
     'nodes.schedulingConfig': 'Scheduling config',
     'nodes.schedulingConfigSelect': 'Select a schedule',

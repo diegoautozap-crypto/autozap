@@ -162,6 +162,13 @@ interface FlowNodeData {
   // webhook trigger
   autoMapFields?: boolean
   ignoredPhones?: string
+  // lead_search
+  segment?: string
+  location?: string
+  limit?: number
+  validateWhatsapp?: boolean
+  skipDuplicates?: boolean
+  tag?: string
   // send_message extras
   footer?: string
   buttons?: any[]
@@ -1432,6 +1439,125 @@ export class FlowEngine {
             updated_at: new Date(),
           }, { onConflict: 'flow_id,conversation_id' })
           return { success: true, paused: true }
+        }
+
+        case 'lead_search': {
+          const segment = this.interpolate(data?.segment || '', ctx, variables).trim()
+          const location = this.interpolate(data?.location || '', ctx, variables).trim()
+          const limit = Math.min(Math.max(Number(data?.limit) || 30, 1), 200)
+          const validateWhatsapp = data?.validateWhatsapp !== false
+          const skipDuplicates = data?.skipDuplicates !== false
+          const tag = (data?.tag || 'lead-google-maps').toString()
+
+          if (!segment || !location) {
+            await this.logNode(flowId, node.id, ctx, 'error', 'Segmento ou localização vazios')
+            variables.leads_encontrados = '0'
+            variables.leads_novos = '0'
+            break
+          }
+
+          const cost = limit * (validateWhatsapp ? 2 : 1)
+          // Tenta debitar créditos
+          const { data: debitResult, error: debitErr } = await db.rpc('debit_lead_credits', {
+            p_tenant_id: ctx.tenantId,
+            p_amount: cost,
+            p_description: `Busca: ${segment} em ${location}`,
+            p_metadata: { segment, location, limit, validateWhatsapp },
+          })
+          if (debitErr || debitResult === false) {
+            await this.logNode(flowId, node.id, ctx, 'error', `Sem créditos suficientes (precisa ${cost})`)
+            variables.leads_encontrados = '0'
+            variables.leads_novos = '0'
+            return { success: false, nextHandle: 'no_credits' }
+          }
+
+          let leads: any[] = []
+          try {
+            const { searchGoogleMaps } = await import('./outscraper-client')
+            leads = await searchGoogleMaps({ query: `${segment} ${location}`, limit })
+          } catch (err) {
+            // Devolve créditos em caso de erro
+            await db.rpc('credit_lead_credits', {
+              p_tenant_id: ctx.tenantId,
+              p_amount: cost,
+              p_type: 'refund',
+              p_description: `Refund: busca falhou — ${(err as Error).message}`,
+            })
+            await this.logNode(flowId, node.id, ctx, 'error', `Busca falhou: ${(err as Error).message}`)
+            variables.leads_encontrados = '0'
+            variables.leads_novos = '0'
+            break
+          }
+
+          // Filtra leads sem telefone
+          let validLeads = leads.filter(l => l.phone)
+          // Normaliza telefones BR
+          validLeads = validLeads.map(l => ({ ...l, phone: normalizeBRPhone(l.phone) }))
+          // Dedup interna (números repetidos no resultado)
+          const seenPhones = new Set<string>()
+          validLeads = validLeads.filter(l => { if (seenPhones.has(l.phone)) return false; seenPhones.add(l.phone); return true })
+
+          // Dedup contra contatos existentes (se ativo)
+          let newLeads = validLeads
+          if (skipDuplicates && validLeads.length > 0) {
+            const phones = validLeads.map(l => l.phone)
+            const { data: existing } = await db.from('contacts')
+              .select('phone').eq('tenant_id', ctx.tenantId).in('phone', phones)
+            const existingSet = new Set((existing || []).map((c: { phone: string }) => c.phone))
+            newLeads = validLeads.filter(l => !existingSet.has(l.phone))
+          }
+
+          // Cria contatos novos
+          let createdCount = 0
+          for (const lead of newLeads) {
+            try {
+              const { data: created } = await db.from('contacts').insert({
+                id: generateId(),
+                tenant_id: ctx.tenantId,
+                phone: lead.phone,
+                name: lead.name || null,
+                email: lead.email || null,
+                origin: 'google_maps',
+                status: 'active',
+                metadata: {
+                  endereco: lead.address,
+                  rating: lead.rating,
+                  reviews: lead.reviews_count,
+                  categoria: lead.category,
+                  website: lead.website,
+                },
+              }).select('id').single()
+              if (created) {
+                createdCount++
+                // Adiciona tag
+                if (tag) {
+                  const { data: tagRow } = await db.from('tags').select('id')
+                    .eq('tenant_id', ctx.tenantId).eq('name', tag).maybeSingle()
+                  let tagId = tagRow?.id
+                  if (!tagId) {
+                    const { data: newTag } = await db.from('tags').insert({
+                      id: generateId(), tenant_id: ctx.tenantId, name: tag, color: '#16a34a',
+                    }).select('id').single()
+                    tagId = newTag?.id
+                  }
+                  if (tagId) {
+                    try { await db.from('contact_tags').insert({ contact_id: created.id, tag_id: tagId, tenant_id: ctx.tenantId }) }
+                    catch { /* tag link já existe ou outro erro não-crítico */ }
+                  }
+                }
+              }
+            } catch (err) {
+              logger.warn('[lead_search] failed to create contact', { phone: lead.phone, err: (err as Error).message })
+            }
+          }
+
+          variables.leads_encontrados = String(leads.length)
+          variables.leads_validos = String(validLeads.length)
+          variables.leads_novos = String(createdCount)
+          variables.leads_creditos_usados = String(cost)
+          await this.logNode(flowId, node.id, ctx, 'success',
+            `Buscou ${leads.length}, válidos ${validLeads.length}, novos ${createdCount} (${cost} créditos)`)
+          break
         }
 
         case 'create_task': {

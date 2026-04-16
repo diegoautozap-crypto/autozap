@@ -2,7 +2,7 @@ import {
   Zap, MessageSquare, Clock, Tag, MoveRight, UserCheck,
   GitBranch, Brain, Webhook, UserCog, CornerDownRight, Square, Reply,
   RefreshCw, AlignLeft, Link, Play, Mic, ClipboardList, Bell, Split, Shuffle,
-  Calendar, Search, Star,
+  Calendar, Search, Star, MapPin,
 } from 'lucide-react'
 
 export const NODE_COLORS: Record<string, string> = {
@@ -35,6 +35,7 @@ export const NODE_COLORS: Record<string, string> = {
   schedule_appointment:  '#16a34a',
   lookup_contact:        '#0369a1',
   csat:                  '#f59e0b',
+  lead_search:           '#dc2626',
 }
 
 export const NODE_ICONS: Record<string, any> = {
@@ -67,6 +68,7 @@ export const NODE_ICONS: Record<string, any> = {
   schedule_appointment:  Calendar,
   lookup_contact:        Search,
   csat:                  Star,
+  lead_search:           MapPin,
 }
 
 // Fallback hardcoded labels (used when t() is not available)
@@ -98,6 +100,7 @@ export const NODE_LABELS: Record<string, string> = {
   schedule_appointment:  'Agendar horário',
   lookup_contact:        'Buscar dados do contato',
   csat:                  'Pesquisa de satisfação',
+  lead_search:           'Buscar leads (Google Maps)',
 }
 
 const NODE_LABEL_KEYS: Record<string, string> = {
@@ -130,6 +133,7 @@ const NODE_LABEL_KEYS: Record<string, string> = {
   schedule_appointment:  'nodes.scheduleAppointment',
   lookup_contact:        'nodes.lookupContact',
   csat:                  'nodes.csat',
+  lead_search:           'nodes.leadSearch',
 }
 
 export function getNodeLabels(t: (key: string) => string): Record<string, string> {

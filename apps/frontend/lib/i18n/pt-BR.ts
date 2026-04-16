@@ -904,6 +904,7 @@ export const ptBR: Record<string, string> = {
     'nodes.scheduleAppointment': 'Agendar horário',
     'nodes.lookupContact': 'Buscar dados do contato',
     'nodes.csat': 'Pesquisa de satisfação',
+    'nodes.leadSearch': 'Buscar leads (Google Maps)',
     'nodes.scheduleAppointmentInfo': 'Agenda um horário automaticamente para o contato.',
     'nodes.schedulingConfig': 'Configuração de agenda',
     'nodes.schedulingConfigSelect': 'Selecione uma agenda',

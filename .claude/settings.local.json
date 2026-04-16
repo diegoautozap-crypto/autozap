@@ -73,7 +73,22 @@
       "Bash(C:/Users/Adm/.fly/bin/flyctl deploy:*)",
       "Bash(C:/Users/Adm/.fly/bin/flyctl logs:*)",
       "Bash(C:/Users/Adm/.fly/bin/flyctl status:*)",
-      "Bash(C:/Users/Adm/.fly/bin/flyctl certs:*)"
+      "Bash(C:/Users/Adm/.fly/bin/flyctl certs:*)",
+      "WebFetch(domain:vivendasdoatlantico.net.br)",
+      "Bash(C:/Users/Adm/.fly/bin/flyctl redis:*)",
+      "Bash(flyctl deploy *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"UTILS=$?\")",
+      "Bash(echo \"CONV=$?\")",
+      "Bash(echo \"MSG=$?\")",
+      "Bash(echo \"CAMP=$?\")",
+      "Bash(echo \"FRONT=$?\")",
+      "Bash(npm test *)",
+      "Bash(echo \"=== AUTH EXIT $? ===\")",
+      "Bash(echo \"=== TENANT EXIT $? ===\")",
+      "Bash(npx eslint *)",
+      "Bash(flyctl secrets *)",
+      "Bash(flyctl ssh *)"
     ]
   }
 }

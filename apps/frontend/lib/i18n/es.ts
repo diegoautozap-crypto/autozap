@@ -901,6 +901,7 @@ export const es: Record<string, string> = {
     'nodes.scheduleAppointment': 'Agendar cita',
     'nodes.lookupContact': 'Buscar datos del contacto',
     'nodes.csat': 'Encuesta de satisfacción',
+    'nodes.leadSearch': 'Buscar leads (Google Maps)',
     'nodes.scheduleAppointmentInfo': 'Agenda una cita automáticamente para el contacto.',
     'nodes.schedulingConfig': 'Configuración de agenda',
     'nodes.schedulingConfigSelect': 'Seleccione una agenda',

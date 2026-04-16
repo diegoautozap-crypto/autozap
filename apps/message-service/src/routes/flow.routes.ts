@@ -505,4 +505,43 @@ router.post('/flows/:id/webhook-token', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ─── Lead credits ─────────────────────────────────────────────────────────────
+// GET /lead-credits — saldo do tenant
+router.get('/lead-credits', async (req, res, next) => {
+  try {
+    const { data } = await db.from('tenant_lead_credits')
+      .select('balance, total_purchased, total_consumed, updated_at')
+      .eq('tenant_id', req.auth.tid).maybeSingle()
+    res.json(ok(data || { balance: 0, total_purchased: 0, total_consumed: 0 }))
+  } catch (err) { next(err) }
+})
+
+// GET /lead-credits/transactions — últimas 50 movimentações
+router.get('/lead-credits/transactions', async (req, res, next) => {
+  try {
+    const { data } = await db.from('lead_credit_transactions')
+      .select('*').eq('tenant_id', req.auth.tid)
+      .order('created_at', { ascending: false }).limit(50)
+    res.json(ok(data || []))
+  } catch (err) { next(err) }
+})
+
+// POST /lead-credits/add — admin/owner adiciona créditos manualmente
+router.post('/lead-credits/add', async (req, res, next) => {
+  try {
+    if (!['owner', 'admin'].includes(req.auth.role || '')) {
+      throw new AppError('FORBIDDEN', 'Só admin/owner', 403)
+    }
+    const amount = Number(req.body.amount)
+    if (!amount || amount <= 0 || amount > 100000) throw new AppError('INVALID', 'Quantidade inválida', 400)
+    const { data: balance } = await db.rpc('credit_lead_credits', {
+      p_tenant_id: req.auth.tid,
+      p_amount: amount,
+      p_type: 'manual_adjustment',
+      p_description: req.body.description || 'Adicionado manualmente',
+    })
+    res.json(ok({ balance }))
+  } catch (err) { next(err) }
+})
+
 export default router
