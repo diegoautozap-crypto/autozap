@@ -1440,17 +1440,33 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
           </div>
           <div>
             <label style={labelStyle}>Segmento</label>
-            <input style={inputStyle} placeholder="dentista, advogado, padaria..."
+            <input style={inputStyle} placeholder="dentista, advogado, padaria, restaurante..."
               value={(d as any).segment || ''}
               onChange={e => onUpdate(node.id, { segment: e.target.value } as any)}
               onFocus={focusInput} onBlur={blurInput} />
           </div>
           <div>
-            <label style={labelStyle}>Localização</label>
-            <input style={inputStyle} placeholder="São Paulo, SP"
+            <label style={labelStyle}>Localização <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(separar várias por ;)</span></label>
+            <input style={inputStyle} placeholder="ex: Vila Madalena, São Paulo"
               value={(d as any).location || ''}
               onChange={e => onUpdate(node.id, { location: e.target.value } as any)}
               onFocus={focusInput} onBlur={blurInput} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+              <p style={{ fontSize: '10px', color: '#71717a', width: '100%', margin: '0 0 4px' }}>Exemplos (clique pra usar):</p>
+              {[
+                { label: 'Cidade', value: 'Campinas, SP' },
+                { label: 'Bairro', value: 'Vila Madalena, São Paulo' },
+                { label: 'CEP', value: '01310-100 São Paulo' },
+                { label: 'Próx. a marco', value: 'próximo Av Paulista São Paulo' },
+                { label: 'Várias cidades', value: 'São Paulo, SP; Campinas, SP; Santos, SP' },
+              ].map(ex => (
+                <button key={ex.label} type="button"
+                  onClick={() => onUpdate(node.id, { location: ex.value } as any)}
+                  style={{ padding: '3px 8px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '99px', fontSize: '10px', color: '#52525b', cursor: 'pointer' }}>
+                  {ex.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label style={labelStyle}>Quantidade (1 a 200)</label>
@@ -1476,6 +1492,42 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               onChange={e => onUpdate(node.id, { skipDuplicates: e.target.checked } as any)} />
             <span>Ignorar contatos que já existem</span>
           </label>
+
+          {/* Filtros avançados */}
+          <details style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '8px 12px' }}>
+            <summary style={{ fontSize: '12px', fontWeight: 600, color: '#374151', cursor: 'pointer', userSelect: 'none' }}>
+              ⚙ Filtros avançados (opcional)
+            </summary>
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ ...labelStyle, fontSize: '11px' }}>Avaliação mínima ⭐ (0-5)</label>
+                <input type="number" min="0" max="5" step="0.1" style={inputStyle}
+                  placeholder="0 = sem filtro"
+                  value={(d as any).minRating ?? ''}
+                  onChange={e => onUpdate(node.id, { minRating: e.target.value === '' ? 0 : Number(e.target.value) } as any)}
+                  onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>Ex: 4.0 = só lugares bem avaliados</p>
+              </div>
+              <div>
+                <label style={{ ...labelStyle, fontSize: '11px' }}>Mínimo de avaliações no Google</label>
+                <input type="number" min="0" style={inputStyle}
+                  placeholder="0 = sem filtro"
+                  value={(d as any).minReviews ?? ''}
+                  onChange={e => onUpdate(node.id, { minReviews: e.target.value === '' ? 0 : Number(e.target.value) } as any)}
+                  onFocus={focusInput} onBlur={blurInput} />
+                <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>Ex: 50 = ignora negócios novos sem reputação</p>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#374151', fontWeight: 600 }}>
+                <input type="checkbox" checked={(d as any).requireWebsite === true}
+                  onChange={e => onUpdate(node.id, { requireWebsite: e.target.checked } as any)} />
+                <span>Só com website (negócios mais estruturados)</span>
+              </label>
+              <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0', fontStyle: 'italic' }}>
+                ⚠ Filtros descartam leads APÓS a busca. Custo é cobrado normalmente. Use pra qualidade, não pra economia.
+              </p>
+            </div>
+          </details>
+
           <div style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>Variáveis criadas:</p>
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>

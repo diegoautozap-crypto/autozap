@@ -169,6 +169,9 @@ interface FlowNodeData {
   validateWhatsapp?: boolean
   skipDuplicates?: boolean
   tag?: string
+  minRating?: number
+  minReviews?: number
+  requireWebsite?: boolean
   // send_message extras
   footer?: string
   buttons?: any[]
@@ -1443,19 +1446,27 @@ export class FlowEngine {
 
         case 'lead_search': {
           const segment = this.interpolate(data?.segment || '', ctx, variables).trim()
-          const location = this.interpolate(data?.location || '', ctx, variables).trim()
+          const locationRaw = this.interpolate(data?.location || '', ctx, variables).trim()
           const limit = Math.min(Math.max(Number(data?.limit) || 30, 1), 200)
           const validateWhatsapp = data?.validateWhatsapp !== false
           const skipDuplicates = data?.skipDuplicates !== false
           const tag = (data?.tag || 'lead-google-maps').toString()
+          // Filtros avançados (post-processing)
+          const minRating = Number(data?.minRating) || 0
+          const requireWebsite = data?.requireWebsite === true
+          const minReviews = Number(data?.minReviews) || 0
 
-          if (!segment || !location) {
+          // Múltiplas localidades (separadas por ;)
+          const locations = locationRaw.split(';').map((l: string) => l.trim()).filter(Boolean)
+
+          if (!segment || locations.length === 0) {
             await this.logNode(flowId, node.id, ctx, 'error', 'Segmento ou localização vazios')
             variables.leads_encontrados = '0'
             variables.leads_novos = '0'
             break
           }
 
+          // Custo: total pedido (independente de filtros — você paga Outscraper pelo bruto)
           const cost = limit * (validateWhatsapp ? 2 : 1)
           // Tenta debitar créditos
           const { data: debitResult, error: debitErr } = await db.rpc('debit_lead_credits', {
@@ -1474,7 +1485,19 @@ export class FlowEngine {
           let leads: any[] = []
           try {
             const { searchGoogleMaps } = await import('./outscraper-client')
-            leads = await searchGoogleMaps({ query: `${segment} ${location}`, limit })
+            // Divide o limit entre as N localidades (mínimo 5 cada)
+            const perLocation = Math.max(5, Math.ceil(limit / locations.length))
+            const allResults = await Promise.all(
+              locations.map(loc => searchGoogleMaps({ query: `${segment} ${loc}`, limit: perLocation }).catch(err => {
+                logger.warn('[lead_search] location failed', { loc, err: (err as Error).message })
+                return []
+              }))
+            )
+            leads = allResults.flat().slice(0, limit) // limita ao total pedido
+            // Aplica filtros pós-processamento
+            if (minRating > 0) leads = leads.filter(l => (l.rating || 0) >= minRating)
+            if (minReviews > 0) leads = leads.filter(l => (l.reviews_count || 0) >= minReviews)
+            if (requireWebsite) leads = leads.filter(l => l.website)
           } catch (err) {
             // Devolve créditos em caso de erro
             await db.rpc('credit_lead_credits', {
