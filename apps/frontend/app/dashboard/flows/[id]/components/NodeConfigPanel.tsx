@@ -1522,9 +1522,14 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                   onChange={e => onUpdate(node.id, { requireWebsite: e.target.checked } as any)} />
                 <span>Só com website (negócios mais estruturados)</span>
               </label>
-              <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0', fontStyle: 'italic' }}>
-                ⚠ Filtros descartam leads APÓS a busca. Custo é cobrado normalmente. Use pra qualidade, não pra economia.
-              </p>
+              <div style={{ marginTop: '4px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
+                <p style={{ fontSize: '11px', color: '#991b1b', margin: 0, fontWeight: 600, lineHeight: 1.5 }}>
+                  ⚠ <b>Atenção:</b> filtros descartam leads APÓS a busca. Você paga <b>todos os créditos pedidos</b> mesmo se receber menos.
+                </p>
+                <p style={{ fontSize: '10px', color: '#7f1d1d', margin: '4px 0 0', lineHeight: 1.4 }}>
+                  Ex: pediu 100 leads + filtro ⭐4.0 → Outscraper retorna 100 → filtro deixa 30 → você pagou 100, recebeu 30. Use filtros pra <b>qualidade</b>, não pra economia.
+                </p>
+              </div>
             </div>
           </details>
 
