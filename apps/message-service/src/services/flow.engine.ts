@@ -1473,7 +1473,7 @@ export class FlowEngine {
             p_tenant_id: ctx.tenantId,
             p_amount: cost,
             p_description: `Busca: ${segment} em ${location}`,
-            p_metadata: { segment, location, limit, validateWhatsapp },
+            p_metadata: { segment, locations, limit, validateWhatsapp },
           })
           if (debitErr || debitResult === false) {
             await this.logNode(flowId, node.id, ctx, 'error', `Sem créditos suficientes (precisa ${cost})`)
