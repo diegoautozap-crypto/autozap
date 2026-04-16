@@ -1472,7 +1472,7 @@ export class FlowEngine {
           const { data: debitResult, error: debitErr } = await db.rpc('debit_lead_credits', {
             p_tenant_id: ctx.tenantId,
             p_amount: cost,
-            p_description: `Busca: ${segment} em ${location}`,
+            p_description: `Busca: ${segment} em ${locations.join(' / ')}`,
             p_metadata: { segment, locations, limit, validateWhatsapp },
           })
           if (debitErr || debitResult === false) {
