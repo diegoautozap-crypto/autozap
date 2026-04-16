@@ -348,6 +348,26 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
               {manualResult && (
                 <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {manualResult.queued} {t('nodes.contactsQueued')}</p>
               )}
+
+              {/* Modo "executar uma vez sem contato" — pra flows tipo busca de leads */}
+              <div style={{ borderTop: '1px dashed #e4e4e7', paddingTop: '12px', marginTop: '4px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>OU — Executar uma vez (sem contato)</p>
+                <p style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px', lineHeight: 1.5 }}>
+                  Use pra flows que <b>não precisam de cliente</b> (ex: buscar leads no Google Maps, executar webhook único). Roda 1 vez só.
+                </p>
+                <button disabled={manualRunning} onClick={async () => {
+                  setManualRunning(true); setManualResult(null)
+                  try {
+                    const { data } = await messageApi.post(`/flows/${d.flowId}/run-once`, {})
+                    setManualResult(data.data)
+                    toast.success('Flow disparado em modo sistema')
+                  } catch (err: any) { toast.error(err?.response?.data?.error?.message || 'Erro ao executar') }
+                  finally { setManualRunning(false) }
+                }}
+                  style={{ width: '100%', padding: '8px', background: manualRunning ? '#e4e4e7' : 'transparent', border: '1.5px dashed #7c3aed', borderRadius: '7px', fontSize: '12px', fontWeight: 600, color: '#7c3aed', cursor: manualRunning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  {manualRunning ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : '⚙'} Executar 1x sem contato
+                </button>
+              </div>
             </div>
         )}
 

@@ -246,6 +246,31 @@ router.delete('/flows/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// POST /flows/:id/run-once — executa flow 1 única vez sem contato
+// Usado pra flows que NÃO precisam de cliente específico (ex: buscar leads no Maps)
+router.post('/flows/:id/run-once', async (req, res, next) => {
+  try {
+    const { data: flow } = await db.from('flows').select('*').eq('id', req.params.id).eq('tenant_id', req.auth.tid).single()
+    if (!flow) throw new AppError('NOT_FOUND', 'Flow não encontrado', 404)
+    if (!flow.is_active) throw new AppError('INVALID_STATUS', 'Flow está pausado', 400)
+
+    const { data: ch } = await db.from('channels').select('id').eq('tenant_id', req.auth.tid).eq('status', 'active').limit(1).maybeSingle()
+    const channelId = flow.channel_id || ch?.id || '00000000-0000-0000-0000-000000000000'
+
+    const { manualFlowQueue } = await import('../workers/flow.worker')
+    await manualFlowQueue.add('manual-run-once', {
+      flowId: flow.id,
+      tenantId: req.auth.tid,
+      channelId,
+      contactId: '00000000-0000-0000-0000-000000000000',
+      phone: '_system_',
+      contactName: 'Execução de sistema',
+    })
+
+    res.json(ok({ queued: 1 }))
+  } catch (err) { next(err) }
+})
+
 // POST /flows/:id/run — executa flow manualmente para contatos de tags específicas
 router.post('/flows/:id/run', validate(runFlowSchema), async (req, res, next) => {
   try {
