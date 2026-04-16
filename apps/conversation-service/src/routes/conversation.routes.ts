@@ -583,4 +583,39 @@ router.post('/conversations/bulk/labels', validate(bulkLabelsSchema), async (req
   } catch (err) { next(err) }
 })
 
+// POST /conversations/open-by-contact — abre (ou cria) conversa pra um contato
+// Usado quando user clica em "abrir chat" de um contato sem conversa ainda
+router.post('/conversations/open-by-contact', async (req, res, next) => {
+  try {
+    const { contactId, channelId } = req.body as { contactId: string; channelId?: string }
+    if (!contactId) { res.status(400).json({ error: 'contactId required' }); return }
+
+    // Procura conversa existente desse contato
+    const { data: existing } = await db.from('conversations')
+      .select('id').eq('tenant_id', req.auth.tid).eq('contact_id', contactId)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (existing) { res.json(ok({ conversationId: existing.id, isNew: false })); return }
+
+    // Não tem conversa — precisa criar. Pega canal default se não passou
+    let chId = channelId
+    if (!chId) {
+      const { data: ch } = await db.from('channels').select('id, type').eq('tenant_id', req.auth.tid).eq('status', 'active').limit(1).maybeSingle()
+      if (!ch) { res.status(400).json({ error: 'Nenhum canal ativo encontrado' }); return }
+      chId = ch.id
+    }
+    const { data: channel } = await db.from('channels').select('type').eq('id', chId).single()
+
+    // Cria conversa nova vazia em status 'open' pra agente conseguir mandar a primeira msg
+    const newId = generateId()
+    const { error } = await db.from('conversations').insert({
+      id: newId, tenant_id: req.auth.tid, contact_id: contactId, channel_id: chId,
+      channel_type: channel?.type || 'whatsapp', status: 'open',
+      pipeline_stage: 'lead', last_message_at: new Date(),
+    })
+    if (error) { logger.error('failed to create conv', { err: error.message }); res.status(500).json({ error: error.message }); return }
+
+    res.json(ok({ conversationId: newId, isNew: true }))
+  } catch (err) { next(err) }
+})
+
 export default router

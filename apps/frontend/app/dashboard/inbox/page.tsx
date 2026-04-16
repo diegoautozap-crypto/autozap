@@ -567,8 +567,24 @@ export default function InboxPage() {
         if (found) {
           setSelectedConvId(found.id)
           setMobileShowChat(true)
+          setAutoSelectedDone(true)
+        } else {
+          // Não tem conversa — cria uma nova (ex: contato vindo de lead_search)
+          conversationApi.post('/conversations/open-by-contact', { contactId: urlContactId }).then(({ data: r }) => {
+            if (r.data?.conversationId) {
+              setSelectedConvId(r.data.conversationId)
+              setMobileShowChat(true)
+              if (r.data.isNew) {
+                queryClient.invalidateQueries({ queryKey: ['conversations'] })
+                toast.success('Conversa criada — mande a primeira mensagem')
+              }
+            }
+            setAutoSelectedDone(true)
+          }).catch(err => {
+            toast.error(err?.response?.data?.error || 'Não foi possível abrir a conversa')
+            setAutoSelectedDone(true)
+          })
         }
-        setAutoSelectedDone(true)
       }).catch(() => setAutoSelectedDone(true))
     }
   }, [urlContactId, allConvs, autoSelectedDone, statusFilter, channelFilter])
