@@ -1477,13 +1477,20 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
             <span>Ignorar contatos que já existem</span>
           </label>
           <div style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>Variáveis criadas após executar:</p>
-            <pre style={{ fontSize: '10px', color: '#166534', fontFamily: 'monospace', lineHeight: 1.6, margin: 0 }}>
-{`{{leads_encontrados}}  → total retornado pelo Google
-{{leads_validos}}      → com WhatsApp válido
-{{leads_novos}}        → criados como contato (sem duplicatas)
-{{leads_creditos_usados}}`}
-            </pre>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>Variáveis criadas:</p>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[
+                ['{{leads_encontrados}}', 'total retornado'],
+                ['{{leads_validos}}', 'com WhatsApp válido'],
+                ['{{leads_novos}}', 'criados (sem duplicatas)'],
+                ['{{leads_creditos_usados}}', 'créditos gastos'],
+              ].map(([v, d2]) => (
+                <li key={v} style={{ fontSize: '11px', color: '#166534', display: 'flex', flexDirection: 'column' }}>
+                  <code style={{ fontFamily: 'monospace', fontSize: '10px', background: '#fff', padding: '1px 5px', borderRadius: '3px', alignSelf: 'flex-start', wordBreak: 'break-all' }}>{v}</code>
+                  <span style={{ fontSize: '10px', color: '#15803d', marginTop: '1px', marginLeft: '4px' }}>→ {d2}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </>)}
 
