@@ -345,8 +345,11 @@ export function NodeConfigPanel({ node, tags, flows, channels, tenantId, onUpdat
                 style={{ width: '100%', padding: '10px', background: manualRunning || (d.tagIds || []).length === 0 ? '#e4e4e7' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: manualRunning || (d.tagIds || []).length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 {manualRunning ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {t('nodes.executing')}</> : <><Play size={14} /> {t('nodes.executeNow')}</>}
               </button>
-              {manualResult && (
+              {manualResult && (d.tagIds || []).length > 0 && (
                 <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ {manualResult.queued} {t('nodes.contactsQueued')}</p>
+              )}
+              {manualResult && (d.tagIds || []).length === 0 && (
+                <p style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>✓ Flow disparado em modo sistema. Resultado nos próximos segundos.</p>
               )}
 
               {/* Modo "executar uma vez sem contato" — pra flows tipo busca de leads */}

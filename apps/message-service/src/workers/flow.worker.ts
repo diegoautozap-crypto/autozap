@@ -72,13 +72,20 @@ export function startManualFlowWorker(): Worker {
       const { data: flow } = await db.from('flows').select('*').eq('id', flowId).eq('tenant_id', tenantId).single()
       if (!flow || !flow.is_active) return
 
-      // Busca ou cria conversa para o contato usando helper centralizado
-      const { data: channel } = await db.from('channels').select('type').eq('id', channelId).single()
-      const { conversationId } = await ensureConversation({
-        tenantId, contactId, channelId,
-        channelType: channel?.type || 'whatsapp',
-        lastMessage: `Flow manual: ${contactName}`,
-      })
+      // Modo "system run" — sem contato real (usado pra flows tipo lead_search)
+      const isSystemRun = phone === '_system_' || contactId === '00000000-0000-0000-0000-000000000000'
+
+      let conversationId = '00000000-0000-0000-0000-000000000000'
+      if (!isSystemRun) {
+        // Busca ou cria conversa para o contato usando helper centralizado
+        const { data: channel } = await db.from('channels').select('type').eq('id', channelId).single()
+        const result = await ensureConversation({
+          tenantId, contactId, channelId,
+          channelType: channel?.type || 'whatsapp',
+          lastMessage: `Flow manual: ${contactName}`,
+        })
+        conversationId = result.conversationId
+      }
 
       await flowEngine.processWebhookFlow(flowId, {
         tenantId, channelId, contactId, conversationId, phone,
